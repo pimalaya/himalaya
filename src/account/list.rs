@@ -1,3 +1,8 @@
+//! # Account list
+//!
+//! The `account list` command, tabling every account a configuration
+//! declares.
+
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
@@ -23,6 +28,7 @@ use crate::{
 pub struct AccountListCommand;
 
 impl AccountListCommand {
+    /// Loads the configuration and prints its accounts as a table.
     pub fn execute(self, printer: &mut impl Printer, config_paths: &[PathBuf]) -> Result<()> {
         let config = load_config(config_paths)?;
 
@@ -40,7 +46,7 @@ impl AccountListCommand {
 
         let table_cfg = &config.account.list.table;
         let colors = AccountColors {
-            // v1.2.0 defaults: name=Green, backends=Blue, default=Reset.
+            // NOTE: the fallbacks are the v1.2.0 column colors.
             name: map_color_or(table_cfg.name_color, CrosstermColor::Green),
             backends: map_color_or(table_cfg.backends_color, CrosstermColor::Blue),
             default: map_color_or(table_cfg.default_color, CrosstermColor::Reset),
@@ -64,6 +70,7 @@ impl AccountListCommand {
     }
 }
 
+/// Per-column colors of the accounts table.
 #[derive(Clone, Copy, Debug)]
 struct AccountColors {
     name: Color,
@@ -71,6 +78,8 @@ struct AccountColors {
     default: Color,
 }
 
+/// Loads the merged configuration, pointing at the wizard when there is
+/// none to load.
 fn load_config(paths: &[PathBuf]) -> Result<Config> {
     match Config::from_paths_or_default(paths)? {
         Some(config) => Ok(config),
@@ -81,15 +90,19 @@ fn load_config(paths: &[PathBuf]) -> Result<Config> {
     }
 }
 
-/// One account row in the account list: name, backends, default flag.
+/// One row of the accounts table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct AccountRow {
+    /// The name of the `[accounts.<name>]` block.
     pub name: String,
+    /// Whether a command with no `-a/--account` runs against it.
     pub default: bool,
+    /// The backends it declares a block for.
     pub backends: Vec<&'static str>,
 }
 
 impl AccountRow {
+    /// Reads the row off one account block.
     fn from_account(name: &str, account: &AccountConfig) -> Self {
         let mut backends = Vec::new();
         if account.imap.is_some() {
@@ -125,15 +138,18 @@ impl AccountRow {
     }
 }
 
-/// Renderable table for the account list command.
+/// The `account list` output, a table of accounts.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct AccountsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
     #[serde(skip)]
     colors: AccountColors,
+    /// The accounts, sorted by name.
     pub accounts: Vec<AccountRow>,
 }
 

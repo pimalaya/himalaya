@@ -1,3 +1,7 @@
+//! # JMAP identity get
+//!
+//! The `jmap identity get` command, RFC 8621 `Identity/get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -25,6 +29,7 @@ pub struct JmapIdentityGetCommand {
 }
 
 impl JmapIdentityGetCommand {
+    /// Fetches the identities and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -46,11 +51,13 @@ impl JmapIdentityGetCommand {
     }
 }
 
-/// Renderable table of sender identities.
+/// The identities rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct IdentitiesTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The identities, in the order the server returned them.
     pub identities: Vec<JmapIdentity>,
 }
 

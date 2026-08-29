@@ -1,3 +1,8 @@
+//! # Microsoft Graph mail folder list
+//!
+//! The `msgraph mail-folders list` command, tabling the folders of the
+//! mailbox.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -20,22 +25,20 @@ pub struct MsgraphMailFolderListCommand {
     /// Maximum number of folders to return (OData `$top`).
     #[arg(long, value_name = "N")]
     pub top: Option<u32>,
-
     /// Number of folders to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
-
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
     #[arg(long, value_name = "FIELDS")]
     pub select: Option<String>,
-
     /// Also include hidden folders.
     #[arg(long)]
     pub hidden: bool,
 }
 
 impl MsgraphMailFolderListCommand {
+    /// Lists one page of folders and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -76,9 +79,13 @@ pub(crate) fn folders_table(
 /// Per-column colors for the Microsoft Graph mail folders table.
 #[derive(Clone, Copy, Debug)]
 pub struct MailFolderColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the NAME column.
     pub name: Color,
+    /// Color of the TOTAL column.
     pub total: Color,
+    /// Color of the UNREAD column.
     pub unread: Color,
 }
 

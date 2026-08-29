@@ -1,3 +1,8 @@
+//! # Gmail auto-forwarding set
+//!
+//! The `gmail settings autoforwarding set` command,
+//! `users.settings.updateAutoForwarding`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{
@@ -12,10 +17,9 @@ use crate::gmail::{
 
 /// Update the Gmail auto-forwarding settings.
 ///
-/// Partial update: the settings are fetched first and only the options
-/// you pass are changed, so unspecified fields are preserved.
-/// Auto-forwarding is toggled with `--enable` / `--disable` and never
-/// by accident.
+/// A partial update: the settings are fetched first and only the options
+/// passed are changed, so the rest survives. Auto-forwarding itself is
+/// toggled with `--enable` and `--disable`, never by accident.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsAutoForwardingSetCommand {
     /// Turn auto-forwarding on.
@@ -33,6 +37,7 @@ pub struct GmailSettingsAutoForwardingSetCommand {
 }
 
 impl GmailSettingsAutoForwardingSetCommand {
+    /// Applies the auto-forwarding settings.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let mut settings = {
             let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;

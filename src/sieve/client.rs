@@ -1,10 +1,10 @@
-//! Himalaya wrapper around
-//! [`io_managesieve::client::ManagesieveClientStd`].
+//! # ManageSieve client
 //!
-//! Built up front by the dispatch layer (`crate::cli`) via
-//! [`build_sieve_client`] and handed down to every ManageSieve
-//! subcommand. The library opens the whole session, so this layer only
-//! turns the `[sieve]` block into its arguments.
+//! The wrapper around io-managesieve's blocking client every `sieve`
+//! subcommand receives.
+//!
+//! The library opens the whole session, so this layer only turns the
+//! `[sieve]` block into its arguments.
 
 use std::ops::{Deref, DerefMut};
 
@@ -32,15 +32,15 @@ impl SieveClient {
         let tls = config.tls.into_tls(config.alpn);
         let server = parse_sieve_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // NOTE: a `unix://` socket presents a pre-authenticated
-            // session, so no SASL is negotiated over it.
+            // NOTE: a `unix://` socket is already authenticated, so no
+            // SASL is negotiated over it.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server.host_str().ok_or_else(|| {
                     anyhow!("Cannot derive host from ManageSieve server `{server}`")
                 })?;
-                // NOTE: url does not know the sieve(s) default port;
-                // match io-managesieve's own, which is 4190 either way.
+                // NOTE: url knows no sieve default port, so the fallback is
+                // io-managesieve's own, 4190 either way.
                 let port = server
                     .port()
                     .unwrap_or(Inner::default_port(server.scheme()));
@@ -48,9 +48,8 @@ impl SieveClient {
             }
             None => None,
         };
-        // NOTE: RFC 5804 registers one port and defines STARTTLS as the
-        // way to TLS on it, so a `sieve://` server wants the upgrade
-        // unless the user said otherwise.
+        // NOTE: RFC 5804 registers one port and reaches TLS on it through
+        // STARTTLS, so a `sieve://` server wants the upgrade by default.
         let opts = ManagesieveSessionOpenOptions {
             starttls: config.starttls.unwrap_or(server.scheme() == "sieve"),
             allow_cleartext_auth: config.allow_cleartext_auth,
@@ -111,8 +110,8 @@ mod tests {
 
     #[test]
     fn a_bare_authority_resolves_to_starttls_rather_than_implicit_tls() {
-        // NOTE: the one place the bare default differs from IMAP and
-        // SMTP, ManageSieve registering no implicit-TLS port to reach.
+        // NOTE: the one place the bare default differs from IMAP and SMTP,
+        // ManageSieve registering no implicit-TLS port to reach.
         let url = parse_sieve_server("sieve.example.com").unwrap();
         assert_eq!(url.scheme(), "sieve");
         assert_eq!(url.port(), None);

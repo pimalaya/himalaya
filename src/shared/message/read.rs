@@ -1,3 +1,8 @@
+//! # Message read
+//!
+//! The `message read` command, rendering a fetched message as a header
+//! block and a walk of its MIME parts.
+
 use std::{
     fmt,
     io::{Write, stdout},
@@ -16,22 +21,19 @@ use crate::{
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
 
-/// Read a message from the active account (built-in flag reader).
+/// Read a message.
 ///
-/// Renders a minimal header block (Date, From, To, Cc, Subject) then
-/// walks the MIME parts, printing a one-line summary per part with its
-/// `Content-*` headers and the decoded contents of plain-text parts. An
-/// HTML part is shown as a summary only, unless it is the message's sole
-/// text part (an HTML-only mail), in which case its markup is printed.
+/// A minimal header block comes first, then one summary line per MIME
+/// part with its `Content-*` headers and, for a plain-text part, its
+/// decoded contents. An HTML part stays a summary unless it is the sole
+/// text part, where its markup is printed instead.
 ///
-/// Each summary is prefixed with the part's `[ID]` — its position in the
-/// message. That is the same id `attachments list` reports, so the id
-/// shown here is exactly what you pass to `attachments download <ID>`.
+/// The `[ID]` prefixing a summary is the part's position in the message,
+/// the same id `attachment list` reports and `attachment download` takes.
 ///
-/// Pass `--raw` to dump the original RFC 5322 bytes to stdout instead, or
-/// `--json` to emit the full parsed message as JSON. For HTML rendering
-/// or a custom pretty-printer (`mml interpret`, w3m, your own viewer),
-/// pipe the `--raw` output into the renderer of your choice.
+/// `--raw` dumps the original RFC 5322 bytes instead and `--json` the
+/// whole parsed message, either of which pipes into an HTML renderer or
+/// a pretty-printer of your own.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     /// Identifier of the message.
@@ -39,18 +41,20 @@ pub struct MessageReadCommand {
     pub id: String,
     #[command(flatten)]
     pub mailbox: MailboxArg,
-    /// Write the raw RFC 5322 bytes to stdout. With the global `--json`
-    /// flag the bytes are emitted as a JSON `{ "message": "…" }` string
-    /// instead, keeping the output valid JSON.
+    /// Write the raw RFC 5322 bytes to stdout.
+    ///
+    /// With the global `--json` flag the bytes come out as a JSON string
+    /// instead, so the output stays valid JSON.
     #[arg(long)]
     pub raw: bool,
-    /// Mark the message as seen while reading it. Without this flag the
-    /// read leaves the seen state untouched.
+    /// Mark the message as seen, the read leaving its flags alone
+    /// otherwise.
     #[arg(long)]
     pub seen: bool,
 }
 
 impl MessageReadCommand {
+    /// Fetches the message and prints it, raw or rendered.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -78,9 +82,8 @@ impl MessageReadCommand {
     }
 }
 
-/// Parsed message rendered for reading: a minimal header block followed
-/// by a per-part walk (one summary line each, plus the decoded contents
-/// of plain-text parts), or the raw parsed message as JSON.
+/// The `message read` output: a header block, then one summary line per
+/// MIME part with the decoded contents of the text ones.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct MessageView(#[schemars(with = "serde_json::Value")] Message<'static>);
@@ -89,9 +92,6 @@ impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = &self.0;
 
-        // A minimal, common header set, each line shown only when the
-        // header is present. The full header list is one `--json` (or
-        // `--raw`) away for anyone who needs it.
         if let Some(date) = message.date() {
             writeln!(f, "Date: {}", date.to_rfc822())?;
         }
@@ -108,20 +108,13 @@ impl fmt::Display for MessageView {
             writeln!(f, "Subject: {subject}")?;
         }
 
-        // An HTML part is normally summarized, not dumped (its markup is
-        // verbose and `--raw` covers it). The exception is an HTML-only
-        // mail: when the sole text part is a single HTML one, printing its
-        // markup beats printing nothing readable.
+        // NOTE: HTML markup is verbose and `--raw` covers it, so a part
+        // stays a summary unless printing it is the only readable option.
         let html_only = is_html_only(message);
 
-        // Walk the parts in order, skipping the multipart containers
-        // (they carry no content of their own). Each leaf's id is its
-        // 1-based position in the part list, so the numbering has gaps
-        // where containers sit and matches the ids used by the
-        // `attachments` commands (`attachments download <ID>`). Under the
-        // summary line come the part's own MIME headers, then the decoded
-        // body for text parts we render (all plain-text parts, plus a lone
-        // HTML part); other HTML and binary parts stay a summary.
+        // NOTE: a leaf's id is its 1-based position in the whole part
+        // list, so the numbering gaps where a skipped container sits.
+        // That is what makes it the id the `attachment` commands take.
         for (position, part) in message.parts.iter().enumerate() {
             if part.is_multipart() {
                 continue;
@@ -157,9 +150,8 @@ impl fmt::Display for MessageView {
     }
 }
 
-/// Whether the message's only text-based part is a single HTML part (an
-/// HTML-only mail with no plain-text alternative). Used to decide whether
-/// to print an HTML part's markup rather than just summarize it.
+/// Whether the sole text part of the message is a single HTML one, which
+/// is what makes printing its markup worth it.
 fn is_html_only(message: &Message) -> bool {
     let mut html = 0;
     let mut plain = 0;
@@ -173,9 +165,8 @@ fn is_html_only(message: &Message) -> bool {
     html == 1 && plain == 0
 }
 
-/// Renders a part's own MIME headers, indented under its summary line:
-/// the `Content-*` family (type with parameters, transfer encoding,
-/// disposition, id, description), each shown only when present.
+/// Renders a part's own `Content-*` headers, indented under its summary
+/// line, each shown only when it is present.
 fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MessagePart) -> fmt::Result {
     if let Some(ctype) = part.content_type() {
         writeln!(f, "    Content-Type: {}", format_content_type(ctype))?;
@@ -199,9 +190,8 @@ fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MessagePart) -> fmt::R
     Ok(())
 }
 
-/// Formats a `Content-Type` / `Content-Disposition` value as
-/// `type[/subtype][; name=value ...]`, keeping its parameters (charset,
-/// filename, boundary, ...).
+/// Formats a `Content-Type` or `Content-Disposition` value, parameters
+/// included.
 fn format_content_type(ctype: &ContentType) -> String {
     let mut rendered = match ctype.c_subtype.as_deref() {
         Some(subtype) => format!("{}/{subtype}", ctype.c_type),
@@ -217,8 +207,8 @@ fn format_content_type(ctype: &ContentType) -> String {
     rendered
 }
 
-/// The part's MIME type (e.g. `text/plain`), falling back to the decoded
-/// part kind when the part carries no `Content-Type` header.
+/// The part's MIME type, falling back to its decoded kind when it carries
+/// no `Content-Type` header.
 fn part_mime(part: &MessagePart) -> String {
     if let Some(ctype) = part.content_type() {
         return match ctype.c_subtype.as_deref() {
@@ -236,8 +226,8 @@ fn part_mime(part: &MessagePart) -> String {
     }
 }
 
-/// Renders an address header (`From`, `To`, `Cc`) as a comma-separated
-/// list of `Name <addr>` entries, flattening any address groups.
+/// Renders an address header as a comma-separated list, flattening any
+/// address group.
 fn format_address(address: &Address) -> String {
     let addrs: Vec<String> = match address {
         Address::List(list) => list.iter().map(format_addr).collect(),
@@ -250,8 +240,7 @@ fn format_address(address: &Address) -> String {
     addrs.join(", ")
 }
 
-/// Formats a single address as `Name <addr>`, or just the address when
-/// it has no display name.
+/// Formats one address as `Name <addr>`, or bare when it has no name.
 fn format_addr(addr: &Addr) -> String {
     let email = addr.address.as_deref().unwrap_or_default();
     match addr.name.as_deref() {
@@ -283,14 +272,12 @@ mod tests {
 
         let out = render(raw);
 
-        // Minimal header set, and only that set (no Message-ID/X-Mailer).
         assert!(out.contains("From: Alice <alice@example.com>"));
         assert!(out.contains("To: Bob <bob@example.com>"));
         assert!(out.contains("Subject: Hello"));
         assert!(!out.contains("Message-ID"));
         assert!(!out.contains("X-Mailer"));
 
-        // One part summary plus the decoded body.
         assert!(out.contains("[1] text/plain"));
         assert!(out.contains("Hi Bob,"));
         assert!(out.contains("how are you?"));
@@ -320,19 +307,16 @@ mod tests {
 
         let out = render(raw);
 
-        // The multipart container is parts[0], so it is skipped and its
-        // index (1) becomes a gap: the leaves are numbered by their part
-        // position (2, 3, 4), aligning with the `attachments` ids.
+        // NOTE: the skipped multipart container leaves a gap at id 1, the
+        // leaves keeping the `attachment` command ids 2, 3 and 4.
         assert!(out.contains("[2] text/plain"));
         assert!(out.contains("[3] text/html"));
         assert!(out.contains("[4] application/pdf — doc.pdf"));
 
-        // Each part shows its own MIME headers.
         assert!(out.contains("    Content-Type: application/pdf; name=doc.pdf"));
         assert!(out.contains("    Content-Transfer-Encoding: base64"));
         assert!(out.contains("    Content-Disposition: attachment; filename=doc.pdf"));
 
-        // Plain-text contents are shown; HTML markup and binary are not.
         assert!(out.contains("plain body"));
         assert!(!out.contains("<p>html body</p>"));
         assert!(!out.contains("JVBERi0"));
@@ -348,7 +332,6 @@ mod tests {
 
         let out = render(raw);
 
-        // The sole text part is HTML, so its markup is printed.
         assert!(out.contains("[1] text/html"));
         assert!(out.contains("<p>hello there</p>"));
     }
@@ -371,7 +354,6 @@ mod tests {
 
         let out = render(raw);
 
-        // A plain-text alternative is present, so HTML stays a summary.
         assert!(out.contains("plain body"));
         assert!(!out.contains("<p>html body</p>"));
     }

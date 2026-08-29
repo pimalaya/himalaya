@@ -1,3 +1,7 @@
+//! # Gmail command
+//!
+//! The `gmail` command, dispatching onto its subcommand groups.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -13,9 +17,7 @@ use crate::{
 
 /// Gmail-specific API.
 ///
-/// This command gives you access to the raw Gmail REST API, organized by Gmail
-/// resource: profile, labels, messages (and attachments), drafts, threads,
-/// history and settings.
+/// Each subcommand group tracks one Gmail REST resource one to one.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailCommand {
@@ -44,6 +46,7 @@ pub enum GmailCommand {
 }
 
 impl GmailCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

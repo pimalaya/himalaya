@@ -1,3 +1,7 @@
+//! # Gmail draft list
+//!
+//! The `gmail drafts list` command, `users.drafts.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -37,6 +41,7 @@ pub struct GmailDraftsListCommand {
 }
 
 impl GmailDraftsListCommand {
+    /// Lists one page of drafts and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -70,9 +75,12 @@ impl GmailDraftsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct DraftsTable {
     #[serde(skip)]
+    /// The `comfy_table` preset string the table renders with.
     pub preset: String,
     #[serde(skip)]
+    /// The column arrangement the table renders with.
     pub arrangement: ContentArrangement,
+    /// The drafts of this page.
     pub drafts: Vec<GmailDraft>,
 }
 

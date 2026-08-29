@@ -1,8 +1,7 @@
-//! # Search emails query string parser
+//! # Search query parser
 //!
-//! Entry point for parsing a full search emails query from a string
-//! slice. Defers to [`super::filter::parser`] and
-//! [`super::sort::parser`] for the actual grammar. Based on [`chumsky`].
+//! Entry point parsing a whole search query from a string, deferring the
+//! grammar to [`super::filter::parser`] and [`super::sort::parser`].
 
 use chumsky::{Parser, error::Rich, extra};
 
@@ -13,15 +12,14 @@ use crate::email::search::{
     sort::{self, query::SearchEmailsSorter},
 };
 
-/// Alias for a rich [`chumsky`] error for better diagnostics.
+/// A rich chumsky error, which is what the diagnostics are drawn from.
 pub type ParserError<'a> = extra::Err<Rich<'a, char>>;
 
-/// Parses `input` into a [`SearchEmailsQuery`].
+/// Parses a string into a [`SearchEmailsQuery`], which may carry a
+/// filter, a sort, or both.
 ///
-/// Because of the recursive nature of [`SearchEmailsFilterQuery`], the
-/// string is split around the `"order by"` keyword and the two halves
-/// are parsed separately. A query string can be filter-only, sort-only,
-/// or filter then sort.
+/// The string is split around `order by` and each half parsed on its own,
+/// [`SearchEmailsFilterQuery`] being recursive.
 pub fn parse(input: impl AsRef<str>) -> Result<SearchEmailsQuery, Error> {
     let input = input.as_ref().trim();
 

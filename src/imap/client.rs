@@ -1,9 +1,11 @@
-//! Himalaya wrapper around [`io_imap::client::ImapClientStd`].
+//! # IMAP client
 //!
-//! This is what every IMAP-specific subcommand receives: the dispatch
-//! layer (`crate::cli`) opens the session up front via
-//! [`build_imap_client`] and hands the ready-to-use wrapper down,
-//! together with the merged [`Account`] as a sibling argument.
+//! The wrapper around io-imap's blocking client every IMAP-specific
+//! subcommand receives.
+//!
+//! The dispatch layer opens the session up front and hands the ready
+//! wrapper down, the merged [`Account`] riding along as a sibling
+//! argument.
 
 use std::ops::{Deref, DerefMut};
 
@@ -23,8 +25,7 @@ use crate::{
     imap::id::resolve_auto_id_params,
 };
 
-/// Live IMAP client wrapping the io-imap session with cached
-/// capabilities and the sort fallback policy.
+/// A live IMAP session, its capabilities and the sort fallback policy.
 pub struct ImapClient {
     inner: Inner,
     capabilities: Vec<Capability<'static>>,
@@ -32,24 +33,23 @@ pub struct ImapClient {
 }
 
 impl ImapClient {
-    /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL),
-    /// caching the capability list reported by the handshake and the
-    /// `imap.sort.fallback` config override for later policy checks.
+    /// Opens the connection and authenticates, caching the capabilities
+    /// the handshake reported.
     pub fn new(config: ImapConfig) -> Result<Self> {
         let sort_fallback = config.sort.fallback;
         let tls = config.tls.into_tls(config.alpn);
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // NOTE: a `unix://` sirup socket presents a pre-authenticated
-            // session (the greeting is PREAUTH), so no SASL is negotiated.
+            // NOTE: a `unix://` sirup socket greets with PREAUTH, so the
+            // session is already authenticated and no SASL is negotiated.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from IMAP server `{server}`"))?;
-                // NOTE: url does not know the imap(s) default ports, so fall
-                // back to the same scheme defaults io-imap connects with.
+                // NOTE: url knows no imap default port, so the fallback is
+                // the same scheme default io-imap connects with.
                 let port = server.port().unwrap_or(default_port(server.scheme()));
                 Some(cfg.try_into_sasl(host, port)?)
             }
@@ -68,19 +68,21 @@ impl ImapClient {
         })
     }
 
-    /// Resolves the SORT fallback policy: the `imap.sort.fallback`
-    /// config override when set, otherwise on only when the server
-    /// lacks the SORT capability. When `true`, sort client-side via
-    /// SEARCH + FETCH instead of issuing a server `SORT`.
+    /// Whether to sort client-side with SEARCH and FETCH rather than
+    /// issue a server `SORT`.
+    ///
+    /// `imap.sort.fallback` decides when it is set, and the absence of
+    /// the SORT capability otherwise.
     pub fn sort_fallback(&self) -> bool {
         self.sort_fallback
             .unwrap_or_else(|| !has_imap_capability!(self.capabilities, Sort(_)))
     }
 
-    /// Whether the server advertised UIDPLUS (RFC 4315). When it does,
-    /// `COPY`/`MOVE` return an authoritative `COPYUID` and an *absent*
-    /// one means nothing was affected (a stale-UID no-op), so the count
-    /// can be trusted; without it there is no such feedback.
+    /// Whether the server advertised RFC 4315 UIDPLUS.
+    ///
+    /// With it, `COPY` and `MOVE` return an authoritative `COPYUID` whose
+    /// absence means nothing was affected, so a count can be trusted.
+    /// Without it there is no such feedback.
     pub fn supports_uidplus(&self) -> bool {
         has_imap_capability!(self.capabilities, UidPlus)
     }
@@ -88,10 +90,9 @@ impl ImapClient {
 
 /// Parses an IMAP server string into a URL.
 ///
-/// Accepts `imap`/`imaps://host[:port]`, a bare `host:port`, or a bare
-/// `host` (the last two default to `imaps://`, secure), or a
-/// `unix:///path` socket for a local proxy such as sirup. Any other
-/// scheme is rejected.
+/// A full `imap://` or `imaps://` URL, a bare authority or host taking
+/// `imaps://`, or a `unix://` socket for a local proxy such as sirup.
+/// Any other scheme is rejected.
 pub fn parse_imap_server(server: &str) -> Result<Url> {
     parse_server(server, "imaps", &["imap", "imaps", "unix"])
 }
@@ -110,11 +111,10 @@ impl DerefMut for ImapClient {
     }
 }
 
-/// Opens the IMAP session for an already-resolved account: takes the
-/// `[imap]` block out of `account_config`, builds the merged [`Account`]
-/// and connects. Bails when the account has no `[imap]` block. Returns
-/// the live client paired with the merged account so subcommands receive
-/// both as sibling arguments.
+/// Opens the IMAP session of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[imap]` block.
 pub fn build_imap_client(
     config: Config,
     name: String,

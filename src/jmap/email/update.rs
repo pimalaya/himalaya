@@ -1,3 +1,8 @@
+//! # JMAP email update
+//!
+//! The `jmap email update` command, the update half of RFC 8621
+//! `Email/set`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -13,33 +18,28 @@ pub struct JmapEmailUpdateCommand {
     /// Email ID(s) to update.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
-
     /// Add keyword(s) to the email(s).
     #[arg(long, value_name = "KEYWORD", required = false)]
     pub add_keyword: Vec<String>,
-
     /// Remove keyword(s) from the email(s).
     #[arg(long, value_name = "KEYWORD", required = false)]
     pub remove_keyword: Vec<String>,
-
     /// Replace all keywords atomically.
     #[arg(long, value_name = "KEYWORD")]
     pub keywords: Option<Vec<String>>,
-
     /// Add email(s) to a mailbox.
     #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub add_mailbox: Vec<String>,
-
     /// Remove email(s) from a mailbox.
     #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub remove_mailbox: Vec<String>,
-
     /// Replace all mailbox memberships atomically.
     #[arg(long, value_name = "MAILBOX-ID")]
     pub mailboxes: Option<Vec<String>>,
 }
 
 impl JmapEmailUpdateCommand {
+    /// Applies the patches and reports any the server refused.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mut args = JmapEmailSetArgs::default();
 

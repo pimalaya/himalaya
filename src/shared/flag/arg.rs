@@ -1,18 +1,27 @@
+//! # Flag arguments
+//!
+//! The flag and message-id arguments the `flag` and `message add`
+//! commands take.
+
 use std::fmt;
 
 use clap::{Parser, ValueEnum};
 
-/// Shared CLI flag argument for the cross-protocol `flags` and
-/// `messages add` commands. The variant set is the strict
-/// least-common-denominator across IMAP, JMAP and Maildir; backend
-/// extras (`\Deleted`, Maildir `Trashed`/`Passed`, JMAP custom
-/// keywords) live on the protocol-specific commands.
+/// A flag a shared command accepts.
+///
+/// Strictly least-common-denominator: `\Deleted`, the Maildir letters and
+/// the JMAP custom keywords are reached through the protocol-specific
+/// commands instead.
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FlagArg {
+    /// The message has been read.
     Seen,
+    /// The message has been replied to.
     Answered,
+    /// The message is marked for attention.
     Flagged,
+    /// The message is an unsent draft.
     Draft,
 }
 
@@ -57,20 +66,19 @@ impl From<&FlagArg> for crate::email::flag::Flag {
     }
 }
 
-/// Positional argument holding one or more message identifiers.
+/// Positional argument naming one or more messages.
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
-    /// Message identifier(s).
+    /// The identifiers of the messages to act on.
     #[arg(name = "message_ids", value_name = "MESSAGE-IDS")]
     #[arg(num_args = 1..)]
     pub inner: Vec<String>,
 }
 
-/// Repeatable option holding one or more flags to apply to messages.
+/// Repeatable option naming one or more flags.
 #[derive(Debug, Parser)]
 pub struct FlagsArg {
-    /// Flag(s) to apply. Repeat the option to pass several (e.g. `-f
-    /// seen -f flagged`).
+    /// The flags to apply, the option repeating for several.
     #[arg(name = "flags", value_name = "FLAG")]
     #[arg(long = "flag", short, required = true)]
     pub inner: Vec<FlagArg>,

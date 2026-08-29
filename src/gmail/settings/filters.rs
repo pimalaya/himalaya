@@ -1,3 +1,8 @@
+//! # Gmail filter settings
+//!
+//! The `gmail settings filters` commands, covering
+//! `users.settings.filters`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -31,6 +36,7 @@ pub enum GmailSettingsFiltersCommand {
 }
 
 impl GmailSettingsFiltersCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

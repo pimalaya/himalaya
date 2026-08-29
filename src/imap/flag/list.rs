@@ -1,3 +1,8 @@
+//! # IMAP flag list
+//!
+//! The `imap flag` command, reading the flags a `SELECT` response
+//! reports.
+
 use io_imap::client::ImapClient as _;
 use std::{collections::BTreeMap, fmt};
 
@@ -18,10 +23,9 @@ use crate::{
     shared::table::style_from_preset,
 };
 
-/// List the flags available in the given mailbox (SELECT response, RFC 3501).
+/// List the flags a mailbox allows (SELECT response, RFC 3501).
 ///
-/// Reports the FLAGS and PERMANENTFLAGS the server returns when the
-/// mailbox is selected.
+/// The `FLAGS` and `PERMANENTFLAGS` the server returns on selecting it.
 #[derive(Debug, Parser)]
 pub struct ImapFlagListCommand {
     #[command(flatten)]
@@ -29,6 +33,7 @@ pub struct ImapFlagListCommand {
 }
 
 impl ImapFlagListCommand {
+    /// Selects the mailbox and tables the flags it reported.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -52,7 +57,8 @@ impl ImapFlagListCommand {
     }
 }
 
-/// Renderable table of a mailbox's flags and permanent flags.
+/// The `imap flag` output, a table of the flags a mailbox allows and of
+/// the ones it keeps across sessions.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FlagsTable<'a> {
     #[serde(skip_serializing)]
@@ -70,6 +76,7 @@ pub struct FlagsTable<'a> {
 }
 
 impl FlagsTable<'_> {
+    /// Pairs each flag with whether it is permanent.
     fn build_entries(&self) -> Vec<(String, bool)> {
         let mut entries: BTreeMap<String, bool> = BTreeMap::new();
 
@@ -110,6 +117,7 @@ impl fmt::Display for FlagsTable<'_> {
     }
 }
 
+/// Serializes flags as their wire spellings.
 pub fn serialize_flags<S: Serializer>(
     flags: &Vec<Flag<'_>>,
     serializer: S,
@@ -121,6 +129,7 @@ pub fn serialize_flags<S: Serializer>(
         .serialize(serializer)
 }
 
+/// Serializes permanent flags as their wire spellings.
 fn serialize_permanent_flags<S: Serializer>(
     flags: &Vec<FlagPerm<'_>>,
     serializer: S,

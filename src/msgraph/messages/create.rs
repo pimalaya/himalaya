@@ -1,3 +1,7 @@
+//! # Microsoft Graph message create
+//!
+//! The `msgraph messages create` command, creating a draft from raw MIME.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -12,12 +16,12 @@ pub struct MsgraphMessageCreateCommand {
     /// `drafts`). Defaults to the mailbox root.
     #[arg(short = 'f', long, value_name = "ID")]
     pub folder: Option<String>,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl MsgraphMessageCreateCommand {
+    /// Creates the draft from the given MIME bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
         let message = client

@@ -1,3 +1,7 @@
+//! # Gmail profile
+//!
+//! The `gmail profile` command family, covering `users.getProfile`.
+
 pub mod get;
 
 use anyhow::Result;
@@ -16,6 +20,7 @@ pub enum GmailProfileCommand {
 }
 
 impl GmailProfileCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,8 @@
+//! # JMAP mailbox update
+//!
+//! The `jmap mailbox update` command, the update half of RFC 8621
+//! `Mailbox/set`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -17,37 +22,31 @@ pub struct JmapMailboxUpdateCommand {
     /// The ID of the mailbox to update.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// New display name.
     #[arg(long)]
     pub name: Option<String>,
-
     /// New parent mailbox ID.
     #[arg(long, value_name = "ID")]
     pub parent_id: Option<String>,
-
     /// Set a standard role.
     #[arg(long, value_name = "ROLE", conflicts_with = "custom_role")]
     pub role: Option<RoleArg>,
-
     /// Set a custom (non-standard) role.
     #[arg(long, value_name = "ROLE")]
     pub custom_role: Option<String>,
-
     /// New sort order.
     #[arg(long, value_name = "N")]
     pub sort_order: Option<u32>,
-
     /// Subscribe to the mailbox.
     #[arg(long, conflicts_with = "unsubscribe")]
     pub subscribe: bool,
-
     /// Unsubscribe from the mailbox.
     #[arg(long, conflicts_with = "subscribe")]
     pub unsubscribe: bool,
 }
 
 impl JmapMailboxUpdateCommand {
+    /// Applies the patches to the mailbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let is_subscribed = if self.subscribe {
             Some(true)

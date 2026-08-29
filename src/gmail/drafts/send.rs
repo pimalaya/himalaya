@@ -1,3 +1,7 @@
+//! # Gmail draft send
+//!
+//! The `gmail drafts send` command, `users.drafts.send`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::drafts::{GmailDraft, send::GmailDraftSend};
@@ -14,6 +18,7 @@ pub struct GmailDraftSendCommand {
 }
 
 impl GmailDraftSendCommand {
+    /// Sends the draft and reports the message it became.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let draft = GmailDraft {
             id: self.id.clone(),

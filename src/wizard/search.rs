@@ -1,15 +1,15 @@
-//! Email-driven service discovery for the wizard.
+//! # Service search
 //!
-//! Mirrors the cardamum-android configuration screen, adapted to mail:
-//! the address feeds io-pim-discovery's parallel discovery (fixed
-//! provider rules, PACC, Mozilla autoconfig, RFC 6186 SRV, RFC 8620
-//! JMAP resolve, with a final WWW-Authenticate probe refining the
-//! advertised schemes), and every reachable service becomes one
-//! selectable entry carrying the authentication capabilities it
-//! advertised (the concrete method is picked once the service is
-//! chosen). A detected Google or Microsoft account collapses to its
-//! dedicated configurations (the proprietary Gmail / Graph APIs plus
-//! IMAP+SMTP), matching the app's provider short-circuit.
+//! Feeds an email address to io-pim-discovery's parallel discovery:
+//! provider rules, PACC, Mozilla autoconfig, RFC 6186 SRV and RFC 8620
+//! JMAP resolve, refined by a final `WWW-Authenticate` probe.
+//!
+//! Every reachable service becomes one selectable entry carrying the
+//! authentication it advertised, the concrete method being picked once
+//! the service is.
+//!
+//! A Google or Microsoft account collapses to its own configurations,
+//! the proprietary API beside IMAP and SMTP.
 
 use std::{collections::BTreeSet, env, fmt, time::Duration};
 
@@ -78,12 +78,14 @@ pub struct TcpEndpoint {
 }
 
 /// The authentication capabilities a service advertised, folded across
-/// all its discovered methods. It drives the per-service auth prompt:
-/// which SASL mechanisms or HTTP schemes to offer, and whether the OAuth
-/// token brokers appear. Himalaya reads a token an external manager (such
-/// as Ortie) issues but never runs a grant itself, so OAuth is not a
-/// method of its own here: it only unlocks the brokers behind the API
-/// token flow (see [`super::secret`]).
+/// every method discovery found for it.
+///
+/// It drives the per-service prompt: which mechanisms or schemes to offer,
+/// and whether the OAuth brokers appear.
+///
+/// Himalaya reads a token an external manager issues and runs no grant
+/// itself, so OAuth is no method of its own here: it unlocks the brokers
+/// behind the API token flow and nothing more.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AuthCaps {
     /// Basic/password auth: SASL PLAIN/LOGIN/SCRAM for IMAP+SMTP, Basic
@@ -160,9 +162,8 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
     let provider = provider_of(email, &configs);
     let mut found = Vec::new();
 
-    // Google and Microsoft expose no JMAP: their dedicated set is
-    // IMAP+SMTP plus a proprietary API, so JMAP is offered for other
-    // providers only.
+    // NOTE: Google and Microsoft expose no JMAP, their set being IMAP and
+    // SMTP beside a proprietary API.
     if provider.is_none()
         && let Some(jmap) = configs.iter().find(|c| c.service == DiscoveryService::Jmap)
         && let DiscoveryEndpoint::Http(url) = &jmap.endpoint
@@ -174,10 +175,9 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
         });
     }
 
-    // A detected provider restricts IMAP+SMTP to its own configs, so
-    // the app-style dedicated set shows instead of every discovered
-    // relay. IMAP and SMTP may advertise different auth, so the entry
-    // carries the union of both sides' capabilities.
+    // NOTE: a detected provider restricts the entry to its own endpoints,
+    // so its dedicated set shows rather than every discovered relay. The
+    // two sides may advertise different auth, so the entry unions them.
     if let Some(imap) = best(&configs, DiscoveryService::Imap, provider)
         && let Some(endpoint) = tcp_endpoint(imap)
     {
@@ -309,11 +309,12 @@ fn tcp_endpoint(config: &DiscoveryServiceConfig) -> Option<TcpEndpoint> {
     }
 }
 
-/// Resolver used by discovery: the `HIMALAYA_DNS_RESOLVER` override
-/// first, then the system resolver (`/etc/resolv.conf` on unix, the
-/// network adapters on windows), then the Cloudflare default. This
-/// avoids leaking the email domain to a third-party resolver and works
-/// around networks that block the default.
+/// The resolver discovery queries: the `HIMALAYA_DNS_RESOLVER` override,
+/// then the system one, then the Cloudflare default.
+///
+/// Preferring the system resolver keeps the email domain from leaking to a
+/// third party, and the override works around a network blocking the
+/// default.
 pub fn discovery_resolver() -> Url {
     if let Ok(resolver) = env::var("HIMALAYA_DNS_RESOLVER")
         && let Ok(url) = resolver.parse()
@@ -372,8 +373,8 @@ mod tests {
             }
         );
 
-        // NOTE: the Fastmail JMAP shape, bearer plus an OAuth grant and no
-        // Basic, is one "API token" method whose brokers are unlocked.
+        // NOTE: the Fastmail JMAP shape, a bearer and an OAuth grant with
+        // no Basic, is one API token method whose brokers are unlocked.
         let fastmail = caps_of(&[DiscoveryAuthMethod::Bearer, oauth]);
         assert_eq!(
             fastmail,

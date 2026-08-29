@@ -1,3 +1,7 @@
+//! # m2dir flag command
+//!
+//! The `m2dir flag` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -26,6 +30,7 @@ pub enum M2dirFlagCommand {
 }
 
 impl M2dirFlagCommand {
+    /// Runs the subcommand against the account's m2dir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

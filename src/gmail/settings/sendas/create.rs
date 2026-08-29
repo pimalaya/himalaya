@@ -1,3 +1,8 @@
+//! # Gmail send-as create
+//!
+//! The `gmail settings sendas create` command,
+//! `users.settings.sendAs.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, create::GmailSendAsCreate};
@@ -26,6 +31,7 @@ pub struct GmailSettingsSendAsCreateCommand {
 }
 
 impl GmailSettingsSendAsCreateCommand {
+    /// Creates the send-as alias and reports its status.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let send_as = GmailSendAs {
             send_as_email: self.email.clone(),

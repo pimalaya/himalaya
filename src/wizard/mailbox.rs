@@ -1,33 +1,37 @@
-//! Best-effort special-use mailbox discovery for the wizard.
+//! # Mailbox discovery
 //!
-//! The discovered roles are folded into the generated config as
-//! `mailbox.alias.*`, so shared commands have an implicit default mailbox
-//! (the `inbox` alias) and known Sent/Drafts/Trash/… targets without the
-//! user hand-editing backend ids. Discovery reuses the connection opened
-//! for the account test (never a second one) and never fails the wizard:
-//! an inconclusive listing just yields fewer aliases.
+//! Reads the special-use mailboxes of a freshly configured account, best
+//! effort.
+//!
+//! What it finds is folded into the generated configuration as
+//! `mailbox.alias` entries, so the shared commands get an implicit
+//! default mailbox and known targets without anyone hand-editing backend
+//! ids.
+//!
+//! It reuses the connection the account test opened, never a second one,
+//! and never fails the wizard: an inconclusive listing simply yields
+//! fewer aliases.
 
 use std::collections::HashMap;
 
 /// The IMAP inbox alias.
 ///
-/// `INBOX` is a reserved, case-insensitive mailbox name every IMAP server
-/// exposes (RFC 3501), so it is always safe to pin. The other special-use
-/// roles are deferred until io-imap can issue LIST `RETURN (SPECIAL-USE)`
-/// (RFC 6154): imap-codec has no support yet (duesee/imap-codec#350), and
-/// a plain LIST advertises the attributes only on some servers.
+/// `INBOX` is the reserved name every RFC 3501 server exposes, so it is
+/// always safe to pin.
+///
+/// TODO: the other roles wait on io-imap issuing a `LIST RETURN
+/// (SPECIAL-USE)`, which imap-codec does not support yet, a plain `LIST`
+/// advertising the attributes on some servers alone.
 #[cfg(feature = "imap")]
 pub fn imap_aliases() -> HashMap<String, String> {
     HashMap::from([("inbox".to_string(), "INBOX".to_string())])
 }
 
-/// The Gmail special-use aliases, keyed by Gmail's fixed system-label ids.
+/// The Gmail special-use aliases, keyed by the fixed system-label ids.
 ///
-/// The system labels (`INBOX`, `SENT`, …) are universal across every Gmail
-/// account and are the very ids the API addresses, so — like the IMAP
-/// `INBOX` — no live listing is needed. Gmail has no archive label
-/// (archiving just drops the `INBOX` label), and `inbox` is always present
-/// as the default mailbox.
+/// A system label is universal across every Gmail account and is the very
+/// id the API addresses, so no live listing is needed. There is no archive
+/// label, archiving being the loss of the `INBOX` one.
 #[cfg(feature = "gmail")]
 pub fn gmail_aliases() -> HashMap<String, String> {
     [
@@ -44,13 +48,11 @@ pub fn gmail_aliases() -> HashMap<String, String> {
     .collect()
 }
 
-/// The Microsoft Graph special-use aliases, keyed by Graph's well-known
-/// folder names.
+/// The Microsoft Graph special-use aliases, keyed by the well-known folder
+/// names.
 ///
-/// The well-known names (`inbox`, `sentitems`, …) are a stable Graph
-/// contract accepted directly in place of a folder id, so — like the IMAP
-/// `INBOX` — no live listing is needed. `inbox` is always present as the
-/// default mailbox.
+/// A well-known name is a stable Graph contract accepted in place of a
+/// folder id, so no live listing is needed.
 #[cfg(feature = "msgraph")]
 pub fn msgraph_aliases() -> HashMap<String, String> {
     [
@@ -66,11 +68,11 @@ pub fn msgraph_aliases() -> HashMap<String, String> {
     .collect()
 }
 
-/// Maps the JMAP mailbox roles (RFC 8621, authoritative) to alias keys,
-/// keyed by the opaque mailbox id.
+/// Maps the authoritative RFC 8621 mailbox roles onto alias keys, keyed by
+/// the opaque mailbox id.
 ///
-/// Best-effort: a failed `Mailbox/get` (or a role-less mailbox) is simply
-/// skipped, since the connection was already validated by the caller.
+/// Best effort: a failed `Mailbox/get`, or a mailbox with no role, is
+/// skipped, the caller having validated the connection already.
 #[cfg(feature = "jmap")]
 pub fn jmap_aliases(client: &mut crate::jmap::client::JmapClient) -> HashMap<String, String> {
     use io_jmap::rfc8621::mailbox::{JmapMailboxRole, get::JmapMailboxGetOptions};

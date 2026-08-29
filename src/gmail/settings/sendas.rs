@@ -1,3 +1,8 @@
+//! # Gmail send-as settings
+//!
+//! The `gmail settings sendas` commands, covering
+//! `users.settings.sendAs`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -35,6 +40,7 @@ pub enum GmailSettingsSendAsCommand {
 }
 
 impl GmailSettingsSendAsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

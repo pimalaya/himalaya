@@ -1,15 +1,25 @@
+//! # Maildir flag argument
+//!
+//! The argument naming one of the six standard Maildir flags.
+
 use clap::ValueEnum;
 use io_maildir::flag::MaildirFlag;
 
-/// CLI value selecting one of the six standard Maildir flags.
+/// One of the six standard Maildir flags.
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FlagArg {
+    /// `P`: the message has been resent or forwarded.
     Passed,
+    /// `R`: the message has been replied to.
     Replied,
+    /// `S`: the message has been read.
     Seen,
+    /// `T`: the message is marked for deletion.
     Trashed,
+    /// `D`: the message is an unsent draft.
     Draft,
+    /// `F`: the message is marked for attention.
     Flagged,
 }
 

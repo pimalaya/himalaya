@@ -1,3 +1,8 @@
+//! # JMAP identity update
+//!
+//! The `jmap identity update` command, the update half of RFC 8621
+//! `Identity/set`.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::{JmapIdentitySetArgs, JmapIdentityUpdate};
@@ -10,21 +15,19 @@ use crate::jmap::{client::JmapClient, error::format_set_error};
 pub struct JmapIdentityUpdateCommand {
     /// Identity ID to update.
     pub id: String,
-
     /// New display name.
     #[arg(long)]
     pub name: Option<String>,
-
     /// New plaintext signature.
     #[arg(long)]
     pub text_signature: Option<String>,
-
     /// New HTML signature.
     #[arg(long)]
     pub html_signature: Option<String>,
 }
 
 impl JmapIdentityUpdateCommand {
+    /// Applies the patches to the identity.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let patch = JmapIdentityUpdate {
             name: self.name,

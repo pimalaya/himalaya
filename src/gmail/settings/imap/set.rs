@@ -1,3 +1,7 @@
+//! # Gmail IMAP set
+//!
+//! The `gmail settings imap set` command, `users.settings.updateImap`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{get_imap::GmailImapGet, update_imap::GmailImapUpdate};
@@ -10,10 +14,9 @@ use crate::gmail::{
 
 /// Update the Gmail IMAP access settings.
 ///
-/// Partial update: the settings are fetched first and only the options
-/// you pass are changed, so unspecified fields are preserved. IMAP
-/// access is toggled with `--enable` / `--disable` and never by
-/// accident.
+/// A partial update: the settings are fetched first and only the options
+/// passed are changed, so the rest survives. IMAP access itself is
+/// toggled with `--enable` and `--disable`, never by accident.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsImapSetCommand {
     /// Turn IMAP access on.
@@ -34,6 +37,7 @@ pub struct GmailSettingsImapSetCommand {
 }
 
 impl GmailSettingsImapSetCommand {
+    /// Applies the IMAP settings.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let mut settings = {
             let c = GmailImapGet::new(&client.auth, &client.user_id)?;

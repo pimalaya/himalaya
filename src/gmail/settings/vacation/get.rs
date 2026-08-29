@@ -1,3 +1,8 @@
+//! # Gmail vacation get
+//!
+//! The `gmail settings vacation get` command,
+//! `users.settings.getVacation`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -14,6 +19,7 @@ use crate::gmail::{client::GmailClient, settings::convert::yes_no};
 pub struct GmailSettingsVacationGetCommand;
 
 impl GmailSettingsVacationGetCommand {
+    /// Fetches the vacation responder and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailVacationGet::new(&client.auth, &client.user_id)?;
@@ -34,11 +40,10 @@ impl GmailSettingsVacationGetCommand {
     }
 }
 
-/// Gmail vacation responder settings, rendered as aligned text or, under
-/// `--json`, as a structured object instead of a wrapped human string.
+/// The `gmail settings vacation get` output.
 ///
-/// The booleans stay booleans in JSON, where the text rendering spells
-/// them enabled and disabled, or yes and no.
+/// A boolean stays a boolean in JSON, where the text spells it enabled or
+/// disabled, yes or no.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailSettingsVacationGetOutput {

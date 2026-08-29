@@ -1,3 +1,7 @@
+//! # Gmail label create
+//!
+//! The `gmail labels create` command, `users.labels.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::GmailLabel;
@@ -14,6 +18,7 @@ pub struct GmailLabelCreateCommand {
 }
 
 impl GmailLabelCreateCommand {
+    /// Creates the label and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let label = GmailLabel {
             name: self.name.clone(),

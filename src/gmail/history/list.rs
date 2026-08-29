@@ -1,3 +1,7 @@
+//! # Gmail history list
+//!
+//! The `gmail history list` command, `users.history.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -33,6 +37,7 @@ pub struct GmailHistoryListCommand {
 }
 
 impl GmailHistoryListCommand {
+    /// Lists one page of history records and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let types: Vec<GmailHistoryType> =
             self.history_types.iter().copied().map(Into::into).collect();
@@ -72,13 +77,17 @@ impl GmailHistoryListCommand {
     }
 }
 
-/// Gmail history change type accepted on the CLI.
+/// The kind of change a history record reports.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "camelCase")]
 pub enum HistoryTypeArg {
+    /// A message arrived in the mailbox.
     MessageAdded,
+    /// A message left the mailbox.
     MessageDeleted,
+    /// A label was put on a message.
     LabelAdded,
+    /// A label was taken off a message.
     LabelRemoved,
 }
 
@@ -93,13 +102,10 @@ impl From<HistoryTypeArg> for GmailHistoryType {
     }
 }
 
-/// Gmail mailbox history delta, rendered as one summary line per record
-/// or, under `--json`, as structured records instead of a wrapped human
-/// string.
+/// The `gmail history list` output, one summary line per record.
 ///
-/// The JSON carries the affected message ids rather than the counts the
-/// text summary shows, since driving an incremental sync is what the
-/// history listing is for.
+/// The JSON carries the affected message ids where the text shows counts,
+/// driving an incremental sync being what a history listing is for.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailHistoryListOutput {

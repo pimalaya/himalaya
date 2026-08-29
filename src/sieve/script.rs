@@ -1,3 +1,7 @@
+//! # ManageSieve script argument
+//!
+//! The argument `put` and `check` read a Sieve source from.
+
 use std::{
     fs,
     io::{IsTerminal, Read, stdin},

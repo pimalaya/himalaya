@@ -1,31 +1,24 @@
-//! Account discovery, the half of the wizard that decides what the
-//! account is.
+//! # Discovery
 //!
-//! What becomes of the discovered account, a file to create, a block to
-//! append or a document on stdout, belongs to [`super::configure`],
-//! which is also where the welcome and the prompts around this one live.
+//! The half of the wizard deciding what the account is, what becomes of
+//! it belonging to [`super::configure`].
 //!
-//! One prompt takes an email address, a server URL, or a local folder
-//! path, and its shape orients the setup, mirroring the cardamum-android
-//! onboarding:
+//! One prompt takes an email address, a server URL or a local folder
+//! path, and its shape orients the setup. An address runs the parallel
+//! discovery of [`super::search`], every reachable service becoming one
+//! selectable configuration whose advertised authentication is then
+//! prompted for.
 //!
-//! - an email (or bare domain) runs io-pim-discovery's parallel
-//!   discovery (see [`super::search`]) and every reachable service
-//!   becomes one selectable configuration; picking one then prompts its
-//!   authentication method (SASL mechanism or HTTP scheme) among those
-//!   advertised; a detected Google or Microsoft account collapses to its
-//!   dedicated set;
-//! - a `scheme://` URL discovers from its host, its scheme narrowing the
-//!   results (`imap(s)` to IMAP + SMTP, an HTTP-family scheme to JMAP);
-//! - an existing folder is a local Maildir or m2dir.
+//! A URL discovers from its host, the scheme narrowing the results, and
+//! an existing folder is a local Maildir or m2dir. A Google or Microsoft
+//! account collapses to its own set of configurations.
 //!
-//! The wizard only configures what it can discover automatically. When
-//! discovery finds nothing for the given input it stops and points at the
-//! documented sample, rather than prompting for a hand-entered config.
+//! The wizard configures what it discovers and nothing else: finding
+//! nothing, it stops and points at the sample rather than prompt for a
+//! hand-written configuration.
 //!
-//! Himalaya runs no OAuth 2.0 grant itself: a grant only unlocks the
-//! external token brokers (Ortie, pizauth, oama) behind the API token
-//! credential prompt (see [`super::secret`]).
+//! Himalaya runs no OAuth 2.0 grant of its own. A grant unlocks the
+//! external token brokers behind the API token prompt, and that is all.
 
 use std::{collections::HashMap, path::Path};
 
@@ -88,11 +81,10 @@ enum Chosen {
 }
 
 /// Discovers one account from a single prompt, tests it, and hands back
-/// the name it proposes with the account itself.
+/// the name it proposes beside the account itself.
 ///
-/// What happens to that account, written to a file, appended to one or
-/// printed, belongs to [`super::configure`], which is also where the
-/// welcome lives: this is the discovery half alone.
+/// What becomes of that account belongs to [`super::configure`]. This is
+/// the discovery half alone.
 pub fn run() -> Result<(String, AccountConfig)> {
     let input = prompt::text("Email:", None)?;
     let input = input.trim();
@@ -105,11 +97,9 @@ pub fn run() -> Result<(String, AccountConfig)> {
     let account_name = default_account_name(input);
     let (account, tested) = build_account(&account_name, input)?;
 
-    // Test the account before printing it: a bad credential or endpoint
-    // fails here and stops the process, like any other error, rather
-    // than emitting a config that cannot connect. The IMAP+SMTP flow
-    // already tests each protocol as it configures them, so skip the
-    // redundant round-trip in that case.
+    // NOTE: testing before printing is what stops a bad credential or
+    // endpoint from becoming a configuration that cannot connect. The
+    // IMAP and SMTP flow already tested each side as it configured them.
     if !tested {
         let spinner = Spinner::start("Testing account configuration");
         if let Err(err) = check::test_account(&account) {
@@ -145,14 +135,14 @@ impl Outcome {
     }
 }
 
-/// Orients the setup from the input shape, then folds the chosen
-/// backend into a fresh [`AccountConfig`]. The returned flag reports
-/// whether the flow already validated its connections (the IMAP+SMTP and
-/// JMAP paths do), so the caller can skip the final account test.
+/// Orients the setup from the input shape, then folds the chosen backend
+/// into a fresh [`AccountConfig`].
 ///
-/// The account is left non-default here. Whether it claims the default
-/// depends on what the configuration already holds, which discovery does
-/// not read, so [`super::configure`] decides it.
+/// The returned flag says whether the flow already validated its
+/// connections, so the caller can skip the final test.
+///
+/// The account is left non-default: whether it claims the default depends
+/// on what the configuration already holds, which discovery never reads.
 fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool)> {
     let Outcome {
         chosen,
@@ -187,31 +177,28 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
         Chosen::M2dir(m2dir) => account.m2dir = Some(m2dir),
     }
 
-    // NOTE: the discovered special-use aliases (e.g. the default `inbox`)
-    // let shared commands resolve a mailbox without hand-editing ids;
-    // empty for the flows that discover none.
+    // NOTE: the discovered special-use aliases are what lets a shared
+    // command resolve a mailbox without anyone hand-editing ids.
     account.mailbox.aliases = aliases;
 
-    // NOTE: an address is the one thing the prompt may already have
-    // been answered with, so the composers get their `From` without
-    // the user writing it down twice. The name it carries is not
-    // discoverable, and is left to be added by hand.
+    // NOTE: the prompt may already have been answered with an address,
+    // so the composers get their `From` without it being typed twice.
     account.email = prompted_email(input).map(ToString::to_string);
 
     Ok((account, tested))
 }
 
-/// Runs the discovery flow for an email, a bare domain, or a
-/// `scheme://` server URL: search the services reachable from it, keep
-/// only those supported by this build (and matching the URL scheme when
-/// one was given), let the user pick one, then configure its backend
-/// (the authentication method is picked in a second, service-specific
-/// prompt). When nothing is discovered the wizard stops rather than
-/// prompting for a hand-entered config (see [`stop_undiscovered`]).
+/// Runs the discovery flow for an email, a bare domain or a server URL.
+///
+/// The services reachable from it are searched, narrowed to what this
+/// build supports and what the scheme allows, then one is picked and its
+/// backend configured, the authentication method being a second prompt.
+///
+/// Finding nothing, the wizard stops rather than prompt for a
+/// hand-written configuration.
 fn configure_discovery(account_name: &str, input: &str) -> Result<Outcome> {
-    // A `scheme://host` URL discovers from its host, and its scheme
-    // narrows the results; an email or bare domain discovers from the
-    // domain with no scheme filter.
+    // NOTE: a URL discovers from its host and narrows on its scheme,
+    // where an email or a bare domain discovers from the domain alone.
     let (email, scheme) = if input.contains("://") {
         let url = Url::parse(input).with_context(|| format!("Invalid server URL `{input}`"))?;
         let host = url.host_str().unwrap_or_default().to_string();
@@ -241,11 +228,12 @@ fn configure_discovery(account_name: &str, input: &str) -> Result<Outcome> {
     dispatch(account_name, &email, choice)
 }
 
-/// Keeps only the discovered entries a `scheme://` URL asked for: `imap`
-/// and `imaps` keep IMAP + SMTP (with `imaps` requiring an implicit-TLS
-/// IMAP endpoint), and the HTTP-family schemes keep JMAP. A proprietary
-/// entry (Gmail, Graph) is dropped, since the user named an open
-/// protocol. An unknown scheme is rejected outright.
+/// Keeps only the discovered entries the URL scheme asked for.
+///
+/// `imap` and `imaps` keep IMAP and SMTP, `imaps` wanting an
+/// implicit-TLS endpoint, and an HTTP-family scheme keeps JMAP. A
+/// proprietary entry is dropped, the user having named an open protocol,
+/// and an unknown scheme is refused.
 fn retain_scheme(found: &mut Vec<Discovered>, scheme: &str) -> Result<()> {
     match scheme {
         #[cfg(all(feature = "imap", feature = "smtp"))]
@@ -267,11 +255,11 @@ fn retain_scheme(found: &mut Vec<Discovered>, scheme: &str) -> Result<()> {
     Ok(())
 }
 
-/// Stops the wizard when discovery found nothing to configure for
-/// `input`: it prints where to go next (a hand-written config, seeded
-/// from the documented sample) and errors out, rather than dropping into
-/// a hand-entry flow. Himalaya's wizard only ever configures what it can
-/// discover automatically.
+/// Stops the wizard when discovery found nothing for the input, pointing
+/// at the sample a hand-written configuration is seeded from.
+///
+/// The wizard configures what it discovers and nothing else, so there is
+/// no hand-entry flow to drop into.
 fn stop_undiscovered(input: &str) -> Result<Outcome> {
     bail!(
         "Could not automatically discover a configuration for `{input}`.\n\n\
@@ -315,10 +303,9 @@ fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outco
                 aliases,
             })
         }
-        // NOTE: Gmail and Graph expose special-use mailboxes through fixed
-        // platform contracts (system-label ids / well-known names), so
-        // their aliases are pinned without a live listing; the connection
-        // is still validated by the final account test.
+        // NOTE: Gmail and Graph name their special-use mailboxes through
+        // platform contracts, so the aliases are pinned without a live
+        // listing and the final account test still runs.
         #[cfg(feature = "gmail")]
         DiscoveredKind::Gmail => Ok(Outcome {
             chosen: Chosen::Gmail(gmail::configure(account_name)?),
@@ -392,12 +379,11 @@ fn default_account_name(input: &str) -> String {
     }
 }
 
-/// The input read back as an email address, or [`None`] when it names
-/// a folder, a server URL or a bare domain instead.
+/// The input read back as an email address, `None` when it names a
+/// folder, a server URL or a bare domain instead.
 ///
-/// A server URL may carry a userinfo part and so hold an `@` of its
-/// own, which is a credential and not an address, hence the check for
-/// a scheme before the one for a local part.
+/// A server URL may carry a userinfo part and so an `@` of its own, which
+/// is a credential rather than an address, hence the scheme check first.
 fn prompted_email(input: &str) -> Option<&str> {
     if is_path(input) || input.contains("://") {
         return None;
@@ -434,10 +420,8 @@ mod tests {
 
     #[test]
     fn account_name_defaults_to_the_first_domain_label() {
-        // Email: the domain's first label, never the local part.
         assert_eq!(default_account_name("clement.douin@posteo.net"), "posteo");
         assert_eq!(default_account_name("alice@mail.example.co.uk"), "mail");
-        // Bare domain (as discovery synthesizes it) and plain domain.
         assert_eq!(default_account_name("@posteo.net"), "posteo");
         assert_eq!(default_account_name("posteo.net"), "posteo");
     }
@@ -459,9 +443,8 @@ mod tests {
             Some("alice@example.org")
         );
 
-        // A bare domain, as discovery also synthesizes it, names no
-        // mailbox; neither does a folder or a server URL, whose `@`
-        // would be a credential.
+        // NOTE: a bare domain names no mailbox, and neither does a folder
+        // or a server URL, whose `@` would be a credential.
         assert_eq!(prompted_email("@example.org"), None);
         assert_eq!(prompted_email("example.org"), None);
         assert_eq!(prompted_email("~/mail/work"), None);
@@ -484,8 +467,8 @@ mod tests {
         assert!(rendered.contains("[accounts.posteo]"));
         assert!(rendered.contains("mailbox.alias.inbox = \"INBOX\""));
 
-        // The identity says what the account is, so it reads before the
-        // mailboxes it names.
+        // NOTE: the identity says what the account is, so it reads before
+        // the mailboxes it names.
         let email = rendered.find("email = ").expect("the address is rendered");
         let alias = rendered
             .find("mailbox.alias")

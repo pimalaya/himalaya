@@ -1,3 +1,8 @@
+//! # Gmail delegate create
+//!
+//! The `gmail settings delegates create` command,
+//! `users.settings.delegates.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::{GmailDelegate, create::GmailDelegateCreate};
@@ -14,6 +19,7 @@ pub struct GmailSettingsDelegateCreateCommand {
 }
 
 impl GmailSettingsDelegateCreateCommand {
+    /// Creates the delegate and reports its status.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let delegate = GmailDelegate {
             delegate_email: self.email.clone(),

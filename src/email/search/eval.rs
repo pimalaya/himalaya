@@ -1,11 +1,12 @@
-//! Client-side evaluation of the shared search query against an
-//! [`Envelope`].
+//! # Search evaluation
 //!
-//! Used by the backends that search locally (Maildir, m2dir): the
-//! filter is matched against each envelope (with the raw bytes for
-//! `body` clauses), then the sort chain (or the default `Date:`
-//! descending) orders the hits. The date clauses target the `Date:`
-//! header (sent-at), consistent with the server-side backends.
+//! Client-side evaluation of a shared search query against an
+//! [`Envelope`], for the backends that search locally.
+//!
+//! The filter is matched against each envelope, `body` clauses reaching
+//! for the raw bytes, then the sort chain orders the hits, `Date:`
+//! descending by default. Date clauses read the `Date:` header, as the
+//! server-side backends do.
 
 use std::cmp::Ordering;
 
@@ -21,7 +22,8 @@ use crate::email::{
     },
 };
 
-/// Evaluates `filter` against `envelope`; `body` clauses re-parse `raw`.
+/// Evaluates a filter against an envelope, a `body` clause re-parsing the
+/// raw message.
 pub fn matches_filter(envelope: &Envelope, raw: &[u8], filter: &SearchEmailsFilterQuery) -> bool {
     use SearchEmailsFilterQuery as Q;
 
@@ -43,8 +45,8 @@ pub fn matches_filter(envelope: &Envelope, raw: &[u8], filter: &SearchEmailsFilt
     }
 }
 
-/// Sorts `envelopes` by the given chain, or by `Date:` descending when
-/// no sort clause is present.
+/// Sorts envelopes by the given chain, or by `Date:` descending when the
+/// query carries no sort clause.
 pub fn sort_envelopes(envelopes: &mut [Envelope], sort: Option<&[SearchEmailsSorter]>) {
     match sort {
         Some(chain) if !chain.is_empty() => envelopes.sort_by(|a, b| compare_with(a, b, chain)),

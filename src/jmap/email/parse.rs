@@ -1,3 +1,7 @@
+//! # JMAP email parse
+//!
+//! The `jmap email parse` command, RFC 8621 `Email/parse`.
+
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
@@ -19,6 +23,7 @@ pub struct JmapEmailParseCommand {
 }
 
 impl JmapEmailParseCommand {
+    /// Parses the blobs and prints the text bodies they hold.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let output = client.email_parse(self.blob_ids.clone(), Default::default())?;
 
@@ -50,6 +55,7 @@ impl JmapEmailParseCommand {
     }
 }
 
+/// The `jmap email parse` output, the text bodies the blobs held.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct ParsedBodies {
     bodies: Vec<String>,

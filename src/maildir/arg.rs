@@ -1,8 +1,13 @@
+//! # Maildir argument
+//!
+//! The argument naming a Maildir the commands act on.
+
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 use io_maildir::maildir::MaildirSubdir;
 
+/// The Maildir an argument defaults to.
 const INBOX: &str = "Inbox";
 
 /// CLI argument carrying the name of a Maildir.
@@ -62,11 +67,14 @@ pub struct MessageIdsArg {
     pub inner: Vec<String>,
 }
 
-/// CLI value selecting a Maildir subdirectory: cur, new, or tmp.
+/// A subdirectory of a Maildir.
 #[derive(Clone, Debug, ValueEnum)]
 pub enum MaildirSubdirArg {
+    /// Where a message a client has seen lives.
     Cur,
+    /// Where a freshly delivered message lives.
     New,
+    /// Where a delivery is staged before its rename.
     Tmp,
 }
 

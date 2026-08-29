@@ -1,3 +1,8 @@
+//! # Gmail send-as delete
+//!
+//! The `gmail settings sendas delete` command,
+//! `users.settings.sendAs.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::delete::GmailSendAsDelete;
@@ -14,6 +19,7 @@ pub struct GmailSettingsSendAsDeleteCommand {
 }
 
 impl GmailSettingsSendAsDeleteCommand {
+    /// Removes the send-as alias.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailSendAsDelete::new(&client.auth, &client.user_id, &self.email)?;

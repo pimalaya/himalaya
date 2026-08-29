@@ -1,3 +1,7 @@
+//! # Envelope list
+//!
+//! The `envelope list` command, tabling one page of a mailbox.
+
 use std::{collections::BTreeSet, fmt};
 
 use anyhow::Result;
@@ -15,51 +19,44 @@ use crate::{
     shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
-/// List envelopes for the active account, regardless of the underlying
-/// backend.
+/// List the envelopes of a mailbox, most recent first.
 ///
-/// Envelopes are ordered by date descending (most recent first). Use
-/// `envelope search` to filter and/or sort with the shared search
-/// query DSL.
+/// `envelope search` is the same listing with a filter and a sort.
 #[derive(Debug, Parser)]
 pub struct EnvelopeListCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
-
-    /// Page number, starting from 1. The most recent envelopes are on
-    /// page 1.
+    /// Page number, starting at 1, which holds the most recent
+    /// envelopes.
     #[arg(long, short = 'p')]
     #[arg(value_name = "N", default_value = "1")]
     pub page: u32,
-
     /// Maximum number of envelopes per page.
     ///
-    /// When omitted, the merged `envelope.list.page-size` config
-    /// value is used; when neither is set, the hard fallback is 25.
+    /// Omitted, the configured `envelope.list.page-size` answers, and 25
+    /// is the hard fallback.
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<u32>,
-
     /// Maximum width of the rendered table, in terminal columns.
     ///
-    /// Overrides comfy-table's auto-detection. Columns shrink with
-    /// ellipsis if needed.
+    /// Overrides the auto-detected width, columns shrinking with an
+    /// ellipsis as needed.
     #[arg(long = "max-width", short = 'w')]
     #[arg(value_name = "COLUMNS")]
     pub max_width: Option<u16>,
-
-    /// Render recipients (`To:`) instead of senders (`From:`). Useful
-    /// for sent folders.
+    /// Render recipients instead of senders, which is what a sent
+    /// mailbox wants.
     #[arg(long, short)]
     pub recipient: bool,
-
-    /// Populate the ATT column. Depending on the backend this can cost
-    /// an extra lookup per envelope, so it is opt-in.
+    /// Fill the ATT column, which on some backends costs one extra
+    /// lookup per envelope.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
 }
 
 impl EnvelopeListCommand {
+    /// Lists one page of the mailbox and prints it as a table.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -108,18 +105,22 @@ impl EnvelopeListCommand {
     }
 }
 
-/// Glyphs the FLAGS / ATT columns substitute in, sourced from the
-/// merged account config (v1.2.0 defaults: `*`, `R`, `!`, `@`).
+/// Glyphs the FLAGS and ATT columns are drawn with, from the merged
+/// account configuration.
 #[derive(Clone, Copy, Debug)]
 pub struct FlagChars {
+    /// Glyph of a message lacking `\Seen`.
     pub unseen: char,
+    /// Glyph of a message carrying `\Answered`.
     pub replied: char,
+    /// Glyph of a message carrying `\Flagged`.
     pub flagged: char,
+    /// Glyph of a message carrying an attachment.
     pub attachment: char,
 }
 
-/// Per-column foreground colors for the envelopes table. `Color::Reset`
-/// means "use the terminal default" (i.e. no override).
+/// Per-column colors of the envelopes table, `Color::Reset` leaving the
+/// terminal default in place.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct EnvelopeColors {
     pub id: Color,
@@ -132,31 +133,41 @@ pub(super) struct EnvelopeColors {
     pub size: Color,
 }
 
-/// Table of envelope rows rendered to the terminal or as JSON.
+/// The `envelope list` output, a table of envelopes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Envelopes {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// The width the table is capped at, when one was asked for.
     #[serde(skip)]
     pub max_width: Option<u16>,
+    /// The chrono `strftime` format of the DATE column.
     #[serde(skip)]
     pub datetime_fmt: String,
+    /// Whether a date is converted to the local timezone first.
     #[serde(skip)]
     pub datetime_local_tz: bool,
+    /// Whether recipients are drawn instead of senders.
     #[serde(skip)]
     pub recipient: bool,
+    /// Whether the ATT column is drawn.
     #[serde(skip)]
     pub with_attachment: bool,
     #[serde(skip)]
     pub(super) chars: FlagChars,
     #[serde(skip)]
     pub(super) colors: EnvelopeColors,
-    /// Messages staged for creation and not yet pushed, which have no id yet
-    /// and so cannot be listed. Zero for every backend whose writes reach the
-    /// server as they are made.
+    /// Messages staged for creation and not pushed yet, which have no id
+    /// and so no row.
+    ///
+    /// Zero for every backend whose writes reach the server as they are
+    /// made.
     pub queued: usize,
+    /// The envelopes of this page.
     pub envelopes: Vec<Envelope>,
 }
 
@@ -223,9 +234,8 @@ impl fmt::Display for Envelopes {
         writeln!(f)?;
         writeln!(f, "{table}")?;
 
-        // A queued message has no id and so no row; saying how many there are
-        // is what keeps a saved message that is not in the table from reading
-        // as one that was lost.
+        // NOTE: a queued message has no row, so saying how many there are
+        // is what keeps a saved one from reading as a lost one.
         match self.queued {
             0 => Ok(()),
             1 => writeln!(f, "1 queued message, see `himalaya pimdir queue list`"),
@@ -234,9 +244,10 @@ impl fmt::Display for Envelopes {
     }
 }
 
-/// 3-character flag widget: unseen, replied, flagged. Each slot is a
-/// space when the flag is absent, otherwise the configured glyph
-/// (v1.2.0 defaults: `*`, `R`, `!`).
+/// Renders the three-slot FLAGS widget: unseen, replied, flagged.
+///
+/// A slot is a space when its flag is absent and the configured glyph
+/// when it is set.
 pub fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
     let mut out = String::with_capacity(3);
     out.push(if flags.iter().any(Flag::is_seen) {
@@ -257,6 +268,8 @@ pub fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
     out
 }
 
+/// Renders the ATT cell: the glyph, nothing, or `?` when the backend
+/// could not tell.
 pub(super) fn format_attachment(has: Option<bool>, glyph: char) -> String {
     match has {
         Some(true) => glyph.to_string(),
@@ -265,6 +278,8 @@ pub(super) fn format_attachment(has: Option<bool>, glyph: char) -> String {
     }
 }
 
+/// Renders addresses as a comma-separated list of display names, falling
+/// back to the address itself.
 pub fn format_addresses(addrs: &[Address]) -> String {
     addrs
         .iter()
@@ -276,6 +291,8 @@ pub fn format_addresses(addrs: &[Address]) -> String {
         .join(", ")
 }
 
+/// Renders a date with the configured format, in the local timezone when
+/// asked for.
 pub(super) fn format_date(
     date: Option<DateTime<FixedOffset>>,
     fmt: &str,

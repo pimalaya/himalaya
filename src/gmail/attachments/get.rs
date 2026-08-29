@@ -1,3 +1,8 @@
+//! # Gmail attachment get
+//!
+//! The `gmail attachments get` command,
+//! `users.messages.attachments.get`.
+
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
@@ -23,6 +28,7 @@ pub struct GmailAttachmentGetCommand {
 }
 
 impl GmailAttachmentGetCommand {
+    /// Fetches the attachment and writes or prints its bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c =

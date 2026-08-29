@@ -1,47 +1,39 @@
+//! # Mailbox argument
+//!
+//! The `-m/--mailbox` flag every shared command targeting one mailbox
+//! takes, and the alias resolution behind it.
+
 use anyhow::{Result, anyhow};
 use clap::Parser;
 
 use crate::account::context::Account;
 
-/// Optional `-m|--mailbox <NAME>` flag shared by every cross-protocol
-/// command that targets a single mailbox. The argument is resolved
-/// through [`Self::resolve`] so callers can transparently consult the
-/// account's `[mailbox.alias]` map and fall back to the implicit
-/// default mailbox bound to the `inbox` alias.
+/// The `-m/--mailbox` flag of a command targeting one mailbox.
 #[derive(Clone, Debug, Default, Parser)]
 pub struct MailboxArg {
-    /// Mailbox name. Looked up against `[mailbox.alias]`
-    /// case-insensitively; raw backend-native ids are accepted too
-    /// and returned verbatim when no alias matches. Omit to fall
-    /// back to the id mapped to the `inbox` alias.
+    /// Mailbox name, alias or backend-native id.
+    ///
+    /// The value is looked up against `mailbox.alias` case-insensitively
+    /// and passed through verbatim when nothing matches. Omitted, the
+    /// mailbox the `inbox` alias names is used.
     #[arg(short = 'm', long = "mailbox", value_name = "NAME")]
     pub inner: Option<String>,
 }
 
 impl MailboxArg {
-    /// Resolves the mailbox name to a backend-native id, returning
-    /// an owned `String` (the borrowed view from
-    /// [`Account::resolve_mailbox`] does not survive past the temporary
-    /// lookup key).
-    ///
-    /// Errors only when `-m/--mailbox` is omitted and the account has
-    /// no `inbox` alias configured.
+    /// Resolves the flag to a backend-native id, erroring only when it
+    /// is omitted and no `inbox` alias is configured.
     pub fn resolve(&self, account: &Account) -> Result<String> {
         resolve_mailbox_or_default(account, self.inner.as_deref())
     }
 }
 
-/// Resolves a shared command's optional mailbox argument to a
-/// backend-native id: a provided `name` goes through the account's
-/// `[mailbox.alias]` map ([`Account::resolve_mailbox`]); an omitted one
-/// falls back to the `inbox` alias ([`Account::default_mailbox`]),
-/// erroring when none is configured.
+/// Resolves an optional mailbox name to a backend-native id, falling back
+/// to the `inbox` alias and erroring when there is none.
 ///
-/// The shared commands cannot guess a backend's inbox id (JMAP's is an
-/// opaque server-assigned string), so an omitted mailbox requires the
-/// `inbox` alias rather than silently defaulting to a literal name.
-/// Shared by `-m/--mailbox` and the `--from` source of `message
-/// copy`/`move`.
+/// A shared command cannot guess a backend's inbox id, JMAP's being an
+/// opaque server-assigned string, so an omitted mailbox wants the alias
+/// rather than a literal name.
 pub fn resolve_mailbox_or_default(account: &Account, name: Option<&str>) -> Result<String> {
     match name {
         Some(name) => Ok(account.resolve_mailbox(name).to_string()),

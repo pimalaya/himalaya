@@ -1,3 +1,8 @@
+//! # Microsoft Graph child folder list
+//!
+//! The `msgraph mail-folders child-folders` command, tabling the folders
+//! under one folder.
+
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::list::MsgraphMailFoldersListParams;
@@ -15,26 +20,23 @@ pub struct MsgraphChildFoldersListCommand {
     /// The id or well-known name of the parent folder.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// Maximum number of folders to return (OData `$top`).
     #[arg(long, value_name = "N")]
     pub top: Option<u32>,
-
     /// Number of folders to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
-
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
     #[arg(long, value_name = "FIELDS")]
     pub select: Option<String>,
-
     /// Also include hidden folders.
     #[arg(long)]
     pub hidden: bool,
 }
 
 impl MsgraphChildFoldersListCommand {
+    /// Lists the folders under the given one and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

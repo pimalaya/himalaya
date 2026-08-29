@@ -1,3 +1,7 @@
+//! # ManageSieve delete
+//!
+//! The `sieve delete` command, RFC 5804 `DELETESCRIPT`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -17,6 +21,7 @@ pub struct SieveScriptDeleteCommand {
 }
 
 impl SieveScriptDeleteCommand {
+    /// Deletes the named script.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         client.delete_script(self.name)?;
         printer.out(Message::new("Sieve script successfully deleted"))

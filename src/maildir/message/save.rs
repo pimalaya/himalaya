@@ -1,3 +1,8 @@
+//! # Maildir message save
+//!
+//! The `maildir message save` command, delivering a raw message into a
+//! Maildir.
+
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
@@ -18,29 +23,25 @@ use crate::{
 
 /// Store a message into a Maildir folder.
 ///
-/// Writes the raw message as a new file under the folder's chosen
-/// subdirectory (new by default). The message can be passed as a
-/// positional file path, an inline raw string, or piped via stdin
-/// (see [`MessageArg`] for resolution order).
+/// The message comes from a file path, an inline string or piped standard
+/// input, and lands under the chosen subdirectory, `new` by default.
 #[derive(Debug, Parser)]
 pub struct MaildirMessageSaveCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-
     /// The subdirectory of the Maildir
     #[arg(long, short, value_name = "DIR", value_enum)]
     #[arg(default_value = "new")]
     pub subdir: MaildirSubdirArg,
-
     /// The flags to add to the message.
     #[arg(long = "flag", short, num_args = 0..)]
     pub flags: Vec<FlagArg>,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl MaildirMessageSaveCommand {
+    /// Delivers the raw message into the Maildir.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
         let msg = self.message.parse()?;

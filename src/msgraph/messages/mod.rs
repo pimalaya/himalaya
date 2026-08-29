@@ -1,3 +1,7 @@
+//! # Microsoft Graph messages
+//!
+//! The `msgraph messages` command family, covering `me.messages`.
+
 pub mod cli;
 pub mod copy;
 pub mod create;

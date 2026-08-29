@@ -1,3 +1,7 @@
+//! # m2dir command
+//!
+//! The `m2dir` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -20,7 +24,6 @@ pub enum M2dirCommand {
     Create(M2dirMailboxCreateCommand),
     Delete(M2dirMailboxDeleteCommand),
     List(M2dirMailboxListCommand),
-
     #[command(subcommand)]
     #[command(visible_alias = "msg", aliases = ["messages", "msgs"])]
     Message(M2dirMessageCommand),
@@ -30,6 +33,7 @@ pub enum M2dirCommand {
 }
 
 impl M2dirCommand {
+    /// Runs the subcommand against the account's m2dir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

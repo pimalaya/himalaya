@@ -1,3 +1,8 @@
+//! # Attachment list
+//!
+//! The `attachment list` command, tabling the attachment parts of one
+//! message.
+
 use std::fmt;
 
 use anyhow::{Result, bail};
@@ -14,17 +19,12 @@ use crate::{
     shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
-/// List the attachments carried by a single message in the active
-/// account.
+/// List the attachments of one message.
 ///
-/// Each row carries the `ID` of the underlying MIME part: its 1-based
-/// position in the whole part list, the same id `message read` prints in
-/// its per-part summary (`[ID] ...`). Only attachment parts are listed,
-/// so the ids are a sparse subset of the message's parts (e.g. `1 5 9`),
-/// stable regardless of the `--inline` filter.
-///
-/// Pass `--inline` to surface inline parts (typically embedded images
-/// referenced by HTML bodies via `cid:`).
+/// The ID of a row is the 1-based position of the MIME part in the whole
+/// message, the same id `message read` prints. Only attachment parts are
+/// listed, so the ids are sparse, and they stay the same whether or not
+/// `--inline` is passed.
 #[derive(Debug, Parser)]
 pub struct AttachmentListCommand {
     #[command(flatten)]
@@ -32,12 +32,14 @@ pub struct AttachmentListCommand {
     /// Identifier of the message.
     #[arg(value_name = "MESSAGE-ID")]
     pub message_id: String,
-    /// Include parts with `Content-Disposition: inline`.
+    /// Also list the parts carrying `Content-Disposition: inline`,
+    /// typically the images an HTML body references through `cid:`.
     #[arg(long, short)]
     pub inline: bool,
 }
 
 impl AttachmentListCommand {
+    /// Fetches the message and prints its attachment parts as a table.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -93,6 +95,7 @@ impl AttachmentListCommand {
     }
 }
 
+/// Per-column colors of the attachments table.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct AttachmentColors {
     pub id: Color,
@@ -103,43 +106,44 @@ pub(crate) struct AttachmentColors {
     pub path: Color,
 }
 
-/// One row of the `attachments list` / `attachments download` output.
+/// One row of the `attachment list` and `attachment download` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachment {
-    /// 1-based position of the MIME part in the message's part list, the
-    /// same id `message read` prints. Sparse (attachments only) and
-    /// stable across the `--inline` filter.
+    /// The 1-based position of the MIME part in the message, the same id
+    /// `message read` prints.
     pub id: String,
-    /// Filename from `Content-Disposition: filename=` (or
-    /// `Content-Type: name=`), RFC 2231-decoded. `None` when the
-    /// source provides no name.
+    /// The RFC 2231-decoded filename, `None` when the part names none.
     pub filename: Option<String>,
-    /// MIME type (e.g. `"application/pdf"`). `None` when the source
-    /// omits the `Content-Type` header.
+    /// The MIME type, `None` when the part carries no `Content-Type`.
     pub mime: Option<String>,
-    /// Size in bytes of the decoded part body.
+    /// The size of the decoded part body, in bytes.
     pub size: u64,
-    /// `true` when the part carries `Content-Disposition: inline`.
+    /// Whether the part carries `Content-Disposition: inline`.
     pub inline: bool,
-    /// Destination path the bytes were written to (set by
-    /// `attachments download`; `None` for `attachments list`).
+    /// Where the bytes were written, which `attachment download` alone
+    /// fills in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 }
 
-/// Table of attachment rows rendered to the terminal or as JSON.
+/// The `attachment list` output, a table of attachments.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachments {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// Whether the INLINE column is drawn.
     #[serde(skip)]
     pub with_inline: bool,
+    /// Whether the PATH column is drawn.
     #[serde(skip)]
     pub with_path: bool,
     #[serde(skip)]
     pub(crate) colors: AttachmentColors,
+    /// The attachments, in part order.
     pub attachments: Vec<Attachment>,
 }
 
@@ -189,6 +193,7 @@ impl fmt::Display for Attachments {
     }
 }
 
+/// Renders a part's `Content-Type` as `type/subtype`.
 pub(super) fn mime_string(part: &MessagePart<'_>) -> Option<String> {
     let ct = part.content_type()?;
 

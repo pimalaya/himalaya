@@ -1,3 +1,7 @@
+//! # Gmail thread modify
+//!
+//! The `gmail threads modify` command, `users.threads.modify`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::threads::modify::GmailThreadModify;
@@ -21,6 +25,7 @@ pub struct GmailThreadModifyCommand {
 }
 
 impl GmailThreadModifyCommand {
+    /// Applies the label changes to every message of the thread.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailThreadModify::new(

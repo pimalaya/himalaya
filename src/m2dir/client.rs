@@ -1,4 +1,7 @@
-//! Himalaya wrapper around [`io_m2dir::client::M2dirClient`].
+//! # m2dir client
+//!
+//! The wrapper around io-m2dir's client every m2dir-specific subcommand
+//! receives, built up front by the dispatch layer.
 
 use std::ops::{Deref, DerefMut};
 
@@ -10,14 +13,13 @@ use crate::{
     config::{AccountConfig, Config, M2dirConfig},
 };
 
-/// Live m2dir client wrapping io_m2dir with the configured store root.
+/// An m2dir client rooted at the configured store.
 pub struct M2dirClient {
     inner: Inner,
 }
 
 impl M2dirClient {
-    /// Builds an [`M2dirClient`] rooted at the configured m2store
-    /// path.
+    /// Builds a client rooted at the configured store path.
     pub fn new(config: M2dirConfig) -> Self {
         let inner = Inner::new(config.root.to_string_lossy().into_owned());
         Self { inner }
@@ -38,11 +40,10 @@ impl DerefMut for M2dirClient {
     }
 }
 
-/// Opens the m2dir client for an already-resolved account: takes the
-/// `[m2dir]` block out of `account_config` and builds the merged
-/// [`Account`]. Bails when the account has no `[m2dir]` block. Returns
-/// the client paired with the merged account so subcommands receive both
-/// as sibling arguments.
+/// Opens the m2dir client of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[m2dir]` block.
 pub fn build_m2dir_client(
     config: Config,
     name: String,

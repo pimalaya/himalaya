@@ -1,3 +1,7 @@
+//! # Microsoft Graph profile command
+//!
+//! The `msgraph profile` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -14,6 +18,7 @@ pub enum MsgraphProfileCommand {
 }
 
 impl MsgraphProfileCommand {
+    /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

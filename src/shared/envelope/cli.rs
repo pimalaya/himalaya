@@ -1,3 +1,7 @@
+//! # Envelope command
+//!
+//! The `envelope` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -12,9 +16,8 @@ use crate::{
 
 /// Manage envelopes using the shared API.
 ///
-/// An envelope is a message headers subset. It is usually small, and contains
-/// enough information to have an overall understanding of what a message is
-/// about.
+/// An envelope is a small subset of a message's headers, enough to say
+/// what the message is about without fetching it.
 #[derive(Debug, Subcommand)]
 pub enum EnvelopeCommand {
     #[command(visible_alias = "ls")]
@@ -24,6 +27,7 @@ pub enum EnvelopeCommand {
 }
 
 impl EnvelopeCommand {
+    /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

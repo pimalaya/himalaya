@@ -1,3 +1,7 @@
+//! # IMAP expunge
+//!
+//! The `imap expunge` command, RFC 3501 `EXPUNGE`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
@@ -11,7 +15,7 @@ use crate::imap::{
 
 /// Expunge the given mailbox (EXPUNGE, RFC 3501).
 ///
-/// Permanently removes every message flagged \Deleted from the mailbox.
+/// Every message flagged `\Deleted` goes for good.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxExpungeCommand {
     #[command(flatten)]
@@ -21,6 +25,7 @@ pub struct ImapMailboxExpungeCommand {
 }
 
 impl ImapMailboxExpungeCommand {
+    /// Selects the mailbox unless told not to, then expunges it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 

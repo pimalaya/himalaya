@@ -1,3 +1,8 @@
+//! # JMAP submission create
+//!
+//! The `jmap submission create` command, the create half of RFC 8621
+//! `EmailSubmission/set`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -21,31 +26,28 @@ pub struct JmapSubmissionCreateCommand {
     /// The ID of the draft email to send.
     #[arg(value_name = "EMAIL-ID")]
     pub email_id: String,
-
     /// The identity ID to send as (from `identity get`).
     #[arg(long, value_name = "IDENTITY-ID")]
     pub identity_id: String,
-
     /// Override the MAIL FROM address (uses `From` header if omitted).
     #[arg(long, value_name = "ADDRESS")]
     pub mail_from: Option<String>,
-
     /// Override the RCPT TO addresses (uses `To`, `Cc`, `Bcc` if omitted).
     #[arg(long, value_name = "ADDRESS")]
     pub rcpt_to: Vec<String>,
 }
 
 impl JmapSubmissionCreateCommand {
+    /// Submits the draft and reports the new submission.
     pub fn execute(
         self,
         printer: &mut impl Printer,
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        // The JMAP envelope is all-or-nothing: mail_from is required, so
-        // it cannot be derived while overriding rcpt_to (or vice versa).
-        // With neither, the server derives mail_from from the identity
-        // and rcpt_to from the message headers.
+        // NOTE: the JMAP envelope is all or nothing, mail_from being
+        // required, so one side cannot be overridden while the other is
+        // derived. With neither, the server derives both.
         let envelope = match (self.mail_from, self.rcpt_to.is_empty()) {
             (None, true) => None,
             (Some(mail_from_addr), false) => {

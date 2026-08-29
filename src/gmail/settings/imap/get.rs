@@ -1,3 +1,7 @@
+//! # Gmail IMAP get
+//!
+//! The `gmail settings imap get` command, `users.settings.getImap`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ use crate::gmail::{
 pub struct GmailSettingsImapGetCommand;
 
 impl GmailSettingsImapGetCommand {
+    /// Fetches the IMAP settings and tables them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailImapGet::new(&client.auth, &client.user_id)?;
@@ -35,12 +40,11 @@ impl GmailSettingsImapGetCommand {
     }
 }
 
-/// Gmail IMAP access settings, rendered as aligned text or, under
-/// `--json`, as a structured object instead of a wrapped human string.
+/// The `gmail settings imap get` output.
 ///
-/// The booleans stay booleans in JSON, where the text rendering spells
-/// them yes and no; the expunge behavior keeps its Gmail wire spelling,
-/// so a value read with `get` is a value `set` accepts back.
+/// A boolean stays a boolean in JSON where the text spells it yes or no,
+/// and the expunge behaviour keeps its Gmail wire spelling, so a value
+/// `get` reads is a value `set` accepts back.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailSettingsImapGetOutput {

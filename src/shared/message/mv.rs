@@ -1,3 +1,8 @@
+//! # Message move
+//!
+//! The `message move` command, moving messages between two mailboxes of
+//! one account.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -9,32 +14,27 @@ use crate::{
     },
 };
 
-/// Move message(s) from one mailbox to another within the active
-/// account.
+/// Move messages from one mailbox to another within the active account.
 ///
-/// Both `--from` and `--to` are resolved through the account's
-/// `[mailbox.alias]` map before the backend call. IMAP uses
-/// `UID MOVE` (RFC 6851); JMAP uses `Email/set` patches that remove
-/// the source and add the destination from each email's
-/// `mailboxIds`; Maildir renames the underlying file. Cross-account
-/// / cross-backend move is out of scope.
+/// Both mailboxes are resolved through the account's aliases. Moving
+/// across accounts or backends is out of scope.
 #[derive(Debug, Parser)]
 pub struct MessageMoveCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
-
-    /// Source mailbox name or alias. Omit to fall back to the `inbox`
-    /// alias (errors when none is configured, as the shared layer
-    /// cannot guess a backend's inbox id).
+    /// Source mailbox name or alias, the `inbox` alias when omitted.
+    ///
+    /// The command errors when neither is given, the shared layer having
+    /// no way to guess a backend's inbox id.
     #[arg(long = "from", short = 'f', value_name = "NAME")]
     pub from: Option<String>,
-
-    /// Destination mailbox name or alias. Mandatory.
+    /// Destination mailbox name or alias.
     #[arg(long = "to", short = 't', value_name = "NAME")]
     pub to: String,
 }
 
 impl MessageMoveCommand {
+    /// Moves the messages and reports how many landed.
     pub fn execute(
         self,
         printer: &mut impl Printer,

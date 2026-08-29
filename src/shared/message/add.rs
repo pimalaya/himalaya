@@ -1,3 +1,8 @@
+//! # Message add
+//!
+//! The `message add` command, appending a raw RFC 5322 message to a
+//! mailbox.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -21,38 +26,26 @@ use crate::{
 
 /// Add a raw RFC 5322 message to a mailbox.
 ///
-/// The message can be passed as a positional file path, an inline raw
-/// string, or piped via stdin (see [`MessageArg`] for resolution
-/// order). The destination is resolved through the account's
-/// `[mailbox.alias]` map before the backend call. Pass `--send` to
-/// also push the message through the account's send path after the
-/// append (mirrors `messages send --save <MAILBOX>`).
-///
-/// IMAP appends via `APPEND` (RFC 3501); JMAP uploads the blob and
-/// imports it via `Email/import` (the destination mailbox is
-/// resolved by exact-match name); Maildir writes a new file under
-/// the target maildir's `cur/` subdir using the standard
-/// tmp-then-rename delivery protocol.
+/// The message comes from a file path, an inline string or piped standard
+/// input, and the mailbox is resolved through the account's aliases.
 #[derive(Debug, Parser)]
 pub struct MessageAddCommand {
-    /// Destination mailbox name or alias. Mandatory.
+    /// Destination mailbox name or alias.
     #[arg(long = "mailbox", short = 'm', value_name = "NAME")]
     pub mailbox: String,
-
-    /// Flag(s) to set on the new message. Optional.
+    /// Flags to set on the new message.
     #[arg(long = "flag", short = 'f', value_name = "FLAG", num_args = 0..)]
     pub flag: Vec<FlagArg>,
-
-    /// Send the message after appending it. Combines with the
-    /// mandatory `--mailbox` to save-then-send.
+    /// Send the message once appended, which is `message send --save`
+    /// the other way round.
     #[arg(long)]
     pub send: bool,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl MessageAddCommand {
+    /// Appends the message, sends it when asked, and reports its new id.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -69,6 +62,7 @@ impl MessageAddCommand {
     }
 }
 
+/// The `message add` output, naming the message that was appended.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct MessageAddOutput {
     id: String,

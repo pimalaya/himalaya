@@ -1,3 +1,7 @@
+//! # Gmail labels
+//!
+//! The `gmail labels` command family, covering `users.labels`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -33,6 +37,7 @@ pub enum GmailLabelsCommand {
 }
 
 impl GmailLabelsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

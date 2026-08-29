@@ -1,3 +1,8 @@
+//! # m2dir flag remove
+//!
+//! The `m2dir flag remove` command, removing flags from the existing
+//! set.
+
 use anyhow::Result;
 use clap::Parser;
 use io_m2dir::flag::M2dirFlags;
@@ -13,10 +18,8 @@ use crate::m2dir::{
 pub struct M2dirFlagRemoveCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
-
     #[command(flatten)]
     pub m2dir: M2dirNameFlag,
-
     /// Flag(s) to remove from the message. Repeat `-f` per flag (e.g.
     /// `-f seen -f flagged`); a single `-f` takes one value so trailing
     /// message ids are not silently swallowed as flags.
@@ -25,6 +28,7 @@ pub struct M2dirFlagRemoveCommand {
 }
 
 impl M2dirFlagRemoveCommand {
+    /// Removes the flags from the existing set of each message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;

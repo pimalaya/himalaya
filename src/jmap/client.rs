@@ -1,9 +1,11 @@
-//! Himalaya wrapper around [`io_jmap::client::JmapClientStd`] that
-//! bundles the merged [`Account`] alongside the live JMAP client.
+//! # JMAP client
 //!
-//! Built up front by the dispatch layer (`crate::cli`) via
-//! [`build_jmap_client`] and handed down to every JMAP-specific
-//! subcommand.
+//! The wrapper around io-jmap's blocking client every JMAP-specific
+//! subcommand receives.
+//!
+//! The dispatch layer opens the session up front and hands the ready
+//! wrapper down, the merged [`Account`] riding along as a sibling
+//! argument.
 
 use std::ops::{Deref, DerefMut};
 
@@ -18,25 +20,21 @@ use crate::{
     config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, parse_server},
 };
 
-/// Live JMAP session paired with the merged account configuration.
+/// A live JMAP session and the mailbox index it caches.
 pub struct JmapClient {
     inner: Inner,
-    /// The original JMAP config block, kept around so commands like
-    /// `email import` / `email export` can spin up their own
-    /// auxiliary sessions (e.g. against the upload/download URL when
-    /// it lives on a different authority than the API URL).
+    /// The `[jmap]` block, kept so a command can open an auxiliary
+    /// session of its own against an upload or download authority the
+    /// API one does not cover.
     pub config: JmapConfig,
-    /// Lazily-fetched `(id, name)` pairs for every mailbox, used by
-    /// [`Self::resolve_mailbox_id`] to map the shared layer's
-    /// human-facing mailbox names onto opaque JMAP ids. Cached for the
-    /// client's lifetime so a `copy`/`move` resolves both endpoints in
-    /// a single `Mailbox/get`.
+    /// The `(id, name)` pairs [`Self::resolve_mailbox_id`] maps names
+    /// through, fetched once and cached for the client's lifetime.
     mailbox_index: Option<Vec<(String, String)>>,
 }
 
 impl JmapClient {
-    /// Establishes the JMAP session (TLS, `/.well-known/jmap`
-    /// discovery).
+    /// Establishes the session, discovering the endpoint through
+    /// `/.well-known/jmap` when the configuration names an authority.
     pub fn new(config: JmapConfig) -> Result<Self> {
         let tls = config.tls.clone().into_tls(config.alpn.clone());
 
@@ -53,19 +51,11 @@ impl JmapClient {
         })
     }
 
-    /// Maps a human mailbox name to its opaque JMAP id, for the shared
-    /// backend which otherwise addresses mailboxes by their id.
+    /// Maps a human mailbox name onto its opaque JMAP id.
     ///
-    /// A value that already matches a known id is returned verbatim (id
-    /// passthrough, mirroring IMAP where the name *is* the id); an exact
-    /// display-name match returns the mapped id (first match wins on the
-    /// rare duplicate-name case); an unknown value is handed back as-is
-    /// so the server surfaces the error. The mailbox index is fetched
-    /// once (`Mailbox/get`) and cached.
-    ///
-    /// This lives here, on the Himalaya client, precisely so the backend
-    /// operation methods (`list_envelopes`, `add_message`, …) stay pure
-    /// id consumers: name resolution never happens inside them.
+    /// A known id passes through, a name match returns its id, and an
+    /// unknown value goes back as it is so the server surfaces the error.
+    /// It lives here so every backend method stays a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         if self.mailbox_index.is_none() {
             let output = self.mailbox_get(JmapMailboxGetOptions {
@@ -93,16 +83,12 @@ impl JmapClient {
         Ok(mailbox.to_string())
     }
 
-    /// Downloads a blob whose URL may live on a different authority than
-    /// the JMAP API endpoint. Fastmail, for one, serves downloads from
-    /// `*.fastmailusercontent.com` while the API is on `api.fastmail.com`.
+    /// Downloads a blob, whose URL may live on another authority.
     ///
-    /// When the download host matches the API host the live session
-    /// connection is reused; otherwise a fresh authenticated connection
-    /// is opened to the download host. The API socket is *never* reused
-    /// for a foreign host — doing so sends the download request to the
-    /// API server, which (Fastmail) answers with a `302` to its docs
-    /// page and fails the non-redirectable download.
+    /// A matching host reuses the live session, a foreign one opens a
+    /// fresh authenticated connection. Reusing the API socket would send
+    /// the request to the API server, which answers with a redirect no
+    /// download follows.
     pub fn download_blob(&mut self, download_url: &Url) -> Result<Vec<u8>> {
         let api_url = {
             let session = self
@@ -143,11 +129,10 @@ impl DerefMut for JmapClient {
     }
 }
 
-/// Opens the JMAP session for an already-resolved account: takes the
-/// `[jmap]` block out of `account_config`, builds the merged [`Account`]
-/// and connects. Bails when the account has no `[jmap]` block. Returns
-/// the live client paired with the merged account so subcommands receive
-/// both as sibling arguments.
+/// Opens the JMAP session of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[jmap]` block.
 pub fn build_jmap_client(
     config: Config,
     name: String,

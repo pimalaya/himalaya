@@ -1,5 +1,10 @@
+//! # m2dir argument
+//!
+//! The argument naming an m2dir folder the commands act on.
+
 use clap::Parser;
 
+/// The folder an argument defaults to.
 const INBOX: &str = "Inbox";
 
 /// CLI argument carrying the name of an m2dir folder.

@@ -1,3 +1,8 @@
+//! # Message send
+//!
+//! The `message send` command, pushing a raw RFC 5322 message through the
+//! account's outgoing backend.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
@@ -10,28 +15,25 @@ use crate::{
     },
 };
 
-/// Send a message via the active account.
+/// Send a message through the active account.
 ///
-/// Routes through SMTP or JMAP depending on the account's configured
-/// outgoing backend. The envelope sender is taken from the `From:`
-/// header and recipients are collected from `To:` / `Cc:` / `Bcc:`.
+/// The route is SMTP or JMAP, whichever the account configures. The
+/// envelope sender comes from the `From:` header and the recipients from
+/// `To:`, `Cc:` and `Bcc:`.
 ///
-/// The message can be passed as a positional file path, an inline
-/// raw string, or piped via stdin (see [`MessageArg`] for resolution
-/// order). Pass `--save <MAILBOX>` to also append a copy of the
-/// sent message to a mailbox; the mailbox name is resolved through
-/// the account's `[mailbox.alias]` map before the backend call.
+/// The message comes from a file path, an inline string or piped standard
+/// input.
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
-    /// Append a copy of the sent message to this mailbox.
+    /// Append a copy of the sent message to this mailbox name or alias.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl MessageSendCommand {
+    /// Sends the message, saving a copy when asked.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,7 @@
+//! # Gmail thread list
+//!
+//! The `gmail threads list` command, `users.threads.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -42,6 +46,7 @@ pub struct GmailThreadsListCommand {
 }
 
 impl GmailThreadsListCommand {
+    /// Lists one page of threads and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -76,9 +81,12 @@ impl GmailThreadsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadsTable {
     #[serde(skip)]
+    /// The `comfy_table` preset string the table renders with.
     pub preset: String,
     #[serde(skip)]
+    /// The column arrangement the table renders with.
     pub arrangement: ContentArrangement,
+    /// The threads of this page.
     pub threads: Vec<GmailThreadSummary>,
 }
 

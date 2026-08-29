@@ -1,3 +1,7 @@
+//! # IMAP search
+//!
+//! The `imap search` command, RFC 3501 `SEARCH`.
+
 use io_imap::client::ImapClient as _;
 use std::fmt;
 
@@ -25,28 +29,26 @@ use crate::{
     shared::table::style_from_preset,
 };
 
-/// Search IMAP messages (SEARCH, RFC 3501).
+/// Search messages (SEARCH, RFC 3501).
 ///
-/// Returns the UIDs (or sequence numbers with --seq) of messages
-/// matching the given criteria. Each criteria flag maps to one IMAP
-/// search key and multiple flags are ANDed; with no criteria, every
-/// message matches.
+/// Returns the UIDs of the matching messages, or their message numbers
+/// with `--seq`. Each criteria flag is one IMAP search key and several
+/// are ANDed, so with none every message matches.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeSearchCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
-
     #[command(flatten)]
     pub criteria: SearchCriteriaArgs,
-
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
 }
 
 impl ImapEnvelopeSearchCommand {
+    /// Selects the mailbox unless told not to, then searches it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -77,12 +79,11 @@ impl ImapEnvelopeSearchCommand {
     }
 }
 
-/// IMAP SEARCH criteria (RFC 3501).
+/// The `SEARCH` criteria flags, each one IMAP search key, several ANDed
+/// together and none resolving to `ALL`.
 ///
-/// Each flag maps to one IMAP search key; multiple flags are ANDed
-/// together. With no flag set, the criteria resolve to `ALL`. Search
-/// keys not exposed here (OR, NOT, HEADER, ...) are reachable through
-/// the raw passthrough.
+/// The keys not exposed here, `OR`, `NOT` and `HEADER` among them, are
+/// reachable through `imap raw`.
 #[derive(Debug, Parser)]
 pub struct SearchCriteriaArgs {
     /// Match messages whose From header contains TEXT.
@@ -106,7 +107,6 @@ pub struct SearchCriteriaArgs {
     /// Match messages whose headers or body contain TEXT.
     #[arg(long, value_name = "TEXT")]
     pub text: Option<String>,
-
     /// Match messages received before DATE (YYYY-MM-DD).
     #[arg(long, value_name = "DATE", value_parser = date_parser)]
     pub before: Option<NaiveDate>,
@@ -116,14 +116,12 @@ pub struct SearchCriteriaArgs {
     /// Match messages received on DATE (YYYY-MM-DD).
     #[arg(long, value_name = "DATE", value_parser = date_parser)]
     pub on: Option<NaiveDate>,
-
     /// Match messages larger than BYTES.
     #[arg(long, value_name = "BYTES")]
     pub larger: Option<u32>,
     /// Match messages smaller than BYTES.
     #[arg(long, value_name = "BYTES")]
     pub smaller: Option<u32>,
-
     /// Match \Seen messages.
     #[arg(long)]
     pub seen: bool,
@@ -166,8 +164,8 @@ pub struct SearchCriteriaArgs {
 }
 
 impl SearchCriteriaArgs {
-    /// Folds every set flag into an IMAP search key, ANDed together;
-    /// resolves to a single `ALL` key when nothing is set.
+    /// Folds every set flag into an IMAP search key, or into a single
+    /// `ALL` when none is set.
     pub fn into_criteria(self) -> Result<Vec1<SearchKey<'static>>> {
         let mut keys: Vec<SearchKey<'static>> = Vec::new();
 
@@ -258,7 +256,7 @@ impl SearchCriteriaArgs {
     }
 }
 
-/// Clap value parser for a YYYY-MM-DD search date.
+/// Parses a `YYYY-MM-DD` search date.
 fn date_parser(s: &str) -> Result<NaiveDate, String> {
     let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
         .map_err(|_| format!("expected a YYYY-MM-DD date, got `{s}`"))?;
@@ -266,13 +264,14 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
     NaiveDate::try_from(date).map_err(|e| format!("invalid date `{s}`: {e}"))
 }
 
-/// One row of the SEARCH results table: a single message id.
+/// One row of the search results, a single message id.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SearchResult {
+    /// The UID, or the message number under `--seq`.
     pub id: u32,
 }
 
-/// Renderable table of SEARCH result message ids.
+/// The `imap search` output, a table of message ids.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SearchTable {
     #[serde(skip)]

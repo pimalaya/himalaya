@@ -1,3 +1,8 @@
+//! # IMAP id
+//!
+//! The `imap id` command, RFC 2971 `ID`, and the parameter resolution the
+//! auth coroutines take.
+
 use io_imap::client::ImapClient as _;
 use std::{collections::HashMap, fmt};
 
@@ -20,21 +25,20 @@ use crate::{
     shared::table::style_from_preset,
 };
 
-/// Get information about the IMAP server.
+/// Exchange identification parameters with the server (ID, RFC 2971).
 ///
-/// This command allows you to exchange parameters with the IMAP server
-/// accordingly to the [RFC 2971]. Some providers like mail.qq enforce sending
-/// ID command before selecting a mailbox.
-///
-/// [RFC 2971]: https://www.rfc-editor.org/rfc/rfc2971.html
+/// Some providers, mail.qq among them, want the exchange before a mailbox
+/// can be selected at all.
 #[derive(Debug, Parser)]
 pub struct ImapIdCommand {
+    /// Extra parameters to send, on top of himalaya's own.
     #[arg(short, long, num_args = 1..)]
     #[arg(value_name = "KEY:VAL", value_parser = parameter_parser)]
     parameter: Option<Vec<(IString<'static>, NString<'static>)>>,
 }
 
 impl ImapIdCommand {
+    /// Sends the parameters and tables the ones the server answered.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -76,12 +80,14 @@ impl ImapIdCommand {
     }
 }
 
-/// Renderable table of the IMAP server ID parameters.
+/// The `imap id` output, a table of the parameters the server sent back.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerIdTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The parameters, a `NIL` value coming through as `None`.
     pub server_id: HashMap<String, Option<String>>,
 }
 
@@ -108,13 +114,11 @@ impl fmt::Display for ServerIdTable {
     }
 }
 
-/// Resolves an [`ImapIdConfig`] into the wire-level parameter list
-/// passed to the io-imap auth coroutines.
+/// Resolves the configured `imap.id.fields` into the parameter list the
+/// io-imap auth coroutines send.
 ///
-/// [`None`] when `auto = false`; otherwise a vec where each entry
-/// maps the user-supplied key to either himalaya's canned value
-/// (when the user set `true` and the key is well-known) or `NIL`.
-/// Unknown keys with `true` log a warning and fall back to `NIL`.
+/// `None` when `auto` is off. A key set to `true` takes himalaya's canned
+/// value, or `NIL` with a warning when there is none.
 pub fn resolve_auto_id_params(
     config: &ImapIdConfig,
 ) -> Result<Option<Vec<(IString<'static>, NString<'static>)>>> {
@@ -149,6 +153,7 @@ pub fn resolve_auto_id_params(
     Ok(Some(params))
 }
 
+/// Parses a `KEY:VAL` parameter, an empty value meaning `NIL`.
 fn parameter_parser(param: &str) -> Result<(IString<'static>, NString<'static>), String> {
     let Some((key, val)) = param.split_once(':') else {
         return Err(format!("Invalid parameter `{param}`: missing `:`"));
@@ -171,6 +176,7 @@ fn parameter_parser(param: &str) -> Result<(IString<'static>, NString<'static>),
     Ok((ikey.into_static(), nval.into_static()))
 }
 
+/// himalaya's own value for a well-known `ID` key.
 fn canned_value(key: &str) -> Option<&'static str> {
     match key {
         "name" => Some(env!("CARGO_PKG_NAME")),
@@ -181,6 +187,7 @@ fn canned_value(key: &str) -> Option<&'static str> {
     }
 }
 
+/// Builds the wire pair of a well-known key and its canned value.
 fn build_canned_pair(key: &str) -> Result<(IString<'static>, NString<'static>)> {
     let ikey = IString::try_from(key)
         .map_err(|err| anyhow!("Invalid IMAP ID parameter key `{key}`: {err}"))?

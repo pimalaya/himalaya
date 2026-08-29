@@ -1,3 +1,8 @@
+//! # Microsoft Graph message list
+//!
+//! The `msgraph messages list` command, tabling one page of a mailbox or
+//! of one folder.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -24,42 +29,36 @@ pub struct MsgraphMessageListCommand {
     /// `inbox`). Lists the whole mailbox when omitted.
     #[arg(short = 'f', long, value_name = "ID")]
     pub folder: Option<String>,
-
     /// Maximum number of messages to return (OData `$top`).
     #[arg(long, value_name = "N")]
     pub top: Option<u32>,
-
     /// Number of messages to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
-
     /// OData `$filter` expression (e.g. `isRead eq false`).
     #[arg(long, value_name = "EXPR")]
     pub filter: Option<String>,
-
-    /// OData `$search` query (e.g. `subject:report` or a bare term).
+    /// OData `$search` query, `subject:report` or a bare term.
     ///
-    /// Graph forbids combining `$search` with `$orderby` and ignores
-    /// `$count`, so both are dropped when this is set; results come back
-    /// in relevance order.
+    /// Graph forbids `$search` beside `$orderby` and ignores `$count`, so
+    /// both are dropped here and the results come back in relevance
+    /// order.
     #[arg(long, value_name = "QUERY")]
     pub search: Option<String>,
-
     /// OData `$orderby` expression. Defaults to `receivedDateTime desc`.
     #[arg(long, value_name = "EXPR")]
     pub orderby: Option<String>,
-
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `subject,from,receivedDateTime`).
     #[arg(long, value_name = "FIELDS")]
     pub select: Option<String>,
-
     /// Request the total count of matching messages (OData `$count`).
     #[arg(long)]
     pub count: bool,
 }
 
 impl MsgraphMessageListCommand {
+    /// Lists one page of messages and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -68,9 +67,9 @@ impl MsgraphMessageListCommand {
     ) -> Result<()> {
         let search = self.search.as_deref();
 
-        // Graph rejects `$search` alongside `$orderby` and needs a
-        // `ConsistencyLevel` header (not sent by the client) for
-        // `$search` + `$count`; drop both when searching.
+        // NOTE: Graph rejects `$search` beside `$orderby`, and pairing it
+        // with `$count` wants a `ConsistencyLevel` header the client does
+        // not send, so both are dropped when searching.
         let orderby = match search {
             Some(_) => None,
             None => Some(self.orderby.as_deref().unwrap_or("receivedDateTime desc")),
@@ -129,9 +128,13 @@ fn messages_table(account: &Account, messages: Vec<MsgraphMessage>) -> MessagesT
 /// Per-column colors for the Microsoft Graph messages table.
 #[derive(Clone, Copy, Debug)]
 pub struct MessageColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the SUBJECT column.
     pub subject: Color,
+    /// Color of the FROM column.
     pub from: Color,
+    /// Color of the DATE column.
     pub date: Color,
 }
 

@@ -1,3 +1,8 @@
+//! # Gmail POP settings
+//!
+//! The `gmail settings pop` commands, covering `users.settings.getPop`
+//! and its setter.
+
 pub mod get;
 pub mod set;
 
@@ -24,6 +29,7 @@ pub enum GmailSettingsPopCommand {
 }
 
 impl GmailSettingsPopCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

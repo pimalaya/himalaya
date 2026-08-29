@@ -1,11 +1,12 @@
-//! Local backend wizard.
+//! # Local wizard
 //!
-//! A typed path pointing at an existing folder configures a local
-//! store. The backend kind is auto-detected from the directory's on-disk
-//! markers — a `.m2store`/`.m2dir` marker means m2dir, a `cur`/`new`/`tmp`
-//! tree means Maildir. When detection is inconclusive (an empty or
-//! ambiguous directory) and both backends are compiled in, the user
-//! picks; otherwise the sole compiled backend is used.
+//! Configures a local store from a typed path pointing at an existing
+//! folder.
+//!
+//! The kind is read off the directory's own markers: an `.m2store` or
+//! `.m2dir` marker is m2dir, and a `cur`, `new` and `tmp` tree is
+//! Maildir. An empty or ambiguous directory leaves the user to pick, or
+//! takes the sole compiled backend when there is one.
 
 use std::path::{Path, PathBuf};
 

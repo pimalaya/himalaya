@@ -1,16 +1,12 @@
-//! JSON Schema registry for the `json-schema <DIR>` meta command.
+//! # JSON Schema registry
 //!
-//! For every command that emits structured `--json` output, this module
-//! maps a CLI-invocation key (the command path joined with hyphens and
-//! prefixed `himalaya-`, mirroring how the man pages are named
-//! `himalaya-<cmd>-<subcmd>.1`) to the JSON Schema describing that
-//! command's `--json` payload. [`JsonSchemaCommand`] writes one
-//! `<key>.json` file per entry.
+//! Maps a CLI-invocation key, the command path joined with hyphens and
+//! prefixed `himalaya-`, to the JSON Schema of that command's `--json`
+//! payload. [`JsonSchemaCommand`] writes one file per entry.
 //!
 //! Protocol-specific entries are gated behind the same cargo features as
-//! their command modules, so the registry compiles and stays coherent
-//! under any feature combination (including none): only the schemas for
-//! compiled-in backends are emitted.
+//! their command modules, so the registry stays coherent under any feature
+//! combination, none included.
 //!
 //! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::JsonSchemaCommand
 
@@ -21,10 +17,9 @@ use serde_json::Value;
 
 /// Builds the command-to-schema map consumed by `json-schema <DIR>`.
 ///
-/// Each value is the JSON Schema of the concrete Rust type the command
-/// hands to `printer.out(...)` (the same value serialized under
-/// `--json`). Paginated listings use the `Paginated<T>` wrapper so the
-/// extra `next_page` field is described.
+/// Each value describes the type the command hands to the printer.
+/// Paginated listings use the `Paginated<T>` wrapper, so the extra
+/// `next_page` field is described too.
 pub fn schemas() -> BTreeMap<String, Value> {
     let mut schemas = BTreeMap::new();
 
@@ -37,8 +32,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
         };
     }
 
-    // --- Shared API (needs a storage backend, like the commands)
-
     #[cfg(backend)]
     {
         insert!(
@@ -49,7 +42,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-envelope-list",
             crate::shared::envelope::list::Envelopes
         );
-        // `envelope search` renders the same `Envelopes` table as `list`.
+        // NOTE: `envelope search` renders the `Envelopes` table of `list`.
         insert!(
             "himalaya-envelope-search",
             crate::shared::envelope::list::Envelopes
@@ -76,14 +69,13 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-attachment-list",
             crate::shared::attachment::list::Attachments
         );
-        // `attachment download` reports the same `Attachments` table.
+        // NOTE: `attachment download` reports the `Attachments` table of
+        // `list`.
         insert!(
             "himalaya-attachment-download",
             crate::shared::attachment::list::Attachments
         );
     }
-
-    // --- Account meta commands (always present)
 
     insert!(
         "himalaya-configure",
@@ -91,8 +83,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
     );
     insert!("himalaya-account-list", crate::account::list::AccountsTable);
     insert!("himalaya-account-check", crate::account::check::CheckReport);
-
-    // --- IMAP
 
     #[cfg(feature = "imap")]
     {
@@ -124,8 +114,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
         insert!("himalaya-imap-fetch", crate::imap::fetch::FetchedMessages);
     }
 
-    // --- ManageSieve
-
     #[cfg(feature = "sieve")]
     {
         insert!(
@@ -135,8 +123,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
         insert!("himalaya-sieve-list", crate::sieve::list::SieveScripts);
         insert!("himalaya-sieve-get", crate::sieve::get::SieveScriptOutput);
     }
-
-    // --- JMAP
 
     #[cfg(feature = "jmap")]
     {
@@ -186,8 +172,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::jmap::vacation::get::VacationTable
         );
     }
-
-    // --- Gmail
 
     #[cfg(feature = "gmail")]
     {
@@ -287,8 +271,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
     }
 
-    // --- Microsoft Graph
-
     #[cfg(feature = "msgraph")]
     {
         use crate::shared::output::Paginated;
@@ -323,8 +305,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
     }
 
-    // --- Maildir
-
     #[cfg(feature = "maildir")]
     {
         insert!("himalaya-maildir-list", crate::maildir::list::MaildirsTable);
@@ -337,8 +317,6 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::maildir::message::save::StoredMessage
         );
     }
-
-    // --- m2dir
 
     #[cfg(feature = "m2dir")]
     {

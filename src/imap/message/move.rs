@@ -1,3 +1,7 @@
+//! # IMAP move
+//!
+//! The `imap move` command, RFC 6851 `MOVE`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
@@ -12,29 +16,27 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
 };
 
-/// Move IMAP message(s) to the given mailbox (MOVE, RFC 6851).
+/// Move messages to the given mailbox (MOVE, RFC 6851).
 ///
-/// Moves the messages in the sequence set from the source mailbox to
-/// the destination mailbox. Requires the MOVE extension.
+/// The server has to advertise the MOVE extension.
 #[derive(Debug, Parser)]
 pub struct ImapMessageMoveCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
-
-    /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
+    /// The messages to move, as `1`, `1,2,3` or `1:*`.
     #[arg(name = "sequence_set", value_name = "SEQUENCE")]
     pub sequence_set: String,
     #[command(flatten)]
     pub mailbox_dest_name: TargetMailboxNameArg,
-
-    /// Use sequence numbers instead of UIDs.
+    /// Read the sequence set as message numbers rather than UIDs.
     #[arg(long)]
     pub seq: bool,
 }
 
 impl ImapMessageMoveCommand {
+    /// Selects the source mailbox unless told not to, then moves.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 

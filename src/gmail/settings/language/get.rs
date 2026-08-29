@@ -1,3 +1,8 @@
+//! # Gmail language get
+//!
+//! The `gmail settings language get` command,
+//! `users.settings.getLanguage`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -14,6 +19,7 @@ use crate::gmail::client::GmailClient;
 pub struct GmailSettingsLanguageGetCommand;
 
 impl GmailSettingsLanguageGetCommand {
+    /// Fetches the display language and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailLanguageGet::new(&client.auth, &client.user_id)?;

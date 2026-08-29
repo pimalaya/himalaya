@@ -1,14 +1,13 @@
-//! Himalaya wrapper around [`io_pimdir`]'s store, blob reader and producer.
+//! # pimdir client
 //!
-//! The store belongs to the sync engine, not to Himalaya. Reads go through
-//! [`PimdirReader`], the role that takes no lock (pimdir SPEC §8) and carries no
-//! write at all, so a sync in flight neither blocks Himalaya nor is blocked by
-//! it. Writes go through [`PimdirProducer`], which takes the shared lock for the
-//! length of one enqueue: a producer stages actions for the owner to apply and
-//! never mutates the index itself.
+//! The wrapper around io-pimdir's store, blob reader and producer.
 //!
-//! The reader overlays the queue (pimdir SPEC §15.4), so an action this process
-//! staged shows on the next read instead of waiting for the owner to apply it.
+//! The store belongs to the sync engine. Reads take the lockless reader
+//! role, so a sync in flight neither blocks Himalaya nor is blocked by
+//! it, and writes take the shared lock for one enqueue.
+//!
+//! The reader overlays the queue, so an action this process staged shows
+//! on the next read rather than wait for the owner to apply it.
 
 use std::path::PathBuf;
 
@@ -39,13 +38,12 @@ pub struct PimdirClient {
 impl PimdirClient {
     /// Opens the pimdir store at the configured root, read-only.
     ///
-    /// The store must exist: Himalaya reads a replica a sync populated, and
+    /// The store has to exist: Himalaya reads a replica a sync populated, so
     /// creating one here would answer a mistyped root with an empty mailbox
-    /// list instead of saying the path is wrong.
+    /// list rather than say the path is wrong.
     pub fn new(config: PimdirConfig) -> Result<Self> {
-        // Expand `~` and env vars: `root` is a `PathBuf` that carries the raw
-        // `~/…` verbatim, and opening it unexpanded would look for a store at a
-        // literal `./~/…` relative to the cwd.
+        // NOTE: the configured root carries its `~` verbatim, and opening it
+        // unexpanded would look for a store at a literal one under the cwd.
         let root = shellexpand::full(&config.root.to_string_lossy())
             .map(|expanded| PathBuf::from(expanded.into_owned()))
             .unwrap_or_else(|_| config.root.clone());
@@ -57,8 +55,8 @@ impl PimdirClient {
             ));
         }
 
-        // Reads overlay the queue (pimdir SPEC §15.4): what this client
-        // staged is visible on the next read rather than on the next sync.
+        // NOTE: reads overlay the queue, so what this client staged shows on
+        // the next read rather than on the next sync.
         let store = PimdirReader::open(&root)
             .map_err(|err| anyhow!("Open pimdir store `{}`: {err}", root.display()))?
             .with_pending();
@@ -76,9 +74,8 @@ impl PimdirClient {
 
     /// Opens a producer for the length of one staging batch.
     ///
-    /// A producer holds the store's shared lock, so it is opened for the writes
-    /// it is about to stage and dropped as they land, rather than kept for the
-    /// process's lifetime.
+    /// A producer holds the store's shared lock, so it is opened for the
+    /// writes it stages and dropped as they land.
     pub(crate) fn producer(&self) -> Result<PimdirProducer> {
         let producer = PimdirProducer::open(&self.root, PRODUCER)
             .map_err(|err| anyhow!("Open pimdir producer `{}`: {err}", self.root.display()))?;
@@ -91,15 +88,16 @@ impl PimdirClient {
 }
 
 impl PimdirClient {
-    /// Cancels one queued action, taking the store owner role for the length of
-    /// the call (pimdir SPEC §15.5), and reports whether there was a row.
+    /// Cancels one queued action, reporting whether there was a row.
     ///
-    /// Cancelling is an owner write and the only retraction a queued creation
-    /// has. The role is entered here and released before this returns, so
-    /// Himalaya never holds a handle that could drain the queue or collect the
-    /// store. A sync in flight owns it, and that is refused at once rather than
-    /// waited out: the action is still queued, and may have been applied by the
-    /// time the user reads the message.
+    /// Cancelling is an owner write, and the only retraction a queued
+    /// creation has. The role is entered and released inside this call, so
+    /// Himalaya never holds a handle that could drain the queue or collect
+    /// the store.
+    ///
+    /// A sync in flight owns the store, and that is refused at once rather
+    /// than waited out: the action is still queued, and may have been applied
+    /// by the time the user reads the message.
     pub fn cancel_queued(&self, id: i64) -> Result<bool> {
         PimdirStore::cancel_action(&self.root, id).map_err(|err| match err {
             PimdirError::Owned(_) => anyhow!(
@@ -129,11 +127,13 @@ pub fn build_pimdir_client(
 
 /// The account this client reads, configured or derived.
 ///
-/// A store synced by one account groups its collections under that one name (or
-/// under none, in a store written before the grouping), so the common case needs
-/// no configuration. Several accounts in one store is what `pimdir.account`
-/// answers, and leaving it unset there is an error rather than a guess: picking
-/// one would silently show the wrong mailbox set.
+/// A store synced by one account groups its collections under that name, or
+/// under none in a store predating the grouping, so the common case needs no
+/// configuration.
+///
+/// A store several accounts share is what `pimdir.account` answers, and
+/// leaving it unset there errors rather than guess: picking one would show
+/// the wrong mailbox set.
 fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<Option<String>> {
     if configured.is_some() {
         return Ok(configured);

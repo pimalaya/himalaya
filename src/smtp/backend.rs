@@ -1,11 +1,11 @@
-//! SMTP adapter for the shared cross-protocol client.
+//! # SMTP backend
 //!
-//! SMTP is send-only: the dispatcher registers it as a sending transport
-//! for storage backends that cannot send themselves (IMAP, Maildir,
-//! m2dir). `send_message` derives the RFC 5321 envelope from the raw
-//! message headers (From: as the reverse path; To:/Cc:/Bcc: as the
-//! forward paths), then reuses [`SmtpClient`]'s `send`. The envelope
-//! parsing is lifted from the retired io-email SMTP driver.
+//! The SMTP adapter of the shared cross-protocol client, a send-only
+//! transport for the storage backends that cannot send themselves.
+//!
+//! The RFC 5321 envelope is derived from the message headers: `From:`
+//! becomes the reverse path, and `To:`, `Cc:` and `Bcc:` the forward
+//! paths.
 
 use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;

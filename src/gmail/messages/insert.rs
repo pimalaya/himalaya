@@ -1,3 +1,7 @@
+//! # Gmail message insert
+//!
+//! The `gmail messages insert` command, `users.messages.insert`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw, insert::GmailMessageInsert};
@@ -17,6 +21,7 @@ pub struct GmailMessageInsertCommand {
 }
 
 impl GmailMessageInsertCommand {
+    /// Inserts the message without applying any delivery rule.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
 

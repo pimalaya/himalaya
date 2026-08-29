@@ -1,15 +1,11 @@
-//! Shared MIME-building helpers for the built-in `compose`, `reply`
-//! and `forward` subcommands.
+//! # Message builder
 //!
-//! Each subcommand has its own clap struct (different positional /
-//! optional args), but they all collapse into the same set of fields
-//! once the source message — if any — is fetched. The helpers here
-//! accept those fields and assemble an RFC 5322 message with
-//! `mail_builder` (plus reply/forward header derivation via
-//! `mail_parser`).
+//! The MIME assembly behind the `compose`, `reply` and `forward`
+//! commands, which collapse into one set of fields once the source
+//! message, if there is one, has been fetched.
 //!
-//! The `-with` subcommands delegate composition entirely to an
-//! external command and never go through this module.
+//! An RFC 5322 message comes out, headers derived from the source with
+//! mail-parser and the whole assembled with mail-builder.
 
 use std::{
     io::{IsTerminal, Read as _, stdin},
@@ -24,63 +20,73 @@ use mail_builder::{
 };
 use mail_parser::{HeaderValue, MessageParser, parsers::MessageStream};
 
-/// How a quoted source body is laid out relative to the user's body
-/// when replying or forwarding.
+/// Where a quoted source body sits relative to the written one.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum PostingStyle {
-    /// User body above the quoted source body.
+    /// The written body above the quoted source body.
     Top,
-    /// Quoted source body above the user body.
+    /// The quoted source body above the written body.
     Bottom,
 }
 
-/// All the fields the built-in MIME assembler needs. Each subcommand
-/// populates these from its own clap struct.
+/// Everything the MIME assembler needs, which each command fills in from
+/// its own clap struct.
 pub struct BuilderArgs<'a> {
-    /// Address the `From` header carries, from `--from` or from the
-    /// account's `email`. A value spelling out a display name, as in
-    /// `Alice <alice@example.org>`, is split back apart rather than
-    /// taken for one long address.
+    /// Address the `From` header carries.
+    ///
+    /// A value spelling out a display name is split back apart rather
+    /// than taken for one long address.
     pub from: Option<&'a str>,
-    /// Name that address goes by, from the account's `display-name`.
-    /// Kept apart from the address so `mail_builder` encodes it, a
-    /// name holding a comma or a quote needing no rule of ours.
+    /// Name that address goes by, kept apart from it so mail-builder
+    /// encodes it: a name holding a comma or a quote wants no rule here.
     pub from_name: Option<&'a str>,
+    /// Addresses the `To` header carries.
     pub to: &'a [String],
+    /// Addresses the `Cc` header carries.
     pub cc: &'a [String],
+    /// Addresses the `Bcc` header carries.
     pub bcc: &'a [String],
+    /// The `Subject` header.
     pub subject: Option<&'a str>,
+    /// The text body, when it was given inline.
     pub body: Option<&'a str>,
+    /// The file the text body is read from instead.
     pub body_file: Option<&'a Path>,
+    /// The files to attach.
     pub attach: &'a [PathBuf],
-    /// Signature text, from `--signature` or from the account's
-    /// `signature`. Left `None` when `signature_file` names the file
-    /// holding it.
+    /// The signature, `None` when `signature_file` names the file holding
+    /// it.
     pub signature: Option<&'a str>,
+    /// The file the signature is read from instead.
     pub signature_file: Option<&'a Path>,
-    /// Separator written before the signature, from the account's
-    /// `signature-delim`. Written verbatim.
+    /// Separator written before the signature, verbatim.
     pub signature_delim: &'a str,
 }
 
-/// Source-message metadata, populated for reply/forward subcommands.
+/// The source message a reply or a forward is derived from.
 pub struct SourceArgs<'a> {
+    /// The raw RFC 5322 bytes of the source.
     pub raw: &'a [u8],
+    /// Whether it is being replied to or forwarded.
     pub mode: SourceMode,
+    /// Where its quoted body sits relative to the written one.
     pub posting_style: PostingStyle,
+    /// The headline placed before its quoted body.
     pub quote_headline: &'a str,
 }
 
 /// Whether the source message is being replied to or forwarded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceMode {
+    /// The reply derives `In-Reply-To`, `References` and a `Re:` subject.
     Reply,
+    /// The forward derives `References` and a `Fwd:` subject.
     Forward,
 }
 
-/// Assembles a MIME message from `args` and an optional reply/forward
-/// `source`. Returns the raw RFC 5322 bytes.
+/// Assembles the raw RFC 5322 bytes of a message, deriving the reply or
+/// forward headers when a source is given.
 pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Vec<u8>> {
     let mut builder = MessageBuilder::new();
 
@@ -179,10 +185,12 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
         .map_err(|err| anyhow!("serialize composed message: {err}"))
 }
 
-/// Splits a mailbox into its display name, if it carries one, and its
-/// address. Handing `mail_builder` the whole `Alice <alice@example.org>`
-/// as an address would make it a `From: <Alice <alice@example.org>>`
-/// no SMTP server accepts.
+/// Splits a mailbox into its display name, when it carries one, and its
+/// address.
+///
+/// Handing mail-builder the whole `Alice <alice@example.org>` as an
+/// address would emit a `From: <Alice <alice@example.org>>` no SMTP
+/// server accepts.
 fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
     use mail_parser::Address as ParserAddress;
 
@@ -211,6 +219,7 @@ fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
     Ok((name, address))
 }
 
+/// Builds an address list out of bare addresses.
 fn addresses(values: &[String]) -> Address<'static> {
     Address::new_list(
         values
@@ -220,6 +229,8 @@ fn addresses(values: &[String]) -> Address<'static> {
     )
 }
 
+/// Reads the text body from the flag, the file it names, or piped
+/// standard input.
 fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
     if let Some(body) = body {
         return Ok(body.to_owned());
@@ -239,6 +250,7 @@ fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
     Ok(String::new())
 }
 
+/// Reads the signature from the flag or the file it names.
 fn read_signature(
     signature: Option<&str>,
     signature_file: Option<&Path>,
@@ -256,9 +268,8 @@ fn read_signature(
     Ok(None)
 }
 
-/// Builds the final text body from user input, optional quoted
-/// source text, an optional headline, an optional signature and the
-/// separator introducing it, and the requested posting style.
+/// Lays out the final text body: the written text, the quoted source
+/// under its headline, and the signature after its separator.
 fn compose_body(
     user_body: &str,
     source_text: &str,
@@ -320,15 +331,17 @@ fn compose_body(
     body
 }
 
+/// Whether a subject already carries a `Re:` or `Fwd:` prefix.
 fn has_prefix(subject: &str, prefix: &str) -> bool {
     let s = subject.trim_start();
-    // Keep the colon: comparing only the letters would treat a subject
-    // like "Ready to ship" as already carrying a "Re:" prefix and drop
-    // the real one.
+    // NOTE: the colon is part of the comparison, letters alone reading
+    // "Ready to ship" as already `Re:`-prefixed.
     let p = prefix.trim();
     s.len() >= p.len() && s.get(..p.len()).map(|h| h.eq_ignore_ascii_case(p)) == Some(true)
 }
 
+/// Derives the recipients of a reply from the source's `Reply-To`, or
+/// from its `From` when it names none.
 fn reply_recipients(msg: &mail_parser::Message<'_>) -> Option<Address<'static>> {
     use mail_parser::Address as ParserAddress;
 
@@ -368,6 +381,8 @@ fn reply_recipients(msg: &mail_parser::Message<'_>) -> Option<Address<'static>> 
     }
 }
 
+/// Builds the `References` header of a reply: the source's own chain,
+/// or its `In-Reply-To`, with the source id appended.
 fn compute_references(msg: &mail_parser::Message<'_>, source_message_id: &str) -> String {
     let mut out = String::new();
 
@@ -397,6 +412,8 @@ fn compute_references(msg: &mail_parser::Message<'_>, source_message_id: &str) -
     out
 }
 
+/// Appends one message id to a `References` chain, wrapped in angle
+/// brackets.
 fn push_msg_id(out: &mut String, id: &str) {
     let id = id.trim();
     if id.is_empty() {
@@ -414,6 +431,7 @@ fn push_msg_id(out: &mut String, id: &str) {
     }
 }
 
+/// Guesses the MIME type of an attachment from its path.
 fn mime_for(path: &Path) -> String {
     mime_guess::from_path(path)
         .first_or_octet_stream()
@@ -425,8 +443,8 @@ fn mime_for(path: &Path) -> String {
 mod tests {
     use super::*;
 
-    /// A raw source message used by the reply/forward tests. It already
-    /// carries a `References` header so threading can be asserted.
+    /// A raw source message for the reply and forward tests, carrying a
+    /// `References` header so threading can be asserted.
     const SOURCE: &[u8] = b"From: Alice <alice@example.com>\r\n\
 To: Bob <bob@example.com>\r\n\
 Subject: Project update\r\n\
@@ -495,8 +513,8 @@ Original body line.\r\n";
     fn compose_names_the_from_address() {
         let to = vec!["bob@example.com".to_string()];
         let mut a = args("alice@example.com", &to, Some("Hello"), "Hi Bob");
-        // A comma is what an unquoted display name would break on, the
-        // header reading as two addresses.
+        // NOTE: a comma is what an unquoted display name breaks on, the
+        // header then reading as two addresses.
         a.from_name = Some("Doe, Alice");
 
         let raw = build(a, None).unwrap();
@@ -514,14 +532,10 @@ Original body line.\r\n";
         let msg = parse(&raw);
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        // subject gains a single "Re:" prefix
         assert_eq!(msg.subject(), Some("Re: Project update"));
-        // with no explicit --to, the reply goes to the source's From
         assert!(text.contains("alice@example.com"));
-        // threading: In-Reply-To is the source id, References appends it
         assert!(text.contains("In-Reply-To:"));
         assert!(text.contains("orig-2@example.com"));
-        // body: user text above the quoted source, with a headline
         let body = msg.body_text(0).unwrap();
         assert!(body.contains("My reply"));
         assert!(body.contains("On a day, Alice wrote:"));
@@ -544,7 +558,6 @@ Original body line.\r\n";
 
     #[test]
     fn reply_prefixes_subject_that_merely_starts_with_re_letters() {
-        // regression: "Ready…" starts with "Re" but is not "Re:"-prefixed
         let raw = b"Subject: Ready to ship\r\nMessage-ID: <x@e>\r\n\r\nbody";
         let src = SourceArgs {
             raw,
@@ -599,19 +612,16 @@ Original body line.\r\n";
 
     #[test]
     fn compute_references_appends_source_id() {
-        // existing References win and the source id is appended
         let msg = parse(SOURCE);
         assert_eq!(
             compute_references(&msg, "orig-2@example.com"),
             "<orig-0@example.com> <orig-1@example.com> <orig-2@example.com>",
         );
 
-        // falls back to In-Reply-To when there is no References header
         let raw = b"In-Reply-To: <a@e>\r\nMessage-ID: <b@e>\r\n\r\nx";
         let msg = parse(raw);
         assert_eq!(compute_references(&msg, "b@e"), "<a@e> <b@e>");
 
-        // neither header: just the source id, wrapped
         let raw = b"Message-ID: <b@e>\r\n\r\nx";
         let msg = parse(raw);
         assert_eq!(compute_references(&msg, "b@e"), "<b@e>");
@@ -637,12 +647,10 @@ Original body line.\r\n";
         assert_eq!(name, None);
         assert_eq!(address, "alice@example.org");
 
-        // a quoted name keeps the comma the quotes protect
         let (name, address) = parse_mailbox("\"Doe, Alice\" <alice@example.org>").unwrap();
         assert_eq!(name.as_deref(), Some("Doe, Alice"));
         assert_eq!(address, "alice@example.org");
 
-        // an encoded word is decoded rather than carried verbatim
         let (name, _) = parse_mailbox("=?utf-8?B?QWxpY2U=?= <alice@example.org>").unwrap();
         assert_eq!(name.as_deref(), Some("Alice"));
 
@@ -656,7 +664,6 @@ Original body line.\r\n";
         let raw = build(args("Alice <alice@example.org>", &empty, None, "hi"), None).unwrap();
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        // regression: the whole value used to land inside the brackets
         assert!(!text.contains("<Alice <alice@example.org>>"));
 
         let msg = parse(&raw);
@@ -686,7 +693,7 @@ Original body line.\r\n";
 
     #[test]
     fn compose_body_writes_the_signature_delimiter_verbatim() {
-        // A delimiter meant to stand on its own line carries its own
+        // NOTE: a delimiter meant to stand on its own line carries its own
         // newline; one that does not, does not.
         let custom = compose_body("mine", "", "", "Alice", "~~~\n", PostingStyle::Top);
         assert_eq!(custom, "mine\n\n~~~\nAlice");

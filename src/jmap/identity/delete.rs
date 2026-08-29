@@ -1,3 +1,8 @@
+//! # JMAP identity delete
+//!
+//! The `jmap identity delete` command, the destroy half of RFC 8621
+//! `Identity/set`.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::JmapIdentitySetArgs;
@@ -14,6 +19,7 @@ pub struct JmapIdentityDeleteCommand {
 }
 
 impl JmapIdentityDeleteCommand {
+    /// Destroys the identity.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mut args = JmapIdentitySetArgs::default();
 

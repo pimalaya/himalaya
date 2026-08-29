@@ -1,3 +1,8 @@
+//! # JMAP email
+//!
+//! The `jmap email` command family, covering the `Email` data type and
+//! its blob endpoints.
+
 pub mod cli;
 pub mod copy;
 pub mod delete;

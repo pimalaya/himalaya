@@ -1,3 +1,7 @@
+//! # ManageSieve command
+//!
+//! The `sieve` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -44,6 +48,7 @@ pub enum SieveCommand {
 }
 
 impl SieveCommand {
+    /// Runs the subcommand against the account's ManageSieve session.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,7 @@
+//! # Gmail message untrash
+//!
+//! The `gmail messages untrash` command, `users.messages.untrash`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -13,6 +17,7 @@ pub struct GmailMessageUntrashCommand {
 }
 
 impl GmailMessageUntrashCommand {
+    /// Takes the message back out of the trash.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let message = client.message_untrash(&self.id)?.response;
         printer.out(Message::new(format!(

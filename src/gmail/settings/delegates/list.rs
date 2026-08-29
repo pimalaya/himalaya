@@ -1,3 +1,8 @@
+//! # Gmail delegate list
+//!
+//! The `gmail settings delegates list` command,
+//! `users.settings.delegates.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -21,6 +26,7 @@ use crate::{
 pub struct GmailSettingsDelegatesListCommand;
 
 impl GmailSettingsDelegatesListCommand {
+    /// Lists every delegate and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,

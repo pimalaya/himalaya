@@ -1,3 +1,8 @@
+//! # Attachment download
+//!
+//! The `attachment download` command, writing the attachment parts of one
+//! message to disk.
+
 use std::{
     collections::BTreeSet,
     fs,
@@ -18,41 +23,30 @@ use crate::{
     },
 };
 
-/// Download specific attachments of a single message to disk.
+/// Download the attachments of one message to disk.
 ///
-/// The attachment ids are the MIME part positions reported by
-/// `attachments list` and by `message read` (`[ID] ...`). Pass one or
-/// more ids to fetch exactly those parts. Inline parts are addressable
-/// by their id too — the id you see in `attachments list --inline` is
-/// the same id you pass here.
-///
-/// The destination directory defaults to the account's
-/// `downloads-dir` config (falling back to the global one, then the
-/// platform's standard downloads directory). Pass `--dir <PATH>` to
-/// override.
+/// An attachment id is the MIME part position `attachment list` and
+/// `message read` report, inline parts included. A name colliding with an
+/// existing file is suffixed rather than overwriting it.
 #[derive(Debug, Parser)]
 pub struct AttachmentDownloadCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
-
     /// Identifier of the message.
     #[arg(value_name = "MESSAGE-ID")]
     pub message_id: String,
-
-    /// Attachment identifier(s) to download.
-    ///
-    /// Omit identifiers to download all attachments.
+    /// Identifiers of the attachments to download, all of them when none
+    /// is given.
     #[arg(value_name = "ATTACHMENT-ID", num_args = 0..)]
     pub attachment_ids: Vec<String>,
-
-    /// Destination directory.
-    ///
-    /// Overrides the account/global `downloads-dir` config.
+    /// Destination directory, overriding the configured `downloads-dir`.
     #[arg(long, short, value_name = "PATH")]
     pub dir: Option<PathBuf>,
 }
 
 impl AttachmentDownloadCommand {
+    /// Fetches the message, writes the wanted parts and tables what
+    /// landed where.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -135,8 +129,8 @@ impl AttachmentDownloadCommand {
     }
 }
 
-/// Strips path separators and parent traversals so a hostile filename
-/// header can't escape the download directory.
+/// Strips path separators and parent traversals, so a hostile filename
+/// header cannot escape the download directory.
 fn sanitize(name: &str) -> String {
     let trimmed = name.trim();
     let cleaned: String = trimmed
@@ -154,8 +148,8 @@ fn sanitize(name: &str) -> String {
     }
 }
 
-/// Returns a path inside `dir` that doesn't already exist by suffixing
-/// `(1)`, `(2)`, … to the stem when needed.
+/// Returns a path in the directory that does not exist yet, suffixing the
+/// stem with `(1)`, `(2)` and so on as needed.
 fn unique_path(dir: &Path, name: &str) -> PathBuf {
     let candidate = dir.join(name);
     if !candidate.exists() {

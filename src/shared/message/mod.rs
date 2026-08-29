@@ -1,9 +1,12 @@
-// `arg` (the `MessageArg` input resolver) is used by the protocol
-// send/save commands too, so it stays compiled. `compose`/`send` (and
-// their `builder`/`handler` helpers, plus the `cli` enum that hosts
-// them) also work over SMTP, so they carry `any(backend, feature =
-// "smtp")`; the remaining commands need a mailbox backend, so they carry
-// `backend`.
+//! # Message
+//!
+//! The `message` command family: reading a message, writing one, and
+//! moving one between mailboxes.
+//!
+//! The `arg` input resolver is compiled unconditionally, the
+//! protocol-specific send and save commands taking it too. Composing and
+//! sending work over SMTP alone, where the rest needs a mailbox backend.
+
 #[cfg(backend)]
 pub mod add;
 pub mod arg;

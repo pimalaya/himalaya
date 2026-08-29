@@ -1,3 +1,8 @@
+//! # Maildir flag list
+//!
+//! The `maildir flag list` command, naming the six standard flags and
+//! their letters.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -18,6 +23,7 @@ use crate::{account::context::Account, shared::table::style_from_preset};
 pub struct MaildirFlagListCommand;
 
 impl MaildirFlagListCommand {
+    /// Tables the six standard flags and their info letters.
     pub fn execute(self, printer: &mut impl Printer, account: &mut Account) -> Result<()> {
         let table = FlagsTable {
             preset: account.table_preset().to_string(),

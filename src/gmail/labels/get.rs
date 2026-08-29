@@ -1,3 +1,7 @@
+//! # Gmail label get
+//!
+//! The `gmail labels get` command, `users.labels.get`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
@@ -16,6 +20,7 @@ pub struct GmailLabelGetCommand {
 }
 
 impl GmailLabelGetCommand {
+    /// Fetches the labels and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

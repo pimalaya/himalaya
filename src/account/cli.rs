@@ -1,3 +1,7 @@
+//! # Account command
+//!
+//! The `account` command, dispatching onto its subcommands.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -11,9 +15,9 @@ use crate::{
 
 /// Manage accounts defined in the TOML configuration file.
 ///
-/// An account is a named group of backend settings (imap, jmap,
-/// maildir, smtp). Use these subcommands to inspect them or validate
-/// their connection. To create a new account, run bare `himalaya`.
+/// An account is a named group of backend settings. These subcommands
+/// inspect them and validate their connection; creating one is bare
+/// `himalaya`.
 #[derive(Debug, Subcommand)]
 pub enum AccountCommand {
     #[command(visible_alias = "ls")]
@@ -22,6 +26,7 @@ pub enum AccountCommand {
 }
 
 impl AccountCommand {
+    /// Runs the subcommand against the configuration `-c` names.
     pub fn execute(
         self,
         printer: &mut impl Printer,

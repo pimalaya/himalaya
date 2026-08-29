@@ -1,3 +1,7 @@
+//! # IMAP select
+//!
+//! The `imap select` command, RFC 3501 `SELECT`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
@@ -8,11 +12,9 @@ use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Select the given mailbox (SELECT, RFC 3501).
 ///
-/// Opens the mailbox for read-write access and returns its status
-/// (flags, message count, UID validity, ...).
-///
-/// NOTE: a selected mailbox only persists within a stateful IMAP
-/// session. See https://github.com/pimalaya/sirup
+/// Opens it for read-write access and returns its status. The selection
+/// only outlives the command over a stateful IMAP session such as a Sirup
+/// proxy.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxSelectCommand {
     #[command(flatten)]
@@ -20,6 +22,7 @@ pub struct ImapMailboxSelectCommand {
 }
 
 impl ImapMailboxSelectCommand {
+    /// Selects the mailbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         client.select(mailbox, ImapMailboxSelectOptions::default())?;

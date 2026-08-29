@@ -1,3 +1,7 @@
+//! # IMAP status
+//!
+//! The `imap status` command, RFC 3501 `STATUS`.
+
 use io_imap::client::ImapClient as _;
 use std::fmt;
 
@@ -17,7 +21,7 @@ use crate::{
 
 /// Get the status of the given mailbox (STATUS, RFC 3501).
 ///
-/// Reports message counts and UID values without selecting the mailbox.
+/// Message counts and UID values, without selecting the mailbox.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxStatusCommand {
     #[command(flatten)]
@@ -25,6 +29,7 @@ pub struct ImapMailboxStatusCommand {
 }
 
 impl ImapMailboxStatusCommand {
+    /// Asks for every status item and tables what came back.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -51,16 +56,24 @@ impl ImapMailboxStatusCommand {
     }
 }
 
-/// Parsed STATUS data items for a mailbox.
+/// The `imap status` output, one field per data item the server returned.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxStatus {
+    /// Total message count.
     pub messages: Option<u32>,
+    /// Count of messages carrying `\Recent`.
     pub recent: Option<u32>,
+    /// The UID the next message will be assigned.
     pub uid_next: Option<u32>,
+    /// The UID validity, which changes when every UID does.
     pub uid_validity: Option<u32>,
+    /// Count of messages lacking `\Seen`.
     pub unseen: Option<u32>,
+    /// Count of messages carrying `\Deleted`, per RFC 9208.
     pub deleted: Option<u32>,
+    /// Bytes an expunge would reclaim, per RFC 9208.
     pub deleted_storage: Option<u64>,
+    /// The highest modification sequence, per RFC 7162 CONDSTORE.
     pub highest_mod_seq: Option<u64>,
 }
 
@@ -94,9 +107,11 @@ impl From<Vec<StatusDataItem>> for MailboxStatus {
     }
 }
 
-/// Renderable table of a mailbox's STATUS values.
+/// The status rendered as a table of attributes and values.
 pub struct MailboxStatusTable {
+    /// The `comfy_table` preset string the table renders with.
     pub preset: String,
+    /// The status the server reported.
     pub status: MailboxStatus,
 }
 

@@ -1,3 +1,8 @@
+//! # JMAP submission cancel
+//!
+//! The `jmap submission cancel` command, an RFC 8621
+//! `EmailSubmission/set` update setting the undo status.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -16,6 +21,7 @@ pub struct JmapSubmissionCancelCommand {
 }
 
 impl JmapSubmissionCancelCommand {
+    /// Sets the undo status of the submission to canceled.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let output = client.email_submission_cancel(self.ids.clone())?;
 

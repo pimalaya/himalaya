@@ -1,7 +1,7 @@
-//! # Search emails sort query string parser
+//! # Search sort parser
 //!
-//! Parsers needed to build a [`SearchEmailsSorter`] chain from a string
-//! slice. Based on [`chumsky`].
+//! The chumsky grammar building a [`SearchEmailsSorter`] chain from a
+//! string.
 //!
 //! [`SearchEmailsSorter`]: crate::email::search::sort::query::SearchEmailsSorter
 
@@ -12,11 +12,8 @@ use crate::email::search::{
     sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
 };
 
-/// The emails search sort query string parser.
-///
-/// A sort query string is a list of sorters separated by spaces. Each
-/// sorter is a kind (`date`, `from`, `to`, `subject`) followed by an
-/// optional order (`asc`, `desc`; ascending when omitted).
+/// Parses a sort: space-separated sorters, each a key followed by an
+/// optional direction, ascending when omitted.
 pub fn query<'a>() -> impl Parser<'a, &'a str, Vec<SearchEmailsSorter>, ParserError<'a>> + Clone {
     choice((date(), from(), to(), subject()))
         .separated_by(

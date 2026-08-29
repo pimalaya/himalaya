@@ -1,21 +1,28 @@
-//! CLI presentation and input helpers mapping Gmail settings enums to
-//! and from their camelCase wire spellings. These converters live in
-//! himalaya, not io-gmail, since they are pure CLI affordances. Input
-//! enums derive [`ValueEnum`] with the Gmail wire spelling, so the
-//! value a `set` command accepts matches what the paired `get` prints.
+//! # Gmail settings conversion
+//!
+//! Maps the Gmail settings enums to and from their camelCase wire
+//! spellings.
+//!
+//! These are pure CLI affordances, so they live here rather than in
+//! io-gmail. Each input enum keeps the wire spelling, so what a `set`
+//! accepts is what the paired `get` prints.
 
 use clap::ValueEnum;
 use io_gmail::v1::rest::settings::{
     GmailDisposition, GmailExpungeBehavior, GmailPopAccessWindow, GmailVerificationStatus,
 };
 
-/// Auto-forwarding / POP disposition accepted on the CLI.
+/// What becomes of a message once it has been forwarded or fetched.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "camelCase")]
 pub enum DispositionArg {
+    /// Leave it in the inbox, unread.
     LeaveInInbox,
+    /// Archive it.
     Archive,
+    /// Move it to the trash.
     Trash,
+    /// Leave it in the inbox, marked read.
     MarkRead,
 }
 
@@ -30,12 +37,15 @@ impl From<DispositionArg> for GmailDisposition {
     }
 }
 
-/// IMAP expunge behavior accepted on the CLI.
+/// What becomes of a message an IMAP client expunges.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "camelCase")]
 pub enum ExpungeBehaviorArg {
+    /// Archive it.
     Archive,
+    /// Move it to the trash.
     Trash,
+    /// Delete it for good.
     DeleteForever,
 }
 
@@ -49,12 +59,15 @@ impl From<ExpungeBehaviorArg> for GmailExpungeBehavior {
     }
 }
 
-/// POP access window accepted on the CLI.
+/// Which mail a POP client may fetch.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "camelCase")]
 pub enum PopAccessWindowArg {
+    /// None: POP access is off.
     Disabled,
+    /// Only the mail arriving from now on.
     FromNowOn,
+    /// Every mail in the mailbox.
     AllMail,
 }
 

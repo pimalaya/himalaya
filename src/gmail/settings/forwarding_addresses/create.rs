@@ -1,3 +1,8 @@
+//! # Gmail forwarding address create
+//!
+//! The `gmail settings forwarding-addresses create` command,
+//! `users.settings.forwardingAddresses.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::{
@@ -17,6 +22,7 @@ pub struct GmailSettingsForwardingAddressCreateCommand {
 }
 
 impl GmailSettingsForwardingAddressCreateCommand {
+    /// Registers the forwarding address and reports its status.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let address = GmailForwardingAddress {
             forwarding_email: self.email.clone(),

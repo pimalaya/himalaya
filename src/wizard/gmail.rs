@@ -1,8 +1,9 @@
-//! Gmail REST API wizard (Google accounts).
+//! # Gmail wizard
 //!
-//! The Gmail API is bearer-token-only: the wizard collects the user id
-//! and the token secret, typically an Ortie shell command since tokens
-//! expire and need refreshing.
+//! Configures a Google account against the Gmail REST API.
+//!
+//! The API takes bearer tokens alone, so the prompts collect the user id
+//! and the token, usually as a broker command since a token expires.
 
 use anyhow::Result;
 use pimalaya_cli::prompt;

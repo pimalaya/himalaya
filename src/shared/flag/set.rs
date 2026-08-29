@@ -1,3 +1,8 @@
+//! # Flag set
+//!
+//! The `flag set` command, replacing the whole flag set of one or more
+//! messages.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -16,7 +21,7 @@ use crate::{
     },
 };
 
-/// Replace flag(s) of message(s) for the active account.
+/// Replace the flags of messages, dropping the ones not named.
 #[derive(Debug, Parser)]
 pub struct FlagSetCommand {
     #[command(flatten)]
@@ -28,6 +33,7 @@ pub struct FlagSetCommand {
 }
 
 impl FlagSetCommand {
+    /// Replaces the flags and reports which ones landed.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -45,6 +51,7 @@ impl FlagSetCommand {
     }
 }
 
+/// The `flag set` output, naming the flags that were set.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SetFlags {
     flags: Vec<String>,

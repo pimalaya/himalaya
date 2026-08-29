@@ -1,3 +1,8 @@
+//! # Flag remove
+//!
+//! The `flag remove` command, removing flags from the existing set of one
+//! or more messages.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -16,7 +21,7 @@ use crate::{
     },
 };
 
-/// Remove flag(s) from message(s) for the active account.
+/// Remove flags from messages, keeping the ones not named.
 #[derive(Debug, Parser)]
 pub struct FlagRemoveCommand {
     #[command(flatten)]
@@ -28,6 +33,7 @@ pub struct FlagRemoveCommand {
 }
 
 impl FlagRemoveCommand {
+    /// Removes the flags and reports which ones went.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -45,6 +51,7 @@ impl FlagRemoveCommand {
     }
 }
 
+/// The `flag remove` output, naming the flags that were removed.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct RemovedFlags {
     flags: Vec<String>,

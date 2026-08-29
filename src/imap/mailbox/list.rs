@@ -1,3 +1,7 @@
+//! # IMAP list
+//!
+//! The `imap list` command, RFC 3501 `LIST` and `LSUB`.
+
 use io_imap::client::ImapClient as _;
 use std::fmt;
 
@@ -14,24 +18,25 @@ use crate::{
     shared::table::style_from_preset,
 };
 
-/// List mailboxes (LIST / LSUB, RFC 3501).
+/// List mailboxes (LIST and LSUB, RFC 3501).
 ///
-/// Lists subscribed mailboxes (LSUB) by default, or every mailbox
-/// (LIST) with --all.
+/// `LSUB` lists the subscribed mailboxes, which is the default, and
+/// `--all` switches to the `LIST` of every one.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxListCommand {
-    /// List all mailboxes, not just subscribed ones.
+    /// List every mailbox rather than the subscribed ones.
     #[arg(short = 'A', long)]
     pub all: bool,
-    /// The reference name for the LIST/LSUB command.
+    /// The reference name the listing starts from.
     #[arg(short, long, default_value = "")]
     pub reference: String,
-    /// The mailbox name pattern with wildcards (* and %).
+    /// The name pattern to match, `*` and `%` being the wildcards.
     #[arg(short, long, default_value = "*")]
     pub pattern: String,
 }
 
 impl ImapMailboxListCommand {
+    /// Lists the mailboxes and prints them as a table.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -57,13 +62,16 @@ impl ImapMailboxListCommand {
     }
 }
 
-/// Renderable table of LIST/LSUB mailboxes.
+/// The `imap list` output, a table of mailboxes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxesTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The color of the NAME column.
     #[serde(skip)]
     pub name_color: Color,
+    /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<MailboxRow>,
 }
 
@@ -107,11 +115,14 @@ impl fmt::Display for MailboxesTable {
     }
 }
 
-/// One row of the mailboxes table: name, delimiter and attributes.
+/// One row of the mailboxes table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxRow {
+    /// The mailbox name.
     pub name: String,
+    /// The hierarchy delimiter, empty when the server reported none.
     pub delimiter: String,
+    /// The name attributes the server reported, SPECIAL-USE included.
     pub attributes: Vec<String>,
 }
 

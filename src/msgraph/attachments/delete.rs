@@ -1,3 +1,8 @@
+//! # Microsoft Graph attachment delete
+//!
+//! The `msgraph attachments delete` command, removing one attachment
+//! from a message.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -11,13 +16,13 @@ pub struct MsgraphAttachmentDeleteCommand {
     /// The id of the message the attachment belongs to.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
-
     /// The id of the attachment to delete.
     #[arg(value_name = "ATTACHMENT_ID")]
     pub id: String,
 }
 
 impl MsgraphAttachmentDeleteCommand {
+    /// Removes the attachment from the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.attachment_delete(&self.message_id, &self.id)?;
         printer.out(Message::new(format!(

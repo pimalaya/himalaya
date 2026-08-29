@@ -1,3 +1,8 @@
+//! # Gmail filter summary
+//!
+//! Renders a filter's match criteria as the one line its listing
+//! shows.
+
 use io_gmail::v1::rest::settings::filters::{GmailFilterAction, GmailFilterCriteria};
 
 /// Best-effort one-line summary of a filter's match criteria.

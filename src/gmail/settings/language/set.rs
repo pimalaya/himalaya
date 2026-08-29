@@ -1,3 +1,8 @@
+//! # Gmail language set
+//!
+//! The `gmail settings language set` command,
+//! `users.settings.updateLanguage`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{GmailLanguageSettings, update_language::GmailLanguageUpdate};
@@ -14,6 +19,7 @@ pub struct GmailSettingsLanguageSetCommand {
 }
 
 impl GmailSettingsLanguageSetCommand {
+    /// Applies the display language.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let settings = GmailLanguageSettings {
             display_language: self.display_language,

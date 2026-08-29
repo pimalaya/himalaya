@@ -1,3 +1,7 @@
+//! # Gmail thread get
+//!
+//! The `gmail threads get` command, `users.threads.get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -33,6 +37,7 @@ pub struct GmailThreadGetCommand {
 }
 
 impl GmailThreadGetCommand {
+    /// Fetches the thread and prints its messages.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let format = GmailMessageFormat::from(self.format);
         let hs: Vec<&str> = self.headers.iter().map(String::as_str).collect();

@@ -1,3 +1,7 @@
+//! # Microsoft Graph mail folders command
+//!
+//! The `msgraph mail-folders` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -33,6 +37,7 @@ pub enum MsgraphMailFoldersCommand {
 }
 
 impl MsgraphMailFoldersCommand {
+    /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

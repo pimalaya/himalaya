@@ -1,3 +1,7 @@
+//! # Gmail POP get
+//!
+//! The `gmail settings pop get` command, `users.settings.getPop`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ use crate::gmail::{
 pub struct GmailSettingsPopGetCommand;
 
 impl GmailSettingsPopGetCommand {
+    /// Fetches the POP settings and tables them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailPopGet::new(&client.auth, &client.user_id)?;
@@ -35,11 +40,10 @@ impl GmailSettingsPopGetCommand {
     }
 }
 
-/// Gmail POP access settings, rendered as aligned text or, under
-/// `--json`, as a structured object instead of a wrapped human string.
+/// The `gmail settings pop get` output.
 ///
-/// The enums keep their Gmail wire spelling, so a value read with `get`
-/// is a value `set` accepts back.
+/// The enums keep their Gmail wire spelling, so a value `get` reads is a
+/// value `set` accepts back.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailSettingsPopGetOutput {

@@ -1,3 +1,8 @@
+//! # SMTP send
+//!
+//! The `smtp send` command, an RFC 5321 `MAIL FROM`, `RCPT TO` and
+//! `DATA` exchange.
+
 use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
 
@@ -10,16 +15,15 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{shared::message::arg::MessageArg, smtp::client::SmtpClient};
 
-/// Send a raw RFC 5322 message via SMTP (MAIL FROM / RCPT TO / DATA).
+/// Send a raw RFC 5322 message over SMTP.
 ///
-/// The envelope is explicit: `--mail-from` is the reverse path and each
-/// `--rcpt-to` is a forward path, matching the SMTP transaction exactly. The
-/// message bytes are the DATA payload and can be passed as a positional file
-/// path, an inline raw string, or piped via stdin (see [`MessageArg`] for
-/// resolution order).
+/// The envelope is explicit, `--mail-from` being the reverse path and each
+/// `--rcpt-to` a forward path, so the flags match the transaction exactly.
+/// The message is the DATA payload, from a file path, an inline string or
+/// piped standard input.
 ///
-/// To derive the envelope from the message `From:` / `To:` / `Cc:` / `Bcc:`
-/// headers instead, use the shared `message send` command.
+/// The shared `message send` derives the envelope from the headers
+/// instead.
 #[derive(Debug, Parser)]
 pub struct SmtpSendCommand {
     /// The envelope sender (MAIL FROM reverse path).
@@ -35,6 +39,7 @@ pub struct SmtpSendCommand {
 }
 
 impl SmtpSendCommand {
+    /// Derives the envelope from the headers, then sends the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         let message = self.message.parse()?;
         client.send(self.mail_from, self.rcpt_to, message.into_bytes())?;

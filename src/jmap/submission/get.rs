@@ -1,3 +1,7 @@
+//! # JMAP submission get
+//!
+//! The `jmap submission get` command, RFC 8621 `EmailSubmission/get`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::get::JmapEmailSubmissionGetOptions;
@@ -18,6 +22,7 @@ pub struct JmapSubmissionGetCommand {
 }
 
 impl JmapSubmissionGetCommand {
+    /// Fetches the submissions and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

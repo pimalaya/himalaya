@@ -1,23 +1,22 @@
-//! Command generating an account.
+//! # Configure command
 //!
-//! The wizard generates, it never edits: it discovers an account from
-//! one prompt (see [`super::discover`]), tests it, then hands the
-//! resulting `[accounts.<name>]` table back as a file to create, a block
-//! to append, or a document on stdout. Everything discovery does not
-//! cover is written by hand against the documented sample.
+//! The `configure` command: the wizard generates an account, it never
+//! edits one.
+//!
+//! An account is discovered from one prompt, tested, then handed back as
+//! a file to create, a block to append or a document on stdout. Whatever
+//! discovery does not cover is written by hand against the sample.
 //!
 //! It runs from `himalaya configure`, and from the offer a bare
-//! `himalaya` or a command needing an account raises when it finds no
-//! configuration. That offer is the only place the wizard introduces
-//! itself, with a welcome naming the file that is missing: the command
-//! asked for by name goes straight to the prompts.
+//! `himalaya` raises when it finds no configuration. That offer is the
+//! only place the wizard introduces itself, the command asked for by name
+//! going straight to the prompts.
 //!
-//! Appending is a plain text append rather than a re-serialization of
-//! the whole file, so comments, ordering and hand-written formatting
-//! come out untouched. Two rules guard it: the account name must be
-//! free, since two `[accounts.<name>]` tables make the whole document
-//! fail to parse, and the generated account claims the default only when
-//! no other account does.
+//! Appending is a plain text append rather than a re-serialization, so
+//! comments, ordering and hand-written formatting survive. Two rules
+//! guard it: the account name has to be free, two tables of one name
+//! making the whole document fail to parse, and the new account claims
+//! the default only when no other one does.
 
 use std::{
     fmt,
@@ -40,28 +39,24 @@ use crate::{
 
 /// Configure an account interactively.
 ///
-/// This command discovers a provider's settings from an email address (or
-/// a server URL, or a local folder path), tests the connection, then
-/// saves the resulting account to the configuration file, appends it to
-/// the one already there, or prints it for you to place by hand. Anything
-/// discovery does not cover is written by hand.
+/// Discovers a provider from an email address, a server URL or a local
+/// folder path, tests the connection, then writes the account, appends it
+/// to the configuration already there, or prints it to be placed by hand.
+///
+/// Anything discovery does not cover is written by hand.
 #[derive(Debug, Parser)]
 pub struct ConfigureCommand;
 
 impl ConfigureCommand {
     /// Runs the wizard, then saves, appends or prints the account.
     ///
-    /// No welcome: whoever typed the command knows what it does. The
-    /// banner belongs to the offer a missing configuration raises, which
-    /// is where the wizard meets someone who did not ask for it. The
-    /// account name is not asked either, since it is only the TOML table
-    /// key, and renaming it is one edit in the file the wizard just
-    /// wrote.
+    /// No welcome here: whoever typed the command knows what it does, the
+    /// banner belonging to the offer a missing configuration raises. The
+    /// account name is not asked either, being only the table key.
     ///
-    /// A redirected stdout (`himalaya configure > config.toml`) and the
-    /// JSON output both stay non-interactive: the document goes to stdout
-    /// and no file is touched. The prompts render on stderr, so they stay
-    /// out of the redirected document.
+    /// A redirected stdout and the JSON output both stay
+    /// non-interactive, the document going to stdout and no file being
+    /// touched. The prompts render on stderr, out of that document.
     pub fn execute(self, printer: &mut impl Printer, config_paths: &[PathBuf]) -> Result<()> {
         if !stdin().is_terminal() {
             bail!(
@@ -108,12 +103,12 @@ struct ExistingConfig {
 }
 
 impl ExistingConfig {
-    /// Reads the configuration at the given path, or `None` when no file
-    /// is there.
+    /// Reads the configuration at the given path, `None` when there is no
+    /// file there.
     ///
-    /// A file that fails to parse is an error rather than a `None`:
-    /// appending to a broken document would bury the actual problem under
-    /// a second one.
+    /// A file that fails to parse errors rather than read as absent:
+    /// appending to a broken document would bury the real problem under a
+    /// second one.
     fn read(path: &Path) -> Result<Option<Self>> {
         if !path.exists() {
             return Ok(None);
@@ -148,15 +143,12 @@ impl fmt::Display for GeneratedConfig {
     }
 }
 
-/// Frames Himalaya, names the configuration file that is missing, and
-/// points at the sample for everything the wizard does not cover.
+/// Frames Himalaya, names the missing configuration file, and points at
+/// the sample for what the wizard does not cover.
 ///
-/// Printed before the offer a bare `himalaya` or a command needing an
-/// account raises when it finds no configuration, so the wizard
-/// introduces itself to someone who did not ask for it. `configure`
-/// skips it, since it was asked for by name.
-///
-/// On stderr, so a redirected stdout holds the document alone.
+/// It runs before the offer a bare `himalaya` raises, where the wizard
+/// meets someone who did not ask for it, and `configure` skips it. On
+/// stderr, so a redirected stdout holds the document alone.
 pub fn print_welcome(path: &Path) {
     eprintln!();
     eprintln!("Welcome to Himalaya, the CLI to manage emails.");
@@ -180,11 +172,10 @@ pub fn print_welcome(path: &Path) {
 }
 
 /// The name discovery proposes, suffixed until the configuration does not
-/// already hold it.
+/// hold it already.
 ///
-/// Not prompted: the name is only the TOML table key, and whoever wants
-/// another one renames it in the file. It still has to be free, since a
-/// second `[accounts.<name>]` table makes the whole document fail to
+/// It is never prompted, being only the table key, but it does have to be
+/// free: a second table of one name makes the whole document fail to
 /// parse, taking the accounts that used to work down with it.
 fn account_name(base: &str, existing: Option<&ExistingConfig>) -> String {
     let taken = existing
@@ -247,11 +238,10 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedCon
         .open(path)
         .with_context(|| format!("Open the config file {}", path.display()))?;
 
-    // NOTE: appending text keeps every comment and every hand-written
-    // line of the file as they are, which parsing and re-serializing the
-    // whole document would not. The leading newline separates the two
-    // tables, and terminates the last line when the file ends without
-    // one.
+    // NOTE: appending text keeps every comment and hand-written line as
+    // they are, which re-serializing the document would not. The leading
+    // newline separates the two tables, and terminates the last line of a
+    // file that ends without one.
     write!(file, "\n{config}")
         .with_context(|| format!("Append to the config file {}", path.display()))?;
 
@@ -263,8 +253,8 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedCon
 /// Tells where the account landed, under which name, and what to run
 /// next.
 ///
-/// The name matters here because it was never asked for: an account that
-/// did not claim the default is only reachable through `-a`.
+/// The name matters because it was never asked for: an account that did
+/// not claim the default is reachable through `-a` alone.
 fn print_saved(path: &Path, config: &GeneratedConfig) {
     let name = &config.name;
 
@@ -322,13 +312,11 @@ mod tests {
             Some(Path::new("/tmp/mail"))
         );
 
-        // Every other field is left at its default, so none of them is
-        // written: a generated document holds what was configured.
+        // NOTE: a generated document holds what was configured, every
+        // defaulted field being left out.
         assert!(!document.contains("imap"));
         assert!(!document.contains("table"));
 
-        // The account name heads the block, and `default` reads before
-        // the backend it qualifies.
         let lines: Vec<&str> = document.lines().collect();
         assert_eq!(lines[0], "[accounts.perso]");
         assert_eq!(lines[1], "default = true");
@@ -336,9 +324,8 @@ mod tests {
 
     #[test]
     fn the_endpoint_reads_before_its_credentials() {
-        // Serialized alphabetically, `maildir.root-dir` would sit under
-        // any sibling sorting before it; the renderer lifts the endpoint
-        // of a group to its top.
+        // NOTE: serialized alphabetically the endpoint would sit under
+        // its siblings, so the renderer lifts it to the top of its group.
         let document = account(true).render("perso").expect("render the account");
         let maildir: Vec<&str> = document
             .lines()
@@ -352,8 +339,8 @@ mod tests {
     fn an_appended_account_keeps_the_existing_one() {
         let path = config_path();
 
-        // No trailing newline, the shape an appended block has to survive
-        // without merging into the last line.
+        // NOTE: no trailing newline, which is the shape an appended block
+        // survives without merging into the last line.
         fs::write(
             &path,
             "# my accounts\n[accounts.work]\ndefault = true\nmaildir.root = \"/tmp/work\"",
@@ -379,7 +366,6 @@ mod tests {
 
         assert_eq!(config.accounts.len(), 2);
 
-        // Exactly one default, and the comment is still there.
         let defaults = config
             .accounts
             .values()

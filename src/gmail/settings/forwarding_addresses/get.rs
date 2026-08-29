@@ -1,3 +1,8 @@
+//! # Gmail forwarding address get
+//!
+//! The `gmail settings forwarding-addresses get` command,
+//! `users.settings.forwardingAddresses.get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -21,6 +26,7 @@ pub struct GmailSettingsForwardingAddressGetCommand {
 }
 
 impl GmailSettingsForwardingAddressGetCommand {
+    /// Fetches the forwarding address and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailForwardingAddressGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -32,12 +38,10 @@ impl GmailSettingsForwardingAddressGetCommand {
     }
 }
 
-/// A Gmail forwarding address, rendered as aligned text or, under
-/// `--json`, as the forwarding address resource itself instead of a
-/// wrapped human string.
+/// The `gmail settings forwarding-addresses get` output.
 ///
-/// The resource is emitted verbatim so that one address read with `get`
-/// has the very same shape as a row of `list`.
+/// The resource is emitted verbatim, so one address has the very same
+/// shape here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub(crate) struct GmailSettingsForwardingAddressGetOutput(GmailForwardingAddress);

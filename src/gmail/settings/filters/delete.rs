@@ -1,3 +1,8 @@
+//! # Gmail filter delete
+//!
+//! The `gmail settings filters delete` command,
+//! `users.settings.filters.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::delete::GmailFilterDelete;
@@ -14,6 +19,7 @@ pub struct GmailSettingsFilterDeleteCommand {
 }
 
 impl GmailSettingsFilterDeleteCommand {
+    /// Deletes the filter.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailFilterDelete::new(&client.auth, &client.user_id, &self.id)?;

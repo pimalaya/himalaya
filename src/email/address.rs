@@ -1,18 +1,16 @@
-//! Email address shared across all protocols.
+//! # Address
+//!
+//! An email address shared across all protocols.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A single email address with an optional display name.
-///
-/// Common shape used by every protocol-specific envelope and message
-/// representation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct Address {
-    /// Display name (e.g. `Alice`), if any.
+    /// The display name, `Alice` in `Alice <alice@example.org>`.
     pub name: Option<String>,
-
-    /// Email address (e.g. `alice@example.org`).
+    /// The address itself.
     pub email: String,
 }

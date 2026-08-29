@@ -1,3 +1,8 @@
+//! # Gmail attachments
+//!
+//! The `gmail attachments` command family, covering
+//! `users.messages.attachments`.
+
 pub mod get;
 
 use anyhow::Result;
@@ -17,6 +22,7 @@ pub enum GmailAttachmentsCommand {
 }
 
 impl GmailAttachmentsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,8 @@
+//! # Microsoft Graph attachment get
+//!
+//! The `msgraph attachments get` command, downloading one attachment's
+//! content.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -14,17 +19,16 @@ pub struct MsgraphAttachmentGetCommand {
     /// The id of the message the attachment belongs to.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
-
     /// The id of the attachment to download.
     #[arg(value_name = "ATTACHMENT_ID")]
     pub id: String,
-
     /// Save the attachment to this path instead of printing its bytes.
     #[arg(short = 'o', long, value_name = "PATH")]
     pub output: Option<PathBuf>,
 }
 
 impl MsgraphAttachmentGetCommand {
+    /// Downloads the attachment and writes or prints its bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let bytes = client
             .attachment_get_raw(&self.message_id, &self.id)?

@@ -1,3 +1,7 @@
+//! # ManageSieve put
+//!
+//! The `sieve put` command, RFC 5804 `PUTSCRIPT`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -19,6 +23,7 @@ pub struct SieveScriptPutCommand {
 }
 
 impl SieveScriptPutCommand {
+    /// Uploads the script under the given name.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         let script = self.script.read()?;
 

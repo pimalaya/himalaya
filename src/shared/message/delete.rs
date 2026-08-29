@@ -1,3 +1,8 @@
+//! # Message delete
+//!
+//! The `message delete` command, trashing messages or, once they are in
+//! the trash, removing them.
+
 use std::fmt;
 
 use anyhow::{Result, anyhow};
@@ -11,15 +16,14 @@ use crate::{
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
-/// Delete message(s) from the active account.
+/// Delete messages, trash first.
 ///
-/// Follows a trash-first policy: the messages are moved to the trash
-/// mailbox, unless they already are in the trash, in which case they are
-/// permanently removed. The trash mailbox is resolved from the backend
-/// when it can be (otherwise from the `mailbox.alias.trash` config
-/// entry, and failing that the command errors). Note that on IMAP
-/// servers without UIDPLUS the in-trash removal only flags the messages
-/// `\Deleted`; a later `expunge` reclaims them.
+/// The messages are moved to the trash, or removed for good when they are
+/// already there. The trash comes from the backend when it names one, and
+/// from `mailbox.alias.trash` otherwise.
+///
+/// On an IMAP server without UIDPLUS, removing from the trash only flags
+/// the messages `\Deleted`, and a later expunge reclaims them.
 #[derive(Debug, Parser)]
 pub struct MessageDeleteCommand {
     #[command(flatten)]
@@ -29,6 +33,7 @@ pub struct MessageDeleteCommand {
 }
 
 impl MessageDeleteCommand {
+    /// Trashes or removes the messages and reports which happened.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -38,9 +43,6 @@ impl MessageDeleteCommand {
         let mailbox = self.mailbox.resolve(account)?;
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
 
-        // Resolve the trash mailbox: the backend's own trash when it can
-        // resolve one, else the `mailbox.alias.trash` config entry, else
-        // an error.
         let trash = match client.native_trash()? {
             Some(trash) => trash,
             None => account.mailbox_alias.get("trash").cloned().ok_or_else(|| {
@@ -50,13 +52,12 @@ impl MessageDeleteCommand {
             })?,
         };
 
-        // `resolve_mailbox_id` is idempotent, so this compares the current
-        // mailbox against the trash regardless of how each was addressed.
+        // NOTE: `resolve_mailbox_id` is idempotent, so the comparison holds
+        // however each of the two mailboxes was addressed.
         let current_id = client.resolve_mailbox_id(&mailbox)?;
         let trash_id = client.resolve_mailbox_id(&trash)?;
 
         let report = if current_id == trash_id {
-            // Already in the trash: permanently delete these ids.
             let count = ids.len();
             if client.delete_messages(&current_id, &ids)? {
                 DeleteReport::new(DeleteAction::Deleted, count)
@@ -64,7 +65,6 @@ impl MessageDeleteCommand {
                 DeleteReport::new(DeleteAction::Flagged, count)
             }
         } else {
-            // Elsewhere: move them to the trash.
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
             DeleteReport::new(DeleteAction::MovedToTrash, moved)
         };
@@ -73,8 +73,7 @@ impl MessageDeleteCommand {
     }
 }
 
-/// Structured result of `messages delete`: which action was taken and how
-/// many messages it affected.
+/// The `message delete` output: what was done, and to how many messages.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct DeleteReport {
@@ -83,16 +82,22 @@ pub(crate) struct DeleteReport {
 }
 
 impl DeleteReport {
+    /// Reports one action over a message count.
     fn new(action: DeleteAction, count: usize) -> Self {
         Self { action, count }
     }
 }
 
+/// What `message delete` did to the messages it was given.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum DeleteAction {
+    /// They were moved to the trash.
     MovedToTrash,
+    /// They were in the trash and were removed for good.
     Deleted,
+    /// They were in the trash and were flagged `\Deleted`, an expunge
+    /// still owing.
     Flagged,
 }
 

@@ -1,3 +1,8 @@
+//! # Microsoft Graph mail folder delete
+//!
+//! The `msgraph mail-folders delete` command, deleting a folder and
+//! everything in it.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -14,6 +19,7 @@ pub struct MsgraphMailFolderDeleteCommand {
 }
 
 impl MsgraphMailFolderDeleteCommand {
+    /// Deletes the folder and everything in it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.mail_folder_delete(&self.id)?;
 

@@ -11,52 +11,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A pimdir write now shows on the next read instead of on the next sync.
 
-  A pimdir store is a replica the sync engine owns, so Himalaya appends its writes to the store's queue rather than applying them; until now a read projected only the committed index, so flagging a message lost the flag from the listing and moving one left it where it was, until Neverest ran. Reads go through the store's reader role with the pending queue overlaid (pimdir SPEC §15.4), so a staged flag, edit, deletion, move or copy shows straight away. All of them address a message that already exists and keeps its public id, so nothing changed about how a message is addressed.
+  A pimdir store is a replica the sync engine owns, so Himalaya appends its writes to the store's queue rather than apply them. A read used to project the committed index alone, so flagging a message lost the flag from the listing until Neverest ran.
 
-  A staged *creation* has no id until the sync engine applies it, so it cannot be an envelope and does not list. `envelope list` reports how many the mailbox has instead, and names where to see them; `envelope search` reports none, a queued message never having been matched against the query.
+  Reads now overlay the pending queue, so a staged flag, edit, deletion, move or copy shows straight away. All of them address a message that already exists and keeps its public id, so nothing changed about how a message is addressed.
+
+  A staged *creation* has no id until the sync engine applies it, so it can be no envelope and does not list. `envelope list` reports how many the mailbox has and where to see them, and `envelope search` reports none, a queued message never having been matched against the query.
 
 - `himalaya pimdir queue list` and `himalaya pimdir queue cancel`, for the staged creations the mailbox listing cannot show.
 
-  The `pimdir` binary is kind-agnostic and prints ids, hashes and flags; Himalaya holds the mail conventions and the blobs, so it renders a queued message with its flags, subject, recipient and the moment it was queued. `cancel` retracts one by the row id that view prints: the only way back for a message that does not exist yet, where a staged flag or move is undone by doing the opposite. Cancelling is the store owner's write, so it takes that role for the length of the call and reports a sync in flight rather than waiting on it.
+  The `pimdir` binary is kind-agnostic and prints ids, hashes and flags. Himalaya holds the mail conventions and the blobs, so it renders a queued message with its flags, subject, recipient and the moment it was queued.
 
-- Added ManageSieve support
- behind the `sieve` cargo feature, on by default ([#739]).
+  `cancel` retracts one by the row id that view prints, which is the only way back for a message that does not exist yet: a staged flag or move is undone by doing the opposite.
 
-  An account gains an optional `[sieve]` block, and `himalaya sieve` exposes `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw`. The protocol lives in the new [io-managesieve](https://github.com/pimalaya/io-managesieve) library, so every SASL mechanism the other backends accept works here too, and a password or a bearer token is refused over an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
+  Cancelling is the store owner's write, so it takes that role for the length of the call and reports a sync in flight rather than wait on it.
 
-  A bare `sieve.server` authority resolves to `sieve://` with STARTTLS on, where the `imap` and `smtp` ones resolve to their implicit-TLS scheme: RFC 5804 registers one port, 4190, and defines STARTTLS as the way to TLS on it. `sieves://` is accepted for the deployments listening for a TLS handshake straight away, and `unix://` for a local pre-authenticated proxy.
+- Added ManageSieve support behind the `sieve` cargo feature, on by default ([#739]).
+
+  An account gains an optional `[sieve]` block, and `himalaya sieve` exposes `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw`.
+
+  The protocol lives in the new [io-managesieve](https://github.com/pimalaya/io-managesieve) library, so every SASL mechanism the other backends accept works here too, and a password or a bearer token is refused over an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
+
+  A bare `sieve.server` authority takes `sieve://` with STARTTLS on, where the `imap` and `smtp` ones take their implicit-TLS scheme: RFC 5804 registers one port, 4190, and reaches TLS on it through STARTTLS.
+
+  `sieves://` is accepted for the deployments listening for a handshake straight away, and `unix://` for a local pre-authenticated proxy.
 
 ### Changed
 
-- **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim: `-m imap/INBOX` where `-m INBOX` used to work, and a listing shows `imap/INBOX` in both columns. `pimdir.namespace` is removed.
+- **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim, and `pimdir.namespace` is removed.
 
-  The sync engine binds a source's collections under a namespace, and Himalaya used to strip it back off, so one mailbox answered to two spellings. The store cannot be asked where that prefix ends: a collection id is opaque to it, parsed nowhere, and hierarchy is a parent link rather than a separator, so the stripping was a guess at the sync engine's convention that needed a config key wherever it could not decide. The id is now the only spelling, as it already is for JMAP's opaque ids, and `mailbox.alias.inbox = "imap/INBOX"` is how you stop typing it.
+  `-m imap/INBOX` is what `-m INBOX` used to be, and a listing shows `imap/INBOX` in both columns.
 
-- **BREAKING**: renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias: `imap flags`, `maildir messages`, `maildir flags`, `m2dir messages` and `m2dir flags` become `imap flag`, `maildir message`, `maildir flag`, `m2dir message` and `m2dir flag`. Every old spelling keeps working, hidden from `--help`.
+  The sync engine binds a source's collections under a namespace, and Himalaya used to strip it back off, so one mailbox answered to two spellings. The store cannot be asked where that prefix ends: a collection id is opaque to it and hierarchy is a parent link rather than a separator.
 
-  A command mirroring a vendor API resource keeps that API's spelling instead, so `gmail labels`, `messages`, `attachments`, `drafts`, `threads`, `settings` (with `filters`, `forwarding-addresses` and `delegates` under it) are unchanged. The `msgraph` family, singular where Graph is plural, is aligned onto Graph instead: `msgraph mail-folder`, `message` and `attachment` become `mail-folders`, `messages` and `attachments`, joining the `child-folders` that already sat under the first. Every singular spelling stays as a hidden alias, where it used to be shown beside the plural. `completion`, `manual` and `json-schema` gain the plural aliases they lacked.
+  The stripping was therefore a guess at the sync engine's convention, needing a config key wherever it could not decide. The id is now the only spelling, as it already is for JMAP's opaque ids, and `mailbox.alias.inbox = "imap/INBOX"` is how you stop typing it.
+
+- **BREAKING**: renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias.
+
+  `imap flags`, `maildir messages`, `maildir flags`, `m2dir messages` and `m2dir flags` become `imap flag`, `maildir message`, `maildir flag`, `m2dir message` and `m2dir flag`. Every old spelling keeps working, hidden from `--help`.
+
+  A command mirroring a vendor API resource keeps that API's spelling instead, so the `gmail` family is unchanged.
+
+  The `msgraph` one, singular where Graph is plural, is aligned onto Graph: `mail-folder`, `message` and `attachment` become `mail-folders`, `messages` and `attachments`, joining the `child-folders` that already sat under the first.
+
+  Every singular spelling stays as a hidden alias, where it used to be shown beside the plural, and `completion`, `manual` and `json-schema` gain the plural aliases they lacked.
 
 ### Fixed
 
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
-  A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item: one copy was kept, the other was recorded on it and mirrored nowhere, so it showed in no listing and could not be read. The store now gives the second copy a key of its own (pimdir SPEC §9), so both list, each with its own public id and neither marked, which is what the mailbox holds. Whether they are duplicates worth removing is the server's state and the user's call, so nothing here merges or hides one.
+  A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item. One copy was kept and the other recorded on it, mirrored nowhere, so it showed in no listing and could not be read.
+
+  The store now gives the second copy a key of its own, so both list, each with its own public id and neither marked, which is what the mailbox holds. Whether they are duplicates worth removing is the server's state and the user's call, so nothing here merges or hides one.
 
   Saving a locally-composed message is unchanged: an add naming an id the mailbox already holds parks in the queue instead, the store being liberal with what a sync hands it and strict with what a producer creates.
 
 - Fixed `completion` writing files instead of printing the completion script to the standard output ([#736]).
 
-  The script has been documented as going to stdout since the command exists, but the directory it fell back on turned `himalaya completion bash` into a file-writing command printing a report, which broke every packaging helper capturing stdout, Homebrew's `generate_completions_from_executable` among them. Giving `--dir` keeps writing one script per shell.
+  The script has been documented as going to stdout since the command exists, but the directory it fell back on turned `himalaya completion bash` into a file-writing command printing a report.
 
-  `manual` and `json-schema` follow the same shape, so the three behave alike: they print to stdout the single page or schema they are asked for, they take their directory through `--dir` where it used to be a positional argument, and they accept command names (`himalaya`, `himalaya-envelope`, `himalaya-envelope-list`) to select what to generate. Restoring the documented behaviour is a regression fix rather than a breaking change, hence the patch release, and generating completions, manual pages or schemas is not a daily gesture.
+  That broke every packaging helper capturing stdout, Homebrew's `generate_completions_from_executable` among them. Giving `--dir` keeps writing one script per shell.
+
+  `manual` and `json-schema` follow the same shape, so the three behave alike: they print the single page or schema they are asked for, they take their directory through `--dir` where it used to be a positional, and they accept command names to select what to generate.
+
+  Restoring the documented behaviour is a regression fix rather than a breaking change, hence the patch release, and generating completions, manual pages or schemas is not a daily gesture.
 
 - Fixed `maildir message copy` leaving an empty message behind when the process died mid-copy ([#738]).
 
-  The copy wrote straight to the name the target mailbox lists, so a death inside it left a 0-byte entry that `envelope list` shows as an ordinary message with blank columns, that `account check` calls healthy, and that only `message read` rejects. The copy is now staged and renamed, so an interrupted copy leaves nothing behind in the mailbox.
+  The copy wrote straight to the name the target mailbox lists, so a death inside it left a 0-byte entry `envelope list` shows as an ordinary message with blank columns, `account check` calls healthy, and `message read` alone rejects.
+
+  The copy is now staged and renamed, so an interruption leaves nothing behind.
 
 - Fixed maildir flag writes doing nothing to a message still unread in a mailbox's `new` directory ([#637]).
 
-  `message read --seen` and `flag add` reported success and left the message untouched, since a Maildir name in `new` has nowhere to carry a flag. The message now moves to `cur` under the same id with its flags in the name, the transition every other Maildir client performs when it takes a message out of `new`.
+  `message read --seen` and `flag add` reported success and left the message untouched, a Maildir name in `new` having nowhere to carry a flag. The message now moves to `cur` under the same id with its flags in the name, which is the transition every Maildir client performs.
 
 ## [2.1.0] - 2026-08-16
 
@@ -64,9 +91,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added the `pimdir` storage backend, Himalaya over the local store the sync engine populates.
 
-  Reads build envelopes from the stored meta and report a body that is not local as "body not fetched". A mailbox is named the way its server names it: the sync keys a collection `<namespace>/<name>`, so the collection `imap/INBOX` is the mailbox `INBOX`, and a name matching no collection is refused naming the ones the account holds. The namespace is derived unless `pimdir.namespace` names it, and `pimdir.account` picks the account in a store several share.
+  Reads build envelopes from the stored meta and report a body that is not local as "body not fetched".
 
-  Himalaya reads the store read-only, which takes no lock, so a sync in flight neither blocks it nor is blocked by it. A write (flag, move, copy, delete, append) is staged as an action queued for the store's owner to apply and push, rather than written into the index: the owner's write path collects unreferenced objects, and running that beside a sync destroys the bodies it has streamed but not yet attached. An appended body is written to the blob store before the action referencing it, which pins it.
+  A mailbox is named the way its server names it: the sync keys a collection `<namespace>/<name>`, so the collection `imap/INBOX` is the mailbox `INBOX`, and a name matching no collection is refused naming the ones the account holds.
+
+  The namespace is derived unless `pimdir.namespace` names it, and `pimdir.account` picks the account in a store several share.
+
+  Himalaya reads the store read-only, which takes no lock, so a sync in flight neither blocks it nor is blocked by it.
+
+  A write is staged as an action queued for the store's owner to apply and push, rather than written into the index: the owner's write path collects unreferenced objects, and running that beside a sync destroys the bodies it has streamed but not yet attached.
+
+  An appended body is written to the blob store before the action referencing it, which pins it.
 
 - Added back the `email` and `display-name` config fields, at the global and the account level ([#721]).
 
@@ -303,7 +338,9 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 - Added `message edit` command to edit a message. To edit on place (replace a message), use `--on-place`.
 - Added `account.list.table.preset` global config option, `accounts.<name>.folder.list.table.preset` and `accounts.<name>.envelope.list.table.preset` account config options.
 
-  These options customize the shape of tables, see examples at [`comfy_table::presets`](https://docs.rs/comfy-table/latest/comfy_table/presets/index.html). Defaults to `"||  |-|||           "`, which corresponds to [`comfy_table::presets::ASCII_MARKDOWN`](https://docs.rs/comfy-table/latest/comfy_table/presets/constant.ASCII_MARKDOWN.html).
+  These options customize the shape of tables, see examples at [`comfy_table::presets`](https://docs.rs/comfy-table/latest/comfy_table/presets/index.html).
+
+  Defaults to `"||  |-|||           "`, which corresponds to [`comfy_table::presets::ASCII_MARKDOWN`](https://docs.rs/comfy-table/latest/comfy_table/presets/constant.ASCII_MARKDOWN.html).
 
 - Added `account.list.table.name-color` config option to customize the color used for the accounts' `NAME` column (defaults to `green`).
 - Added `account.list.table.backends-color` config option to customize the color used for the folders' `BACKENDS` column (defaults to `blue`).
@@ -326,7 +363,9 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 - Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
 - Improved long version `--version` ([#496]).
 - Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed ([#20]).(https://github.com/pimalaya/core/issues/20)
-- Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, se ([#802]).(https://github.com/toml-rs/toml/issues/802):
+- Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`.
+
+  It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, se ([#802]).(https://github.com/toml-rs/toml/issues/802):
 
   - `imap.*`, `maildir.*` and `notmuch.*` moved to `backend.*`:
 
@@ -444,8 +483,12 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 ### Changed
 
-- Removed account configurations flatten level in order to improve diagnostic errors, due to a [bug](https://github.com/toml-rs/toml/issues/589#issuecomment-1872345017) in clap. **This means that accounts need to be prefixed by `accounts`: `[my-account]` becomes `[accounts.my-account]`**. It also opens doors for interface-specific configurations.
-- Rolled back cargo feature additions from the previous release. It was a mistake: the amount of features was too big, the code (both CLI and lib) was too hard to maintain. Cargo features kept: `imap`, `maildir`, `notmuch`, `smtp`, `sendmail`, `account-sync`, `account-discovery`, `pgp-gpg`, `pgp-commands` and `pgp-native`.
+- Removed account configurations flatten level in order to improve diagnostic errors, due to a [bug](https://github.com/toml-rs/toml/issues/589#issuecomment-1872345017) in clap.
+
+  **This means that accounts need to be prefixed by `accounts`: `[my-account]` becomes `[accounts.my-account]`**. It also opens doors for interface-specific configurations.
+- Rolled back cargo feature additions from the previous release. It was a mistake: the amount of features was too big, the code (both CLI and lib) was too hard to maintain.
+
+  Cargo features kept: `imap`, `maildir`, `notmuch`, `smtp`, `sendmail`, `account-sync`, `account-discovery`, `pgp-gpg`, `pgp-commands` and `pgp-native`.
 - Moved `sync.strategy` to `folder.sync.filter`.
 - Changed location of the synchronization data from `$XDG_DATA_HOME/himalaya/<account-name>` to `$XDG_DATA_HOME/pimalaya/email/sync/<account-name>-cache`.
 - Changed location of the synchronization cache from `sync.dir` to `$XDG_CACHE_HOME/pimalaya/email/sync/<hash>/`.
@@ -498,7 +541,9 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 Few major concepts changed:
 
-- The concept of *Backend* and *Sender* changed. The Sender does not exist anymore (it is now a backend feature). A Backend is now a set of features like add folders, list envelopes or send raw message. The backend of every single feature can be customized in the configuration file, which gives users more flexibility. Here the list of backend features that can be customized:
+- The concept of *Backend* and *Sender* changed. The Sender does not exist anymore (it is now a backend feature).
+
+  A Backend is now a set of features like add folders, list envelopes or send raw message. The backend of every single feature can be customized in the configuration file, which gives users more flexibility. Here the list of backend features that can be customized:
   - `backend` ***(required)***: the backend used by default by all backend features (`maildir`, `imap` or `notmuch`)
   - `folder.add.backend`: override the backend used for creating folders (`maildir`, `imap` or `notmuch`)
   - `folder.list.backend`: override the backend used for listing folders (`maildir`, `imap` or `notmuch`)
@@ -764,7 +809,9 @@ Few major concepts changed:
   
 ### Changed
 
-- Changed the behaviour of the `-t|--mime-type` argument of the `read` command. It is less strict now: if no part is found for the given MIME type, it will fallback to the other one. For example, giving `-t html` will show in priority HTML parts, but if none of them are found it will show plain parts instead (and vice versa).
+- Changed the behaviour of the `-t|--mime-type` argument of the `read` command. It is less strict now: if no part is found for the given MIME type, it will fallback to the other one.
+
+  For example, giving `-t html` will show in priority HTML parts, but if none of them are found it will show plain parts instead (and vice versa).
 - Sanitization is not done by default when using the `read` command, the flag `-s|--sanitize` needs to be explicitly provided.
 
 ### Fixed

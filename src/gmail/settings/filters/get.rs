@@ -1,3 +1,8 @@
+//! # Gmail filter get
+//!
+//! The `gmail settings filters get` command,
+//! `users.settings.filters.get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -21,6 +26,7 @@ pub struct GmailSettingsFilterGetCommand {
 }
 
 impl GmailSettingsFilterGetCommand {
+    /// Fetches the filter and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailFilterGet::new(&client.auth, &client.user_id, &self.id)?;
@@ -32,14 +38,11 @@ impl GmailSettingsFilterGetCommand {
     }
 }
 
-/// A Gmail filter, rendered as a one-line summary of its criteria and
-/// action or, under `--json`, as the filter resource itself instead of a
-/// wrapped human string.
+/// The `gmail settings filters get` output.
 ///
-/// The resource is emitted verbatim so that one filter read with `get`
-/// has the very same shape as a row of `list`, and so that the criteria
-/// and action stay machine-readable: the summaries the text rendering
-/// builds are lossy on purpose.
+/// The text is a one-line summary of the criteria and the action, lossy on
+/// purpose. The resource is emitted verbatim, so one filter has the very
+/// same shape here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub(crate) struct GmailSettingsFilterGetOutput(GmailFilter);

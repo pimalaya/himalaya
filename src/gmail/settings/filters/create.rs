@@ -1,3 +1,8 @@
+//! # Gmail filter create
+//!
+//! The `gmail settings filters create` command,
+//! `users.settings.filters.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::{
@@ -40,6 +45,7 @@ pub struct GmailSettingsFilterCreateCommand {
 }
 
 impl GmailSettingsFilterCreateCommand {
+    /// Creates the filter and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let filter = GmailFilter {
             id: String::new(),

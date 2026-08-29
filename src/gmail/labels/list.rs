@@ -1,3 +1,7 @@
+//! # Gmail label list
+//!
+//! The `gmail labels list` command, `users.labels.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ use crate::{
 pub struct GmailLabelsListCommand;
 
 impl GmailLabelsListCommand {
+    /// Lists every label and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -32,9 +37,13 @@ impl GmailLabelsListCommand {
 /// Per-column colors for the Gmail labels table.
 #[derive(Clone, Copy, Debug)]
 pub struct LabelColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the NAME column.
     pub name: Color,
+    /// Color of the TOTAL column.
     pub total: Color,
+    /// Color of the UNREAD column.
     pub unread: Color,
 }
 

@@ -1,3 +1,8 @@
+//! # Parser
+//!
+//! Top-level clap parser and subcommand dispatcher, resolving the account
+//! a command runs against before handing it a ready client.
+
 use std::{
     io::{IsTerminal, stdin},
     path::{Path, PathBuf},
@@ -36,8 +41,8 @@ use crate::shared::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
     mailbox::cli::MailboxCommand,
 };
-// `EmailClient` and the `message` command host the send path
-// (`compose`/`send`), so they exist for any backend, not just storage.
+// NOTE: `EmailClient` and the `message` command host the send path, so
+// they exist for any backend rather than for storage ones alone.
 #[cfg(any(backend, feature = "smtp"))]
 use crate::shared::{client::EmailClient, message::cli::MessageCommand};
 #[cfg(feature = "sieve")]
@@ -69,24 +74,19 @@ pub struct Cli {
     /// The subcommand to run.
     ///
     /// Omitted, a bare `himalaya` offers to generate a configuration when
-    /// it finds none, since running the binary with no argument is what a
-    /// newcomer does first, and shows this help otherwise.
+    /// it finds none, and shows this help otherwise.
     #[command(subcommand)]
     pub cmd: Option<Command>,
-
     #[command(flatten)]
     pub config: ConfigPathsArg,
     #[command(flatten)]
     pub account: AccountFlag,
     /// Force a specific backend for cross-protocol commands.
     ///
-    /// Only consumed by the shared commands (`mailboxes`, `envelopes`,
-    /// `flags`, `messages`); the protocol-specific subcommands ignore it
-    /// and always use their own backend. With `auto` (the default) the
-    /// shared command picks the first configured backend it supports;
-    /// with an explicit value it uses only that backend, and bails if
-    /// the account has no matching config block or the operation has no
-    /// implementation for it (e.g. `--backend smtp mailboxes list`).
+    /// Only the shared commands read it, the protocol-specific ones always
+    /// using their own backend. `auto`, the default, picks the first
+    /// configured backend the command supports; an explicit value bails when
+    /// the account has no such block, or the command no such implementation.
     #[arg(short, long, global = true, default_value_t)]
     pub backend: Backend,
     #[command(flatten)]
@@ -98,8 +98,6 @@ pub struct Cli {
 /// Top-level subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    // --- Shared API (needs a storage backend)
-    //
     #[cfg(backend)]
     #[command(subcommand, visible_alias = "mbox", alias = "mailboxes")]
     Mailbox(MailboxCommand),
@@ -115,9 +113,6 @@ pub enum Command {
     #[cfg(backend)]
     #[command(subcommand, alias = "attachments")]
     Attachment(AttachmentCommand),
-
-    // --- Protocol-specific APIs
-    //
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
@@ -145,9 +140,6 @@ pub enum Command {
     #[cfg(feature = "sieve")]
     #[command(subcommand)]
     Sieve(SieveCommand),
-
-    // --- Meta
-    //
     /// Configure an account interactively.
     #[command(visible_alias = "wizard")]
     Configure(ConfigureCommand),
@@ -169,24 +161,21 @@ pub enum Command {
 pub struct ConfigPathsArg {
     /// Override the default configuration file path.
     ///
-    /// The given paths are shell-expanded then canonicalized (if
-    /// applicable). Other paths are merged with the first one, which
-    /// allows you to separate your public config from your private
-    /// one(s). Multiple paths can also be given at once, delimited by
-    /// `:` like `$PATH` in a POSIX shell.
+    /// Paths are shell-expanded then canonicalized, and several may be given
+    /// at once, delimited by `:` like `$PATH`. The first is the base and the
+    /// rest are merged on top, which is how a public configuration stays
+    /// separate from the private ones.
     #[arg(long = "config", short = 'c', global = true, env = "HIMALAYA_CONFIG")]
     #[arg(name = "config_paths", value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
     pub paths: Vec<PathBuf>,
 }
 
-/// Welcomes, then offers to generate a first configuration. Returns
+/// Welcomes, then offers to generate a first configuration, returning
 /// whether the wizard ran.
 ///
-/// Raised from the two places nothing can happen without a
-/// configuration: a bare invocation, and a command that needs an
-/// account. It is a hook rather than a gate, so declining it decides
-/// nothing: what happens next is the caller's business, and for a
-/// command that is simply carrying on.
+/// A hook rather than a gate: declining decides nothing, and what happens
+/// next is the business of the caller, a bare invocation or a command
+/// that needs an account.
 pub fn offer_configuration(
     printer: &mut impl Printer,
     config_paths: &[PathBuf],
@@ -203,17 +192,12 @@ pub fn offer_configuration(
     Ok(true)
 }
 
-/// Resolves the account a command runs against: loads the merged config
-/// from `config_paths`, then takes the account named by `-a` (or the one
-/// marked `default`). Returns the leftover global config, the resolved
-/// account name and its config.
+/// Resolves the account a command runs against, returning the leftover
+/// global config, the account name and its config.
 ///
-/// A missing configuration is met with the wizard rather than with an
-/// error: the welcome frames what Himalaya is and offers to generate an
-/// account, then the command carries on either way. Accepting is what
-/// gives it a chance to work; declining leaves it to fail on the
-/// configuration it still has not got. The two other failures name what
-/// is missing and how to pick an account.
+/// A missing configuration is met with the wizard rather than an error, and
+/// the command carries on either way: accepting gives it a chance to work,
+/// declining leaves it to fail on the configuration it still has not got.
 fn resolve_account(
     printer: &mut impl Printer,
     config_paths: &[PathBuf],
@@ -222,22 +206,18 @@ fn resolve_account(
     let mut config = match Config::from_paths_or_default(config_paths)? {
         Some(config) => config,
         None => {
-            // NOTE: the target path is where `-c` pointed, or the default
-            // location when it named none, so a mistyped path shows up as
-            // itself rather than as a generic first run.
+            // NOTE: the target path is where `-c` pointed, so a mistyped
+            // path shows up as itself rather than as a generic first run.
             let path = Config::target_path(config_paths)?;
 
-            // NOTE: nobody is there to answer a prompt in a script or a
-            // cron job, and a JSON consumer wants a failure it can read,
-            // so both skip the offer and fail below.
+            // NOTE: a script and a JSON consumer cannot answer a prompt, so
+            // both skip the offer and fail below.
             if !printer.is_json() && stdin().is_terminal() {
                 offer_configuration(printer, config_paths, &path)?;
             }
 
-            // NOTE: the wizard also prints the account instead of writing
-            // it, so having run it proves nothing: the configuration is
-            // looked up again, and the command fails the ordinary way
-            // when nothing landed.
+            // NOTE: the wizard may print the account instead of writing it,
+            // so having run it proves nothing and the lookup runs again.
             match Config::from_paths_or_default(config_paths)? {
                 Some(config) => config,
                 None => bail!(
@@ -272,6 +252,8 @@ fn resolve_account(
 }
 
 impl Command {
+    /// Opens the client the subcommand needs, then runs it against the
+    /// account `-a` names, or the default one.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -280,8 +262,6 @@ impl Command {
         backend: Backend,
     ) -> Result<()> {
         match self {
-            // --- Shared API (needs a storage backend)
-            //
             #[cfg(backend)]
             Self::Mailbox(cmd) => {
                 let (config, _name, account_config) =
@@ -318,8 +298,6 @@ impl Command {
                 cmd.execute(printer, &mut account, &mut client)
             }
 
-            // --- Protocol-specific APIs
-            //
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
                 let (config, name, account_config) =
@@ -384,8 +362,6 @@ impl Command {
                 cmd.execute(printer, &mut account, &mut client)
             }
 
-            // --- Meta
-            //
             Self::Configure(cmd) => cmd.execute(printer, config_paths),
             Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
             Self::Completion(cmd) => cmd.execute(printer, Cli::command()),

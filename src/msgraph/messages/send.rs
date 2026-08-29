@@ -1,3 +1,8 @@
+//! # Microsoft Graph message send
+//!
+//! The `msgraph messages send` command, sending raw MIME through
+//! `sendMail`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -13,6 +18,7 @@ pub struct MsgraphMessageSendCommand {
 }
 
 impl MsgraphMessageSendCommand {
+    /// Sends the given MIME bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
         client.mail_send_mime(&raw)?;

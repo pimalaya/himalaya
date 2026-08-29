@@ -1,3 +1,7 @@
+//! # Microsoft Graph mail folder get
+//!
+//! The `msgraph mail-folders get` command, fetching folders by id.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
@@ -17,6 +21,7 @@ pub struct MsgraphMailFolderGetCommand {
 }
 
 impl MsgraphMailFolderGetCommand {
+    /// Fetches the folders and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

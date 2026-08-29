@@ -1,3 +1,7 @@
+//! # Microsoft Graph attachments command
+//!
+//! The `msgraph attachments` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -26,6 +30,7 @@ pub enum MsgraphAttachmentsCommand {
 }
 
 impl MsgraphAttachmentsCommand {
+    /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

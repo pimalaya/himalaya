@@ -1,3 +1,7 @@
+//! # ManageSieve capability
+//!
+//! The `sieve capability` command, RFC 5804 `CAPABILITY`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ use crate::{
 pub struct SieveCapabilityListCommand;
 
 impl SieveCapabilityListCommand {
+    /// Reads the capabilities the server advertises and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -51,13 +56,16 @@ pub struct SieveCapability {
     pub value: Option<String>,
 }
 
-/// Structured output for `sieve capability`.
+/// The `sieve capability` output, a table of capabilities.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SieveCapabilities {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// The capabilities the server advertised.
     pub capabilities: Vec<SieveCapability>,
 }
 

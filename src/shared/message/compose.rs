@@ -1,3 +1,7 @@
+//! # Message compose
+//!
+//! The `message compose` command, assembling a new message from flags.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -15,81 +19,70 @@ use crate::{
     },
 };
 
-/// Compose a new message from CLI arguments (built-in flag composer).
+/// Compose a new message from flags.
 ///
-/// Use this for the simple case: pass `--from`, `--to`, `--body`,
-/// etc., and the message is assembled with `mail_builder`. The
-/// produced RFC 5322 bytes are written to stdout by default; pass
-/// `--save <mailbox>` to append a copy, `--send` to push through the
-/// account's SMTP/JMAP send path, or both. For richer composition
-/// (multipart MIME, MML directives, signing/encryption, editor-driven
-/// workflows), chain a standalone composer like
-/// [`mml`](https://github.com/pimalaya/mml) into `messages send` /
-/// `messages add` via a tempfile or bash/zsh process substitution.
+/// The RFC 5322 bytes go to stdout, unless `--save` appends a copy to a
+/// mailbox, `--send` pushes the message out, or both.
+///
+/// Multipart MIME, MML directives, signing and editor-driven workflows
+/// belong to a standalone composer such as mml, piped into `message send`
+/// or `message add`.
 #[derive(Debug, Parser)]
 pub struct MessageComposeCommand {
-    /// Sender address (`From` header). Defaults to the account's
-    /// `email`, named by its `display-name`.
+    /// Sender address, defaulting to the account's `email` under its
+    /// `display-name`.
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
-
-    /// Recipient address(es) (`To` header). Repeat the flag or use a
+    /// Recipient addresses, the flag repeating or taking a
     /// comma-separated list.
     #[arg(long, short = 't', value_name = "ADDR", value_delimiter = ',')]
     pub to: Vec<String>,
-
-    /// Carbon-copy recipient(s) (`Cc` header).
+    /// Carbon-copy recipients.
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub cc: Vec<String>,
-
-    /// Blind carbon-copy recipient(s) (`Bcc` header).
+    /// Blind carbon-copy recipients.
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub bcc: Vec<String>,
-
     /// Subject line.
     #[arg(long, short = 's', value_name = "TEXT")]
     pub subject: Option<String>,
-
-    /// Inline body. Conflicts with `--body-file`; stdin is used as a
-    /// fallback when neither is given.
+    /// Inline body, the standard input answering when neither this nor
+    /// `--body-file` is given.
     #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
     pub body: Option<String>,
-
-    /// Read the body from a file. Mutually exclusive with `--body`
-    /// and stdin.
+    /// Read the body from a file, exclusive with `--body` and the
+    /// standard input.
     #[arg(long = "body-file", value_name = "PATH")]
     pub body_file: Option<PathBuf>,
-
-    /// Attachment file(s).
+    /// Files to attach.
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
-
-    /// Signature appended after the body, introduced by the account's
-    /// `signature-delim` (RFC 3676 §4.3 `-- ` by default). Defaults to
-    /// the account's `signature`.
+    /// Signature appended after the body, defaulting to the account's
+    /// `signature`.
+    ///
+    /// The account's `signature-delim` introduces it, the RFC 3676
+    /// section 4.3 `-- ` by default.
     #[arg(long, value_name = "TEXT")]
     pub signature: Option<String>,
-
-    /// Read the signature from a file. Mutually exclusive with
-    /// `--signature`.
+    /// Read the signature from a file, exclusive with `--signature`.
     #[arg(
         long = "signature-file",
         value_name = "PATH",
         conflicts_with = "signature"
     )]
     pub signature_file: Option<PathBuf>,
-
-    /// Append a copy of the composed message to this mailbox.
+    /// Append a copy of the composed message to this mailbox name or
+    /// alias.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-
-    /// Send the composed message through the account's SMTP/JMAP path.
-    /// Combines with `--save` to also keep a copy.
+    /// Send the composed message, which combines with `--save` to keep a
+    /// copy too.
     #[arg(long)]
     pub send: bool,
 }
 
 impl MessageComposeCommand {
+    /// Builds the message and hands it to the handler.
     pub fn execute(
         self,
         printer: &mut impl Printer,

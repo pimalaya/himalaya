@@ -1,3 +1,7 @@
+//! # JMAP thread command
+//!
+//! The `jmap thread` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -15,6 +19,7 @@ pub enum JmapThreadCommand {
 }
 
 impl JmapThreadCommand {
+    /// Runs the subcommand against the account's JMAP client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

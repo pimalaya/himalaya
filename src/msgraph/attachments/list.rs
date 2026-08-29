@@ -1,3 +1,8 @@
+//! # Microsoft Graph attachment list
+//!
+//! The `msgraph attachments list` command, tabling the attachments of a
+//! message.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -21,6 +26,7 @@ pub struct MsgraphAttachmentListCommand {
 }
 
 impl MsgraphAttachmentListCommand {
+    /// Lists the attachments of the message and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -49,10 +55,15 @@ impl MsgraphAttachmentListCommand {
 /// Per-column colors for the Microsoft Graph attachments table.
 #[derive(Clone, Copy, Debug)]
 pub struct AttachmentColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the NAME column.
     pub name: Color,
+    /// Color of the TYPE column.
     pub content_type: Color,
+    /// Color of the SIZE column.
     pub size: Color,
+    /// Color of the INLINE column.
     pub inline: Color,
 }
 

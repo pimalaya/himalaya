@@ -1,3 +1,7 @@
+//! # Gmail draft update
+//!
+//! The `gmail drafts update` command, `users.drafts.update`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::{
@@ -22,6 +26,7 @@ pub struct GmailDraftUpdateCommand {
 }
 
 impl GmailDraftUpdateCommand {
+    /// Replaces the draft with the given message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
 

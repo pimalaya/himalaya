@@ -1,3 +1,8 @@
+//! # Gmail forwarding address list
+//!
+//! The `gmail settings forwarding-addresses list` command,
+//! `users.settings.forwardingAddresses.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -22,6 +27,7 @@ use crate::{
 pub struct GmailSettingsForwardingAddressesListCommand;
 
 impl GmailSettingsForwardingAddressesListCommand {
+    /// Lists every forwarding address and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,

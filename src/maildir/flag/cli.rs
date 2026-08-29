@@ -1,3 +1,7 @@
+//! # Maildir flag command
+//!
+//! The `maildir flag` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -26,6 +30,7 @@ pub enum MaildirFlagCommand {
 }
 
 impl MaildirFlagCommand {
+    /// Runs the subcommand against the account's Maildir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

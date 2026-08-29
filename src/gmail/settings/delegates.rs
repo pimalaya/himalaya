@@ -1,3 +1,8 @@
+//! # Gmail delegate settings
+//!
+//! The `gmail settings delegates` commands, covering
+//! `users.settings.delegates`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -30,6 +35,7 @@ pub enum GmailSettingsDelegatesCommand {
 }
 
 impl GmailSettingsDelegatesCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

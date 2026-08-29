@@ -1,3 +1,7 @@
+//! # Gmail label delete
+//!
+//! The `gmail labels delete` command, `users.labels.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -13,6 +17,7 @@ pub struct GmailLabelDeleteCommand {
 }
 
 impl GmailLabelDeleteCommand {
+    /// Deletes the label.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         client.label_delete(&self.id)?;
 

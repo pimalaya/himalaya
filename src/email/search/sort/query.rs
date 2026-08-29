@@ -1,25 +1,23 @@
-//! # Search emails sort query
+//! # Search sort query
 //!
-//! Exposes [`SearchEmailsSortQuery`] and friends, the AST produced by
-//! [`super::parser::query`].
+//! Exposes [`SearchEmailsSortQuery`] and friends, the AST
+//! [`super::parser::query`] produces.
 
-/// The search emails sort query.
-///
-/// Just a list of [`SearchEmailsSorter`]s, applied left-to-right (the
-/// first sorter is the primary sort key).
+/// The sort half of a search query, applied left to right, so the first
+/// sorter is the primary key.
 pub type SearchEmailsSortQuery = Vec<SearchEmailsSorter>;
 
-/// A single sorter: a kind plus an order.
+/// One sorter: a key and a direction.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SearchEmailsSorter(
-    /// The search emails sorter kind.
+    /// The property to sort on.
     pub SearchEmailsSorterKind,
-    /// The search emails sorter order.
+    /// The direction to sort in.
     pub SearchEmailsSorterOrder,
 );
 
 impl SearchEmailsSorter {
-    /// Build a sorter from a kind and an order.
+    /// Builds a sorter from a key and a direction.
     pub fn new(kind: SearchEmailsSorterKind, order: SearchEmailsSorterOrder) -> Self {
         Self(kind, order)
     }
@@ -43,30 +41,25 @@ impl From<SearchEmailsSorterKind> for SearchEmailsSorter {
     }
 }
 
-/// The property a sorter sorts emails on. `Date` resolves to the
-/// `Date:` header (sent-at).
+/// The property a sorter sorts on.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SearchEmailsSorterKind {
-    /// Sort emails by message header `Date`.
+    /// The `Date:` header, the sent-at.
     Date,
-
-    /// Sort emails by envelope sender.
+    /// The envelope sender.
     From,
-
-    /// Sort emails by envelope recipient.
+    /// The envelope recipient.
     To,
-
-    /// Sort emails by message header `Subject`.
+    /// The `Subject:` header.
     Subject,
 }
 
-/// Sort direction. Defaults to ascending.
+/// The direction a sorter sorts in.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SearchEmailsSorterOrder {
-    /// Sort emails by ascending order.
+    /// Smallest first.
     #[default]
     Ascending,
-
-    /// Sort emails by descending order.
+    /// Greatest first.
     Descending,
 }

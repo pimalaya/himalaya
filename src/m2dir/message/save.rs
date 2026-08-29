@@ -1,3 +1,7 @@
+//! # m2dir message save
+//!
+//! The `m2dir message save` command, storing a raw message in a folder.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -14,27 +18,23 @@ use crate::{
 
 /// Save a message to an m2dir folder.
 ///
-/// Appends a message to the specified m2dir. The message can be
-/// passed as a positional file path, an inline raw string, or piped
-/// via stdin (see [`MessageArg`] for resolution order). When flags
-/// are passed, they are written to the `.meta/<id>.flags` file
-/// alongside the message.
+/// The message comes from a file path, an inline string or piped standard
+/// input. Flags land in the `.meta/<id>.flags` sidecar beside it.
 #[derive(Debug, Parser)]
 pub struct M2dirMessageSaveCommand {
     #[command(flatten)]
     pub m2dir: M2dirNameFlag,
-
     /// Flag(s) to write to the new message's `.flags` metadata file.
     /// Each flag is an arbitrary UTF-8 string (e.g. `$seen`, `custom`);
     /// repeat `-f` per flag so one `-f` takes a single value.
     #[arg(long = "flag", short = 'f', value_name = "FLAG")]
     pub flags: Vec<String>,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl M2dirMessageSaveCommand {
+    /// Stores the raw message in the folder.
     pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;

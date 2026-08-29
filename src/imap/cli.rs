@@ -1,3 +1,7 @@
+//! # IMAP command
+//!
+//! The `imap` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -31,15 +35,12 @@ use crate::{
 
 /// IMAP-specific API.
 ///
-/// Gives access to the raw IMAP API. Each command matches the name of
-/// its IMAP counterpart (RFC 3501 and extensions), exposed as a flat
-/// command list like the protocol itself.
+/// Each subcommand carries the name of its RFC 3501 counterpart, laid out
+/// as the flat command list the protocol itself is.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum ImapCommand {
     Id(ImapIdCommand),
-
-    // Mailbox lifecycle.
     Select(ImapMailboxSelectCommand),
     Create(ImapMailboxCreateCommand),
     Delete(ImapMailboxDeleteCommand),
@@ -51,28 +52,21 @@ pub enum ImapCommand {
     Close(ImapMailboxCloseCommand),
     Unselect(ImapMailboxUnselectCommand),
     Expunge(ImapMailboxExpungeCommand),
-
-    // Search and ordering.
     Search(ImapEnvelopeSearchCommand),
     Sort(ImapEnvelopeSortCommand),
     Thread(ImapEnvelopeThreadCommand),
-
-    // Flags.
     Store(ImapStoreCommand),
     #[command(alias = "flags")]
     Flag(ImapFlagListCommand),
-
-    // Message data.
     Fetch(ImapFetchCommand),
     Append(ImapMessageSaveCommand),
     Copy(ImapMessageCopyCommand),
     Move(ImapMessageMoveCommand),
-
-    // Raw passthrough.
     Raw(ImapRawCommand),
 }
 
 impl ImapCommand {
+    /// Runs the subcommand against the account's IMAP session.
     pub fn execute(
         self,
         printer: &mut impl Printer,

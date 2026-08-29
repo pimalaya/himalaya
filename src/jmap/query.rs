@@ -1,3 +1,8 @@
+//! # JMAP query
+//!
+//! The `jmap query` command, a raw method-calls array sent as it is
+//! written.
+
 use std::{
     fmt,
     io::{BufRead, stdin},
@@ -18,19 +23,17 @@ use crate::jmap::client::JmapClient;
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
-/// METHOD_CALLS must be a JSON array of JMAP method call tuples:
+/// The argument is a JSON array of method call tuples, as in
+/// `'[["Mailbox/query", {"filter": {"role": "inbox"}}, "c0"]]'`, read
+/// from stdin when it is `-` or absent.
 ///
-///   '[["Mailbox/query", {"filter": {"role": "inbox"}}, "c0"]]'
-///
-/// The `accountId` field is injected into each call's arguments
-/// automatically if not already present. Pass `-` or omit to read
-/// from stdin.
+/// An `accountId` is injected into each call's arguments when it names
+/// none itself.
 #[derive(Debug, Parser)]
 pub struct JmapQueryCommand {
     /// Extra capability URNs to declare (core and mail are always included).
     #[arg(long = "using", value_name = "URN")]
     pub using: Vec<String>,
-
     /// The JMAP methodCalls JSON array (or omit / pass `-` to read stdin).
     #[arg(trailing_var_arg = true)]
     #[arg(name = "method-calls", value_name = "METHOD_CALLS")]
@@ -38,6 +41,7 @@ pub struct JmapQueryCommand {
 }
 
 impl JmapQueryCommand {
+    /// Sends the method calls and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")

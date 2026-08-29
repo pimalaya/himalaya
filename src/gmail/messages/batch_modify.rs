@@ -1,3 +1,8 @@
+//! # Gmail message batch modify
+//!
+//! The `gmail messages batch-modify` command,
+//! `users.messages.batchModify`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::batch_modify::GmailMessagesBatchModify;
@@ -21,6 +26,7 @@ pub struct GmailMessageBatchModifyCommand {
 }
 
 impl GmailMessageBatchModifyCommand {
+    /// Applies the label changes to every named message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let count = self.ids.len();
 

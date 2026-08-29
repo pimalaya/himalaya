@@ -1,3 +1,7 @@
+//! # JMAP mailbox command
+//!
+//! The `jmap mailbox` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -32,6 +36,7 @@ pub enum JmapMailboxCommand {
 }
 
 impl JmapMailboxCommand {
+    /// Runs the subcommand against the account's JMAP client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

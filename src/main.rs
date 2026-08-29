@@ -1,44 +1,52 @@
-//! # himalaya
+//! # Himalaya
 //!
-//! CLI to manage emails. himalaya is an application, the top layer of
-//! the Pimalaya stack: it writes no protocol or storage logic of its
-//! own and ships no library target, only this binary. It is a thin
-//! shell driving the sans-I/O io-* libraries below it, consuming their
-//! blocking `*Std` clients and orchestrating and rendering the results.
+//! A CLI to manage emails, and the crate architecture (header-001): the
+//! behavioural contract lives in cairn/spec/, the manual provider test
+//! reports in cairn/spec/testing/, the history in cairn/log/, the shared
+//! conventions in the [Pimalaya ARCHITECTURE][pimalaya].
+//!
+//! [pimalaya]: https://github.com/pimalaya/.github/blob/master/ARCHITECTURE.md
+//!
+//! ## Place in the stack
+//!
+//! An application, the top of the Pimalaya stack: it writes no protocol
+//! and no storage logic of its own and ships no library target, only this
+//! binary. A thin shell driving the sans-I/O io-* libraries below it,
+//! consuming their blocking `*Std` clients and rendering the results.
 //!
 //! ## Backends and plumbing
 //!
 //! The network backends are io-imap, io-jmap, io-gmail, io-msgraph,
-//! io-smtp and io-managesieve; the local storage backends are
-//! io-maildir and io-m2dir.
-//! Account discovery comes from io-pim-discovery (Mozilla autoconfig,
-//! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve). The CLI plumbing (clap
-//! args, printer, logger), TOML config loading and the blocking stream
-//! runtime come from pimalaya-cli, pimalaya-config and pimalaya-stream.
-//! Every backend sits behind its own cargo feature, so a build ships
-//! only the protocols it needs.
+//! io-smtp and io-managesieve, the local ones io-maildir and io-m2dir.
+//! Account discovery comes from io-pim-discovery: Mozilla autoconfig,
+//! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve.
+//!
+//! The CLI plumbing, TOML loading and blocking stream runtime come from
+//! pimalaya-cli, pimalaya-config and pimalaya-stream. Every backend sits
+//! behind its own cargo feature, so a build ships only the protocols it
+//! needs.
 //!
 //! ## Command families
 //!
-//! The command tree ([`cli`], `Command`) splits into three groups. The
-//! shared API (mailbox, envelope, flag, message, attachment) is the
-//! cross-protocol least-common-denominator surface, behaving the same
-//! whatever backend serves the active account. The protocol-specific
-//! APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp, sieve) each expose
-//! the full surface of one backend, including operations the shared API
-//! cannot model. The meta commands (account, completion, manual,
-//! json-schema) cover account configuration, shell completions, man
-//! pages and JSON Schemas.
+//! The command tree ([`cli`], `Command`) splits in three. The shared API
+//! (mailbox, envelope, flag, message, attachment) is the cross-protocol
+//! least-common-denominator surface, behaving the same whatever backend
+//! serves the active account.
+//!
+//! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
+//! m2dir, smtp, sieve) each expose the full surface of one backend,
+//! including operations the shared API cannot model. The meta commands
+//! cover account configuration, completions, man pages and JSON Schemas.
 //!
 //! ## Shared commands and backend selection
 //!
-//! The shared commands run over a local [`shared::client`] `EmailClient`
-//! that owns one `BackendClient` enum variant per compiled-in backend:
-//! the first configured storage backend the global `--backend` flag
-//! allows (local before network), plus an optional SMTP transport for
-//! storage backends that cannot send (IMAP, Maildir, m2dir). Each shared
-//! method matches the active backend and calls its per-protocol
-//! `backend.rs` adapter, which converts io-* results into the CLI's own
+//! The shared commands run over a [`shared::client`] `EmailClient` owning
+//! one `BackendClient` variant per compiled-in backend: the first
+//! configured storage backend the global `--backend` flag allows, local
+//! before network, plus an SMTP transport for those that cannot send.
+//!
+//! Each shared method matches the active backend and calls its
+//! per-protocol adapter, which converts io-* results into the CLI's own
 //! [`email`] shared types. The active [`account`] context is threaded as
 //! a sibling argument through every `execute` chain.
 //!
@@ -47,30 +55,29 @@
 //! Each protocol module builds its client via a `build_<proto>_client`
 //! helper and a `<Proto>Client` wrapper that derefs onto the io-* `*Std`
 //! client, ignoring `--backend`. Subcommands are clap-derived structs
-//! with an `execute` method the module's command enum dispatches to. The
-//! imap command mirrors IMAP's flat command list; gmail and msgraph
-//! track their REST resource domains one-to-one; the filesystem backends
-//! expose only operations that map to their on-disk layout, leaving MIME
+//! with an `execute` method the module's command enum dispatches to.
+//!
+//! The imap command mirrors IMAP's flat command list, gmail and msgraph
+//! track their REST resource domains one-to-one, and the filesystem
+//! backends expose only what maps to their on-disk layout, leaving MIME
 //! rendering to the shared commands.
 //!
 //! ## Configuration and output
 //!
 //! Config is loaded by pimalaya-config from the first existing canonical
-//! path (or the `-c` override), later paths deep-merged on top; the
-//! schema ([`config`]) is multi-account, a top-level block plus named
-//! account blocks carrying optional per-backend sub-blocks. Bare
-//! `himalaya` (no subcommand) runs the interactive [`wizard`], which
-//! discovers an account and offers to save it to a config file (or
-//! prints it on stdout when redirected); it is also proposed when a
-//! command finds no config. Bare `himalaya --account <NAME>` shows the
-//! help instead. A config that exists but lacks the requested account
-//! is a hard error. Output follows the Pimalaya rule: data and errors go
-//! to stdout through the printer (`--json` switches every command to JSON),
-//! stderr carries logs only. Each command's doc comment is its `--help`
-//! text, so `himalaya <command> --help` is the canonical per-command
-//! usage reference. The design memory lives in the cairn/ folder (the
-//! Cairn convention: spec/, changes/, log/), including the manual
-//! provider test reports under cairn/spec/testing/.
+//! path, or the `-c` override, later paths deep-merged on top. The schema
+//! ([`config`]) is multi-account: a top-level block plus named account
+//! blocks carrying optional per-backend sub-blocks.
+//!
+//! Bare `himalaya` runs the interactive [`wizard`], which discovers an
+//! account and offers to save it, or prints it on stdout when redirected;
+//! it is also proposed when a command finds no config. A config that
+//! exists but lacks the requested account is a hard error.
+//!
+//! Output follows the Pimalaya rule: data and errors go to stdout through
+//! the printer, `--json` switching every command to JSON, and stderr
+//! carries logs only. Each command's doc comment is its `--help`, so
+//! `himalaya <command> --help` is the canonical usage reference.
 
 mod account;
 mod backend;
@@ -133,16 +140,9 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
 
 /// Meets a bare `himalaya`, which is where a newcomer lands.
 ///
-/// With no command there is nothing to run: a missing configuration
-/// raises the offer, and an existing one gets the help, which is also
-/// what a script or a JSON caller gets since neither can answer a
-/// prompt. A file that exists but fails to parse counts as a
-/// configuration, so the offer never proposes to write over a broken
-/// one: the parse error surfaces when a real command reads it.
-///
-/// `--account` names an account to act on, so with no subcommand it is a
-/// half-typed command rather than a first run: it gets the help, which
-/// points at the commands, instead of an offer to create an account.
+/// A missing configuration raises the offer; anything else gets the help.
+/// A broken file counts as a configuration, so the offer never writes over
+/// one, and `--account` alone is a half-typed command, not a first run.
 fn meet_bare_invocation(
     printer: &mut StdoutPrinter,
     config_paths: &[PathBuf],
@@ -156,9 +156,8 @@ fn meet_bare_invocation(
     if !configured && !named_account && !printer.is_json() && stdin().is_terminal() {
         let path = Config::target_path(config_paths)?;
 
-        // NOTE: a bare invocation has nothing to run after the offer, so
-        // a declined one falls back to the help. The wizard already says
-        // what to run next when it ran.
+        // NOTE: a bare invocation has nothing to run after the offer, so a
+        // declined one falls back to the help.
         if cli::offer_configuration(printer, config_paths, &path)? {
             return Ok(());
         }

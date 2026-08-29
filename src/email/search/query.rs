@@ -1,9 +1,7 @@
-//! # Search emails query
+//! # Search query
 //!
-//! Exposes [`SearchEmailsQuery`], the top-level structure wrapping a
-//! [`SearchEmailsFilterQuery`] (filter) and a [`SearchEmailsSortQuery`]
-//! (sort). The query parses from a string slice via [`FromStr`]; see
-//! [`super::parser`] for the parser entry point and the grammar.
+//! Exposes [`SearchEmailsQuery`], a filter and a sort parsed from one
+//! string by [`super::parser`].
 
 use std::str::FromStr;
 
@@ -12,17 +10,12 @@ use crate::email::search::{
     sort::query::SearchEmailsSortQuery,
 };
 
-/// The search emails query structure.
-///
-/// Composed of an optional recursive [`SearchEmailsFilterQuery`] and an
-/// optional [`SearchEmailsSortQuery`]. At least one of the two must be
-/// present in a valid query string.
+/// A search query, a valid one carrying at least one of its two halves.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SearchEmailsQuery {
-    /// The recursive emails search filter query.
+    /// Which emails the query keeps.
     pub filter: Option<SearchEmailsFilterQuery>,
-
-    /// The emails search sort query.
+    /// In which order it returns them.
     pub sort: Option<SearchEmailsSortQuery>,
 }
 

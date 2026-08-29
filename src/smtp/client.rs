@@ -1,11 +1,11 @@
-//! Himalaya wrapper around [`io_smtp::client::SmtpClientStd`].
+//! # SMTP client
 //!
-//! Built up front by the dispatch layer (`crate::cli`) via
-//! [`build_smtp_client`] and handed down to every SMTP-specific
-//! subcommand. SMTP send is stateless after auth, so unlike the
-//! storage backends the commands need no account context: the merged
-//! [`Account`] returned by [`build_smtp_client`] (for dispatch
-//! uniformity) is not threaded into them.
+//! The wrapper around io-smtp's blocking client every SMTP-specific
+//! subcommand receives.
+//!
+//! Sending is stateless once authenticated, so unlike a storage backend
+//! these commands need no account context: the merged [`Account`] comes
+//! back for dispatch uniformity and is not threaded into them.
 
 use std::{
     net::Ipv4Addr,
@@ -37,15 +37,15 @@ impl SmtpClient {
         let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // A `unix://` sirup socket presents a pre-authenticated
-            // session, so no SASL is negotiated over it.
+            // NOTE: a `unix://` sirup socket is already authenticated, so
+            // no SASL is negotiated over it.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from SMTP server `{server}`"))?;
-                // url does not know the smtp(s) default ports; match
-                // io-smtp's own connection defaults (465 for smtps).
+                // NOTE: url knows no smtp default port, so the fallback is
+                // io-smtp's own connection default.
                 let port = server
                     .port()
                     .unwrap_or(Inner::default_port(server.scheme()));
@@ -63,10 +63,9 @@ impl SmtpClient {
 
 /// Parses an SMTP server string into a URL.
 ///
-/// Accepts `smtp`/`smtps://host[:port]`, a bare `host:port`, or a bare
-/// `host` (the last two default to `smtps://`, secure), or a
-/// `unix:///path` socket for a local proxy such as sirup. Any other
-/// scheme is rejected.
+/// A full `smtp://` or `smtps://` URL, a bare authority or host taking
+/// `smtps://`, or a `unix://` socket for a local proxy such as sirup. Any
+/// other scheme is rejected.
 pub fn parse_smtp_server(server: &str) -> Result<Url> {
     parse_server(server, "smtps", &["smtp", "smtps", "unix"])
 }
@@ -85,12 +84,12 @@ impl DerefMut for SmtpClient {
     }
 }
 
-/// Opens the SMTP session for an already-resolved account: takes the
-/// `[smtp]` block out of `account_config` and builds the merged
-/// [`Account`]. Bails when the account has no `[smtp]` block. Returns the
-/// live client paired with the merged account for dispatch uniformity
-/// with the other `build_*_client` helpers, though SMTP subcommands
-/// ignore the account.
+/// Opens the SMTP session of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[smtp]` block. The account rides
+/// along for uniformity with the other builders, the SMTP subcommands
+/// ignoring it.
 pub fn build_smtp_client(
     config: Config,
     name: String,

@@ -1,8 +1,10 @@
-//! Amount of message detail requested by the Gmail `get` commands.
+//! # Gmail format
+//!
+//! How much message detail the Gmail `get` commands ask for.
 //!
 //! Gmail exposes the same `format` query parameter on `messages.get`,
-//! `drafts.get` and `threads.get`, so the three commands share a single
-//! [`ValueEnum`] instead of declaring one each.
+//! `drafts.get` and `threads.get`, so the three commands share one
+//! [`ValueEnum`] rather than declare one each.
 
 use clap::ValueEnum;
 use io_gmail::v1::rest::messages::GmailMessageFormat;

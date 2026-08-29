@@ -1,3 +1,8 @@
+//! # ManageSieve deactivate
+//!
+//! The `sieve deactivate` command, an RFC 5804 `SETACTIVE` naming no
+//! script.
+
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -13,6 +18,7 @@ use crate::sieve::client::SieveClient;
 pub struct SieveScriptDeactivateCommand;
 
 impl SieveScriptDeactivateCommand {
+    /// Leaves the account with no active script.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         client.activate_script(None)?;
         printer.out(Message::new("Sieve script successfully deactivated"))

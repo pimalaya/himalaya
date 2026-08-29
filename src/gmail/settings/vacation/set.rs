@@ -1,3 +1,8 @@
+//! # Gmail vacation set
+//!
+//! The `gmail settings vacation set` command,
+//! `users.settings.updateVacation`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{
@@ -9,10 +14,9 @@ use crate::gmail::{client::GmailClient, settings::convert::enabled_flag};
 
 /// Update the Gmail vacation responder settings.
 ///
-/// Partial update: the settings are fetched first and only the options
-/// you pass are changed, so unspecified fields are preserved. The
-/// responder is toggled with `--enable` / `--disable` and never by
-/// accident.
+/// A partial update: the settings are fetched first and only the options
+/// passed are changed, so the rest survives. The responder itself is
+/// toggled with `--enable` and `--disable`, never by accident.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsVacationSetCommand {
     /// Turn the responder on.
@@ -47,6 +51,7 @@ pub struct GmailSettingsVacationSetCommand {
 }
 
 impl GmailSettingsVacationSetCommand {
+    /// Applies the vacation responder settings.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let mut settings = {
             let c = GmailVacationGet::new(&client.auth, &client.user_id)?;

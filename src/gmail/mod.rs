@@ -1,3 +1,8 @@
+//! # Gmail
+//!
+//! The `gmail` command family, one subcommand group per Gmail REST
+//! resource, plus the adapter serving the shared commands over Gmail.
+
 pub mod attachments;
 pub mod backend;
 pub mod cli;

@@ -1,3 +1,7 @@
+//! # JMAP submission command
+//!
+//! The `jmap submission` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -18,7 +22,7 @@ use crate::{
 pub enum JmapSubmissionCommand {
     /// Fetch submissions by ID (EmailSubmission/get).
     Get(JmapSubmissionGetCommand),
-    /// Query and list submissions (EmailSubmission/query + EmailSubmission/get).
+    /// Query and list submissions (EmailSubmission/query, then /get).
     #[command(aliases = ["lst", "list"])]
     Query(JmapSubmissionQueryCommand),
     /// Submit a draft email for sending (EmailSubmission/set).
@@ -29,6 +33,7 @@ pub enum JmapSubmissionCommand {
 }
 
 impl JmapSubmissionCommand {
+    /// Runs the subcommand against the account's JMAP client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

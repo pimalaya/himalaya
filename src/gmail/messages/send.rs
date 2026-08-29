@@ -1,3 +1,7 @@
+//! # Gmail message send
+//!
+//! The `gmail messages send` command, `users.messages.send`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw};
@@ -13,6 +17,7 @@ pub struct GmailMessageSendCommand {
 }
 
 impl GmailMessageSendCommand {
+    /// Sends the message and reports the id it landed under.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
         let message = GmailMessage {

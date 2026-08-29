@@ -1,3 +1,7 @@
+//! # m2dir list
+//!
+//! The `m2dir list` command, tabling the folders under the store root.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -16,6 +20,7 @@ use crate::{
 pub struct M2dirMailboxListCommand;
 
 impl M2dirMailboxListCommand {
+    /// Lists the folders under the store root and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -46,13 +51,16 @@ impl M2dirMailboxListCommand {
     }
 }
 
-/// Renderable table of m2dir folders.
+/// The `m2dir list` output, a table of folders.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct M2dirsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The color of the NAME column.
     #[serde(skip)]
     pub name_color: Color,
+    /// The folders found under the store root.
     #[serde(rename = "m2dirs")]
     pub rows: Vec<M2dirRow>,
 }
@@ -81,9 +89,11 @@ impl fmt::Display for M2dirsTable {
     }
 }
 
-/// One row of the m2dir folders table: name and path.
+/// One row of the folders table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct M2dirRow {
+    /// The folder name, relative to the store root.
     pub name: String,
+    /// Its filesystem path.
     pub path: String,
 }

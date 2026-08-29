@@ -1,9 +1,10 @@
-//! Himalaya wrapper around [`io_maildir::client::MaildirClient`].
+//! # Maildir client
 //!
-//! Built up front by the dispatch layer (`crate::cli`) via
-//! [`build_maildir_client`] and handed down to every maildir-specific
-//! subcommand, together with the merged [`Account`] as a sibling
-//! argument.
+//! The wrapper around io-maildir's client every Maildir-specific
+//! subcommand receives.
+//!
+//! The dispatch layer builds it up front and hands it down, the merged
+//! [`Account`] riding along as a sibling argument.
 
 use std::{
     ops::{Deref, DerefMut},
@@ -27,18 +28,16 @@ impl From<MaildirKeywordHeaderConfig> for KeywordHeader {
     }
 }
 
-/// Live Maildir client wrapping io_maildir with the configured root.
+/// A Maildir client rooted at the configured store.
 pub struct MaildirClient {
     inner: Inner,
-    /// Filesystem root of the configured maildir. Kept on the wrapper
-    /// so commands can join sub-paths (per-mailbox) without needing
-    /// the original [`MaildirConfig`].
+    /// The filesystem root, kept here so a command joins a sub-path
+    /// without reaching back for the configuration.
     pub root: PathBuf,
 }
 
 impl MaildirClient {
-    /// Builds a [`MaildirClient`] rooted at the configured maildir
-    /// path.
+    /// Builds a client rooted at the configured Maildir path.
     pub fn new(config: MaildirConfig) -> Self {
         let root = config.root.clone();
         let mut inner = Inner::new(root.to_string_lossy().into_owned());
@@ -47,15 +46,12 @@ impl MaildirClient {
         Self { inner, root }
     }
 
-    /// Resolves a maildir CLI argument to a loaded [`Maildir`].
+    /// Resolves a command's Maildir argument into a loaded [`Maildir`].
     ///
     /// io-maildir resolves every logical name relative to the store root,
-    /// so an absolute path — the `id` column of `mailbox list`, or the
-    /// configured root itself — is first reduced to its root-relative
-    /// name (the empty name, which maps back to the root/INBOX, when the
-    /// path *is* the root); a plain relative name (`Archive`,
-    /// `Projects/Work`) is loaded as-is. Loading validates the `cur` /
-    /// `new` / `tmp` markers.
+    /// so an absolute path is first reduced to its root-relative name,
+    /// the empty one when it is the root itself. Loading validates the
+    /// `cur`, `new` and `tmp` markers.
     pub fn resolve_maildir(&self, path: &Path) -> Result<Maildir> {
         let name = path.strip_prefix(&self.root).unwrap_or(path);
         Ok(self.load_maildir(name.to_string_lossy().into_owned())?)
@@ -76,11 +72,10 @@ impl DerefMut for MaildirClient {
     }
 }
 
-/// Opens the maildir client for an already-resolved account: takes the
-/// `[maildir]` block out of `account_config` and builds the merged
-/// [`Account`]. Bails when the account has no `[maildir]` block. Returns
-/// the client paired with the merged account so subcommands receive both
-/// as sibling arguments.
+/// Opens the Maildir client of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[maildir]` block.
 pub fn build_maildir_client(
     config: Config,
     name: String,

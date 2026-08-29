@@ -1,5 +1,7 @@
-//! Shared output helpers for commands that return raw message or
-//! attachment content, or paginated listings (Gmail, Microsoft Graph).
+//! # Output
+//!
+//! What the commands returning raw content or a paginated listing print
+//! through.
 
 use std::{
     fmt, fs,
@@ -12,10 +14,11 @@ use pimalaya_cli::printer::{Message, Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-/// Wraps a renderable listing with an optional pagination cursor so the
-/// "next page" hint is part of the command output: a trailing footer
-/// line in text mode, an extra `next_page` field in JSON. This keeps
-/// the cursor visible to scripts, unlike logging it to stderr.
+/// A listing plus the cursor of its next page.
+///
+/// The cursor is part of the output, a footer line in text and a
+/// `next_page` field in JSON, so a script reads it. Logging it to stderr
+/// would not.
 #[derive(Serialize, JsonSchema)]
 pub struct Paginated<T> {
     #[serde(flatten)]
@@ -25,6 +28,7 @@ pub struct Paginated<T> {
 }
 
 impl<T> Paginated<T> {
+    /// Wraps a listing and the cursor its backend returned.
     pub fn new(inner: T, next_page: Option<String>) -> Self {
         Self { inner, next_page }
     }
@@ -42,13 +46,11 @@ impl<T: fmt::Display> fmt::Display for Paginated<T> {
     }
 }
 
-/// Writes `bytes` to `output` when given, otherwise to stdout.
+/// Writes bytes to the given path, or to stdout when there is none.
 ///
-/// Redirected or piped stdout always receives the verbatim bytes (so
-/// `> file.pdf` is byte-exact). To avoid corrupting the display or
-/// injecting escape sequences, binary-looking content is refused when
-/// stdout is a terminal; text (e.g. a raw RFC 5322 message) still
-/// prints interactively.
+/// A redirected stdout receives the bytes verbatim, so a saved file is
+/// byte-exact. Binary-looking content is refused on a terminal, where it
+/// would corrupt the display or inject escape sequences.
 pub fn write_bytes_or_save(
     printer: &mut impl Printer,
     output: Option<&Path>,
@@ -66,9 +68,8 @@ pub fn write_bytes_or_save(
 
     let mut stdout = io::stdout();
 
-    // NOTE: treat a NUL or a C0 control other than tab/newline/CR as binary;
-    // such content can corrupt a terminal or inject escape sequences, so refuse
-    // it on a TTY (piped output is unaffected).
+    // NOTE: a NUL or a C0 control other than tab, newline and CR reads as
+    // binary, which is what a terminal must be spared.
     let looks_binary = bytes
         .iter()
         .any(|&byte| byte == 0 || (byte < 0x20 && !matches!(byte, b'\t' | b'\n' | b'\r')));

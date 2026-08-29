@@ -1,3 +1,8 @@
+//! # Gmail settings
+//!
+//! The `gmail settings` command family, covering `users.settings` and
+//! its sub-resources.
+
 pub mod autoforwarding;
 pub mod convert;
 pub mod delegates;
@@ -58,6 +63,7 @@ pub enum GmailSettingsCommand {
 }
 
 impl GmailSettingsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

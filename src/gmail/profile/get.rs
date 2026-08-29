@@ -1,3 +1,7 @@
+//! # Gmail profile get
+//!
+//! The `gmail profile get` command, `users.getProfile`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -14,6 +18,7 @@ use crate::gmail::client::GmailClient;
 pub struct GmailProfileGetCommand;
 
 impl GmailProfileGetCommand {
+    /// Fetches the profile and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let profile = client.profile_get()?.response;
 

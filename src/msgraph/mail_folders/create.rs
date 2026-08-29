@@ -1,3 +1,8 @@
+//! # Microsoft Graph mail folder create
+//!
+//! The `msgraph mail-folders create` command, creating a folder under the
+//! mailbox root.
+
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::MsgraphMailFolder;
@@ -15,6 +20,7 @@ pub struct MsgraphMailFolderCreateCommand {
 }
 
 impl MsgraphMailFolderCreateCommand {
+    /// Creates the folder and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let folder = MsgraphMailFolder {
             display_name: self.name.clone(),

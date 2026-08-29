@@ -1,3 +1,8 @@
+//! # JMAP mailbox query
+//!
+//! The `jmap mailbox query` command, an RFC 8621 `Mailbox/query` chained
+//! into a `Mailbox/get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -26,46 +31,38 @@ pub struct JmapMailboxQueryCommand {
     /// Filter by parent mailbox identifier.
     #[arg(long, value_name = "ID")]
     pub parent_id: Option<String>,
-
     /// Filter by a standard role.
     #[arg(long, value_name = "ROLE", conflicts_with = "custom_role")]
     pub role: Option<RoleArg>,
-
     /// Filter by a custom (non-standard) role.
     #[arg(long, value_name = "ROLE")]
     pub custom_role: Option<String>,
-
     /// Filter by substring name match.
     #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
-
     /// Restrict to subscribed mailboxes. Native `Mailbox/query` applies
     /// no subscription filter, so the default lists every mailbox.
     #[arg(long, default_value_t)]
     pub subscribed: bool,
-
     /// Only return mailboxes that have a role.
     #[arg(long, default_value_t)]
     pub has_any_role: bool,
-
     /// Sort by property.
     #[arg(long, value_name = "PROP", default_value_t)]
     pub sort: SortArg,
-
     /// Sort in descending order.
     #[arg(long, default_value_t)]
     pub desc: bool,
-
     /// Number of mailboxes to display per page.
     #[arg(long, short = 's', value_name = "N", default_value = "10")]
     pub page_size: u64,
-
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
 }
 
 impl JmapMailboxQueryCommand {
+    /// Queries the mailboxes and tables the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -118,12 +115,16 @@ impl JmapMailboxQueryCommand {
     }
 }
 
-/// Per-column colors for the mailboxes table.
+/// Per-column colors of the mailboxes table.
 #[derive(Clone, Copy, Debug)]
 pub struct MailboxColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the NAME column.
     pub name: Color,
+    /// Color of the TOTAL column.
     pub total: Color,
+    /// Color of the UNREAD column.
     pub unread: Color,
 }
 
@@ -138,13 +139,16 @@ impl Default for MailboxColors {
     }
 }
 
-/// Renderable table of mailboxes.
+/// The mailboxes rendered as a table.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct MailboxesTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The per-column colors.
     #[serde(skip)]
     pub colors: MailboxColors,
+    /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<JmapMailbox>,
 }
 
@@ -184,18 +188,27 @@ impl fmt::Display for MailboxesTable {
     }
 }
 
-/// Standard JMAP mailbox role (RFC 8621 / IANA).
+/// A registered JMAP mailbox role, per RFC 8621 and the IANA registry.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "lower")]
 pub enum RoleArg {
+    /// The mailbox new mail arrives in.
     Inbox,
+    /// The mailbox archived mail is kept in.
     Archive,
+    /// The mailbox unsent mail is kept in.
     Drafts,
+    /// The mailbox flagged mail is gathered in.
     Flagged,
+    /// The mailbox important mail is gathered in.
     Important,
+    /// The mailbox junk is gathered in.
     Junk,
+    /// The mailbox sent mail is kept in.
     Sent,
+    /// The mailbox subscribed feeds are delivered to.
     Subscribed,
+    /// The mailbox deleted mail is kept in.
     Trash,
 }
 
@@ -229,13 +242,16 @@ pub(crate) fn role_from_args(
     }
 }
 
-/// CLI sort key for mailboxes.
+/// The property a mailbox query sorts on.
 #[derive(Clone, Debug, Default, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum SortArg {
+    /// The mailbox name.
     Name,
+    /// The order the server itself wants them displayed in.
     #[default]
     SortOrder,
+    /// The id of the parent mailbox.
     ParentId,
 }
 

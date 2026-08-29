@@ -1,3 +1,7 @@
+//! # Gmail message get
+//!
+//! The `gmail messages get` command, `users.messages.get`.
+
 use std::fmt;
 
 use anyhow::{Result, anyhow};
@@ -33,6 +37,7 @@ pub struct GmailMessageGetCommand {
 }
 
 impl GmailMessageGetCommand {
+    /// Fetches the message and prints it at the requested detail.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let format = GmailMessageFormat::from(self.format);
         let hs: Vec<&str> = self.headers.iter().map(String::as_str).collect();
@@ -59,14 +64,11 @@ impl GmailMessageGetCommand {
     }
 }
 
-/// Gmail message metadata, rendered as aligned text or, under `--json`,
-/// as a structured object instead of a wrapped human string.
+/// The `gmail messages get` output, the metadata of one message.
 ///
-/// Only the metadata is exposed, never the whole Gmail resource: the
-/// payload of a message fetched with the full format is a recursive MIME
-/// tree carrying base64-encoded bodies, which belongs on the `--format
-/// raw` path rather than in a `--json` object. Bodies stay reachable
-/// through `messages get --format raw` and `attachments get`.
+/// The whole resource is never exposed: a full-format payload is a
+/// recursive MIME tree of base64 bodies, which belongs on the raw path.
+/// `--format raw` and `attachments get` are how a body is reached.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailMessageGetOutput {
@@ -110,15 +112,15 @@ impl fmt::Display for GmailMessageGetOutput {
     }
 }
 
-/// A single RFC 5322 header of a Gmail message.
+/// One RFC 5322 header of a Gmail message.
 ///
-/// Headers are a list rather than a map because a message may repeat a
-/// name (Received, References) and their order is meaningful. They are
-/// absent with the minimal format, narrowed by `--header` when it is
-/// given, and complete otherwise.
+/// Headers are a list rather than a map, a message being free to repeat a
+/// name and their order being meaningful.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct GmailMessageHeaderOutput {
+    /// The header name.
     pub name: String,
+    /// Its value.
     pub value: String,
 }
 
@@ -131,18 +133,16 @@ impl From<GmailMessageHeader> for GmailMessageHeaderOutput {
     }
 }
 
-/// Folds the RFC 5322 headers of a message payload into output headers,
-/// keeping only the `names` requested with `--header`. An empty `names`
-/// keeps them all.
+/// Folds the headers of a payload into output headers, keeping the names
+/// `--header` asked for and all of them when it asked for none.
 ///
-/// The filter is applied here rather than left to Gmail because the
-/// `metadataHeaders` query parameter narrows the response under the
-/// metadata format alone: the full format returns every header whatever
-/// is asked for. Matching is case-insensitive, as RFC 5322 header names
-/// are, and both the order and the repeats of the payload are kept.
+/// The filter runs here because Gmail honours `metadataHeaders` under the
+/// metadata format alone, the full format returning every header whatever
+/// was asked for. Matching is case-insensitive, and both the order and
+/// the repeats survive.
 ///
-/// Only the top-level part is read, since that is where Gmail puts the
-/// message headers; nested parts carry their own MIME headers.
+/// Only the top-level part is read, which is where Gmail puts the message
+/// headers, a nested part carrying its own MIME ones.
 pub(crate) fn message_headers(
     payload: Option<GmailMessagePayload>,
     names: &[&str],

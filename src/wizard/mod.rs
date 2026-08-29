@@ -1,3 +1,8 @@
+//! # Wizard
+//!
+//! The interactive configuration: one prompt discovering an account, the
+//! per-backend prompts completing it, and the document it comes out as.
+
 pub mod configure;
 pub mod discover;
 #[cfg(feature = "gmail")]

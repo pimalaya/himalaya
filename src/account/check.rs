@@ -1,3 +1,9 @@
+//! # Account check
+//!
+//! The `account check` command, opening one connection per configured
+//! backend so a credential or an endpoint fails here rather than in the
+//! middle of a real command.
+
 use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, bail};
@@ -18,15 +24,14 @@ use crate::{
 
 /// Validate the account configuration.
 ///
-/// Loads the TOML configuration, picks the active account (via the
-/// global `--account` flag or the default), and checks each backend
-/// allowed by `--backend`. The check tries to instantiate a client per
-/// backend, which exercises the same handshake / authentication paths
-/// the other commands would take.
+/// Every backend `--backend` allows is opened, which exercises the same
+/// handshake and authentication paths a real command takes. The report
+/// names each backend and whether it answered.
 #[derive(Debug, Parser)]
 pub struct AccountCheckCommand;
 
 impl AccountCheckCommand {
+    /// Checks every allowed backend of the account and prints the report.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -133,10 +138,11 @@ impl AccountCheckCommand {
     }
 }
 
-/// Tests every backend the account has configured, failing on the first
-/// error. Used by the wizard to validate a freshly-built account before
-/// printing it, so a bad credential or endpoint stops the process
-/// instead of yielding a config that cannot connect.
+/// Tests every configured backend, failing on the first error.
+///
+/// The wizard runs it over a freshly built account, so a bad credential
+/// or endpoint stops it rather than yielding a configuration that cannot
+/// connect.
 pub fn test_account(account_config: &AccountConfig) -> Result<()> {
     #[cfg(feature = "imap")]
     if let Some(imap_config) = &account_config.imap {
@@ -181,6 +187,7 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
     Ok(())
 }
 
+/// Opens an authenticated IMAP session and drops it.
 #[cfg(feature = "imap")]
 pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
     use io_imap::{
@@ -213,11 +220,11 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
     Ok(())
 }
 
-/// Opens an unauthenticated IMAP connection to `server` (implicit TLS or
-/// STARTTLS) purely to read the server's CAPABILITY, and returns the
-/// authentication mechanisms it advertises (most preferred first, LOGIN
-/// last). Used by the wizard to offer only what the server supports; the
-/// connection is dropped without authenticating.
+/// Reads a server's CAPABILITY over an unauthenticated connection and
+/// returns the mechanisms it advertises, most preferred first.
+///
+/// The wizard offers what comes back rather than the whole list, and the
+/// connection is dropped without ever authenticating.
 #[cfg(feature = "imap")]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
     use io_imap::{
@@ -240,6 +247,7 @@ pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<
     Ok(available_auth_mechanisms(&capabilities))
 }
 
+/// Opens a JMAP client and fetches the session object.
 #[cfg(feature = "jmap")]
 fn connect_jmap(jmap_config: &crate::config::JmapConfig) -> Result<()> {
     use io_jmap::client::JmapClientStd;
@@ -255,6 +263,7 @@ fn connect_jmap(jmap_config: &crate::config::JmapConfig) -> Result<()> {
     Ok(())
 }
 
+/// Opens a Gmail client and fetches the account profile.
 #[cfg(feature = "gmail")]
 fn connect_gmail(gmail_config: &crate::config::GmailConfig) -> Result<()> {
     use io_gmail::v1::client::{GmailClientStd, GmailClientStdConnectOptions};
@@ -274,6 +283,7 @@ fn connect_gmail(gmail_config: &crate::config::GmailConfig) -> Result<()> {
     Ok(())
 }
 
+/// Opens a Microsoft Graph client and fetches the signed-in user.
 #[cfg(feature = "msgraph")]
 fn connect_msgraph(msgraph_config: &crate::config::MsgraphConfig) -> Result<()> {
     use io_msgraph::v1::client::{MsgraphClientStd, MsgraphClientStdConnectOptions};
@@ -296,6 +306,7 @@ fn connect_msgraph(msgraph_config: &crate::config::MsgraphConfig) -> Result<()> 
     Ok(())
 }
 
+/// Checks that the Maildir root is a directory.
 #[cfg(feature = "maildir")]
 fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> {
     if !maildir_config.root.is_dir() {
@@ -308,6 +319,7 @@ fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> 
     Ok(())
 }
 
+/// Checks that the m2dir root is a directory.
 #[cfg(feature = "m2dir")]
 fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
     if !m2dir_config.root.is_dir() {
@@ -320,6 +332,7 @@ fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
     Ok(())
 }
 
+/// Opens an authenticated SMTP session and drops it.
 #[cfg(feature = "smtp")]
 pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()> {
     use std::net::Ipv4Addr;
@@ -351,28 +364,35 @@ pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()
     Ok(())
 }
 
+/// Opens an authenticated ManageSieve session and drops it.
 #[cfg(feature = "sieve")]
 pub(crate) fn connect_sieve(sieve_config: &crate::config::SieveConfig) -> Result<()> {
     let _client = crate::sieve::client::SieveClient::new(sieve_config.clone())?;
     Ok(())
 }
 
-/// Aggregated account check result: one outcome per backend.
+/// The `account check` output, one outcome per backend.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct CheckReport {
+    /// The account that was checked.
     pub account: String,
+    /// One entry per backend the account declares and `--backend` allows.
     pub backends: Vec<BackendCheck>,
 }
 
-/// Outcome of checking a single backend's connection.
+/// Outcome of checking one backend's connection.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct BackendCheck {
+    /// The backend that was checked.
     pub backend: &'static str,
+    /// Whether it answered.
     pub ok: bool,
+    /// Why it did not, when it did not.
     pub error: Option<String>,
 }
 
 impl BackendCheck {
+    /// Folds a connection attempt into its outcome.
     fn from(backend: &'static str, result: Result<()>) -> Self {
         match result {
             Ok(()) => Self {

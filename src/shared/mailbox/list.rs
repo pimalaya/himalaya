@@ -1,3 +1,8 @@
+//! # Mailbox list
+//!
+//! The `mailbox list` command, tabling the mailboxes of the active
+//! account.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -13,28 +18,27 @@ use crate::{
     shared::{client::EmailClient, table::style_from_preset},
 };
 
-/// Shared API to list mailboxes for the active account.
+/// List the mailboxes of the active account.
 #[derive(Debug, Parser)]
 pub struct MailboxListCommand {
-    /// Populate per-mailbox message counts (TOTAL and UNREAD columns).
+    /// Fill the TOTAL and UNREAD columns.
     ///
-    /// JMAP returns counts in the same response. IMAP issues an
-    /// extra `STATUS` per mailbox, which can be slow on accounts
-    /// with many mailboxes. Maildir does not implement counts yet.
+    /// JMAP returns the counts in the same response, but IMAP issues one
+    /// extra `STATUS` per mailbox, which is slow on an account with many.
+    /// Maildir does not implement counts at all.
     #[arg(long)]
     pub counts: bool,
-
     /// Maximum width of the rendered table, in terminal columns.
     ///
-    /// Overrides comfy-table's auto-detection. Columns shrink with
-    /// ellipsis if needed. Useful when piping through `less -S` or
-    /// rendering into a fixed-width log.
+    /// Overrides the auto-detected width, columns shrinking with an
+    /// ellipsis as needed, which is what piping through `less -S` wants.
     #[arg(long = "max-width", short = 'w')]
     #[arg(value_name = "COLUMNS")]
     pub max_width: Option<u16>,
 }
 
 impl MailboxListCommand {
+    /// Lists the mailboxes and prints them as a table.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -61,6 +65,7 @@ impl MailboxListCommand {
     }
 }
 
+/// Per-column colors of the mailboxes table.
 #[derive(Clone, Copy, Debug)]
 struct MailboxColors {
     id: Color,
@@ -69,19 +74,24 @@ struct MailboxColors {
     unread: Color,
 }
 
-/// Table of mailbox rows rendered to the terminal or as JSON.
+/// The `mailbox list` output, a table of mailboxes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Mailboxes {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// The width the table is capped at, when one was asked for.
     #[serde(skip)]
     pub max_width: Option<u16>,
+    /// Whether the count columns are drawn.
     #[serde(skip)]
     pub with_counts: bool,
     #[serde(skip)]
     colors: MailboxColors,
+    /// The mailboxes, in the order the backend returned them.
     pub mailboxes: Vec<Mailbox>,
 }
 
@@ -120,6 +130,7 @@ impl fmt::Display for Mailboxes {
     }
 }
 
+/// Renders a count, or an empty cell when the backend gave none.
 fn count_cell(value: Option<u64>) -> Cell {
     match value {
         Some(n) => Cell::new(n),

@@ -1,3 +1,7 @@
+//! # Gmail thread delete
+//!
+//! The `gmail threads delete` command, `users.threads.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::threads::delete::GmailThreadDelete;
@@ -14,6 +18,7 @@ pub struct GmailThreadDeleteCommand {
 }
 
 impl GmailThreadDeleteCommand {
+    /// Deletes the thread and its messages for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailThreadDelete::new(&client.auth, &client.user_id, &self.id)?;

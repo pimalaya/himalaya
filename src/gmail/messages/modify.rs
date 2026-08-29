@@ -1,3 +1,7 @@
+//! # Gmail message modify
+//!
+//! The `gmail messages modify` command, `users.messages.modify`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -19,6 +23,7 @@ pub struct GmailMessageModifyCommand {
 }
 
 impl GmailMessageModifyCommand {
+    /// Applies the label changes to the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let message = client
             .message_modify(&self.id, &self.add, &self.remove)?

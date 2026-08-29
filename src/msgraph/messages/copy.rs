@@ -1,3 +1,8 @@
+//! # Microsoft Graph message copy
+//!
+//! The `msgraph messages copy` command, copying a message into another
+//! folder.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -11,13 +16,13 @@ pub struct MsgraphMessageCopyCommand {
     /// The id of the message to copy.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// The destination folder id or well-known name.
     #[arg(value_name = "DESTINATION")]
     pub destination: String,
 }
 
 impl MsgraphMessageCopyCommand {
+    /// Copies the message into the destination folder.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let message = client.message_copy(&self.id, &self.destination)?.response;
         printer.out(Message::new(format!(

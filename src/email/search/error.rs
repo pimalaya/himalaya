@@ -1,11 +1,15 @@
+//! # Search error
+//!
+//! What a search query fails to parse with.
+
 use std::fmt;
 
 use chumsky::error::Rich;
 
-/// Search-query parse failure, carrying the rich `chumsky` errors (for
-/// pretty diagnostics) alongside the original query string.
+/// A search query that did not parse.
 #[derive(Debug)]
 pub enum Error {
+    /// The chumsky diagnostics, and the query they were raised over.
     ParseError(Vec<Rich<'static, char>>, String),
 }
 

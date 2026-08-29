@@ -1,3 +1,7 @@
+//! # Gmail POP set
+//!
+//! The `gmail settings pop set` command, `users.settings.updatePop`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{GmailPopSettings, update_pop::GmailPopUpdate};
@@ -20,6 +24,7 @@ pub struct GmailSettingsPopSetCommand {
 }
 
 impl GmailSettingsPopSetCommand {
+    /// Applies the POP settings.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let settings = GmailPopSettings {
             access_window: self.access_window.map(Into::into),

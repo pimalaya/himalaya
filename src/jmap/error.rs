@@ -1,3 +1,8 @@
+//! # JMAP error
+//!
+//! Renders the `SetError` a JMAP method returns into the message a
+//! command fails with.
+
 use io_jmap::rfc8621::{
     email::{
         copy::JmapEmailCopyItemError, import::JmapEmailImportItemError, set::JmapEmailSetItemError,
@@ -14,8 +19,8 @@ pub trait JmapSetError {
     fn type_name(&self) -> &'static str;
 }
 
-/// Renders a JMAP `*Set`-style error suffix like
-/// `: invalidProperties (\`name\`) — too long`.
+/// Renders the suffix a failed JMAP set is reported with: its error type,
+/// the properties it names, then its description.
 pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
     let mut msg = format!(": {}", err.type_name());
 

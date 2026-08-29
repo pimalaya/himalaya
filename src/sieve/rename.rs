@@ -1,3 +1,7 @@
+//! # ManageSieve rename
+//!
+//! The `sieve rename` command, RFC 5804 `RENAMESCRIPT`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -20,6 +24,7 @@ pub struct SieveScriptRenameCommand {
 }
 
 impl SieveScriptRenameCommand {
+    /// Renames the named script.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         client.rename_script(self.name, self.new_name)?;
         printer.out(Message::new("Sieve script successfully renamed"))

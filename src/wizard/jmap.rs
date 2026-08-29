@@ -1,7 +1,8 @@
-//! JMAP wizard.
+//! # JMAP wizard
 //!
-//! A discovery entry pins the session endpoint and the authentication
-//! method, so [`configure_discovered`] prompts only the credentials.
+//! Configures an account against the session endpoint discovery pinned,
+//! which also names the authentication method, so only the credentials
+//! are prompted.
 
 use std::collections::HashMap;
 
@@ -21,12 +22,12 @@ use crate::{
 const BASIC: &str = "Basic (username + password)";
 const BEARER: &str = "Bearer (API token)";
 
-/// Configures JMAP from a discovered entry: the endpoint is pinned, the
-/// HTTP authentication scheme is picked among the advertised ones (skipped
-/// when only one qualifies), then its credentials are prompted. The
-/// connection is tested and its role-based `mailbox.alias.*` entries
-/// discovered on the same session, so the caller skips the final account
-/// test.
+/// Configures JMAP from a discovered entry, whose endpoint is pinned.
+///
+/// The HTTP scheme is picked among the advertised ones, skipped when only
+/// one qualifies, and its credentials prompted. The connection is tested
+/// and the role-based aliases discovered on that same session, so the
+/// caller skips the final account test.
 pub fn configure_discovered(
     account_name: &str,
     email: &str,
@@ -48,9 +49,11 @@ pub fn configure_discovered(
     Ok((config, aliases))
 }
 
-/// Connects to JMAP — the connection test — and best-effort discovers the
-/// role-based mailbox aliases on the same session. A failed connection is
-/// the wizard's error; a failed listing only means fewer aliases.
+/// Connects to JMAP, which is the connection test, and discovers the
+/// role-based aliases on that same session.
+///
+/// A failed connection is the wizard's error, where a failed listing only
+/// means fewer aliases.
 fn test_and_discover(config: &JmapConfig) -> Result<HashMap<String, String>> {
     let spinner = Spinner::start("Testing JMAP connection");
 

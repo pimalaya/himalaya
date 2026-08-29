@@ -1,3 +1,7 @@
+//! # ManageSieve raw
+//!
+//! The `sieve raw` command, a byte-for-byte passthrough to the server.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -5,16 +9,14 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{shared::raw::RawCommandArg, sieve::client::SieveClient};
 
-/// Send a raw ManageSieve command and print the verbatim server
-/// response.
+/// Send a raw ManageSieve command and print the verbatim server response.
 ///
-/// The command is a single line sent without trailing CRLF (e.g.
-/// `CAPABILITY`, `LISTSCRIPTS`, `GETSCRIPT "main"`); io-managesieve
-/// appends the CRLF and reads the whole response back, literals
-/// included. A NO or BYE is returned as output, not as an error.
-/// Batching is rejected and a literal-bearing command such as
-/// `PUTSCRIPT` has its own subcommand, the exchange reading exactly one
-/// response.
+/// One line goes out without its trailing CRLF, which io-managesieve
+/// appends before reading the whole response back, literals included. A NO
+/// or a BYE comes back as output rather than as an error.
+///
+/// The exchange reads exactly one response, so batching is refused, and a
+/// literal-bearing command such as `PUTSCRIPT` has its own subcommand.
 #[derive(Debug, Parser)]
 pub struct SieveRawCommand {
     #[command(flatten)]
@@ -22,9 +24,10 @@ pub struct SieveRawCommand {
 }
 
 impl SieveRawCommand {
+    /// Sends the command and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        // NOTE: io-managesieve appends the trailing CRLF itself, so
-        // strip the one the caller may have added (literal or real).
+        // NOTE: io-managesieve appends the trailing CRLF itself, so the one
+        // the caller may have added is stripped.
         let command = self.command.parse()?;
         let command = command.trim_end_matches(['\r', '\n']);
 

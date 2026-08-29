@@ -1,7 +1,7 @@
-//! ManageSieve subcommands (RFC 5804).
+//! # ManageSieve
 //!
-//! The protocol lives in io-managesieve; this module is the CLI around
-//! it, one file per subcommand.
+//! The `sieve` command family, RFC 5804, one file per subcommand around
+//! the protocol io-managesieve implements.
 
 pub mod activate;
 pub mod capability;

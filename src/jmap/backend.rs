@@ -1,13 +1,11 @@
-//! JMAP adapter for the shared cross-protocol client.
+//! # JMAP backend
 //!
-//! Thin glue over [`JmapClient`], which wraps io_jmap's high-level
-//! client (`mailbox_get`, `email_query`, `email_get`, `email_set`,
-//! `email_import`, `email_submission_set`, `blob_upload`,
-//! `blob_download`). The shared `mailbox` argument is always a JMAP
-//! mailbox id: the shared client maps human names to ids up front via
-//! [`JmapClient::resolve_mailbox_id`], so these adapters never resolve
-//! names themselves. The conversion is lifted from the retired io-email
-//! JMAP drivers.
+//! The JMAP adapter of the shared cross-protocol client, glue over the
+//! io-jmap client [`JmapClient`] wraps.
+//!
+//! The shared mailbox argument is always an opaque JMAP id, the client
+//! having mapped human names up front with
+//! [`JmapClient::resolve_mailbox_id`], so nothing here resolves a name.
 
 use std::collections::BTreeMap;
 
@@ -90,11 +88,12 @@ impl JmapClient {
         Ok(output.emails.into_iter().map(envelope_from).collect())
     }
 
-    /// Searches envelopes in `mailbox` (a JMAP mailbox id) via
-    /// `Email/query` + `Email/get`. Date clauses over-approximate on the
-    /// wire (JMAP filters `receivedAt` while the shared DSL targets
-    /// `sentAt`), so they are re-checked client-side and pagination then
-    /// happens after the trim.
+    /// Searches a mailbox with an `Email/query` chained into an
+    /// `Email/get`.
+    ///
+    /// A date clause over-approximates on the wire, JMAP filtering
+    /// `receivedAt` where the shared query means `sentAt`, so it is
+    /// rechecked client-side and the page is cut after that trim.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -206,8 +205,8 @@ impl JmapClient {
 
         let raw = self.download_blob(&url)?;
 
-        // JMAP has no side-effecting read (the blob download cannot carry a
-        // mutation), so `--seen` is a separate `Email/set`.
+        // NOTE: a blob download carries no mutation, so `--seen` costs a
+        // separate `Email/set` here.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
@@ -309,12 +308,12 @@ impl JmapClient {
         Ok(())
     }
 
-    /// Queues `raw` for delivery: upload, import into the drafts mailbox
-    /// as `$draft`, then `EmailSubmission/set` under the sending
-    /// identity. The identity and drafts mailbox come from the
-    /// `identity_id` / `drafts_mailbox_id` config when set, otherwise
-    /// they are discovered from the account (default identity and the
-    /// `drafts`-role mailbox).
+    /// Queues a message for delivery: upload, import as a draft, then
+    /// `EmailSubmission/set` under the sending identity.
+    ///
+    /// The identity and the drafts mailbox come from the configuration
+    /// when it names them, and from the account's default identity and
+    /// `drafts`-role mailbox otherwise.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
         let identity_id = self.resolve_identity_id()?;
         let drafts_id = self.resolve_drafts_mailbox_id()?;
@@ -364,8 +363,8 @@ impl JmapClient {
     }
 
     /// Resolves the identity to submit under: the configured
-    /// `identity_id`, else the account's default — the first identity
-    /// `Identity/get` reports (servers list the primary first).
+    /// `identity_id`, or the first one `Identity/get` reports, servers
+    /// listing the primary identity first.
     fn resolve_identity_id(&mut self) -> Result<String> {
         if let Some(id) = self.config.identity_id.clone() {
             return Ok(id);
@@ -523,15 +522,14 @@ fn envelope_from(email: JmapEmail) -> Envelope {
     let date = email.sent_at.as_deref().and_then(parse_rfc3339);
     let size = email.size.unwrap_or(0);
     let has_attachment = email.has_attachment;
-    // NOTE: JMAP returns messageId as a list (RFC 5322 allows multiple
-    // header instances); the first non-empty entry is canonical.
+    // NOTE: JMAP returns messageId as a list, RFC 5322 allowing several
+    // header instances, and the first non-empty entry is canonical.
     let message_id = email
         .message_id
         .and_then(|ids| ids.into_iter().find_map(|s| normalize_message_id(&s)));
-    // NOTE: inReplyTo is a list by definition (RFC 5322 §3.6.4), and
-    // JMAP hands the ids over already stripped of their brackets;
-    // normalising anyway keeps them comparable with a server that does
-    // not.
+    // NOTE: JMAP hands the ids over already stripped of their brackets,
+    // but normalising anyway keeps them comparable with a server that
+    // does not.
     let in_reply_to = email
         .in_reply_to
         .unwrap_or_default()
@@ -651,8 +649,8 @@ fn convert_filter(
             ..Default::default()
         }),
 
-        // Over-approximate via after = start-of-day(D); the exact
-        // sent-at rule is re-checked client-side.
+        // NOTE: the wire filter over-approximates from the start of the
+        // day, the exact sent-at rule being rechecked client-side.
         Q::Date(target) => {
             post_filters.push(PostFilter::Date(*target));
             JmapFilter::Condition(JmapEmailFilter {
@@ -660,8 +658,8 @@ fn convert_filter(
                 ..Default::default()
             })
         }
-        // Over-approximate via after = start-of-day(D+1); the strict
-        // sent-at rule is re-checked client-side.
+        // NOTE: the wire filter over-approximates from the start of the
+        // next day, the strict rule being rechecked client-side.
         Q::AfterDate(target) => {
             post_filters.push(PostFilter::AfterDate(*target));
             let bumped = target.succ_opt().unwrap_or(*target);

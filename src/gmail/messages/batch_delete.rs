@@ -1,3 +1,8 @@
+//! # Gmail message batch delete
+//!
+//! The `gmail messages batch-delete` command,
+//! `users.messages.batchDelete`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::batch_delete::GmailMessagesBatchDelete;
@@ -15,6 +20,7 @@ pub struct GmailMessageBatchDeleteCommand {
 }
 
 impl GmailMessageBatchDeleteCommand {
+    /// Deletes every named message for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let count = self.ids.len();
 

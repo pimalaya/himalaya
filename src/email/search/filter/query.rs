@@ -1,50 +1,37 @@
-//! # Search emails filter query
+//! # Search filter query
 //!
-//! Exposes [`SearchEmailsFilterQuery`], the recursive AST produced by
-//! [`super::parser::query`].
+//! Exposes [`SearchEmailsFilterQuery`], the recursive AST
+//! [`super::parser::query`] produces.
 
 use chrono::NaiveDate;
 
 use crate::email::flag::Flag;
 
-/// The search emails filter query.
+/// The filter half of a search query: three operators over seven
+/// conditions.
 ///
-/// Composed of 3 operators (and, or, not) and 7 conditions (date,
-/// after date, from, to, subject, body, flag). All date-related
-/// conditions are anchored to the `Date:` header (sent-at), never to
-/// the server-side received-at timestamp.
+/// Both date conditions read the `Date:` header, the sent-at, rather than
+/// the server's received-at.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SearchEmailsFilterQuery {
-    /// Filter emails that match both given conditions.
+    /// Emails matching both conditions.
     And(Box<SearchEmailsFilterQuery>, Box<SearchEmailsFilterQuery>),
-
-    /// Filter emails that match one of the two given conditions.
+    /// Emails matching either condition.
     Or(Box<SearchEmailsFilterQuery>, Box<SearchEmailsFilterQuery>),
-
-    /// Filter emails that do not match the given condition.
+    /// Emails matching the condition not at all.
     Not(Box<SearchEmailsFilterQuery>),
-
-    /// Filter emails where the `Date:` header of the message matches
-    /// the given date. Only the year, month and day are considered.
+    /// Emails sent on that day, the time of day being ignored.
     Date(NaiveDate),
-
-    /// Filter emails where the `Date:` header of the message is
-    /// strictly greater than the given date. Only the year, month and
-    /// day are considered.
+    /// Emails sent strictly after that day.
     AfterDate(NaiveDate),
-
-    /// Filter emails where the `From:` header contains the pattern.
+    /// Emails whose `From:` header contains the pattern.
     From(String),
-
-    /// Filter emails where the `To:` header contains the pattern.
+    /// Emails whose `To:` header contains the pattern.
     To(String),
-
-    /// Filter emails where the `Subject:` header contains the pattern.
+    /// Emails whose `Subject:` header contains the pattern.
     Subject(String),
-
-    /// Filter emails where one of the text bodies contains the pattern.
+    /// Emails one of whose text bodies contains the pattern.
     Body(String),
-
-    /// Filter emails where the given flag is set on the envelope.
+    /// Emails carrying the flag.
     Flag(Flag),
 }

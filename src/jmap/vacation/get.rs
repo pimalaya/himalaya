@@ -1,3 +1,8 @@
+//! # JMAP vacation get
+//!
+//! The `jmap vacation-response get` command, RFC 8621
+//! `VacationResponse/get`.
+
 use std::fmt;
 
 use anyhow::{Result, bail};
@@ -19,6 +24,7 @@ use crate::{
 pub struct JmapVacationGetCommand;
 
 impl JmapVacationGetCommand {
+    /// Fetches the vacation response and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -51,11 +57,14 @@ impl JmapVacationGetCommand {
 }
 
 /// Renderable table of the vacation response settings.
+/// The vacation response rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct VacationTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The vacation response the server holds.
     pub vacation: JmapVacationResponse,
 }
 

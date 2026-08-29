@@ -1,3 +1,8 @@
+//! # Maildir flag remove
+//!
+//! The `maildir flag remove` command, removing flags from the existing
+//! set.
+
 use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
@@ -17,7 +22,6 @@ use crate::maildir::{
 pub struct MaildirFlagRemoveCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
-
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     /// Flag(s) to remove from the message. Repeat `-f` per flag (e.g.
@@ -28,6 +32,7 @@ pub struct MaildirFlagRemoveCommand {
 }
 
 impl MaildirFlagRemoveCommand {
+    /// Removes the flags from the existing set of each message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 

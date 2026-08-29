@@ -1,8 +1,12 @@
-// `backend` (see build.rs) is set when any mailbox backend is enabled.
-// The read/write shared commands need one; `client` (and the send-only
-// `messages compose`/`send`) also work over SMTP, hence
-// `any(backend, feature = "smtp")`. `crlf` is pure and always compiled;
-// `message` stays compiled for its `arg` submodule.
+//! # Shared API
+//!
+//! The cross-protocol commands, behaving the same whatever backend serves
+//! the active account, and the client dispatching them onto it.
+//!
+//! The `backend` cfg build.rs sets is on when a mailbox backend is
+//! compiled in. Most commands need one, but composing and sending also
+//! work over SMTP alone, so those carry `any(backend, feature = "smtp")`.
+
 #[cfg(backend)]
 pub mod attachment;
 #[cfg(any(backend, feature = "smtp"))]

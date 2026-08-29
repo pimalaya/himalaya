@@ -1,3 +1,7 @@
+//! # Microsoft Graph profile get
+//!
+//! The `msgraph profile get` command, fetching the signed-in user.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -14,6 +18,7 @@ use crate::msgraph::client::MsgraphClient;
 pub struct MsgraphProfileGetCommand;
 
 impl MsgraphProfileGetCommand {
+    /// Fetches the signed-in user and tables the profile.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let user = client.me()?.response;
 

@@ -1,3 +1,7 @@
+//! # JMAP email get
+//!
+//! The `jmap email get` command, RFC 8621 `Email/get`.
+
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
@@ -22,6 +26,7 @@ pub struct JmapEmailGetCommand {
 }
 
 impl JmapEmailGetCommand {
+    /// Fetches the emails and tables their envelopes.
     pub fn execute(
         self,
         printer: &mut impl Printer,

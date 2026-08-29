@@ -1,3 +1,7 @@
+//! # Gmail draft create
+//!
+//! The `gmail drafts create` command, `users.drafts.create`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::{
@@ -19,6 +23,7 @@ pub struct GmailDraftCreateCommand {
 }
 
 impl GmailDraftCreateCommand {
+    /// Creates the draft and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
 

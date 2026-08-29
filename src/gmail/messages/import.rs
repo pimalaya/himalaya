@@ -1,3 +1,7 @@
+//! # Gmail message import
+//!
+//! The `gmail messages import` command, `users.messages.import`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw, import::GmailMessageImport};
@@ -16,6 +20,7 @@ pub struct GmailMessageImportCommand {
 }
 
 impl GmailMessageImportCommand {
+    /// Imports the message, delivery rules and all.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
 

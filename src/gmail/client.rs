@@ -1,15 +1,12 @@
-//! Himalaya wrapper around [`io_gmail::v1::client::GmailClientStd`] plus
-//! the credential helper shared with the cross-protocol client
-//! ([`crate::shared::client`]) and the account checker
-//! ([`crate::account::check`]).
+//! # Gmail client
 //!
-//! The shared API ([`crate::shared::client::EmailClient`]) covers the
-//! least-common-denominator operations over Gmail; the protocol-
-//! specific `himalaya gmail` command uses [`GmailClient`] directly to
-//! expose the full Gmail REST surface (labels, threads, drafts,
-//! history, raw message/attachment access).
+//! The wrapper around io-gmail's blocking client every Gmail-specific
+//! subcommand receives, plus the credential helper the shared client and
+//! the account checker take.
 //!
-//! [`GmailClientStd::connect`]: io_gmail::v1::client::GmailClientStd::connect
+//! The shared API covers the least-common-denominator operations, where
+//! the `gmail` command reaches for the full REST surface through this
+//! wrapper.
 
 use std::ops::{Deref, DerefMut};
 
@@ -22,21 +19,17 @@ use crate::{
     config::{AccountConfig, Config, GmailAuthConfig, GmailConfig},
 };
 
-/// Live Gmail client handed down to every `gmail` subcommand.
+/// A live Gmail client and the label index it caches.
 pub struct GmailClient {
     inner: Inner,
-    /// Lazily-fetched `(id, name)` pairs for every label, used by
-    /// [`Self::resolve_mailbox_id`] to map the shared layer's
-    /// human-facing label names onto opaque Gmail label ids. Cached for
-    /// the client's lifetime so a `copy`/`move` resolves both endpoints
-    /// with a single `labels.list`.
+    /// The `(id, name)` pairs [`Self::resolve_mailbox_id`] maps names
+    /// through, fetched once and cached for the client's lifetime.
     label_index: Option<Vec<(String, String)>>,
 }
 
 impl GmailClient {
-    /// Opens a TLS connection to the Gmail REST API
-    /// (`https://gmail.googleapis.com`) with the configured bearer
-    /// credential and user id.
+    /// Opens a TLS connection to the Gmail REST API with the configured
+    /// bearer credential and user id.
     pub fn new(config: GmailConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
         let token = gmail_token(config.auth)?;
@@ -51,18 +44,11 @@ impl GmailClient {
         })
     }
 
-    /// Maps a human label name to its opaque Gmail label id, for the
-    /// shared backend which otherwise addresses mailboxes (labels) by
-    /// their id.
+    /// Maps a human label name onto its opaque Gmail label id.
     ///
-    /// A value already matching a known id passes through untouched (id
-    /// passthrough); an exact display-name match returns the mapped id
-    /// (first match wins); an unknown value is handed back as-is so the
-    /// API surfaces the error. The label index is fetched once
-    /// (`labels.list`) and cached.
-    ///
-    /// Lives here so the backend operation methods stay pure id
-    /// consumers: name resolution never happens inside them.
+    /// A known id passes through, a name match returns its id, and an
+    /// unknown value goes back as it is so the API surfaces the error. It
+    /// lives here so every backend method stays a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         if self.label_index.is_none() {
             let labels = self.labels_list()?.response.labels;
@@ -101,9 +87,10 @@ impl DerefMut for GmailClient {
     }
 }
 
-/// Opens the Gmail client for an already-resolved account: takes the
-/// `[gmail]` block out of `account_config` and builds the merged
-/// [`Account`]. Bails when the account has no `[gmail]` block.
+/// Opens the Gmail client of an already-resolved account, returning it
+/// beside the merged [`Account`].
+///
+/// Bails when the account declares no `[gmail]` block.
 pub fn build_gmail_client(
     config: Config,
     name: String,
@@ -118,8 +105,8 @@ pub fn build_gmail_client(
     Ok((account, client))
 }
 
-/// Resolves a [`GmailAuthConfig`] into the bare OAuth 2.0 bearer token;
-/// the Gmail client adds the `Bearer ` prefix itself.
+/// Resolves the configuration into the bare OAuth 2.0 token, the client
+/// adding the `Bearer ` prefix itself.
 pub fn gmail_token(config: GmailAuthConfig) -> Result<SecretString> {
     Ok(config.token.get()?)
 }

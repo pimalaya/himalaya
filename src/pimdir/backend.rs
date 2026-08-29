@@ -1,23 +1,21 @@
-//! pimdir adapter for the shared cross-protocol client.
+//! # pimdir backend
 //!
-//! Reads project [`io_pimdir`]'s client read API (`list_collections_by_account`,
-//! `list_items`, `get_item`, `count_items`) plus the blob store, building
-//! envelopes from the stored `v: 1` meta (pimdir SPEC Annex A) with no body reads.
-//! An item whose body is not local (`level < Full`) still lists; `get_message`
-//! reports "body not fetched" rather than an error — the cue to sync.
+//! The pimdir adapter of the shared cross-protocol client, reading the
+//! store's index and blobs.
 //!
-//! Writes enqueue [`PimdirAction`]s for the store's owner to apply (pimdir SPEC
-//! §15.1). Himalaya is a producer, not the owner: it never mutates the index and
-//! never collects, so a staged flag change cannot race a sync mid-hydration. The
-//! owner drains the queue on its next run and derives the push from there.
+//! Envelopes are built from the stored meta with no body read, so an item
+//! whose body is not local still lists and reads as not fetched rather
+//! than as an error.
 //!
-//! A mailbox is its collection id, verbatim: the sync binds a source's
-//! collections under a namespace, so the mailbox a server calls `INBOX` is
-//! `imap/INBOX` here and is addressed by that. The id is opaque to the store,
-//! which parses it nowhere, so shortening it would be a guess at the sync's
-//! convention rather than a lookup. [`PimdirClient::hub_id`] checks one against
-//! the account's collections, and `[mailbox.alias]` is how a user avoids typing
-//! it, as for the JMAP ids it resembles.
+//! Writes enqueue actions for the store's owner to apply. Himalaya is a
+//! producer, never the owner: it mutates no index and collects nothing,
+//! so a staged flag change cannot race a sync mid-hydration.
+//!
+//! A mailbox is its collection id, verbatim. The sync binds a source's
+//! collections under a namespace, so the mailbox a server calls `INBOX`
+//! is `imap/INBOX` here. The id is opaque to the store, so shortening it
+//! would guess at the sync's convention rather than look it up, and
+//! `mailbox.alias` is how a user avoids typing it.
 
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -52,9 +50,9 @@ const SCAN_BATCH: usize = 500;
 
 /// Whether a collection's declared kind makes it a mailbox.
 ///
-/// A kind-less collection counts: a sync that created one before kinds were
-/// declared left the column empty, and refusing those would hide the mailboxes
-/// of every store written back then.
+/// A kind-less collection counts: a sync predating declared kinds left the
+/// column empty, and refusing those would hide every mailbox of a store
+/// written back then.
 pub(crate) fn is_mail(kind: &str) -> bool {
     kind.is_empty() || kind == MAIL_KIND
 }
@@ -79,15 +77,12 @@ struct MetaView {
 }
 
 impl PimdirClient {
-    // --- Mailbox naming --------------------------------------------------
-
     /// The collection a user-typed mailbox addresses, which is the mailbox
     /// itself: a pimdir mailbox is its collection id, verbatim.
     ///
     /// The id is checked against the account's mail collections rather than
-    /// passed through. An id nothing was written under reads as a mailbox that
-    /// exists and is empty, so an unknown one is refused here, naming what the
-    /// account does hold.
+    /// passed through, an id nothing was written under otherwise reading as
+    /// a mailbox that exists and is empty.
     pub(crate) fn hub_id(&self, mailbox: &str) -> Result<String> {
         let mut ids: Vec<String> = self
             .mail_collections()?
@@ -117,8 +112,6 @@ impl PimdirClient {
             .filter(|collection| is_mail(&collection.kind))
             .collect())
     }
-
-    // --- Reads -----------------------------------------------------------
 
     /// Lists the account's mail collections, each addressed by its collection
     /// id and named by the collection row's own name, sorted by id.
@@ -191,13 +184,12 @@ impl PimdirClient {
         Ok(paginate(hits, page, page_size))
     }
 
-    /// How many messages the mailbox has queued for creation and not yet
-    /// synced (pimdir SPEC §15.4).
+    /// How many messages the mailbox has queued for creation and not synced
+    /// yet.
     ///
-    /// A queued create has no public id until the store's owner applies it, so
-    /// it is not an envelope and does not list; the count is what a listing
-    /// reports instead, so a saved message that is not in the list reads as
-    /// queued rather than as lost.
+    /// A queued create has no public id until the owner applies it, so it is
+    /// no envelope and has no row. The count is what a listing reports
+    /// instead, so a saved message reads as queued rather than as lost.
     pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
         let collection = self.hub_id(mailbox)?;
         self.store
@@ -207,9 +199,9 @@ impl PimdirClient {
 
     /// The mailbox's queued creations, rendered as mail.
     ///
-    /// The operator CLI is kind-agnostic and prints ids, hashes and flags; this
-    /// client holds the conventions and the blobs, so it reads the sender,
-    /// subject and date out of the action's own `v: 1` summary.
+    /// The operator CLI is kind-agnostic and prints ids, hashes and flags.
+    /// This client holds the conventions and the blobs, so it reads the
+    /// sender, subject and date out of the action's own summary.
     pub fn queued_envelopes(&mut self, mailbox: &str) -> Result<Vec<PimdirQueued>> {
         let collection = self.hub_id(mailbox)?;
         let queued = self
@@ -220,9 +212,10 @@ impl PimdirClient {
         Ok(queued.iter().filter_map(queued_from_action).collect())
     }
 
-    /// Reads one message's raw bytes from its content-addressed blob. Fails with
-    /// a clear "body not fetched" when the item is not hydrated to `Full` (no
-    /// local body) — the client's cue to sync rather than a data-loss error.
+    /// Reads one message's raw bytes from its content-addressed blob.
+    ///
+    /// An item with no local body fails as not fetched rather than as a data
+    /// loss, which is the cue to sync.
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let collection = self.hub_id(mailbox)?;
         let Some(item) = self.get(&collection, id)? else {
@@ -239,8 +232,8 @@ impl PimdirClient {
             .get(&hash)?
             .ok_or_else(|| anyhow!("Body blob missing for `{id}` in `{mailbox}`"))?;
 
-        // `--seen` stages a flag change; a read stays non-mutating by default,
-        // and a store that refuses the staging must not fail the read.
+        // NOTE: a store refusing the staged flag change must not fail the
+        // read, which is non-mutating by default.
         if seen {
             let seen_flag = Flag::from_iana(IanaFlag::Seen);
             if let Err(err) = self.store_flags(mailbox, &[id], &[seen_flag], FlagOp::Add) {
@@ -251,12 +244,10 @@ impl PimdirClient {
         Ok(bytes)
     }
 
-    // --- Writes (queued actions the store's owner applies) ---------------
-
     /// Adds, sets, or removes `flags` on an id set, staged as `SetFlags`.
     ///
-    /// The action carries the whole replacement set, never a delta, so the owner
-    /// applying it twice lands the same state.
+    /// The action carries the whole replacement set, never a delta, so an
+    /// owner applying it twice lands the same state.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -285,23 +276,22 @@ impl PimdirClient {
         Ok(())
     }
 
-    /// Appends `raw` to `mailbox` as a locally-authored item, staged as `Add`
-    /// (the next sync uploads it). Returns the link id it is stored under.
+    /// Stages a locally-authored message for the next sync to upload,
+    /// returning the link id it is stored under.
     ///
-    /// The body lands in the blob store first and durably, then the action
-    /// referencing it is enqueued: the queue row pins the object, so nothing
-    /// collects a body between the two.
+    /// The body lands in the blob store durably before the action referencing
+    /// it is enqueued, and the queue row pins the object, so nothing collects
+    /// a body between the two.
     ///
-    /// The link id is the bare `Message-ID` [`derive`] gives, and a staged add
-    /// whose link id the collection already holds parks (pimdir SPEC §15.3):
-    /// it neither deduplicates against the stored copy nor mints a key of its
-    /// own. The store answers the two producers differently on purpose.
-    /// Minting is its answer to what a source hands over, a replica owing the
-    /// collection what the collection holds, so a mailbox holding one
-    /// `Message-ID` twice keeps both items (SPEC §9). Parking is its answer to
-    /// a producer authoring a message the collection already has, which named
-    /// a key it does not own and is told so rather than having its message
-    /// filed under a key it never asked for.
+    /// The link id is the bare `Message-ID`, and a staged add whose link id
+    /// the collection already holds parks rather than deduplicate or mint a
+    /// key of its own.
+    ///
+    /// The store answers its two producers differently on purpose. It mints
+    /// for a source, a replica owing the collection what the collection
+    /// holds, so one `Message-ID` twice keeps two items. It parks for a
+    /// producer, which named a key it does not own and is told so rather than
+    /// filed under one it never asked for.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let collection = self.hub_id(mailbox)?;
         let derived = derive(&raw)?;
@@ -334,8 +324,8 @@ impl PimdirClient {
         })
     }
 
-    /// Moves each id from `from` to `to`, staged as `Move` (one server-side move
-    /// on the next sync).
+    /// Moves each id between two mailboxes, staged as one server-side move
+    /// for the next sync.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         self.refile(from, to, ids, |seq, target| PimdirAction::Move {
             seq,
@@ -358,8 +348,6 @@ impl PimdirClient {
         }
         Ok(())
     }
-
-    // --- Internals -------------------------------------------------------
 
     /// Stages one refiling action per id, `build` deciding whether the source
     /// copy stays.
@@ -457,7 +445,8 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
         .and_then(|d| DateTime::parse_from_rfc3339(d).ok());
 
     Envelope {
-        // The public id: a short store-global integer, not the long link id.
+        // NOTE: the public id is a short store-global integer rather than the
+        // long link id.
         id: item.seq.to_string(),
         message_id: view.message_id,
         in_reply_to: view.in_reply_to,
@@ -486,11 +475,11 @@ pub struct PimdirQueued {
     pub envelope: Envelope,
 }
 
-/// Builds a queued row from a pending `Add`, skipping any other kind.
+/// Builds a queued row from a pending add, skipping every other action.
 ///
-/// The envelope keeps an empty id on purpose. A create has no public id yet,
-/// and putting the queue row id there would be an identifier from another
-/// space in the field every command reads back.
+/// The envelope keeps an empty id on purpose: a create has no public id yet,
+/// and the queue row id belongs to another space than the field every command
+/// reads back.
 fn queued_from_action(queued: &PimdirPendingAction) -> Option<PimdirQueued> {
     let PimdirAction::Add { flags, meta, .. } = &queued.action else {
         return None;
@@ -517,12 +506,11 @@ fn queued_from_action(queued: &PimdirPendingAction) -> Option<PimdirQueued> {
     })
 }
 
-/// Derives the link id, meta and sort key of a to-be-added raw message.
+/// Derives the link id, meta and sort key of a message about to be added.
 ///
-/// Through [`io_pimdir::conventions`], the one implementation of pimdir SPEC
-/// Annex A: two writers of one collection disagreeing about the id of a message
-/// with no `Message-ID` link it twice and store its body twice, so the sync
-/// engine and this client must derive it identically, not merely similarly.
+/// It goes through io-pimdir's conventions, the one implementation of the
+/// spec: two writers of a collection disagreeing about the id of a message
+/// carrying no `Message-ID` would link it twice and store its body twice.
 fn derive(raw: &[u8]) -> Result<PimdirDerivation> {
     conventions::derive(MAIL_KIND, raw)
         .ok_or_else(|| anyhow!("pimdir has no conventions for `{MAIL_KIND}`"))
@@ -572,8 +560,8 @@ fn to_replica_flags(flags: &[Flag]) -> ReplicaFlags {
     ReplicaFlags::Known(flags.iter().map(|f| f.raw().to_string()).collect())
 }
 
-/// Parses a message id — the public `seq` (a small integer) — from the CLI, with
-/// a clear error for a non-numeric one.
+/// Parses a message id, the public `seq`, off the command line, with a clear
+/// error for a non-numeric one.
 fn parse_id(id: &str) -> Result<i64> {
     id.parse::<i64>()
         .map_err(|_| anyhow!("Invalid message id `{id}` (expected a number)"))
@@ -627,12 +615,13 @@ mod tests {
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
 
-    /// A mailbox holding one `Message-ID` twice is ordinary (a double delivery,
-    /// a retried append, a restore, a copy of a sent message), and the store
-    /// keys the second copy apart under a minted `dup:<hint>#<handle>` (pimdir
-    /// SPEC §9) rather than keeping one of the two. Both project as ordinary
-    /// envelopes: the id a user sees is the `seq`, which differs between them,
-    /// so neither hides the other, and the minted key never shows.
+    /// A mailbox holding one `Message-ID` twice is ordinary, and the store
+    /// keys the second copy apart under a minted one rather than keep one of
+    /// the two.
+    ///
+    /// Both project as ordinary envelopes: the id a user sees is the `seq`,
+    /// which differs between them, so neither hides the other and the minted
+    /// key never shows.
     #[test]
     fn two_items_sharing_a_message_id_project_two_public_ids() {
         let item = |seq, link_id: &str| PimdirItem {
@@ -676,13 +665,13 @@ mod tests {
         assert!(envelope_from_item(&item).flags.is_empty());
     }
 
-    /// An added message links the way the store spells it: the bare
-    /// `Message-ID` pimdir SPEC Annex A.1 gives, with nothing prepended, which
-    /// is what the sync engine derives for the same body. Staging any other
-    /// spelling would file a message the collection already holds as a second
-    /// item instead of parking it (pimdir SPEC §15.3), the answer the store
-    /// owes a producer that named a key it does not own; minting a second key
-    /// is what it does for a source, not for this client.
+    /// An added message links the way the store spells it, the bare
+    /// `Message-ID` with nothing prepended, which is what the sync engine
+    /// derives for the same body.
+    ///
+    /// Any other spelling would file a message the collection already holds
+    /// as a second item instead of parking it, which is the answer the store
+    /// owes a producer rather than a source.
     #[test]
     fn an_added_message_links_the_way_the_store_spells_it() {
         let raw = b"Message-ID: <new@host>\r\nSubject: Compose\r\nFrom: a@x.org\r\n\r\nbody";
@@ -718,8 +707,8 @@ mod tests {
         assert!(!removed.contains("\\Seen"));
     }
 
-    /// An add onto an unknown set must not carry the unknown forward: the action
-    /// replaces the set, and an unknown one would erase the markers a sync knows.
+    /// An add onto an unknown set must not carry the unknown forward: the
+    /// action replaces the set, and an unknown one erases what a sync knows.
     #[test]
     fn a_flag_op_on_an_unknown_set_stages_a_known_one() {
         let staged = apply_flag_op(
@@ -756,8 +745,8 @@ mod tests {
         assert_eq!(queued.envelope.subject, "Re: lunch");
         assert_eq!(queued.envelope.to[0].email, "alice@x.org");
         assert_eq!(queued.envelope.message_id.as_deref(), Some("draft@x.org"));
-        // The row id names an action, not a message: putting it in `id` would
-        // be an identifier from another space in the field commands read back.
+        // NOTE: the row id names an action rather than a message, so it
+        // belongs to another space than the field commands read back.
         assert!(queued.envelope.id.is_empty());
     }
 
@@ -771,8 +760,8 @@ mod tests {
             attempts: 0,
         };
 
-        // A staged removal addresses a message that exists, so it shows in the
-        // ordinary listing (as an absence) and has nothing to render here.
+        // NOTE: a staged removal addresses a message that exists, so the
+        // ordinary listing shows it and nothing is rendered here.
         assert!(queued_from_action(&queued).is_none());
     }
 }

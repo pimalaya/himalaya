@@ -1,3 +1,7 @@
+//! # Gmail message list
+//!
+//! The `gmail messages list` command, `users.messages.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -39,6 +43,7 @@ pub struct GmailMessagesListCommand {
 }
 
 impl GmailMessagesListCommand {
+    /// Lists one page of message ids and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -70,11 +75,15 @@ impl GmailMessagesListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MessageIdsTable {
     #[serde(skip)]
+    /// The `comfy_table` preset string the table renders with.
     pub preset: String,
     #[serde(skip)]
+    /// The column arrangement the table renders with.
     pub arrangement: ContentArrangement,
     #[serde(skip)]
+    /// The color of the ID column.
     pub id_color: Color,
+    /// The message ids of this page.
     pub ids: Vec<GmailMessageId>,
 }
 

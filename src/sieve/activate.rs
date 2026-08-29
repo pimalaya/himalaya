@@ -1,3 +1,7 @@
+//! # ManageSieve activate
+//!
+//! The `sieve activate` command, RFC 5804 `SETACTIVE`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
@@ -14,6 +18,7 @@ pub struct SieveScriptActivateCommand {
 }
 
 impl SieveScriptActivateCommand {
+    /// Makes the named script the active one.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         client.activate_script(Some(self.name))?;
         printer.out(Message::new("Sieve script successfully activated"))

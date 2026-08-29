@@ -1,3 +1,8 @@
+//! # IMAP mailbox
+//!
+//! The IMAP commands over a mailbox: its lifecycle, its subscription, its
+//! selection and its status.
+
 pub mod arg;
 pub mod close;
 pub mod create;

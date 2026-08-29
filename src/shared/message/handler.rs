@@ -1,17 +1,12 @@
-//! Post-build routing: where the produced MIME bytes go.
+//! # Message handler
 //!
-//! [`apply`] performs the requested side-effects (stdout dump,
-//! save-to-mailbox, send, or save-then-send) and returns an
-//! [`Outcome`] describing what happened. [`route`] is a thin wrapper
-//! that prints a generic "Message successfully X" line based on the
-//! outcome, used by the built-in flag composers
-//! (`compose` / `reply` / `forward`) and by `messages send`.
+//! Where the MIME bytes a composer produced go: stdout, a mailbox, the
+//! send path, or a mailbox then the send path.
 //!
-//! Callers that need a richer success line (e.g. `messages add`
-//! reporting the appended backend id) call [`apply`] directly and
-//! render their own output from the [`Outcome`].
-//!
-//! [`Account::resolve_mailbox`]: crate::account::context::Account::resolve_mailbox
+//! [`route`] runs one of those and prints a generic success line, which
+//! is what the composers want. A caller needing a richer line, `message
+//! add` naming the id it appended, calls [`apply`] and renders the
+//! [`Outcome`] itself.
 
 use std::io::{Write, stdout};
 
@@ -24,22 +19,25 @@ use crate::{
     shared::client::EmailClient,
 };
 
-/// What [`apply`] actually did with `raw`.
+/// What [`apply`] did with the bytes.
 pub enum Outcome {
-    /// Neither `save` nor `send`: bytes were written to stdout.
+    /// Neither saved nor sent, so written to stdout.
     Stdout,
-    /// Saved to a mailbox; `id` is the backend-assigned id of the
-    /// new message, `sent` is `true` when `send` was also requested.
-    Saved { id: String, sent: bool },
-    /// Sent only (no save). The send path returns no id.
+    /// Saved to a mailbox, and sent too when asked.
+    Saved {
+        /// The id the backend assigned the new message.
+        id: String,
+        /// Whether it was sent as well as saved.
+        sent: bool,
+    },
+    /// Sent without being saved, the send path returning no id.
     Sent,
 }
 
-/// Performs the requested combination of side-effects without
-/// printing anything. `save` writes a copy to the named mailbox
-/// (resolved through the account's alias map) with `flags` attached;
-/// `send` pushes the message through the configured SMTP / JMAP send
-/// path. With neither set, dumps `raw` to stdout.
+/// Saves the bytes, sends them, or both, printing nothing.
+///
+/// Saving resolves the mailbox through the account's aliases and attaches
+/// the given flags. With neither asked for, the bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -72,9 +70,8 @@ pub fn apply(
     })
 }
 
-/// Generic wrapper over [`apply`]: hard-codes `\Seen` as the saved
-/// flag and prints a "Message successfully X" line. Used by the
-/// built-in flag composers and by `messages send`.
+/// Runs [`apply`] with `\Seen` as the saved flag and prints a generic
+/// success line.
 pub fn route(
     printer: &mut impl Printer,
     account: &Account,

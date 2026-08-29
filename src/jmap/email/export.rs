@@ -1,3 +1,8 @@
+//! # JMAP email export
+//!
+//! The `jmap email export` command, an `Email/get` for the blob id then a
+//! download of that blob.
+
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_jmap::rfc8621::{
@@ -20,6 +25,7 @@ pub struct JmapEmailExportCommand {
 }
 
 impl JmapEmailExportCommand {
+    /// Downloads the raw message blob and writes it out.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let opts = JmapEmailGetOptions {
             properties: Some(vec![JmapEmailProperty::Id, JmapEmailProperty::BlobId]),

@@ -1,3 +1,8 @@
+//! # Gmail delegate get
+//!
+//! The `gmail settings delegates get` command,
+//! `users.settings.delegates.get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -18,6 +23,7 @@ pub struct GmailSettingsDelegateGetCommand {
 }
 
 impl GmailSettingsDelegateGetCommand {
+    /// Fetches the delegate and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailDelegateGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -29,11 +35,10 @@ impl GmailSettingsDelegateGetCommand {
     }
 }
 
-/// A Gmail delegate, rendered as aligned text or, under `--json`, as
-/// the delegate resource itself instead of a wrapped human string.
+/// The `gmail settings delegates get` output.
 ///
-/// The resource is emitted verbatim so that one delegate read with `get`
-/// has the very same shape as a row of `list`.
+/// The resource is emitted verbatim, so one delegate has the very same
+/// shape here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub(crate) struct GmailSettingsDelegateGetOutput(GmailDelegate);

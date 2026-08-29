@@ -1,3 +1,8 @@
+//! # Message forward
+//!
+//! The `message forward` command, composing a forward of a fetched
+//! message.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -16,73 +21,67 @@ use crate::{
     },
 };
 
-/// Forward a message using the built-in flag composer.
+/// Forward a message from flags.
 ///
-/// Fetches the source, pre-fills `Fwd:` on the subject and the
-/// `References` header, and quotes the source body. The produced
-/// MIME is written to stdout, or routed via `--save` / `--send`.
-/// For richer composition, pipe `messages read <id>` into a
-/// standalone composer (`mml forward`, etc.) and feed its output
-/// back into `messages send` / `messages add`.
+/// The source is fetched to pre-fill the `Fwd:` subject and the
+/// `References` header, and to quote the body. The result goes to stdout,
+/// `--save` or `--send`.
+///
+/// Richer composition is `message read <id>` piped into a standalone
+/// composer, whose output feeds `message send` or `message add`.
 #[derive(Debug, Parser)]
 pub struct MessageForwardCommand {
     /// Identifier of the source message.
     #[arg(value_name = "ID")]
     pub id: String,
-
     #[command(flatten)]
     pub mailbox: MailboxArg,
-
-    /// Sender address (`From` header). Defaults to the account's
-    /// `email`, named by its `display-name`.
+    /// Sender address, defaulting to the account's `email` under its
+    /// `display-name`.
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
-
-    /// Recipient address(es) (`To` header). Repeat the flag or use a
+    /// Recipient addresses, the flag repeating or taking a
     /// comma-separated list.
     #[arg(long, short = 't', value_name = "ADDR", value_delimiter = ',')]
     pub to: Vec<String>,
-
-    /// Carbon-copy recipient(s) (`Cc` header).
+    /// Carbon-copy recipients.
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub cc: Vec<String>,
-
-    /// Blind carbon-copy recipient(s) (`Bcc` header).
+    /// Blind carbon-copy recipients.
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub bcc: Vec<String>,
-
     /// Subject line.
     #[arg(long, short = 's', value_name = "TEXT")]
     pub subject: Option<String>,
-
-    /// Inline body. Conflicts with `--body-file`; stdin is used as a
-    /// fallback when neither is given.
+    /// Inline body, the standard input answering when neither this nor
+    /// `--body-file` is given.
     #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
     pub body: Option<String>,
-
+    /// Read the body from a file, exclusive with `--body` and the
+    /// standard input.
     #[arg(long = "body-file", value_name = "PATH")]
     pub body_file: Option<PathBuf>,
-
-    /// Attachment file(s).
+    /// Files to attach.
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
-
-    /// Signature appended after the body, introduced by the account's
-    /// `signature-delim` (RFC 3676 §4.3 `-- ` by default). Defaults to
-    /// the account's `signature`.
+    /// Signature appended after the body, defaulting to the account's
+    /// `signature`.
+    ///
+    /// The account's `signature-delim` introduces it, the RFC 3676
+    /// section 4.3 `-- ` by default.
     #[arg(long, value_name = "TEXT")]
     pub signature: Option<String>,
-
+    /// Read the signature from a file, exclusive with `--signature`.
     #[arg(
         long = "signature-file",
         value_name = "PATH",
         conflicts_with = "signature"
     )]
     pub signature_file: Option<PathBuf>,
-
-    /// How to lay out the quoted source body relative to the user's
-    /// body. Interleaved posting is left to the user; write your
-    /// message inside the quoted block.
+    /// Where the quoted source body sits relative to the written one.
+    ///
+    /// Interleaved posting is left to the writer: put the message inside
+    /// the quoted block.
     #[arg(
         long = "posting-style",
         short = 'P',
@@ -90,21 +89,24 @@ pub struct MessageForwardCommand {
         default_value = "top"
     )]
     pub posting_style: PostingStyle,
-
-    /// Plain-text headline placed before the quoted source body
-    /// (e.g. `"On {date}, {from} wrote:"`). No substitution is
-    /// performed; pass the literal string you want.
+    /// Plain-text headline placed before the quoted source body.
+    ///
+    /// Nothing is substituted in it, so pass the literal string wanted.
     #[arg(long = "quote-headline", short = 'Q', value_name = "TEXT")]
     pub quote_headline: Option<String>,
-
+    /// Append a copy of the composed message to this mailbox name or
+    /// alias.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-
+    /// Send the composed message, which combines with `--save` to keep a
+    /// copy too.
     #[arg(long)]
     pub send: bool,
 }
 
 impl MessageForwardCommand {
+    /// Fetches the source, builds the forward and hands it to the
+    /// handler.
     pub fn execute(
         self,
         printer: &mut impl Printer,

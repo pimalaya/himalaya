@@ -1143,9 +1143,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.14.0"
+version = "2.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
@@ -1323,7 +1323,7 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.3.0"
-source = "git+https://github.com/pimalaya/io-pimdir#92a4d437659fb21b5e5fbca4210b2d58d796d349"
+source = "git+https://github.com/pimalaya/io-pimdir#2aee3c9436fec0652535a5544e89aaecf5eceead"
 dependencies = [
  "blake3",
  "fs4",
@@ -1348,7 +1348,7 @@ dependencies = [
 [[package]]
 name = "io-replica"
 version = "0.4.2"
-source = "git+https://github.com/pimalaya/io-replica#9f87264dad7e5746bca17bbb01f2e56f692eee8d"
+source = "git+https://github.com/pimalaya/io-replica#89fd2121b9c1b39e98d6d7669ffec0d0b0380aec"
 dependencies = [
  "log",
  "thiserror",

@@ -1,3 +1,7 @@
+//! # JMAP thread get
+//!
+//! The `jmap thread get` command, RFC 8621 `Thread/get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -24,6 +28,7 @@ pub struct JmapThreadGetCommand {
 }
 
 impl JmapThreadGetCommand {
+    /// Fetches the threads and tables the emails they hold.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -43,11 +48,13 @@ impl JmapThreadGetCommand {
     }
 }
 
-/// Renderable table of threads and their email IDs.
+/// The threads rendered as a table, each with the emails it holds.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The threads, in the order the server returned them.
     pub threads: Vec<JmapThread>,
 }
 

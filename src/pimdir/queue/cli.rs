@@ -1,3 +1,7 @@
+//! # pimdir queue command
+//!
+//! The `pimdir queue` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -12,11 +16,12 @@ use crate::{
 
 /// Read and retract the writes Himalaya staged.
 ///
-/// A pimdir store is a replica the sync engine owns, so Himalaya appends its
-/// writes to the store's queue and the engine applies them on its next run
-/// (pimdir SPEC §15). A staged flag, move or deletion shows in the ordinary
-/// listing straight away; a staged creation has no id until the engine applies
-/// it, which is what these commands are for.
+/// A pimdir store is a replica the sync engine owns, so a write is appended
+/// to the store's queue and applied on the engine's next run.
+///
+/// A staged flag, move or deletion shows in the ordinary listing straight
+/// away. A staged creation has no id until the engine applies it, which is
+/// what these commands are for.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum PimdirQueueCommand {
@@ -26,6 +31,7 @@ pub enum PimdirQueueCommand {
 }
 
 impl PimdirQueueCommand {
+    /// Runs the subcommand against the account's pimdir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

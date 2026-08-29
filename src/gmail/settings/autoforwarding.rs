@@ -1,3 +1,8 @@
+//! # Gmail auto-forwarding settings
+//!
+//! The `gmail settings autoforwarding` commands, covering
+//! `users.settings.getAutoForwarding` and its setter.
+
 pub mod get;
 pub mod set;
 
@@ -26,6 +31,7 @@ pub enum GmailSettingsAutoForwardingCommand {
 }
 
 impl GmailSettingsAutoForwardingCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

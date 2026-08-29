@@ -1,3 +1,7 @@
+//! # ManageSieve get
+//!
+//! The `sieve get` command, RFC 5804 `GETSCRIPT`.
+
 use std::fmt;
 
 use anyhow::{Result, anyhow};
@@ -18,6 +22,7 @@ pub struct SieveScriptGetCommand {
 }
 
 impl SieveScriptGetCommand {
+    /// Downloads the named script and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
         let script = client.get_script(self.name.clone())?;
         let script = String::from_utf8(script)

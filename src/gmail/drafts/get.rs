@@ -1,3 +1,7 @@
+//! # Gmail draft get
+//!
+//! The `gmail drafts get` command, `users.drafts.get`.
+
 use std::fmt;
 
 use anyhow::{Result, anyhow};
@@ -27,6 +31,7 @@ pub struct GmailDraftGetCommand {
 }
 
 impl GmailDraftGetCommand {
+    /// Fetches the draft and prints it at the requested detail.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let format = GmailMessageFormat::from(self.format);
 

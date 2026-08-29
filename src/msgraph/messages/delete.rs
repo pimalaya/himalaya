@@ -1,3 +1,7 @@
+//! # Microsoft Graph message delete
+//!
+//! The `msgraph messages delete` command, deleting a message for good.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -14,6 +18,7 @@ pub struct MsgraphMessageDeleteCommand {
 }
 
 impl MsgraphMessageDeleteCommand {
+    /// Deletes the message for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.message_delete(&self.id)?;
         printer.out(Message::new(format!(

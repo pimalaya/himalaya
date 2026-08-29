@@ -1,3 +1,7 @@
+//! # Gmail threads
+//!
+//! The `gmail threads` command family, covering `users.threads`.
+
 pub mod delete;
 pub mod get;
 pub mod list;
@@ -35,6 +39,7 @@ pub enum GmailThreadsCommand {
 }
 
 impl GmailThreadsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,11 +1,11 @@
-//! Gmail adapter for the shared cross-protocol client.
+//! # Gmail backend
 //!
-//! Thin glue over [`GmailClient`], which wraps io_gmail's high-level
-//! client (`labels_list`, `label_get`, `messages_list`, `message_get`,
-//! `message_modify`, `message_send`). Gmail is label-based: labels are
-//! mailboxes, and a subset of system labels back the shared flags. No
-//! `add_message` (Gmail has no append). The conversion is lifted from
-//! the retired io-email Gmail drivers.
+//! The Gmail adapter of the shared cross-protocol client, glue over the
+//! io-gmail client [`GmailClient`] wraps.
+//!
+//! Gmail is label-based, so a label is a mailbox and a handful of system
+//! labels back the shared flags. There is no `add_message`, Gmail having
+//! no append.
 
 use std::collections::BTreeSet;
 
@@ -137,8 +137,8 @@ impl GmailClient {
         let raw = decode_raw(&raw)
             .map_err(|err| anyhow!("Gmail raw message could not be decoded: {err}"))?;
 
-        // `messages.get` never changes read state; `--seen` removes the
-        // `UNREAD` label via a separate `messages.modify`.
+        // NOTE: `messages.get` never changes read state, so `--seen` costs
+        // a separate `messages.modify` removing the `UNREAD` label.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
@@ -373,6 +373,7 @@ fn parse_addresses(raw: &str) -> Vec<Address> {
         .collect()
 }
 
+/// Parses one address of a header value into a shared [`Address`].
 fn parse_address(part: &str) -> Address {
     if let Some(open) = part.rfind('<')
         && let Some(end) = part[open..].find('>')
@@ -388,6 +389,7 @@ fn parse_address(part: &str) -> Address {
     }
 }
 
+/// Parses an RFC 2822 `Date:` header value.
 fn parse_rfc2822(raw: &str) -> Option<DateTime<FixedOffset>> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {

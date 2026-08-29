@@ -1,3 +1,8 @@
+//! # Microsoft Graph message get
+//!
+//! The `msgraph messages get` command, fetching one message or its raw
+//! MIME bytes.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -26,6 +31,7 @@ pub struct MsgraphMessageGetCommand {
 }
 
 impl MsgraphMessageGetCommand {
+    /// Fetches the message, or its raw MIME bytes, and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         if self.raw {
             let bytes = client.message_get_raw(&self.id)?.response;
@@ -38,13 +44,11 @@ impl MsgraphMessageGetCommand {
     }
 }
 
-/// A Microsoft Graph message, rendered as aligned text or, under
-/// `--json`, as the message resource itself instead of a wrapped human
-/// string.
+/// The `msgraph messages get` output, one message.
 ///
-/// The resource is emitted verbatim so that one message read with `get`
-/// has the very same shape as a row of `list`. The text rendering keeps
-/// showing a summary; `--raw` remains the way to get the RFC 5322 bytes.
+/// The resource is emitted verbatim, so a message has the very same shape
+/// here as in a `list` row. The text stays a summary, `--raw` being how
+/// the RFC 5322 bytes are reached.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub(crate) struct MsgraphMessageGetOutput(MsgraphMessage);

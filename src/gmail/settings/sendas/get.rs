@@ -1,3 +1,8 @@
+//! # Gmail send-as get
+//!
+//! The `gmail settings sendas get` command,
+//! `users.settings.sendAs.get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -18,6 +23,7 @@ pub struct GmailSettingsSendAsGetCommand {
 }
 
 impl GmailSettingsSendAsGetCommand {
+    /// Fetches the send-as alias and tables it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailSendAsGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -29,11 +35,10 @@ impl GmailSettingsSendAsGetCommand {
     }
 }
 
-/// A Gmail send-as alias, rendered as aligned text or, under `--json`,
-/// as the send-as resource itself instead of a wrapped human string.
+/// The `gmail settings sendas get` output.
 ///
-/// The resource is emitted verbatim so that one alias read with `get`
-/// has the very same shape as a row of `list`.
+/// The resource is emitted verbatim, so one alias has the very same shape
+/// here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
 pub(crate) struct GmailSettingsSendAsGetOutput(GmailSendAs);

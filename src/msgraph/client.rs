@@ -1,15 +1,12 @@
-//! Himalaya wrapper around [`io_msgraph::v1::client::MsgraphClientStd`]
-//! plus the credential helper shared with the cross-protocol client
-//! ([`crate::shared::client`]) and the account checker
-//! ([`crate::account::check`]).
+//! # Microsoft Graph client
 //!
-//! The shared API ([`crate::shared::client::EmailClient`]) covers the
-//! least-common-denominator operations over Microsoft Graph; the
-//! protocol-specific `himalaya msgraph` command uses [`MsgraphClient`]
-//! directly to expose the Graph mail surface (mail folders, messages,
-//! attachments, raw MIME access).
+//! The wrapper around io-msgraph's blocking client every Graph-specific
+//! subcommand receives, plus the credential helper the shared client and
+//! the account checker take.
 //!
-//! [`MsgraphClientStd::connect`]: io_msgraph::v1::client::MsgraphClientStd::connect
+//! The shared API covers the least-common-denominator operations, where
+//! the `msgraph` command reaches for the Graph mail surface through this
+//! wrapper.
 
 use std::ops::{Deref, DerefMut};
 
@@ -25,14 +22,11 @@ use crate::{
     config::{AccountConfig, Config, MsgraphAuthConfig, MsgraphConfig},
 };
 
-/// Live Microsoft Graph client handed down to every `msgraph` subcommand.
+/// A live Microsoft Graph client and the folder index it caches.
 pub struct MsgraphClient {
     inner: Inner,
-    /// Lazily-fetched `(id, name)` pairs for every mail folder, used by
-    /// [`Self::resolve_mailbox_id`] to map the shared layer's
-    /// human-facing folder names onto opaque Graph folder ids. Cached for
-    /// the client's lifetime so a `copy`/`move` resolves both endpoints
-    /// with a single `mailFolders` listing.
+    /// The `(id, name)` pairs [`Self::resolve_mailbox_id`] maps names
+    /// through, fetched once and cached for the client's lifetime.
     folder_index: Option<Vec<(String, String)>>,
 }
 
@@ -54,19 +48,12 @@ impl MsgraphClient {
         })
     }
 
-    /// Maps a human folder name to its opaque Graph folder id, for the
-    /// shared backend which otherwise addresses mailboxes (folders) by
-    /// their id.
+    /// Maps a human folder name onto its opaque Graph folder id.
     ///
-    /// A value already matching a known id passes through untouched (id
-    /// passthrough); an exact display-name match returns the mapped id
-    /// (first match wins); an unknown value is handed back as-is, so a
-    /// Graph well-known name (`inbox`, `archive`, `sentitems`, …) still
-    /// reaches the API and any other value surfaces the API error. The
-    /// folder index is fetched once (`mailFolders`) and cached.
-    ///
-    /// Lives here so the backend operation methods stay pure id
-    /// consumers: name resolution never happens inside them.
+    /// A known id passes through and a name match returns its id. An
+    /// unknown value goes back as it is, so a Graph well-known name still
+    /// reaches the API. It lives here so every backend method stays a pure
+    /// id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         if self.folder_index.is_none() {
             let params = MsgraphMailFoldersListParams {

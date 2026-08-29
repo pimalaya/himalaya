@@ -1,3 +1,7 @@
+//! # Gmail drafts
+//!
+//! The `gmail drafts` command family, covering `users.drafts`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -35,6 +39,7 @@ pub enum GmailDraftsCommand {
 }
 
 impl GmailDraftsCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,8 @@
+//! # IMAP
+//!
+//! The `imap` command family, mirroring the flat RFC 3501 command list,
+//! plus the adapter serving the shared commands over IMAP.
+
 pub mod backend;
 pub mod cli;
 pub mod client;

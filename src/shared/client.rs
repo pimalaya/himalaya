@@ -1,16 +1,16 @@
-//! Cross-protocol [`EmailClient`] for the shared subcommands
-//! (`mailboxes`, `envelopes`, `flags`, `messages`, `attachments`).
+//! # Email client
 //!
-//! Mirrors cardamum's structure: a single storage backend (the first
-//! configured one the [`Backend`] flag allows, in local-before-network
-//! priority) held in a [`BackendClient`] enum, plus an optional SMTP
-//! transport for accounts whose storage backend cannot send (IMAP,
-//! Maildir, m2dir). Each shared method matches the active backend and
-//! calls its adapter (the per-protocol `<proto>/backend.rs`), which
-//! takes and returns the CLI's shared [`crate::email`] types.
+//! The cross-protocol client every shared subcommand runs over: one
+//! storage backend, plus an SMTP transport for the backends that cannot
+//! send.
 //!
-//! The active [`Account`] is threaded as a sibling argument through
-//! every `execute` chain rather than being bundled into the client.
+//! The storage backend is the first configured one `--backend` allows,
+//! local before network. Each method matches on it and calls that
+//! protocol's adapter, which takes and returns the CLI's own
+//! [`crate::email`] types.
+//!
+//! The active [`Account`] is threaded as a sibling argument through every
+//! `execute` chain rather than bundled into the client.
 
 #[cfg(feature = "smtp")]
 use std::mem;
@@ -31,9 +31,8 @@ use crate::maildir::client::MaildirClient;
 use crate::msgraph::client::MsgraphClient;
 #[cfg(feature = "pimdir")]
 use crate::pimdir::client::PimdirClient;
-// `Envelope`/`Mailbox`/`FlagOp`/`SearchEmailsQuery` are only used by the
-// mailbox-dispatch methods, so they carry the same `backend` gate;
-// `Flag` is also used by the always-compiled `add_message`.
+// NOTE: the mailbox types carry the same `backend` gate as the methods
+// dispatching on them, where `Flag` also serves the ungated send path.
 #[cfg(backend)]
 use crate::email::{
     envelope::Envelope, flag::FlagOp, mailbox::Mailbox, search::query::SearchEmailsQuery,
@@ -47,27 +46,27 @@ use crate::{
 #[cfg(feature = "smtp")]
 use crate::{config::SmtpConfig, smtp::client::SmtpClient};
 
-/// Cross-protocol email client backing the shared subcommands.
+/// The client every shared subcommand runs over.
 pub struct EmailClient {
     storage: Option<BackendClient>,
     #[cfg(feature = "smtp")]
     smtp: SmtpTransport,
 }
 
-/// The SMTP transport slot, connected lazily on the first send so that
-/// read-only commands never open an SMTP connection.
+/// The SMTP transport, connected on the first send so a read-only command
+/// opens no SMTP connection.
 #[cfg(feature = "smtp")]
 enum SmtpTransport {
-    /// No SMTP configured, or excluded by `--backend`.
+    /// No SMTP configured, or `--backend` excluded it.
     Absent,
-    /// Configured but not yet connected.
+    /// Configured but not connected yet.
     Pending(Box<SmtpConfig>),
     /// Connected.
     Ready(SmtpClient),
 }
 
-/// The active storage backend: exactly one of the compiled-in
-/// per-protocol clients.
+/// The active storage backend, one of the compiled-in per-protocol
+/// clients.
 enum BackendClient {
     #[cfg(feature = "imap")]
     Imap(Box<ImapClient>),
@@ -86,10 +85,8 @@ enum BackendClient {
 }
 
 impl EmailClient {
-    /// Opens the connections for the active account: the first
-    /// configured storage backend the `backend` flag allows, plus an
-    /// SMTP transport when one is configured. Bails when nothing usable
-    /// is configured.
+    /// Opens the connections of the active account, bailing when nothing
+    /// usable is configured.
     pub fn new(
         config: Config,
         #[allow(unused_mut)] mut account_config: AccountConfig,
@@ -97,9 +94,8 @@ impl EmailClient {
     ) -> Result<(Account, Self)> {
         let storage = select_storage(&mut account_config, backend)?;
 
-        // NOTE: kept unconnected here; a read-only command must not open
-        // an SMTP connection (it also lets a single-session proxy such as
-        // sirup serve the storage backend without a second client).
+        // NOTE: left unconnected, so a read-only command opens no SMTP
+        // connection and a single-session proxy serves storage alone.
         #[cfg(feature = "smtp")]
         let smtp = match (backend.allows_smtp(), account_config.smtp.take()) {
             (true, Some(config)) => SmtpTransport::Pending(Box::new(config)),
@@ -190,14 +186,13 @@ impl EmailClient {
         }
     }
 
-    /// How many messages the mailbox has staged for creation and not yet
-    /// pushed.
+    /// How many messages the mailbox has staged for creation and not
+    /// pushed yet.
     ///
-    /// Zero for every backend whose writes reach the server as they are made.
-    /// A pimdir store is a replica a sync engine owns, so a saved message waits
-    /// in its queue until that engine runs, with no public id and therefore no
-    /// envelope; the count is what a listing reports so the message reads as
-    /// queued rather than as lost.
+    /// Zero for every backend whose writes reach the server as they are
+    /// made. A pimdir store is a replica a sync engine owns, so a saved
+    /// message waits in its queue with no id and therefore no envelope,
+    /// and the count is what keeps it from reading as lost.
     #[cfg(backend)]
     pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
@@ -210,8 +205,8 @@ impl EmailClient {
         }
     }
 
-    /// Searches envelopes in `mailbox` against the shared query DSL.
-    /// Gmail and Microsoft Graph do not implement the shared search.
+    /// Searches a mailbox with the shared query, which Gmail and
+    /// Microsoft Graph do not implement.
     #[cfg(backend)]
     pub fn search_envelopes(
         &mut self,
@@ -253,7 +248,7 @@ impl EmailClient {
         }
     }
 
-    /// Adds, sets, or removes `flags` on a message id set in `mailbox`.
+    /// Adds, sets or removes flags on a set of messages.
     #[cfg(backend)]
     pub fn store_flags(
         &mut self,
@@ -282,9 +277,11 @@ impl EmailClient {
         }
     }
 
-    /// Fetches one message's raw RFC 5322 bytes. When `seen` is set, the
-    /// message is also marked as seen: IMAP folds this into the fetch
-    /// (`BODY[]`), the other backends issue a separate flag update.
+    /// Fetches one message's raw RFC 5322 bytes, marking it seen when
+    /// asked.
+    ///
+    /// IMAP folds the flag into the fetch itself, where the other
+    /// backends issue a separate update.
     #[cfg(backend)]
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         match self.storage_mut()? {
@@ -305,8 +302,8 @@ impl EmailClient {
         }
     }
 
-    /// Adds `raw` to `mailbox` with `flags`. Gmail and Microsoft Graph
-    /// do not implement adding messages.
+    /// Adds a raw message to a mailbox with the given flags, which Gmail
+    /// and Microsoft Graph do not implement.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
@@ -325,16 +322,14 @@ impl EmailClient {
             BackendClient::Gmail(_) => bail!("Gmail does not support adding messages"),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(_) => bail!("Microsoft Graph does not support adding messages"),
-            // No storage backend compiled in (send-only build): `save`
-            // has nowhere to land. `storage_mut()` bails first, so this
-            // arm only keeps the match exhaustive over the empty enum.
+            // NOTE: `storage_mut` bails first in a send-only build, so
+            // this arm only keeps the match exhaustive over an empty enum.
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
     }
 
-    /// Copies a message id set from `from` to `to`, returning the number
-    /// actually affected (see the per-backend adapters).
+    /// Copies messages between two mailboxes, returning how many landed.
     #[cfg(backend)]
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
@@ -358,8 +353,7 @@ impl EmailClient {
         }
     }
 
-    /// Moves a message id set from `from` to `to`, returning the number
-    /// actually affected (see the per-backend adapters).
+    /// Moves messages between two mailboxes, returning how many landed.
     #[cfg(backend)]
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
@@ -383,11 +377,12 @@ impl EmailClient {
         }
     }
 
-    /// The backend's own trash mailbox id, when it can resolve one
-    /// without configuration (JMAP `role=trash`, Gmail `TRASH` label,
-    /// Graph `deleteditems`). IMAP, Maildir and m2dir return `None`, so
-    /// the caller falls back to the `mailbox.alias.trash` config entry.
-    /// The trash-first delete policy lives in `shared::message::delete`.
+    /// The trash mailbox the backend names on its own, `None` when it
+    /// names none.
+    ///
+    /// JMAP, Gmail and Graph each carry a well-known trash, where IMAP,
+    /// Maildir and m2dir leave the caller to fall back on the
+    /// `mailbox.alias.trash` entry.
     #[cfg(backend)]
     pub fn native_trash(&mut self) -> Result<Option<String>> {
         match self.storage_mut()? {
@@ -408,10 +403,10 @@ impl EmailClient {
         }
     }
 
-    /// Permanently deletes `ids` from `mailbox` (assumed to be the trash).
-    /// Returns `true` when they were physically removed, `false` when
-    /// only flagged (IMAP without UIDPLUS). The move-vs-delete decision
-    /// is made by the caller (`shared::message::delete`).
+    /// Permanently deletes messages from the trash.
+    ///
+    /// Returns whether they were really removed, an IMAP server without
+    /// UIDPLUS only flagging them `\Deleted`.
     #[cfg(backend)]
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
         match self.storage_mut()? {
@@ -432,8 +427,8 @@ impl EmailClient {
         }
     }
 
-    /// Sends `raw`: through the storage backend when it can send itself
-    /// (JMAP, Gmail, Graph), otherwise through the SMTP transport.
+    /// Sends a raw message through the storage backend when it can send,
+    /// and through the SMTP transport otherwise.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
         match &mut self.storage {
             #[cfg(feature = "jmap")]
@@ -453,9 +448,8 @@ impl EmailClient {
         bail!("No send-capable backend (JMAP/Gmail/Graph) or SMTP is configured for this account")
     }
 
-    /// Connects the SMTP transport on first use, returning `None` when no
-    /// SMTP is configured. Only the send path calls this, so read-only
-    /// commands open no SMTP connection.
+    /// Connects the SMTP transport on first use, `None` when none is
+    /// configured.
     #[cfg(feature = "smtp")]
     fn smtp_client_mut(&mut self) -> Result<Option<&mut SmtpClient>> {
         if let SmtpTransport::Pending(_) = &self.smtp {
@@ -473,18 +467,15 @@ impl EmailClient {
         })
     }
 
-    /// Maps the shared layer's human mailbox name onto the
-    /// backend-native id the operation methods expect. Identity for
-    /// every backend whose name already is its id (IMAP, Maildir,
-    /// m2dir); JMAP resolves the opaque mailbox id via a cached
-    /// `Mailbox/get`, Gmail the opaque label id via a cached
-    /// `labels.list`, and Microsoft Graph the opaque folder id via a
-    /// cached `mailFolders` listing (Graph well-known names still pass
-    /// through). Applied by the mailbox-addressing methods above before
-    /// they dispatch, so each per-protocol adapter only ever receives
-    /// ids. Idempotent: an already-resolved id passes through unchanged,
-    /// so `shared::message::delete` uses it to compare a mailbox against
-    /// the trash.
+    /// Maps a human mailbox name onto the backend-native id every
+    /// operation method expects.
+    ///
+    /// Identity where the name already is the id, and a cached listing
+    /// where the backend mints an opaque one. Every dispatching method
+    /// runs it first, so an adapter only ever receives ids.
+    ///
+    /// Idempotent, an already-resolved id passing through unchanged,
+    /// which is what lets a caller compare a mailbox against the trash.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
             #[cfg(feature = "jmap")]
@@ -504,9 +495,8 @@ impl EmailClient {
     }
 }
 
-/// Picks the storage backend for the account: the first configured one
-/// the `backend` flag allows, local before network to match the retired
-/// io-email dispatcher's read priority.
+/// Picks the account's storage backend: the first configured one
+/// `--backend` allows, local before network.
 #[cfg_attr(
     not(any(
         feature = "maildir",

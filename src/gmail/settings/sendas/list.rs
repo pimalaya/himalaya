@@ -1,3 +1,8 @@
+//! # Gmail send-as list
+//!
+//! The `gmail settings sendas list` command,
+//! `users.settings.sendAs.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -19,6 +24,7 @@ use crate::{
 pub struct GmailSettingsSendAsListCommand;
 
 impl GmailSettingsSendAsListCommand {
+    /// Lists every send-as alias and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,

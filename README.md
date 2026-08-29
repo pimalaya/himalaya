@@ -158,7 +158,9 @@ nix run
 
 ## Configuration
 
-Run `himalaya`. With no configuration file on disk the wizard prompts for an account name and an email address, runs provider discovery (PACC, Thunderbird Autoconfiguration, RFC 6186 SRV and RFC 8620 JMAP resolution, all probed in parallel and merged), fills the IMAP/SMTP (or JMAP) prompts with the discovered defaults, then writes the result to disk.
+Run `himalaya`. With no configuration file on disk, the wizard asks for an email address and discovers the services reachable from it, probing PACC, Thunderbird Autoconfiguration, RFC 6186 SRV and RFC 8620 JMAP resolution in parallel.
+
+Picking one prompts the authentication it advertises, tests the connection, then writes the account to disk.
 
 A persistent configuration is loaded from the first valid path among:
 
@@ -243,7 +245,9 @@ mailbox.alias.trash = "[Gmail]/Trash"
 mailbox.alias.archive = "[Gmail]/All Mail"
 ```
 
-Every Gmail label shows up as a top-level IMAP mailbox, and the special mailboxes live under the `[Gmail]/` prefix — quote them in the shell (`-m "[Gmail]/Drafts"`) or reach them through an alias. `[Gmail]/All Mail` is the archive containing every message: aliasing it makes "search everything" one flag away (`himalaya envelope search -m archive ...`).
+Every Gmail label shows up as a top-level IMAP mailbox, and the special ones live under the `[Gmail]/` prefix, so quote them in the shell or reach them through an alias.
+
+`[Gmail]/All Mail` is the archive holding every message, so aliasing it puts "search everything" one flag away: `himalaya envelope search -m archive ...`.
 
 To use Gmail's native REST API instead of IMAP/SMTP, replace the blocks above with a single OAuth 2.0 bearer token from a helper such as [ortie](https://github.com/pimalaya/ortie):
 
@@ -280,7 +284,7 @@ Mail folders carry Graph's opaque folder ids; address them by name (`-m Archive`
 
 ### Posteo
 
-Standard IMAP/SMTP with your regular account password — no app password required.
+Standard IMAP and SMTP with your regular account password: no app password required.
 
 ```toml
 [accounts.posteo]
@@ -296,7 +300,9 @@ smtp.sasl.plain.password.command = "pass show posteo"
 
 ### iCloud Mail
 
-From the [iCloud Mail](https://support.apple.com/en-us/HT202304) support page: the IMAP login is the name of your address (`johnappleseed`, not `johnappleseed@icloud.com`) while the SMTP login is the full address, and a dedicated [app-specific password](https://support.apple.com/en-us/HT204397) is required.
+Per the [iCloud Mail](https://support.apple.com/en-us/HT202304) support page, the IMAP login is the name of your address, `johnappleseed` rather than `johnappleseed@icloud.com`, while the SMTP login is the full address.
+
+A dedicated [app-specific password](https://support.apple.com/en-us/HT204397) is required.
 
 ```toml
 [accounts.icloud]
@@ -349,7 +355,11 @@ himalaya sieve put main --script-file filters.sieve
 himalaya sieve activate main
 ```
 
-ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port, 4190, and reaches TLS through STARTTLS rather than through a second port, so a bare server address resolves to `sieve://` with the upgrade on, where the IMAP and SMTP ones resolve to their implicit-TLS scheme. `sieves://` is accepted too, for the deployments listening for a TLS handshake straight away. A password or a bearer token is refused on an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise. `sieve capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw` are available, and `put` and `check` accept a script file, inline text, or stdin.
+ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port, 4190, and reaches TLS on it through STARTTLS, so a bare server address takes `sieve://` with the upgrade on where the IMAP and SMTP ones take their implicit-TLS scheme.
+
+`sieves://` is accepted too, for the deployments listening for a handshake straight away. A password or a bearer token is refused on an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
+
+`capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw` are available, and `put` and `check` accept a script file, inline text or stdin.
 
 ### Composing messages
 
@@ -407,7 +417,9 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How is OAuth 2.0 handled?</summary>
 
-  v2 does not ship OAuth flows. Use [pimalaya/ortie](https://github.com/pimalaya/ortie) (or any other token broker) to obtain an access token, then plug it as a `command` returning the token on stdout. For JMAP, point `jmap.auth.bearer.token.command` at the broker; for IMAP/SMTP, route the bearer through a SASL mechanism that consumes a command-sourced password.
+  v2 ships no OAuth flow. Use [ortie](https://github.com/pimalaya/ortie), or any other token broker, to obtain an access token, then plug it in as a `command` printing that token on stdout.
+
+  For JMAP, point `jmap.auth.bearer.token.command` at the broker. For IMAP and SMTP, route the bearer through a SASL mechanism taking a command-sourced password.
 </details>
 
 <details>

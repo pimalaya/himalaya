@@ -1,3 +1,8 @@
+//! # JMAP mailbox create
+//!
+//! The `jmap mailbox create` command, the create half of RFC 8621
+//! `Mailbox/set`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -13,18 +18,17 @@ pub struct JmapMailboxCreateCommand {
     /// The name of the new mailbox.
     #[arg(value_name = "NAME")]
     pub name: String,
-
     /// Attach the new mailbox to the parent mailbox matching the
     /// given identifier.
     #[arg(long, value_name = "ID")]
     pub parent_id: Option<String>,
-
     /// Should subscribe to the new mailbox.
     #[arg(long)]
     pub subscribe: bool,
 }
 
 impl JmapMailboxCreateCommand {
+    /// Creates the mailbox and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let new_mailbox = JmapMailboxCreate {
             name: Some(self.name.clone()),

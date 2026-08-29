@@ -1,10 +1,12 @@
-//! Shared CRLF line-ending helper.
+//! # CRLF
+//!
+//! The line-ending normalisation every raw input goes through.
 
-/// Rewrites bare line feeds to CRLF, idempotently: a `\n` already
-/// preceded by `\r` is left untouched, every other `\n` gets a `\r`
-/// inserted before it. Content read from a Unix-LF source or passed
-/// inline with real newlines is thus made RFC 5322 / IMAP `APPEND`
-/// compliant without corrupting content that is already CRLF.
+/// Rewrites bare line feeds to CRLF, idempotently.
+///
+/// A `\n` already preceded by `\r` is left alone, so content read from a
+/// Unix source becomes RFC 5322 compliant without corrupting content that
+/// already is.
 pub fn normalize(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut prev = '\0';

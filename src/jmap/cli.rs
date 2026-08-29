@@ -1,3 +1,7 @@
+//! # JMAP command
+//!
+//! The `jmap` command, dispatching onto its subcommand groups.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -14,15 +18,13 @@ use crate::{
 
 /// JMAP-specific API.
 ///
-/// Gives access to the raw JMAP API. Every CLI command matches the name of its
-/// JMAP counterpart, grouped by domain: mailbox, email, thread, identity,
-/// submission, vacation.
+/// Each subcommand carries the name of its JMAP counterpart, grouped by
+/// data type.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum JmapCommand {
     /// Send a raw JMAP method-calls array and print the response.
     Query(JmapQueryCommand),
-
     /// Manage JMAP mailboxes.
     #[command(subcommand, visible_aliases = ["mbox"])]
     Mailbox(JmapMailboxCommand),
@@ -44,6 +46,7 @@ pub enum JmapCommand {
 }
 
 impl JmapCommand {
+    /// Runs the subcommand against the account's JMAP client.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -53,7 +56,6 @@ impl JmapCommand {
         match self {
             Self::Mailbox(cmd) => cmd.execute(printer, account, client),
             Self::Email(cmd) => cmd.execute(printer, account, client),
-
             Self::Thread(cmd) => cmd.execute(printer, account, client),
             Self::Identity(cmd) => cmd.execute(printer, account, client),
             Self::Submission(cmd) => cmd.execute(printer, account, client),

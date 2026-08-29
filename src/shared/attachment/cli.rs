@@ -1,3 +1,7 @@
+//! # Attachment command
+//!
+//! The `attachment` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -22,6 +26,7 @@ pub enum AttachmentCommand {
 }
 
 impl AttachmentCommand {
+    /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

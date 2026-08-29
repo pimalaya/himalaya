@@ -1,15 +1,12 @@
-//! Merged runtime account — the DTO every command consumes.
+//! # Account context
 //!
-//! Built by the dispatch layer (`crate::cli`) in this order:
+//! The merged runtime account every command consumes, folded by the
+//! dispatch layer from the global [`Config`] then from the selected
+//! `[accounts.<name>]` block.
 //!
-//! 1. [`Account::default`] (all fields `None` / empty).
-//! 2. Fold the global [`Config`] via `Account::from(config)`.
-//! 3. Fold the selected `[accounts.<name>]` via [`Account::merge`]
-//!    with `Account::from(account_config)`.
-//!
-//! Defaults are applied at consumption time by the `*` accessor
-//! methods, not baked in during merge — keeping `Option<T>` fields
-//! lets layers compose cleanly.
+//! Defaults are applied by the accessors at consumption time rather than
+//! baked in during the merge, so every field stays an `Option` and the two
+//! layers compose.
 
 use std::{
     collections::HashMap,
@@ -29,58 +26,59 @@ use crate::{
     shared::table::DEFAULT_PRESET,
 };
 
+/// chrono `strftime` format of the envelope DATE column.
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
+/// Alias naming the mailbox a command omitting `-m/--mailbox` runs against.
 const DEFAULT_MAILBOX_ALIAS: &str = "inbox";
+/// Page size of `envelope list` when nothing names one.
 const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
-
-/// RFC 3676 §4.3 signature separator, written before the signature
-/// when neither the account nor the global config names one.
+/// RFC 3676 section 4.3 signature separator.
 const DEFAULT_SIGNATURE_DELIM: &str = "-- \n";
-
+/// FLAGS glyph of a message lacking `\Seen`.
 const DEFAULT_UNSEEN_CHAR: char = '*';
+/// FLAGS glyph of a message carrying `\Answered`.
 const DEFAULT_REPLIED_CHAR: char = 'R';
+/// FLAGS glyph of a message carrying `\Flagged`.
 const DEFAULT_FLAGGED_CHAR: char = '!';
+/// ATT glyph of a message carrying an attachment.
 const DEFAULT_ATTACHMENT_CHAR: char = '@';
 
 /// Merged runtime account settings consumed by every command.
 #[derive(Debug, Default)]
 pub struct Account {
-    /// Address the account sends as, `None` when it declares none.
+    /// Address the account sends as.
     pub email: Option<String>,
-    /// Name that address carries, `None` when it declares none.
+    /// Name that address carries.
     pub display_name: Option<String>,
-    /// Signature appended to a composed message, `None` when the
-    /// account declares none.
+    /// Signature appended to a composed message.
     pub signature: Option<String>,
-    /// Separator written before the signature, `None` when the account
-    /// declares none.
+    /// Separator written before the signature.
     pub signature_delim: Option<String>,
-
+    /// Directory attachments are downloaded to.
     pub downloads_dir: Option<PathBuf>,
+    /// `comfy_table` preset string every listing renders with.
     pub table_preset: Option<String>,
+    /// `comfy_table` column arrangement every listing renders with.
     pub table_arrangement: Option<TableArrangementConfig>,
-
+    /// chrono `strftime` format of the envelope DATE column.
     pub datetime_fmt: Option<String>,
+    /// Whether an envelope date is converted to the local timezone.
     pub datetime_local_tz: Option<bool>,
+    /// Page size of `envelope list` when `-s/--page-size` is not passed.
     pub envelopes_list_page_size: Option<u32>,
-
-    /// Per-column color + flag glyph overrides for `envelopes list`.
+    /// Per-column colors and flag glyphs of `envelope list`.
     pub envelopes_list_table: EnvelopeListTableConfig,
-    /// Per-column color overrides for `mailboxes list`.
+    /// Per-column colors of `mailbox list`.
     pub mailboxes_list_table: MailboxListTableConfig,
-    /// Per-column color overrides for `attachments list`.
+    /// Per-column colors of `attachment list`.
     pub attachments_list_table: AttachmentListTableConfig,
-
-    /// Mailbox aliases, keys lowercased. Populated from
-    /// `mailbox.alias` at the global and account levels; account
-    /// entries overwrite same-named global entries.
+    /// Mailbox aliases, keys lowercased, an account entry overwriting the
+    /// global one of the same name.
     pub mailbox_alias: HashMap<String, String>,
 }
 
 impl Account {
-    /// Folds `other`'s set fields on top of `self`. Each `Option`
-    /// field is taken from `other` when `Some`, otherwise from
-    /// `self`.
+    /// Folds the fields `other` sets on top of `self`.
     pub fn merge(self, other: Self) -> Self {
         let mut mailbox_alias = self.mailbox_alias;
         mailbox_alias.extend(other.mailbox_alias);
@@ -118,14 +116,12 @@ impl Account {
         }
     }
 
-    /// Resolves the `From` header of a composed message into the
-    /// address it carries and the name that address goes by, the two
-    /// kept apart so the MIME builder does the quoting.
+    /// Resolves the `From` header into an address and its name.
     ///
-    /// `over` is the command's `--from` flag: given, it wins whole, and
-    /// the configured name is not grafted onto an address the user
-    /// spelled out. Otherwise the merged account answers, and a `None`
-    /// address leaves the header out.
+    /// The two are kept apart so the MIME builder does the quoting.
+    /// `--from` wins whole, so a configured name is never grafted onto an
+    /// address the user spelled out, and a `None` address leaves the
+    /// header out.
     pub fn resolve_from<'a>(&'a self, over: Option<&'a str>) -> (Option<&'a str>, Option<&'a str>) {
         match over {
             Some(address) => (Some(address), None),
@@ -135,11 +131,9 @@ impl Account {
 
     /// Resolves the signature a composed message ends with.
     ///
-    /// `over` is `--signature` and `file` is `--signature-file`, which
-    /// clap keeps mutually exclusive. The flag wins; a file named on
-    /// the command line answers in the builder, which is why the
-    /// configured signature stands down rather than shadowing it; with
-    /// neither, the merged account answers.
+    /// `--signature` wins, and `--signature-file` answers in the builder
+    /// instead, which is why the configured signature stands down rather
+    /// than shadowing it. With neither, the merged account answers.
     pub fn resolve_signature<'a>(
         &'a self,
         over: Option<&'a str>,
@@ -152,17 +146,16 @@ impl Account {
         }
     }
 
-    /// Effective separator written before the signature. Defaults to
-    /// the RFC 3676 §4.3 `"-- \n"`, and is written verbatim.
+    /// Separator written before the signature, verbatim, defaulting to
+    /// the RFC 3676 section 4.3 `"-- \n"`.
     pub fn signature_delim(&self) -> &str {
         self.signature_delim
             .as_deref()
             .unwrap_or(DEFAULT_SIGNATURE_DELIM)
     }
 
-    /// Effective downloads directory. Tries the merged
-    /// `downloads_dir` (shell-expanded), then the system default
-    /// downloads dir, then the temp dir.
+    /// Directory attachments are downloaded to, falling back to the
+    /// system one then to the temporary directory.
     pub fn downloads_dir(&self) -> PathBuf {
         self.downloads_dir
             .as_ref()
@@ -173,14 +166,12 @@ impl Account {
             .unwrap_or_else(temp_dir)
     }
 
-    /// Effective `comfy_table` preset string. Defaults to
-    /// `UTF8_FULL_CONDENSED`.
+    /// `comfy_table` preset string, defaulting to `UTF8_FULL_CONDENSED`.
     pub fn table_preset(&self) -> &str {
         self.table_preset.as_deref().unwrap_or(DEFAULT_PRESET)
     }
 
-    /// Effective `comfy_table` content arrangement. Defaults to
-    /// `Dynamic`.
+    /// `comfy_table` content arrangement, defaulting to `Dynamic`.
     pub fn table_arrangement(&self) -> ContentArrangement {
         self.table_arrangement
             .clone()
@@ -188,31 +179,29 @@ impl Account {
             .into()
     }
 
-    /// Effective `chrono` `strftime` format for envelope DATE
-    /// columns. Defaults to `%F %R%:z`.
+    /// chrono `strftime` format of the DATE column, defaulting to
+    /// `%F %R%:z`.
     pub fn datetime_fmt(&self) -> &str {
         self.datetime_fmt.as_deref().unwrap_or(DEFAULT_DATETIME_FMT)
     }
 
-    /// Whether to convert envelope `Date:` headers to the system
-    /// local timezone. Defaults to `false`.
+    /// Whether a `Date:` header is converted to the local timezone,
+    /// defaulting to `false`.
     pub fn datetime_local_tz(&self) -> bool {
         self.datetime_local_tz.unwrap_or(false)
     }
 
-    /// Effective default page size for `envelopes list` when the
-    /// `-s/--page-size` flag is not passed. Defaults to 25.
+    /// Page size of `envelope list` when `-s/--page-size` is not passed,
+    /// defaulting to 25.
     pub fn envelopes_list_page_size(&self) -> u32 {
         self.envelopes_list_page_size
             .unwrap_or(DEFAULT_ENVELOPES_LIST_PAGE_SIZE)
     }
 
-    /// Resolves `name` through the alias map.
+    /// Resolves `name` through the alias map, case-insensitively.
     ///
-    /// Lookup is case-insensitive on the alias name. When `name`
-    /// matches an alias, the stored id is returned verbatim;
-    /// otherwise `name` itself is returned, allowing callers to pass
-    /// either an alias or a raw backend id transparently.
+    /// An unmatched name comes back verbatim, so a caller passes either an
+    /// alias or a raw backend id without knowing which.
     pub fn resolve_mailbox<'a>(&'a self, name: &'a str) -> &'a str {
         let key = name.to_lowercase();
         self.mailbox_alias
@@ -221,117 +210,137 @@ impl Account {
             .unwrap_or(name)
     }
 
-    /// Resolved id of the implicit default mailbox.
-    ///
-    /// Returns the id mapped to the `inbox` alias (case-insensitive),
-    /// or `None` when no such alias is configured. Used by shared
-    /// commands when `-m/--mailbox` is omitted.
+    /// Id the `inbox` alias maps to, which is the mailbox a shared command
+    /// omitting `-m/--mailbox` runs against.
     pub fn default_mailbox(&self) -> Option<&str> {
         self.mailbox_alias
             .get(DEFAULT_MAILBOX_ALIAS)
             .map(String::as_str)
     }
 
-    // ── envelopes list — flag glyphs ─────────────────────────────────────
-
+    /// FLAGS glyph of a message lacking `\Seen`, defaulting to `*`.
     pub fn envelopes_list_table_unseen_char(&self) -> char {
         self.envelopes_list_table
             .unseen_char
             .unwrap_or(DEFAULT_UNSEEN_CHAR)
     }
+
+    /// FLAGS glyph of a message carrying `\Answered`, defaulting to `R`.
     pub fn envelopes_list_table_replied_char(&self) -> char {
         self.envelopes_list_table
             .replied_char
             .unwrap_or(DEFAULT_REPLIED_CHAR)
     }
+
+    /// FLAGS glyph of a message carrying `\Flagged`, defaulting to `!`.
     pub fn envelopes_list_table_flagged_char(&self) -> char {
         self.envelopes_list_table
             .flagged_char
             .unwrap_or(DEFAULT_FLAGGED_CHAR)
     }
+
+    /// ATT glyph of a message carrying an attachment, defaulting to `@`.
     pub fn envelopes_list_table_attachment_char(&self) -> char {
         self.envelopes_list_table
             .attachment_char
             .unwrap_or(DEFAULT_ATTACHMENT_CHAR)
     }
 
-    // ── envelopes list — column colors ───────────────────────────────────
-    //
-    // Defaults mirror pimalaya-tui v1.2.0
-    // (`ListEnvelopesTableConfig::{id,flags,subject,sender,date}_color`).
+    /// Color of the ID column, defaulting to the v1.2.0 red.
     pub fn envelopes_list_table_id_color(&self) -> TableColor {
         map_color_or(self.envelopes_list_table.id_color, Color::Red)
     }
+
+    /// Color of the FLAGS column, defaulting to the v1.2.0 neutral.
     pub fn envelopes_list_table_flags_color(&self) -> TableColor {
         map_color_or(self.envelopes_list_table.flags_color, Color::Reset)
     }
+
+    /// Color of the ATT column, neutral for want of a v1.2.0 precedent:
+    /// the attachment glyph then lived inside FLAGS.
     pub fn envelopes_list_table_att_color(&self) -> TableColor {
-        // No v1 precedent for a standalone ATT column (v1 embedded the
-        // attachment glyph inside FLAGS); leave it neutral.
         map_color_or(self.envelopes_list_table.att_color, Color::Reset)
     }
+
+    /// Color of the SUBJECT column, defaulting to the v1.2.0 green.
     pub fn envelopes_list_table_subject_color(&self) -> TableColor {
         map_color_or(self.envelopes_list_table.subject_color, Color::Green)
     }
+
+    /// Color of the FROM column, defaulting to the v1.2.0 blue.
     pub fn envelopes_list_table_from_color(&self) -> TableColor {
         map_color_or(self.envelopes_list_table.from_color, Color::Blue)
     }
+
+    /// Color of the TO column, mirroring FROM for want of a v1.2.0
+    /// precedent.
     pub fn envelopes_list_table_to_color(&self) -> TableColor {
-        // `to` mirrors `from`'s default; v1 didn't surface a TO column.
         map_color_or(self.envelopes_list_table.to_color, Color::Blue)
     }
+
+    /// Color of the DATE column, defaulting to the v1.2.0 dark yellow.
     pub fn envelopes_list_table_date_color(&self) -> TableColor {
         map_color_or(self.envelopes_list_table.date_color, Color::DarkYellow)
     }
+
+    /// Color of the SIZE column, neutral for want of a v1.2.0 precedent.
     pub fn envelopes_list_table_size_color(&self) -> TableColor {
-        // New in v2, no v1 precedent.
         map_color_or(self.envelopes_list_table.size_color, Color::Reset)
     }
 
-    // ── mailboxes list — column colors ───────────────────────────────────
-    //
-    // `name` matches the v1 `folder.list.table.name-color` default
-    // (`pimalaya-tui::ListFoldersTableConfig::name_color`); the other
-    // columns are new in v2.
+    /// Color of the ID column, neutral for want of a v1.2.0 precedent.
     pub fn mailboxes_list_table_id_color(&self) -> TableColor {
         map_color_or(self.mailboxes_list_table.id_color, Color::Reset)
     }
+
+    /// Color of the NAME column, defaulting to the v1.2.0 blue.
     pub fn mailboxes_list_table_name_color(&self) -> TableColor {
         map_color_or(self.mailboxes_list_table.name_color, Color::Blue)
     }
+
+    /// Color of the TOTAL column, neutral for want of a v1.2.0 precedent.
     pub fn mailboxes_list_table_total_color(&self) -> TableColor {
         map_color_or(self.mailboxes_list_table.total_color, Color::Reset)
     }
+
+    /// Color of the UNREAD column, neutral for want of a v1.2.0 precedent.
     pub fn mailboxes_list_table_unread_color(&self) -> TableColor {
         map_color_or(self.mailboxes_list_table.unread_color, Color::Reset)
     }
 
-    // ── attachments list — column colors ─────────────────────────────────
-    //
-    // No v1 precedent; defaults left neutral.
+    /// Color of the ID column, neutral for want of a v1.2.0 precedent.
     pub fn attachments_list_table_id_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.id_color, Color::Reset)
     }
+
+    /// Color of the FILENAME column, neutral like the whole listing.
     pub fn attachments_list_table_filename_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.filename_color, Color::Reset)
     }
+
+    /// Color of the TYPE column, neutral like the whole listing.
     pub fn attachments_list_table_type_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.type_color, Color::Reset)
     }
+
+    /// Color of the SIZE column, neutral like the whole listing.
     pub fn attachments_list_table_size_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.size_color, Color::Reset)
     }
+
+    /// Color of the INLINE column, neutral like the whole listing.
     pub fn attachments_list_table_inline_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.inline_color, Color::Reset)
     }
+
+    /// Color of the PATH column, neutral like the whole listing.
     pub fn attachments_list_table_path_color(&self) -> TableColor {
         map_color_or(self.attachments_list_table.path_color, Color::Reset)
     }
 }
 
-/// Maps a [`crossterm::style::Color`] (deserialized from TOML) into a
-/// [`comfy_table::Color`] used by the renderers, substituting
-/// `fallback` when the TOML field is unset.
+/// Maps a TOML crossterm color into the comfy-table one the renderers
+/// take, substituting `fallback` when the field is unset.
 pub(crate) fn map_color_or(color: Option<Color>, fallback: Color) -> TableColor {
     match color.unwrap_or(fallback) {
         Color::Reset => TableColor::Reset,
@@ -402,10 +411,10 @@ fn merge_attachment_table(
     }
 }
 
-/// Lowercases every key of `aliases`, leaving values untouched. Used at
-/// the [`Config`] / [`AccountConfig`] -> [`Account`] boundary so that
-/// the merge and the [`Account::resolve_mailbox`] lookup can both rely
-/// on already-normalized keys.
+/// Lowercases every alias key, leaving the values untouched.
+///
+/// Run at the config boundary, so both the merge and
+/// [`Account::resolve_mailbox`] read already-normalized keys.
 fn lowercase_alias_keys(aliases: HashMap<String, String>) -> HashMap<String, String> {
     aliases
         .into_iter()
@@ -546,7 +555,7 @@ mod tests {
             (Some("alice@example.org"), Some("Alice")),
         );
 
-        // An address the user spelled out is theirs whole: the
+        // NOTE: an address the user spelled out is theirs whole, so the
         // configured name is not grafted onto it.
         assert_eq!(
             account.resolve_from(Some("alias@example.org")),
@@ -569,9 +578,8 @@ mod tests {
         assert_eq!(account.resolve_signature(None, None), Some("Alice"));
         assert_eq!(account.signature_delim(), "~~~\n");
 
-        // `--signature` replaces it, and `--signature-file` names the
-        // file the builder reads instead, so the config stands down
-        // rather than shadowing it.
+        // NOTE: `--signature-file` names the file the builder reads, so
+        // the configured signature stands down rather than shadowing it.
         assert_eq!(
             account.resolve_signature(Some("Alias"), None),
             Some("Alias"),

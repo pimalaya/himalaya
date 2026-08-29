@@ -1,3 +1,7 @@
+//! # Gmail draft delete
+//!
+//! The `gmail drafts delete` command, `users.drafts.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::drafts::delete::GmailDraftDelete;
@@ -14,6 +18,7 @@ pub struct GmailDraftDeleteCommand {
 }
 
 impl GmailDraftDeleteCommand {
+    /// Deletes the draft for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailDraftDelete::new(&client.auth, &client.user_id, &self.id)?;

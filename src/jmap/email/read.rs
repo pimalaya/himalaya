@@ -1,3 +1,8 @@
+//! # JMAP email read
+//!
+//! The `jmap email read` command, an `Email/get` asking for the body
+//! values too.
+
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::email::{JmapEmailAddress, get::JmapEmailGetOptions};
@@ -14,13 +19,13 @@ pub struct JmapEmailReadCommand {
     /// The email ID(s) to read.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
-
     /// Show HTML body instead of plain text.
     #[arg(long)]
     pub html: bool,
 }
 
 impl JmapEmailReadCommand {
+    /// Fetches one email with its bodies and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let opts = JmapEmailGetOptions {
             properties: None,

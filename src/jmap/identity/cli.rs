@@ -1,3 +1,7 @@
+//! # JMAP identity command
+//!
+//! The `jmap identity` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -31,6 +35,7 @@ pub enum JmapIdentityCommand {
 }
 
 impl JmapIdentityCommand {
+    /// Runs the subcommand against the account's JMAP client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

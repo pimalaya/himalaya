@@ -1,3 +1,8 @@
+//! # Microsoft Graph mail folder rename
+//!
+//! The `msgraph mail-folders rename` command, patching a folder's display
+//! name.
+
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::MsgraphMailFolder;
@@ -11,13 +16,13 @@ pub struct MsgraphMailFolderRenameCommand {
     /// The id of the mail folder to rename.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// The new display name of the mail folder.
     #[arg(value_name = "NAME")]
     pub name: String,
 }
 
 impl MsgraphMailFolderRenameCommand {
+    /// Patches the display name of the folder.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let folder = MsgraphMailFolder {
             display_name: self.name.clone(),

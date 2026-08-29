@@ -1,3 +1,8 @@
+//! # Gmail language settings
+//!
+//! The `gmail settings language` commands, covering
+//! `users.settings.getLanguage` and its setter.
+
 pub mod get;
 pub mod set;
 
@@ -26,6 +31,7 @@ pub enum GmailSettingsLanguageCommand {
 }
 
 impl GmailSettingsLanguageCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

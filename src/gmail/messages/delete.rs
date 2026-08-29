@@ -1,3 +1,7 @@
+//! # Gmail message delete
+//!
+//! The `gmail messages delete` command, `users.messages.delete`.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -13,6 +17,7 @@ pub struct GmailMessageDeleteCommand {
 }
 
 impl GmailMessageDeleteCommand {
+    /// Deletes the message for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         client.message_delete(&self.id)?;
         printer.out(Message::new(format!(

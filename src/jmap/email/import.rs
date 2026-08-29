@@ -1,3 +1,8 @@
+//! # JMAP email import
+//!
+//! The `jmap email import` command, a blob upload then an RFC 8621
+//! `Email/import`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -17,35 +22,30 @@ use crate::{
     shared::message::arg::MessageArg,
 };
 
-/// Import an RFC 5322 message into a mailbox (upload + Email/import).
+/// Import an RFC 5322 message into a mailbox (upload, then Email/import).
 ///
-/// The message can be passed as a positional file path, an inline
-/// raw string, or piped via stdin (see [`MessageArg`] for resolution
-/// order). Use `--upload-only` to stop after the upload and print
-/// the blobId.
+/// The message comes from a file path, an inline string or piped standard
+/// input. `--upload-only` stops after the upload and prints the blob id.
 #[derive(Debug, Parser)]
 pub struct JmapEmailImportCommand {
     /// Mailbox ID(s) to place the imported email in.
     #[arg(long, value_name = "MAILBOX-ID")]
     pub mailbox_id: Vec<String>,
-
     /// Keywords to set on the imported email (e.g. `$seen`).
     #[arg(long, value_name = "KEYWORD")]
     pub keyword: Vec<String>,
-
     /// Override the `receivedAt` timestamp (RFC 3339).
     #[arg(long, value_name = "DATE")]
     pub received_at: Option<String>,
-
     /// Only upload the blob and print the blobId; skip Email/import.
     #[arg(long)]
     pub upload_only: bool,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl JmapEmailImportCommand {
+    /// Uploads the message as a blob, then imports it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let data = self.message.parse()?.into_bytes();
 

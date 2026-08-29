@@ -1,3 +1,7 @@
+//! # Mailbox command
+//!
+//! The `mailbox` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -17,6 +21,7 @@ pub enum MailboxCommand {
 }
 
 impl MailboxCommand {
+    /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

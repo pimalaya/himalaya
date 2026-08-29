@@ -1,11 +1,10 @@
-//! IMAP adapter for the shared cross-protocol client.
+//! # IMAP backend
 //!
-//! Thin glue over [`ImapClient`], which already wraps io_imap's
-//! high-level session (`select`, `fetch`, `store`, `copy`, `move`,
-//! `append`, `list`, `status`). Each method takes and returns the
-//! CLI's shared [`crate::email`] types; the only real work is
-//! converting between those and io_imap's wire types, adapted from the
-//! retired io-email IMAP drivers.
+//! The IMAP adapter of the shared cross-protocol client, glue over the
+//! io-imap session [`ImapClient`] already wraps.
+//!
+//! Each method takes and returns the CLI's own [`crate::email`] types, so
+//! the work here is converting between those and io-imap's wire types.
 
 use io_imap::client::ImapClient as _;
 use std::{
@@ -60,8 +59,8 @@ use crate::{
 };
 
 impl ImapClient {
-    /// Lists every selectable mailbox. With `with_counts`, follows each
-    /// row with a STATUS to populate totals and unread counts.
+    /// Lists every selectable mailbox, following each with a `STATUS`
+    /// when counts were asked for.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         let reference: ImapMailbox<'static> = ""
             .try_into()
@@ -92,8 +91,8 @@ impl ImapClient {
         Ok(mailboxes)
     }
 
-    /// Lists envelopes from `mailbox`, most recent first. `page = None`
-    /// and `page_size = None` fetch the whole mailbox.
+    /// Lists envelopes most recent first, the whole mailbox when neither
+    /// page nor page size is given.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -128,9 +127,11 @@ impl ImapClient {
         Ok(envelopes)
     }
 
-    /// Searches envelopes in `mailbox`: SELECT, then a UID SORT (RFC 5256,
-    /// with client-side fallback) constrained by the translated query,
-    /// paginated before a UID FETCH reordered back to the SORT order.
+    /// Searches a mailbox with the shared query.
+    ///
+    /// A UID `SORT`, or its client-side fallback, is constrained by the
+    /// translated query, paginated, then fetched and reordered back into
+    /// the order the sort gave.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -187,7 +188,7 @@ impl ImapClient {
         Ok(reorder_envelopes(data, &page_uids))
     }
 
-    /// Adds, sets, or removes `flags` on a UID set in `mailbox`.
+    /// Adds, sets or removes flags on a UID set.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -215,17 +216,16 @@ impl ImapClient {
         Ok(())
     }
 
-    /// Fetches one message's raw RFC 5322 bytes without flipping
-    /// `\Seen` (BODY.PEEK[]).
+    /// Fetches one message's raw RFC 5322 bytes, marking it seen only
+    /// when asked.
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(&[id])?;
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
 
-        // `BODY[]` sets `\Seen` server-side as a side effect of the fetch,
-        // so `--seen` costs no extra round trip; `BODY.PEEK[]` leaves the
-        // flag untouched. The mailbox is always SELECTed read-write.
+        // NOTE: `BODY[]` sets `\Seen` server-side as a side effect, so
+        // `--seen` costs no extra round trip where `BODY.PEEK[]` does not.
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
                 section: None,
@@ -250,8 +250,8 @@ impl ImapClient {
             .ok_or_else(|| anyhow!("FETCH returned no body for the requested message"))
     }
 
-    /// Appends `raw` to `mailbox` with `flags`, returning the appended
-    /// UID (UIDPLUS APPENDUID, else a UID SEARCH on Message-ID).
+    /// Appends a message and returns its UID, from the UIDPLUS
+    /// `APPENDUID` or, failing that, a UID `SEARCH` on its `Message-ID`.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let mbox = parse_mailbox(mailbox)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
@@ -270,8 +270,8 @@ impl ImapClient {
             return Ok(uid.to_string());
         }
 
-        // No UIDPLUS: recover the UID via SELECT + UID SEARCH on the
-        // message's own Message-ID (needs one on the message).
+        // NOTE: without UIDPLUS the UID is recovered by searching the
+        // message's own `Message-ID`, which it therefore has to carry.
         let message_id = MessageParser::default()
             .parse_headers(&raw)
             .and_then(|parsed| parsed.message_id().map(str::to_string))
@@ -297,7 +297,7 @@ impl ImapClient {
             .ok_or_else(|| anyhow!("Fallback UID search returned no match"))
     }
 
-    /// Copies a UID set from `from` to `to`.
+    /// Copies a UID set between two mailboxes.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
@@ -309,7 +309,7 @@ impl ImapClient {
         Ok(self.copied_count(copy_uid, ids.len()))
     }
 
-    /// Moves a UID set from `from` to `to` (RFC 6851).
+    /// Moves a UID set between two mailboxes, per RFC 6851.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
@@ -321,11 +321,12 @@ impl ImapClient {
         Ok(self.copied_count(copy_uid, ids.len()))
     }
 
-    /// Permanently deletes `ids` from `mailbox` (the trash): flags them
-    /// `\Deleted`, then `UID EXPUNGE`s exactly those UIDs when the server
-    /// advertises UIDPLUS (RFC 4315), leaving any other `\Deleted`
-    /// message untouched. Returns `true` when the messages were
-    /// physically removed, `false` when only flagged (no UIDPLUS).
+    /// Permanently deletes a UID set from the trash, returning whether
+    /// the messages were really removed.
+    ///
+    /// They are flagged `\Deleted`, then `UID EXPUNGE`d one by one when
+    /// the server advertises RFC 4315 UIDPLUS, which leaves every other
+    /// `\Deleted` message alone. Without it they are only flagged.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
         let mbox = parse_mailbox(mailbox)?;
 
@@ -345,12 +346,12 @@ impl ImapClient {
         Ok(false)
     }
 
-    /// Number of messages a UID COPY/MOVE actually affected. UIDPLUS
-    /// servers report a `COPYUID` whose source set lists exactly the
-    /// affected UIDs, so it is authoritative — including its absence,
-    /// which means nothing matched (a stale-UID no-op). Servers without
-    /// UIDPLUS give no such feedback, so fall back to the requested
-    /// count rather than under-report a real copy as zero.
+    /// How many messages a UID `COPY` or `MOVE` really affected.
+    ///
+    /// A UIDPLUS `COPYUID` lists exactly those UIDs, so it is
+    /// authoritative, its absence meaning nothing matched. Without
+    /// UIDPLUS there is no such feedback, so the requested count answers
+    /// rather than under-report a real copy as zero.
     fn copied_count(&self, copy_uid: ImapCopyUid, requested: usize) -> usize {
         match copy_uid {
             Some((_, source_uids, _)) => source_uids.len(),
@@ -360,20 +361,20 @@ impl ImapClient {
     }
 }
 
-/// One IMAP LIST row (mailbox, delimiter, attributes).
+/// One `LIST` row: a mailbox, its delimiter and its attributes.
 type ListRow = (
     ImapMailbox<'static>,
     Option<io_imap::types::core::QuotedChar>,
     Vec<FlagNameAttribute<'static>>,
 );
 
-/// Drops `\Noselect` containers (RFC 3501 §6.3.8): they cannot hold
+/// Drops `\Noselect` containers (RFC 3501 section 6.3.8): they cannot hold
 /// messages and would error out on any later shared-API op.
 fn is_selectable(row: &ListRow) -> bool {
     !row.2.contains(&FlagNameAttribute::Noselect)
 }
 
-/// Converts one IMAP LIST row into the shared [`Mailbox`] shape.
+/// Converts one `LIST` row into the shared [`Mailbox`] shape.
 fn mailbox_from(row: ListRow) -> Mailbox {
     let name = match row.0 {
         ImapMailbox::Inbox => "Inbox".to_string(),
@@ -388,7 +389,7 @@ fn mailbox_from(row: ListRow) -> Mailbox {
     }
 }
 
-/// Folds a STATUS response into the matching mailbox row.
+/// Folds a `STATUS` response into the matching mailbox row.
 fn apply_status(mailbox: &mut Mailbox, items: Vec<StatusDataItem>) {
     for item in items {
         match item {
@@ -399,8 +400,8 @@ fn apply_status(mailbox: &mut Mailbox, items: Vec<StatusDataItem>) {
     }
 }
 
-/// FETCH item-name list: UID + FLAGS + ENVELOPE + RFC822.SIZE, plus
-/// BODYSTRUCTURE when `with_attachment` is set.
+/// The `FETCH` item names a listing asks for, `BODYSTRUCTURE` included
+/// only when the attachment column is drawn.
 fn build_item_names(with_attachment: bool) -> MacroOrMessageDataItemNames<'static> {
     let mut names = vec![
         MessageDataItemName::Uid,
@@ -414,8 +415,8 @@ fn build_item_names(with_attachment: bool) -> MacroOrMessageDataItemNames<'stati
     MacroOrMessageDataItemNames::MessageDataItemNames(names)
 }
 
-/// Sequence-set string for `(page, page_size)` against `exists`, or
-/// `None` for an empty window. Page 1 is the most recent window.
+/// The sequence set of one page, `None` when the window is empty. Page 1
+/// is the most recent one.
 fn compute_window(exists: u32, page: Option<u32>, page_size: Option<u32>) -> Option<String> {
     if exists == 0 {
         return None;
@@ -436,7 +437,7 @@ fn compute_window(exists: u32, page: Option<u32>, page_size: Option<u32>) -> Opt
     Some(format!("{start}:{end}"))
 }
 
-/// Folds one FETCH row into a shared [`Envelope`].
+/// Folds one `FETCH` row into a shared [`Envelope`].
 fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     let mut id = String::new();
     let mut message_id: Option<String> = None;
@@ -465,9 +466,8 @@ fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
                 if let Some(m) = env.message_id.into_option() {
                     message_id = normalize_message_id(&bytes_to_string(m.as_ref()));
                 }
-                // NOTE: the 9th ENVELOPE element (RFC 3501 §7.4.2), so
-                // the reply's parent costs nothing beyond the FETCH the
-                // listing already issued.
+                // NOTE: the ninth ENVELOPE element (RFC 3501 section
+                // 7.4.2), so a reply's parent costs no extra round trip.
                 if let Some(m) = env.in_reply_to.into_option() {
                     in_reply_to = parse_message_ids(&bytes_to_string(m.as_ref()));
                 }
@@ -500,6 +500,8 @@ fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     }
 }
 
+/// Converts a fetched flag into a shared [`Flag`], dropping the
+/// non-flag fetch items.
 fn flag_from_fetch(fetch: FlagFetch<'_>) -> Option<Flag> {
     let FlagFetch::Flag(flag) = fetch else {
         return None;
@@ -507,6 +509,7 @@ fn flag_from_fetch(fetch: FlagFetch<'_>) -> Option<Flag> {
     Some(Flag::from_raw(flag.to_string()))
 }
 
+/// Converts an ENVELOPE address into a shared [`Address`].
 fn address_from(addr: &ImapAddress<'_>) -> Address {
     let name = addr
         .name
@@ -539,6 +542,7 @@ fn address_from(addr: &ImapAddress<'_>) -> Address {
     Address { name, email }
 }
 
+/// Whether a body structure holds a part disposed as an attachment.
 fn body_structure_has_attachment(structure: &BodyStructure<'_>) -> bool {
     match structure {
         BodyStructure::Single { extension_data, .. } => extension_data
@@ -553,9 +557,10 @@ fn body_structure_has_attachment(structure: &BodyStructure<'_>) -> bool {
     }
 }
 
-/// Maps a shared [`Flag`] to its IMAP wire counterpart. IANA flags
-/// become the matching system flag; custom keywords pass through as
-/// Keyword atoms, with a sanitised fallback for non-atom-safe input.
+/// Maps a shared [`Flag`] onto its IMAP wire counterpart.
+///
+/// An IANA flag becomes the matching system flag, and a custom keyword a
+/// Keyword atom, sanitised when it is not atom-safe.
 fn flag_from(flag: &Flag) -> ImapFlag<'static> {
     match flag.iana() {
         Some(IanaFlag::Seen) => ImapFlag::Seen,
@@ -577,8 +582,8 @@ fn flag_from(flag: &Flag) -> ImapFlag<'static> {
     }
 }
 
-/// Replaces every non-atom-safe byte with `_` so a keyword with spaces,
-/// controls or `()<>{}` survives IMAP STORE.
+/// Replaces every non-atom-safe byte with `_`, so a keyword carrying
+/// spaces, controls or brackets survives a `STORE`.
 fn sanitise_atom(raw: &str) -> String {
     raw.chars()
         .map(|c| {
@@ -621,25 +626,23 @@ fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
     SequenceSet::try_from(uids).map_err(|_| anyhow!("Invalid UID set"))
 }
 
+/// Parses an RFC 2822 date, retrying without its day-of-week token.
 fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
     }
 
-    // `chrono` validates the optional leading day-of-week against the
-    // date and rejects the whole timestamp when they disagree (a
-    // surprising number of senders get the weekday wrong). The weekday
-    // is redundant, so on failure retry without it.
+    // NOTE: chrono rejects the whole timestamp when the day-of-week
+    // disagrees with the date, which a surprising number of senders get
+    // wrong. The token is redundant, so the retry drops it.
     DateTime::parse_from_rfc2822(trimmed)
         .or_else(|_| DateTime::parse_from_rfc2822(strip_weekday(trimmed)))
         .ok()
 }
 
-/// Drops a leading `Dow, ` day-of-week token (e.g. `Thu, `) from an
-/// RFC 2822 date, leaving the unambiguous `DD Mon YYYY …` remainder
-/// that `chrono` parses without a weekday check. Returns the input
-/// untouched when it has no such prefix.
+/// Drops the leading day-of-week token of an RFC 2822 date, leaving the
+/// unambiguous remainder chrono parses without the weekday check.
 fn strip_weekday(date: &str) -> &str {
     match date.split_once(", ") {
         Some((dow, rest)) if dow.len() == 3 && dow.bytes().all(|b| b.is_ascii_alphabetic()) => rest,
@@ -647,6 +650,7 @@ fn strip_weekday(date: &str) -> &str {
     }
 }
 
+/// Renders bytes as UTF-8, falling back to latin-1 when they are not.
 fn bytes_to_string(bytes: &[u8]) -> String {
     from_utf8(bytes).map(str::to_string).unwrap_or_else(|_| {
         let mut out = String::with_capacity(bytes.len());
@@ -657,8 +661,8 @@ fn bytes_to_string(bytes: &[u8]) -> String {
     })
 }
 
-/// Decodes RFC 2047 MIME-encoded words from IMAP ENVELOPE strings;
-/// falls back to [`bytes_to_string`] on malformed input.
+/// Decodes the RFC 2047 encoded words of an ENVELOPE string, falling back
+/// to [`bytes_to_string`] on malformed input.
 fn decode_mime_bytes(bytes: &[u8]) -> String {
     let decoder = Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Decode);
     decoder
@@ -666,7 +670,7 @@ fn decode_mime_bytes(bytes: &[u8]) -> String {
         .unwrap_or_else(|_| bytes_to_string(bytes))
 }
 
-/// SEARCH key list for `filter`, defaulting to ALL.
+/// The `SEARCH` keys of a shared filter, `ALL` when there is none.
 fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKey<'static>>> {
     let key = match filter {
         None => SearchKey::All,
@@ -675,7 +679,8 @@ fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKe
     Ok(Vec1::from(key))
 }
 
-/// SORT criterion list for `sort`, defaulting to REVERSE DATE.
+/// The `SORT` criteria of a shared sort, `REVERSE DATE` when there is
+/// none.
 fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
     let criteria: Vec<SortCriterion> = match sort {
         Some(chain) if !chain.is_empty() => chain.iter().map(convert_sorter).collect(),
@@ -688,6 +693,7 @@ fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
     Vec1::try_from(criteria).expect("non-empty by construction")
 }
 
+/// Translates one shared filter node into an IMAP search key.
 fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>> {
     use SearchEmailsFilterQuery as Q;
 
@@ -702,10 +708,10 @@ fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>
         ),
         Q::Not(inner) => SearchKey::Not(Box::new(convert_filter(inner)?)),
 
-        // Date(D) maps onto SENTON (Date: header on day D).
         Q::Date(date) => SearchKey::SentOn(imap_date(*date)?),
 
-        // AfterDate(D) is strict "> D"; SENTSINCE is ">=", so bump one day.
+        // NOTE: the shared clause is strictly after, where SENTSINCE is on
+        // or after, so the day is bumped.
         Q::AfterDate(date) => {
             let bumped = date.succ_opt().unwrap_or(*date);
             SearchKey::SentSince(imap_date(bumped)?)
@@ -730,6 +736,7 @@ fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>
     })
 }
 
+/// Translates one shared sorter into an IMAP sort criterion.
 fn convert_sorter(sorter: &SearchEmailsSorter) -> SortCriterion {
     let SearchEmailsSorter(kind, order) = sorter;
 
@@ -746,16 +753,18 @@ fn convert_sorter(sorter: &SearchEmailsSorter) -> SortCriterion {
     }
 }
 
+/// Wraps a search pattern in an IMAP astring.
 fn astring(pattern: &str) -> Result<AString<'static>> {
     AString::try_from(String::from(pattern))
         .map_err(|_| anyhow!("Invalid IMAP search pattern `{pattern}`"))
 }
 
+/// Converts a date into the IMAP wire date a search key takes.
 fn imap_date(date: chrono::NaiveDate) -> Result<ImapNaiveDate> {
     ImapNaiveDate::try_from(date).map_err(|_| anyhow!("Invalid IMAP date `{date}`"))
 }
 
-/// Slices `uids` for `(page, page_size)`, preserving SORT order.
+/// Slices one page out of the sorted UIDs, keeping their order.
 fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>) -> Vec<u32> {
     let total = uids.len();
     let size = page_size.map(|n| n as usize);
@@ -773,7 +782,7 @@ fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>)
     uids[start..end].iter().map(|u| u.get()).collect()
 }
 
-/// Reorders the FETCH response into the requested UID order, dropping
+/// Reorders a `FETCH` response into the requested UID order, dropping the
 /// UIDs the server skipped.
 fn reorder_envelopes(
     data: BTreeMap<NonZeroU32, Vec1<MessageDataItem<'static>>>,
@@ -810,7 +819,6 @@ mod tests {
 
     #[test]
     fn parses_despite_a_wrong_weekday() {
-        // 2026-07-17 is a Friday; `Thu` is wrong but must not void the date.
         let date = parse_rfc2822_date("Thu, 17 Jul 2026 10:00:00 +0000").unwrap();
         assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
     }

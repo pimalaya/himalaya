@@ -1,3 +1,8 @@
+//! # Gmail IMAP settings
+//!
+//! The `gmail settings imap` commands, covering
+//! `users.settings.getImap` and its setter.
+
 pub mod get;
 pub mod set;
 
@@ -24,6 +29,7 @@ pub enum GmailSettingsImapCommand {
 }
 
 impl GmailSettingsImapCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,3 +1,7 @@
+//! # Microsoft Graph messages command
+//!
+//! The `msgraph messages` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -32,6 +36,7 @@ pub enum MsgraphMessagesCommand {
 }
 
 impl MsgraphMessagesCommand {
+    /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

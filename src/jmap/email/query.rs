@@ -1,3 +1,8 @@
+//! # JMAP email query
+//!
+//! The `jmap email query` command, an RFC 8621 `Email/query` chained into
+//! an `Email/get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -28,73 +33,58 @@ pub struct JmapEmailQueryCommand {
     /// Filter by mailbox ID.
     #[arg(long, short, value_name = "MAILBOX-ID")]
     pub mailbox: Option<String>,
-
     /// Filter by received-before date (RFC 3339, e.g. 2024-01-01T00:00:00Z).
     #[arg(long, value_name = "DATE")]
     pub before: Option<String>,
-
     /// Filter by received-after date (RFC 3339, e.g. 2024-01-01T00:00:00Z).
     #[arg(long, value_name = "DATE")]
     pub after: Option<String>,
-
     /// Filter by minimum size in bytes.
     #[arg(long, value_name = "BYTES")]
     pub min_size: Option<u64>,
-
     /// Filter by maximum size in bytes.
     #[arg(long, value_name = "BYTES")]
     pub max_size: Option<u64>,
-
     /// Filter to emails that have this keyword set.
     #[arg(long, value_name = "KEYWORD")]
     pub has_keyword: Option<String>,
-
     /// Filter to emails that do not have this keyword set.
     #[arg(long, value_name = "KEYWORD")]
     pub not_keyword: Option<String>,
-
     /// Filter to emails that have at least one attachment.
     #[arg(long)]
     pub has_attachment: bool,
-
     /// Full-text search across all headers and body.
     #[arg(long, value_name = "TEXT")]
     pub text: Option<String>,
-
     /// Filter by From header (substring match).
     #[arg(long, value_name = "TEXT")]
     pub from: Option<String>,
-
     /// Filter by To header (substring match).
     #[arg(long, value_name = "TEXT")]
     pub to: Option<String>,
-
     /// Filter by Subject header (substring match).
     #[arg(long, value_name = "TEXT")]
     pub subject: Option<String>,
-
     /// Filter by email body (substring match).
     #[arg(long, value_name = "TEXT")]
     pub body: Option<String>,
-
     /// Sort by property.
     #[arg(long, value_name = "PROP", default_value_t)]
     pub sort: SortArg,
-
     /// Sort in descending order.
     #[arg(long, default_value_t)]
     pub desc: bool,
-
     /// Number of emails to display per page.
     #[arg(long, short = 's', value_name = "N", default_value = "10")]
     pub page_size: u64,
-
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
 }
 
 impl JmapEmailQueryCommand {
+    /// Queries the emails and tables the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -181,35 +171,48 @@ impl JmapEmailQueryCommand {
     }
 }
 
-/// Per-column colors for the emails table.
+/// Per-column colors of the emails table.
 #[derive(Clone, Copy, Debug)]
 pub struct EmailsColors {
+    /// Color of the ID column.
     pub id: Color,
+    /// Color of the FLAGS column.
     pub flags: Color,
+    /// Color of the SUBJECT column.
     pub subject: Color,
+    /// Color of the FROM column.
     pub from: Color,
+    /// Color of the DATE column.
     pub date: Color,
 }
 
-/// Flag glyphs used in the emails table.
+/// Flag glyphs of the emails table.
 #[derive(Clone, Copy, Debug)]
 pub struct EmailsChars {
+    /// Glyph of an email lacking `$seen`.
     pub unseen: char,
+    /// Glyph of an email carrying `$flagged`.
     pub flagged: char,
+    /// Glyph of an email carrying an attachment.
     pub attachment: char,
 }
 
-/// Renderable table of email envelopes.
+/// The emails rendered as a table of envelopes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct EmailsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// The per-column colors.
     #[serde(skip)]
     pub colors: EmailsColors,
+    /// The flag glyphs.
     #[serde(skip)]
     pub chars: EmailsChars,
+    /// The emails, in the order the server returned them.
     pub emails: Vec<JmapEmail>,
 }
 
@@ -258,17 +261,24 @@ impl fmt::Display for EmailsTable {
     }
 }
 
-/// CLI sort key for emails.
+/// The property an email query sorts on.
 #[derive(Clone, Debug, Default, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum SortArg {
+    /// When the server received the email.
     #[default]
     ReceivedAt,
+    /// When its author says it was sent.
     SentAt,
+    /// Its size, in octets.
     Size,
+    /// Its first `From` address.
     From,
+    /// Its first `To` address.
     To,
+    /// Its subject.
     Subject,
+    /// Whether it carries an attachment.
     HasAttachment,
 }
 

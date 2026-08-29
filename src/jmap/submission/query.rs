@@ -1,3 +1,8 @@
+//! # JMAP submission query
+//!
+//! The `jmap submission query` command, an RFC 8621
+//! `EmailSubmission/query` chained into an `EmailSubmission/get`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -15,11 +20,14 @@ use crate::{
     account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
 };
 
-/// CLI proxy for [`JmapUndoStatus`].
+/// How far along a submission is, and whether it can still be canceled.
 #[derive(Clone, Debug, ValueEnum)]
 pub enum UndoStatusArg {
+    /// Not sent yet, so still cancelable.
     Pending,
+    /// Sent, so no longer cancelable.
     Final,
+    /// Canceled before it was sent.
     Canceled,
 }
 
@@ -39,25 +47,22 @@ pub struct JmapSubmissionQueryCommand {
     /// Filter by undo status (`pending`, `final`, `canceled`).
     #[arg(long, value_name = "STATUS")]
     pub undo_status: Option<UndoStatusArg>,
-
     /// Filter by sent-before date (RFC 3339).
     #[arg(long, value_name = "DATE")]
     pub before: Option<String>,
-
     /// Filter by sent-after date (RFC 3339).
     #[arg(long, value_name = "DATE")]
     pub after: Option<String>,
-
     /// Number of submissions to display per page.
     #[arg(long, short = 's', value_name = "N", default_value = "10")]
     pub page_size: u64,
-
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
 }
 
 impl JmapSubmissionQueryCommand {
+    /// Queries the submissions and tables the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -93,11 +98,13 @@ impl JmapSubmissionQueryCommand {
     }
 }
 
-/// Renderable table of email submissions.
+/// The submissions rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SubmissionsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The submissions, in the order the server returned them.
     pub submissions: Vec<JmapEmailSubmission>,
 }
 

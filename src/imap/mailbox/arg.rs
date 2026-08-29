@@ -1,8 +1,13 @@
+//! # IMAP mailbox arguments
+//!
+//! The mailbox name arguments and flags the IMAP commands share.
+
 use clap::Parser;
 
+/// The mailbox an argument defaults to.
 const INBOX: &str = "INBOX";
 
-/// The optional mailbox name argument parser.
+/// Optional positional naming a mailbox, `INBOX` by default.
 #[derive(Debug, Parser)]
 pub struct MailboxNameOptionalArg {
     /// The name of the mailbox.
@@ -18,7 +23,7 @@ impl Default for MailboxNameOptionalArg {
     }
 }
 
-/// The optional mailbox name flag parser.
+/// Optional flag naming a mailbox, `INBOX` by default.
 #[derive(Debug, Parser)]
 pub struct MailboxNameOptionalFlag {
     /// The name of the mailbox.
@@ -35,22 +40,19 @@ impl Default for MailboxNameOptionalFlag {
     }
 }
 
-/// The no-select mailbox flag parser.
+/// Flag skipping the `SELECT` a command would otherwise issue.
 #[derive(Debug, Parser)]
 pub struct MailboxNoSelectFlag {
-    /// Do not select the given mailbox before performing the current
-    /// action.
+    /// Do not select the mailbox before acting on it.
     ///
-    /// This argument is useful when stateful IMAP sessions are used,
-    /// for example with Sirup CLI:
-    ///
-    /// https://github.com/pimalaya/sirup
+    /// Useful over a stateful IMAP session, a Sirup proxy for instance,
+    /// where the mailbox is already selected.
     #[arg(long = "no-select", default_value_t)]
     #[arg(name = "mailbox_no_select")]
     pub inner: bool,
 }
 
-/// The required mailbox name argument parser.
+/// Required positional naming a mailbox.
 #[derive(Debug, Parser)]
 pub struct MailboxNameArg {
     /// The name of the mailbox.
@@ -58,7 +60,7 @@ pub struct MailboxNameArg {
     pub inner: String,
 }
 
-/// The target mailbox name argument parser.
+/// Required positional naming the mailbox an operation targets.
 #[derive(Debug, Clone, Parser)]
 pub struct TargetMailboxNameArg {
     /// The name of the target mailbox.

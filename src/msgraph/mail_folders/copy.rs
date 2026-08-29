@@ -1,3 +1,8 @@
+//! # Microsoft Graph mail folder copy
+//!
+//! The `msgraph mail-folders copy` command, copying a folder into
+//! another.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -11,13 +16,13 @@ pub struct MsgraphMailFolderCopyCommand {
     /// The id of the folder to copy.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// The destination folder id or well-known name.
     #[arg(value_name = "DESTINATION")]
     pub destination: String,
 }
 
 impl MsgraphMailFolderCopyCommand {
+    /// Copies the folder into the destination one.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let folder = client
             .mail_folder_copy(&self.id, &self.destination)?

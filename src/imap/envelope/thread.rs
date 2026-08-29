@@ -1,3 +1,7 @@
+//! # IMAP thread
+//!
+//! The `imap thread` command, RFC 5256 `THREAD`.
+
 use io_imap::client::ImapClient as _;
 use std::{collections::HashMap, fmt, num::NonZeroU32};
 
@@ -23,17 +27,16 @@ use crate::imap::{
     utils::decode_mime,
 };
 
-/// Thread IMAP messages (THREAD, RFC 5256).
+/// Thread messages (THREAD, RFC 5256).
 ///
-/// Groups messages matching the given criteria into conversation
-/// threads using --algorithm. Requires the THREAD extension.
+/// Groups the matching messages into conversations. The server has to
+/// advertise the THREAD extension.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeThreadCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
-
     /// Threading algorithm.
     #[arg(
         short = 'A',
@@ -42,16 +45,16 @@ pub struct ImapEnvelopeThreadCommand {
         default_value = "references"
     )]
     pub algorithm: ThreadAlgorithmArg,
-
     #[command(flatten)]
     pub criteria: SearchCriteriaArgs,
-
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
 }
 
 impl ImapEnvelopeThreadCommand {
+    /// Selects the mailbox unless told not to, threads it, then fetches
+    /// the subjects of the messages it returned.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
@@ -80,12 +83,14 @@ impl ImapEnvelopeThreadCommand {
     }
 }
 
-/// IMAP THREAD algorithm (RFC 5256).
+/// The algorithm a `THREAD` groups by, per RFC 5256.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 #[clap(rename_all = "lower")]
 pub enum ThreadAlgorithmArg {
+    /// Follow the `References` and `In-Reply-To` headers.
     #[default]
     References,
+    /// Group by subject, then order by date.
     OrderedSubject,
 }
 
@@ -98,6 +103,7 @@ impl From<ThreadAlgorithmArg> for ThreadingAlgorithm<'static> {
     }
 }
 
+/// Flattens every thread into the message ids it holds.
 fn collect_thread_ids(threads: &[Thread]) -> Vec<NonZeroU32> {
     let mut ids = Vec::new();
     for thread in threads {
@@ -106,13 +112,12 @@ fn collect_thread_ids(threads: &[Thread]) -> Vec<NonZeroU32> {
     ids
 }
 
+/// Walks one thread node, collecting its id and its children's.
 fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
     match thread {
         Thread::Members { prefix, answers } => {
-            // Vec1 can be converted to a slice via as_ref()
             ids.extend(prefix.as_ref().iter().copied());
             if let Some(nested) = answers {
-                // Vec2 can also be converted to a slice via as_ref()
                 for t in nested.as_ref().iter() {
                     collect_thread_ids_recursive(t, ids);
                 }
@@ -126,6 +131,8 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
     }
 }
 
+/// Fetches the subject of every threaded message, so the tree reads as
+/// conversations rather than as bare ids.
 fn fetch_subjects(
     client: &mut ImapClient,
     ids: &[NonZeroU32],
@@ -168,7 +175,6 @@ fn fetch_subjects(
                     id = uid_val.get();
                 }
                 MessageDataItem::Envelope(env) => {
-                    // NString wraps Option<IString>, access via .0
                     if let Some(s) = &env.subject.0 {
                         subject = decode_mime(&String::from_utf8_lossy(s.as_ref()));
                     }
@@ -183,25 +189,30 @@ fn fetch_subjects(
     Ok(subjects)
 }
 
-/// One flattened THREAD node: a message id with its subject and depth.
+/// One flattened thread node.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadEntry {
+    /// The UID, or the message number under `--seq`.
     pub id: u32,
+    /// The subject fetched for that message.
     pub subject: String,
+    /// How deep in its conversation the message sits.
     pub depth: usize,
 }
 
-/// Renderable tree of THREAD results with their fetched subjects.
+/// The `imap thread` output, a tree of conversations.
 pub struct ThreadResultsTable {
     threads: Vec<Thread>,
     subjects: HashMap<u32, String>,
 }
 
 impl ThreadResultsTable {
+    /// Pairs the threads the server returned with the fetched subjects.
     pub fn new(threads: Vec<Thread>, subjects: HashMap<u32, String>) -> Self {
         Self { threads, subjects }
     }
 
+    /// Flattens the tree into one entry per message, depth included.
     fn build_entries(&self) -> Vec<ThreadEntry> {
         let mut entries = Vec::new();
         for thread in &self.threads {
@@ -312,9 +323,8 @@ impl Serialize for ThreadResultsTable {
     }
 }
 
-/// Mirrors the JSON shape produced by [`ThreadResultsTable`]'s manual
-/// [`Serialize`] impl (a single `threads` field), used only to derive
-/// the JSON Schema for the `imap thread` command.
+/// Mirrors the JSON shape [`ThreadResultsTable`]'s hand-written
+/// [`Serialize`] produces, only so the schema can be derived from it.
 #[derive(JsonSchema)]
 #[allow(dead_code)]
 struct ThreadResultsTableSchema {

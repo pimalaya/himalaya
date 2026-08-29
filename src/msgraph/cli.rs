@@ -1,3 +1,7 @@
+//! # Microsoft Graph command
+//!
+//! The `msgraph` command, dispatching onto its subcommand groups.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -11,11 +15,9 @@ use crate::{
     },
 };
 
-/// Microsoft Graph CLI.
+/// Microsoft Graph-specific API.
 ///
-/// This command gives you access to the Microsoft Graph REST API,
-/// organized by Graph resource: the signed-in user (profile), mail
-/// folders, messages and message attachments.
+/// Each subcommand group tracks one Graph mail resource one to one.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum MsgraphCommand {
@@ -30,6 +32,7 @@ pub enum MsgraphCommand {
 }
 
 impl MsgraphCommand {
+    /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

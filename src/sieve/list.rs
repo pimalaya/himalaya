@@ -1,3 +1,7 @@
+//! # ManageSieve list
+//!
+//! The `sieve list` command, RFC 5804 `LISTSCRIPTS`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ use crate::{
 pub struct SieveScriptListCommand;
 
 impl SieveScriptListCommand {
+    /// Lists the scripts and tables them, marking the active one.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -50,13 +55,16 @@ pub struct SieveScript {
     pub active: bool,
 }
 
-/// Structured output for `sieve list`.
+/// The `sieve list` output, a table of scripts.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SieveScripts {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The column arrangement the table renders with.
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    /// The scripts the account holds, the active one marked.
     pub scripts: Vec<SieveScript>,
 }
 

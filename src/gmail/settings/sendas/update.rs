@@ -1,3 +1,8 @@
+//! # Gmail send-as update
+//!
+//! The `gmail settings sendas update` command,
+//! `users.settings.sendAs.update`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{
@@ -32,6 +37,7 @@ pub struct GmailSettingsSendAsUpdateCommand {
 }
 
 impl GmailSettingsSendAsUpdateCommand {
+    /// Applies the patches to the send-as alias.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let send_as = GmailSendAs {
             send_as_email: self.email.clone(),

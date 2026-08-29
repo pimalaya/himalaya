@@ -1,3 +1,7 @@
+//! # JMAP mailbox get
+//!
+//! The `jmap mailbox get` command, RFC 8621 `Mailbox/get`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::get::JmapMailboxGetOptions;
@@ -21,6 +25,7 @@ pub struct JmapMailboxGetCommand {
 }
 
 impl JmapMailboxGetCommand {
+    /// Fetches the mailboxes and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -1,22 +1,21 @@
-//! Shared `comfy_table` preset mapper.
+//! # Table
 //!
-//! `comfy_table` v8 dropped the positional preset string in favour of
-//! the typed [`TableStyle`] builder. The `table.preset` config option
-//! keeps accepting the v7 string so existing configs stay valid; this
-//! module maps one onto the other.
+//! Maps the `table.preset` string onto a comfy-table [`TableStyle`].
+//!
+//! comfy-table v8 dropped the positional preset string for a typed
+//! builder, but the option keeps accepting the v7 spelling so existing
+//! configurations stay valid.
 
 use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
 
-/// Default preset, equivalent to `comfy_table` v7's
-/// `presets::UTF8_FULL_CONDENSED`: full UTF8 borders, no divider
-/// between rows.
+/// Default preset: full UTF-8 borders with no divider between rows, the
+/// v7 `UTF8_FULL_CONDENSED`.
 pub const DEFAULT_PRESET: &str = "││──╞═╪╡┆    ┬┴┌┐└┘";
 
 /// Number of table components a preset string can style.
 const COMPONENTS: usize = 19;
 
-/// Maps a `comfy_table` v7 positional preset string onto a
-/// [`TableStyle`].
+/// Maps a v7 positional preset string onto a [`TableStyle`].
 ///
 /// Each character styles one component, in the order of the v7
 /// `TableComponent` enum:
@@ -31,9 +30,9 @@ const COMPONENTS: usize = 19;
 ///  6 middle header inters. 13 top border intersections
 /// ```
 ///
-/// A space means "don't draw this component", and so does a component
-/// left out of a short string, both matching v7 where an unset
-/// component rendered blank. Characters past the 19th are ignored.
+/// A space leaves a component undrawn, and so does one a short string
+/// leaves out, both matching v7 where an unset component rendered blank.
+/// Characters past the nineteenth are ignored.
 pub fn style_from_preset(preset: &str) -> TableStyle {
     let mut chars = [None; COMPONENTS];
 
@@ -84,9 +83,8 @@ mod tests {
 
     use super::{DEFAULT_PRESET, style_from_preset};
 
-    // The v7 preset strings, mapped against the v8 constants they were
-    // replaced by. Equality across all six line styles proves the
-    // character-to-builder-slot mapping.
+    // NOTE: equality with the v8 constant across all six line styles is
+    // what proves the character-to-slot mapping.
 
     #[test]
     fn utf8_full_matches_upstream() {
@@ -127,8 +125,6 @@ mod tests {
 
     #[test]
     fn missing_components_draw_nothing() {
-        // A short string leaves the remaining components unset, exactly
-        // as an explicit run of spaces would.
         assert_eq!(
             style_from_preset("││──"),
             style_from_preset("││──               ")

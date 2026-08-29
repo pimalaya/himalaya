@@ -1,3 +1,8 @@
+//! # JMAP email delete
+//!
+//! The `jmap email delete` command, the destroy half of RFC 8621
+//! `Email/set`.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email::set::JmapEmailSetArgs;
@@ -14,6 +19,7 @@ pub struct JmapEmailDestroyCommand {
 }
 
 impl JmapEmailDestroyCommand {
+    /// Destroys the emails and reports any the server refused.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mut args = JmapEmailSetArgs::default();
 

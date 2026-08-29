@@ -1,3 +1,7 @@
+//! # Gmail thread untrash
+//!
+//! The `gmail threads untrash` command, `users.threads.untrash`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::threads::untrash::GmailThreadUntrash;
@@ -14,6 +18,7 @@ pub struct GmailThreadUntrashCommand {
 }
 
 impl GmailThreadUntrashCommand {
+    /// Takes the thread back out of the trash.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailThreadUntrash::new(&client.auth, &client.user_id, &self.id)?;

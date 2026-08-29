@@ -1,3 +1,8 @@
+//! # Gmail vacation settings
+//!
+//! The `gmail settings vacation` commands, covering
+//! `users.settings.getVacation` and its setter.
+
 pub mod get;
 pub mod set;
 
@@ -26,6 +31,7 @@ pub enum GmailSettingsVacationCommand {
 }
 
 impl GmailSettingsVacationCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

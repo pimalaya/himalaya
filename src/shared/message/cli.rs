@@ -1,3 +1,7 @@
+//! # Message command
+//!
+//! The `message` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -18,12 +22,11 @@ use crate::{
 
 /// Manage messages using the shared API.
 ///
-/// A message is composed of headers (key-value properties) and a body (suite of
-/// MIME parts). The built-in `compose` / `reply` / `forward` / `read`
-/// subcommands cover simple cases via CLI flags. Richer composition is
-/// delegated to standalone tools (e.g.
-/// [`mml`](https://github.com/pimalaya/mml)) wired up through shell pipelines
-/// into `messages send` / `messages add`.
+/// A message is headers plus a body of MIME parts. The `compose`, `reply`,
+/// `forward` and `read` subcommands cover the simple cases through flags.
+///
+/// Richer composition belongs to a standalone tool such as mml, piped into
+/// `message send` or `message add`.
 #[derive(Debug, Subcommand)]
 pub enum MessageCommand {
     #[cfg(backend)]
@@ -51,6 +54,7 @@ pub enum MessageCommand {
 }
 
 impl MessageCommand {
+    /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

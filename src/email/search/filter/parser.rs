@@ -1,7 +1,7 @@
-//! # Search emails filter query string parser
+//! # Search filter parser
 //!
-//! Parsers needed to build a [`SearchEmailsFilterQuery`] from a string
-//! slice. Based on [`chumsky`].
+//! The chumsky grammar building a [`SearchEmailsFilterQuery`] from a
+//! string.
 
 use chrono::NaiveDate;
 use chumsky::prelude::*;
@@ -11,40 +11,12 @@ use crate::email::{
     search::{filter::query::SearchEmailsFilterQuery, parser::ParserError},
 };
 
-/// The emails search filter query string parser.
+/// Parses a filter of space-separated conditions.
 ///
-/// A filter query string is composed of operators and conditions
-/// separated by spaces. Operators and conditions can be wrapped in
-/// parentheses `(…)` to override precedence.
-///
-/// # Operators
-///
-/// Three operators are supported, ordered by precedence (highest
-/// first):
-///
-/// - `not <condition>`
-/// - `<condition> and <condition>`
-/// - `<condition> or <condition>`
-///
-/// `not` has the highest priority, then `and`, then `or`. `a and b or
-/// c` is the same as `(a and b) or c`, but different from `a and (b or
-/// c)`.
-///
-/// # Conditions
-///
-/// Seven conditions are supported:
-///
-/// - `date <yyyy-mm-dd>`
-/// - `after <yyyy-mm-dd>`
-/// - `from <pattern>`
-/// - `to <pattern>`
-/// - `subject <pattern>`
-/// - `body <pattern>`
-/// - `flag <flag>`
-///
-/// `<pattern>` can be quoted with `"` (`subject "foo bar"`) or
-/// unquoted (spaces must be escaped with a backslash: `subject foo\
-/// bar`).
+/// They join with `not`, `and` and `or`, in that order of precedence, and
+/// group with parentheses. A pattern is quoted, or unquoted with its
+/// spaces backslash-escaped. `himalaya envelope search --help` is the
+/// grammar reference a user reads.
 pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
     recursive(|filter| {
         let filter = choice((

@@ -1,3 +1,7 @@
+//! # m2dir flag list
+//!
+//! The `m2dir flag list` command, naming the flags set on one message.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -29,6 +33,7 @@ pub struct M2dirFlagListCommand {
 }
 
 impl M2dirFlagListCommand {
+    /// Reads the flags set on the message and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,

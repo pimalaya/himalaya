@@ -1,3 +1,8 @@
+//! # pimdir queue list
+//!
+//! The `pimdir queue list` command, tabling the creations staged in one
+//! mailbox.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -20,11 +25,12 @@ use crate::{
 
 /// List the messages staged for creation in a mailbox.
 ///
-/// A saved message waits in the store's queue until the sync engine applies it,
-/// and has no id until then, so it cannot appear in `envelope list`. This is
-/// where it shows: the row id to cancel it by, when it was queued, and the mail
-/// itself. Staged flags, moves and deletions need no such view, since they
-/// address messages that already exist and show in the ordinary listing.
+/// A saved message waits in the queue until the sync engine applies it and
+/// has no id until then, so `envelope list` cannot show it. This is where it
+/// shows: the row id to cancel it by, when it was queued, and the mail.
+///
+/// Staged flags, moves and deletions need no such view, addressing messages
+/// that already exist.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     #[command(flatten)]
@@ -32,6 +38,7 @@ pub struct PimdirQueueListCommand {
 }
 
 impl PimdirQueueListCommand {
+    /// Lists the creations staged in the mailbox and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -82,22 +89,31 @@ pub struct PimdirQueuedMessage {
 /// The `pimdir queue list` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct PimdirQueuedMessages {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// Color of the ID column.
     #[serde(skip)]
     pub id_color: Color,
+    /// Color of the SUBJECT column.
     #[serde(skip)]
     pub subject_color: Color,
+    /// Color of the FROM column.
     #[serde(skip)]
     pub from_color: Color,
+    /// Color of the DATE column.
     #[serde(skip)]
     pub date_color: Color,
+    /// FLAGS glyph of a message lacking `\Seen`.
     #[serde(skip)]
     pub unseen_char: char,
+    /// FLAGS glyph of a message carrying `\Answered`.
     #[serde(skip)]
     pub replied_char: char,
+    /// FLAGS glyph of a message carrying `\Flagged`.
     #[serde(skip)]
     pub flagged_char: char,
+    /// The messages staged for creation in the mailbox.
     pub messages: Vec<PimdirQueuedMessage>,
 }
 

@@ -1,3 +1,7 @@
+//! # Gmail messages
+//!
+//! The `gmail messages` command family, covering `users.messages`.
+
 pub mod batch_delete;
 pub mod batch_modify;
 pub mod delete;
@@ -48,6 +52,7 @@ pub enum GmailMessagesCommand {
 }
 
 impl GmailMessagesCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

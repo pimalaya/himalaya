@@ -1,3 +1,8 @@
+//! # Maildir message move
+//!
+//! The `maildir message move` command, moving messages into another
+//! Maildir.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -19,13 +24,13 @@ pub struct MaildirMessageMoveCommand {
     pub source: MaildirPathFlag,
     #[command(flatten)]
     pub target: TargetMaildirPathFlag,
-
     /// Move the message into a different subdirectory.
     #[arg(long, short, value_name = "DIR", value_enum)]
     pub subdir: Option<MaildirSubdirArg>,
 }
 
 impl MaildirMessageMoveCommand {
+    /// Moves the messages into the destination Maildir.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let source = client.resolve_maildir(&self.source.inner)?;
         let target = client.resolve_maildir(&self.target.inner)?;

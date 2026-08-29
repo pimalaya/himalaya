@@ -1,3 +1,8 @@
+//! # JMAP identity create
+//!
+//! The `jmap identity create` command, the create half of RFC 8621
+//! `Identity/set`.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::{JmapIdentityCreate, JmapIdentitySetArgs};
@@ -10,20 +15,18 @@ use crate::jmap::{client::JmapClient, error::format_set_error};
 pub struct JmapIdentityCreateCommand {
     /// Display name for the sender.
     pub name: String,
-
     /// Email address for the sender.
     pub email: String,
-
     /// Plaintext signature to append to outgoing emails.
     #[arg(long)]
     pub text_signature: Option<String>,
-
     /// HTML signature to append to outgoing emails.
     #[arg(long)]
     pub html_signature: Option<String>,
 }
 
 impl JmapIdentityCreateCommand {
+    /// Creates the identity and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let identity = JmapIdentityCreate {
             name: self.name.clone(),

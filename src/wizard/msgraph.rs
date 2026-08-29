@@ -1,8 +1,9 @@
-//! Microsoft Graph API wizard (Microsoft accounts).
+//! # Microsoft Graph wizard
 //!
-//! The Graph API is bearer-token-only: the wizard collects the user id
-//! and the token secret, typically an Ortie shell command since tokens
-//! expire and need refreshing.
+//! Configures a Microsoft account against the Graph API.
+//!
+//! The API takes bearer tokens alone, so the prompts collect the user id
+//! and the token, usually as a broker command since a token expires.
 
 use anyhow::Result;
 use pimalaya_cli::prompt;

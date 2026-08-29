@@ -1,3 +1,7 @@
+//! # Maildir flag set
+//!
+//! The `maildir flag set` command, replacing the whole flag set.
+
 use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
@@ -17,7 +21,6 @@ use crate::maildir::{
 pub struct MaildirFlagSetCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
-
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     /// Flag(s) to set on the message. Repeat `-f` per flag (e.g. `-f
@@ -28,6 +31,7 @@ pub struct MaildirFlagSetCommand {
 }
 
 impl MaildirFlagSetCommand {
+    /// Replaces the flag set of each message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 

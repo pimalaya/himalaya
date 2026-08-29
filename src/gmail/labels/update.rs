@@ -1,3 +1,7 @@
+//! # Gmail label update
+//!
+//! The `gmail labels update` command, `users.labels.update`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::GmailLabel;
@@ -17,6 +21,7 @@ pub struct GmailLabelUpdateCommand {
 }
 
 impl GmailLabelUpdateCommand {
+    /// Renames the label.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let label = GmailLabel {
             id: self.id.clone(),

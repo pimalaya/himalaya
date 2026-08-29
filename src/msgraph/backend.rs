@@ -1,12 +1,11 @@
-//! Microsoft Graph adapter for the shared cross-protocol client.
+//! # Microsoft Graph backend
 //!
-//! Thin glue over [`MsgraphClient`], which wraps io_msgraph's high-level
-//! client (`mail_folders_list`, `messages_list`, `message_get_raw`,
-//! `message_update`, `message_copy`, `message_move`, `mail_send_mime`).
-//! Graph is folder-based; flags map to the message's scalar fields
-//! (`isRead`, follow-up flag, importance) plus `categories`. No
-//! `add_message`. The conversion is lifted from the retired io-email
-//! Graph drivers.
+//! The Graph adapter of the shared cross-protocol client, glue over the
+//! io-msgraph client [`MsgraphClient`] wraps.
+//!
+//! Graph is folder-based, and a shared flag maps onto a scalar field of
+//! the message, `isRead` or the follow-up flag, or onto its categories.
+//! There is no `add_message`.
 
 use std::collections::BTreeSet;
 
@@ -94,8 +93,8 @@ impl MsgraphClient {
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let raw = self.message_get_raw(id)?.response;
 
-        // Fetching `$value` never changes read state; `--seen` sets
-        // `isRead` via a separate PATCH.
+        // NOTE: fetching `$value` never changes read state, so `--seen`
+        // costs a separate PATCH setting `isRead`.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
@@ -170,10 +169,9 @@ fn envelope_from(message: MsgraphMessage) -> Envelope {
     Envelope {
         id: message.id,
         message_id,
-        // NOTE: Graph carries In-Reply-To only inside
-        // `internetMessageHeaders`, which a listing selection does not
-        // return, so the field stays empty rather than costing one
-        // request per row.
+        // NOTE: Graph carries In-Reply-To inside `internetMessageHeaders`
+        // alone, which a listing does not select, so the field stays
+        // empty rather than cost one request per row.
         in_reply_to: Vec::new(),
         flags,
         subject: message.subject.unwrap_or_default(),
@@ -268,6 +266,7 @@ fn address_from(recipient: MsgraphRecipient) -> Address {
     }
 }
 
+/// Maps the shared `\Flagged` onto a Graph follow-up flag.
 fn followup(flagged: bool) -> MsgraphFollowupFlag {
     let flag_status = if flagged {
         MsgraphFlagStatus::Flagged
@@ -279,6 +278,7 @@ fn followup(flagged: bool) -> MsgraphFollowupFlag {
     }
 }
 
+/// Maps the shared `$Important` onto a Graph importance.
 fn importance(important: bool) -> MsgraphImportance {
     if important {
         MsgraphImportance::High
@@ -287,6 +287,7 @@ fn importance(important: bool) -> MsgraphImportance {
     }
 }
 
+/// Parses the RFC 3339 timestamp Graph reports a date with.
 fn parse_rfc3339(raw: &str) -> Option<DateTime<FixedOffset>> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {

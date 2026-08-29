@@ -1,3 +1,8 @@
+//! # Envelope search
+//!
+//! The `envelope search` command, listing a mailbox through the shared
+//! filter and sort query.
+
 use std::io::{IsTerminal, stdout};
 
 use anyhow::{Result, bail};
@@ -15,45 +20,36 @@ use crate::{
     },
 };
 
-/// Search envelopes for the active account using the shared search
-/// query DSL, regardless of the underlying backend.
+/// Search the envelopes of a mailbox with the shared query language.
 ///
-/// The trailing positional accepts a filter and/or sort clause that
-/// targets the `Date:` header (sent-at) for date clauses and
-/// case-insensitive substring matching for text clauses. See the
-/// `[QUERY]...` argument help below for the full syntax.
+/// A date clause reads the `Date:` header, the sent-at, and a text clause
+/// matches a case-insensitive substring.
 #[derive(Debug, Parser)]
 pub struct EnvelopeSearchCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
-
-    /// Page number, starting from 1.
+    /// Page number, starting at 1.
     #[arg(long, short = 'p')]
     #[arg(value_name = "N", default_value = "1")]
     pub page: u32,
-
     /// Maximum number of envelopes per page.
     ///
-    /// When omitted, the merged `envelope.list.page-size` config
-    /// value is used; when neither is set, the hard fallback is 25.
+    /// Omitted, the configured `envelope.list.page-size` answers, and 25
+    /// is the hard fallback.
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<u32>,
-
     /// Maximum width of the rendered table, in terminal columns.
     #[arg(long = "max-width", short = 'w')]
     #[arg(value_name = "COLUMNS")]
     pub max_width: Option<u16>,
-
-    /// Render recipients (`To:`) instead of senders (`From:`).
+    /// Render recipients instead of senders.
     #[arg(long, short)]
     pub recipient: bool,
-
-    /// Populate the ATT column.
+    /// Fill the ATT column.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
-
-    /// Filter and/or sort query.
+    /// Filter and sort query.
     ///
     /// Conditions: `date <yyyy-mm-dd>`, `after <yyyy-mm-dd>`,
     /// `from <pattern>`, `to <pattern>`, `subject <pattern>`,
@@ -66,6 +62,7 @@ pub struct EnvelopeSearchCommand {
 }
 
 impl EnvelopeSearchCommand {
+    /// Searches the mailbox and prints one page of hits as a table.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -122,10 +119,8 @@ impl EnvelopeSearchCommand {
     }
 }
 
-/// Joins the trailing-positional words and feeds them to
-/// [`SearchEmailsQuery::from_str`]. Returns `Ok(None)` when the input
-/// is empty (no query) so `client.search_envelopes` keeps its default
-/// behaviour, or bails with the ariadne-rendered parse error.
+/// Parses the trailing positional into a query, `None` when it is empty
+/// so the search keeps its default behaviour.
 fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
     let Some(words) = words else {
         return Ok(None);
@@ -147,10 +142,10 @@ fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
     }
 }
 
-/// Pretty-prints a `chumsky` parse error with ariadne, one labelled
-/// report per inner error, into a single returned string so the caller
-/// can surface it through the normal error channel (stdout). Color is
-/// disabled when stdout is not a terminal.
+/// Renders a parse error with ariadne, one labelled report per inner
+/// error, into the string the caller raises through stdout.
+///
+/// Color is dropped when stdout is not a terminal.
 fn render_query_parse_error(err: &SearchQueryError) -> String {
     let SearchQueryError::ParseError(errs, src) = err;
     let source_name = "query";

@@ -1,3 +1,8 @@
+//! # Gmail filter list
+//!
+//! The `gmail settings filters list` command,
+//! `users.settings.filters.list`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -22,6 +27,7 @@ use crate::{
 pub struct GmailSettingsFiltersListCommand;
 
 impl GmailSettingsFiltersListCommand {
+    /// Lists every filter and tables it.
     pub fn execute(
         self,
         printer: &mut impl Printer,

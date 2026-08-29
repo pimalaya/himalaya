@@ -1,11 +1,10 @@
-//! m2dir adapter for the shared cross-protocol client.
+//! # m2dir backend
 //!
-//! Thin glue over [`M2dirClient`], which wraps io_m2dir's high-level
-//! client (`list_m2dirs`, `open_m2dir`, `list_entries`, `read_entry`,
-//! `get`, `store`, `delete_entry`, `add_flags`/`remove_flags`/`set_flags`).
-//! m2dir is content-addressed and has no native copy/move, so those are
-//! get + store (+ delete). The conversion is lifted from the retired
-//! io-email m2dir drivers.
+//! The m2dir adapter of the shared cross-protocol client, glue over the
+//! io-m2dir client [`M2dirClient`] wraps.
+//!
+//! m2dir is content-addressed and has no native copy or move, so a copy
+//! is a get and a store, and a move deletes after them.
 
 use std::path::Path;
 
@@ -28,15 +27,14 @@ use crate::{
 };
 
 impl M2dirClient {
-    /// Resolves a shared-layer mailbox argument to an opened [`M2dir`].
+    /// Resolves a shared mailbox argument into an opened [`M2dir`].
     ///
-    /// An absolute path — the `id` column of `mailbox list` — opens
-    /// directly; a relative name (`Inbox`, `Archive`, `Projects/Work`)
-    /// is resolved under the m2store root first, with the spec's
-    /// percent-encoding, since io-m2dir's `open_m2dir` only accepts a
-    /// filesystem path. This lets the shared commands address a folder
-    /// by name or by id, matching the raw `m2dir` commands (which take a
-    /// name) and the Maildir backend.
+    /// An absolute path opens directly, and a relative name is resolved
+    /// under the store root first, percent-encoded as the spec wants,
+    /// io-m2dir taking a filesystem path alone.
+    ///
+    /// That is what lets a shared command address a folder by name or by
+    /// id, as the raw `m2dir` commands and the Maildir backend do.
     fn resolve_m2dir(&self, mailbox: &str) -> Result<M2dir> {
         if Path::new(mailbox).is_absolute() {
             return Ok(self.open_m2dir(mailbox)?);
@@ -149,8 +147,8 @@ impl M2dirClient {
         let m2dir = self.resolve_m2dir(mailbox)?;
         let (_entry, bytes) = self.get(m2dir, id)?;
 
-        // Reading the bytes never touches the sidecar; `--seen` adds the
-        // `S` flag so the read stays non-mutating by default.
+        // NOTE: reading the bytes never touches the sidecar, so `--seen`
+        // costs a separate write of the `S` flag.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;

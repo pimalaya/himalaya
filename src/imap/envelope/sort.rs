@@ -1,3 +1,7 @@
+//! # IMAP sort
+//!
+//! The `imap sort` command, RFC 5256 `SORT`.
+
 use io_imap::client::ImapClient as _;
 use std::fmt;
 
@@ -26,35 +30,31 @@ use crate::{
     shared::table::style_from_preset,
 };
 
-/// Sort IMAP messages (SORT, RFC 5256).
+/// Sort messages (SORT, RFC 5256).
 ///
-/// Searches with the given criteria, then returns the matching UIDs
-/// (or sequence numbers with --seq) sorted by --sort. Requires the
-/// SORT extension.
+/// Searches with the given criteria, then returns the matching UIDs in
+/// the requested order. The server has to advertise the SORT extension.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeSortCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
-
     /// Sort key.
     #[arg(short = 'S', long, value_name = "KEY", default_value = "date")]
     pub sort: SortKeyArg,
-
     /// Reverse sort order.
     #[arg(short, long)]
     pub reverse: bool,
-
     #[command(flatten)]
     pub criteria: SearchCriteriaArgs,
-
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
 }
 
 impl ImapEnvelopeSortCommand {
+    /// Selects the mailbox unless told not to, then sorts it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -95,17 +95,24 @@ impl ImapEnvelopeSortCommand {
     }
 }
 
-/// IMAP SORT key (RFC 5256).
+/// The property a `SORT` sorts on, per RFC 5256.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 #[clap(rename_all = "lower")]
 pub enum SortKeyArg {
+    /// The `Date:` header, the sent-at.
     #[default]
     Date,
+    /// The internal date, the received-at.
     Arrival,
+    /// The first `From:` address.
     From,
+    /// The first `To:` address.
     To,
+    /// The first `Cc:` address.
     Cc,
+    /// The `Subject:` header, its `Re:` prefix stripped.
     Subject,
+    /// The size in octets.
     Size,
 }
 
@@ -123,7 +130,7 @@ impl From<SortKeyArg> for SortKey {
     }
 }
 
-/// Renderable table of SORT result message ids.
+/// The `imap sort` output, a table of message ids in sorted order.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SortResultsTable {
     #[serde(skip)]

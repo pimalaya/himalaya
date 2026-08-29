@@ -1,3 +1,7 @@
+//! # m2dir delete
+//!
+//! The `m2dir delete` command, removing a folder and its messages.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -12,6 +16,7 @@ pub struct M2dirMailboxDeleteCommand {
 }
 
 impl M2dirMailboxDeleteCommand {
+    /// Deletes the folder and every message in it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir_name.inner)?;

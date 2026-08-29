@@ -1,3 +1,8 @@
+//! # Maildir list
+//!
+//! The `maildir list` command, tabling the Maildirs under the store
+//! root.
+
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
@@ -20,6 +25,7 @@ use crate::{
 pub struct MaildirMailboxListCommand;
 
 impl MaildirMailboxListCommand {
+    /// Lists the Maildirs under the store root and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -38,13 +44,16 @@ impl MaildirMailboxListCommand {
     }
 }
 
-/// Renderable table of Maildir folders.
+/// The `maildir list` output, a table of Maildirs.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MaildirsTable {
+    /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
+    /// The color of the NAME column.
     #[serde(skip)]
     pub name_color: Color,
+    /// The Maildirs found under the store root.
     #[serde(rename = "maildirs")]
     pub rows: Vec<MaildirRow>,
 }
@@ -73,10 +82,12 @@ impl fmt::Display for MaildirsTable {
     }
 }
 
-/// One row of the Maildir folders table: name and path.
+/// One row of the Maildirs table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MaildirRow {
+    /// The Maildir name, relative to the store root.
     pub name: String,
+    /// Its filesystem path.
     pub path: PathBuf,
 }
 

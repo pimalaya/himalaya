@@ -1,3 +1,7 @@
+//! # Gmail history
+//!
+//! The `gmail history` command family, covering `users.history`.
+
 pub mod list;
 
 use anyhow::Result;
@@ -17,6 +21,7 @@ pub enum GmailHistoryCommand {
 }
 
 impl GmailHistoryCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

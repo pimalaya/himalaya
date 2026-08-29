@@ -1,3 +1,7 @@
+//! # pimdir command
+//!
+//! The `pimdir` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -9,9 +13,8 @@ use crate::{
 
 /// pimdir-specific API.
 ///
-/// This command gives you access to what the store holds beside the mail a
-/// mailbox lists: the queue of writes Himalaya staged and the sync engine has
-/// not applied yet.
+/// Reaches what the store holds beside the mail a mailbox lists: the queue
+/// of writes the sync engine has not applied yet.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum PimdirCommand {
@@ -20,6 +23,7 @@ pub enum PimdirCommand {
 }
 
 impl PimdirCommand {
+    /// Runs the subcommand against the account's pimdir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

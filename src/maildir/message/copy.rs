@@ -1,3 +1,8 @@
+//! # Maildir message copy
+//!
+//! The `maildir message copy` command, copying messages into another
+//! Maildir.
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
@@ -19,13 +24,13 @@ pub struct MaildirMessageCopyCommand {
     pub source: MaildirPathFlag,
     #[command(flatten)]
     pub target: TargetMaildirPathFlag,
-
     /// Copy the message into a different subdirectory.
     #[arg(long, short, value_name = "DIR", value_enum)]
     pub subdir: Option<MaildirSubdirArg>,
 }
 
 impl MaildirMessageCopyCommand {
+    /// Copies the messages into the destination Maildir.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let source = client.resolve_maildir(&self.source.inner)?;
         let target = client.resolve_maildir(&self.target.inner)?;

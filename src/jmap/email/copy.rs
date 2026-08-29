@@ -1,3 +1,7 @@
+//! # JMAP email copy
+//!
+//! The `jmap email copy` command, RFC 8621 `Email/copy`.
+
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
@@ -22,6 +26,7 @@ pub struct JmapEmailCopyCommand {
 }
 
 impl JmapEmailCopyCommand {
+    /// Copies the emails and reports any the server refused.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();

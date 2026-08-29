@@ -1,3 +1,7 @@
+//! # IMAP fetch
+//!
+//! The `imap fetch` command, RFC 3501 `FETCH`.
+
 use io_imap::client::ImapClient as _;
 use std::fmt;
 
@@ -23,23 +27,20 @@ use crate::imap::{
     utils::{decode_mime, format_address},
 };
 
-/// Fetch IMAP message data items (FETCH, RFC 3501).
+/// Fetch message data items (FETCH, RFC 3501).
 ///
-/// Fetches the selected data items for every message in the sequence
-/// set and prints them per message. Choose items with the flags below;
-/// with none, `--envelope` is assumed. The UID is always fetched.
+/// One block is printed per message. The flags below pick the items, and
+/// with none `--envelope` is assumed. The UID is always fetched.
 #[derive(Debug, Parser)]
 pub struct ImapFetchCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
-
-    /// The sequence set of messages (e.g. "1", "1,2,3", "1:*").
+    /// The messages to fetch, as `1`, `1,2,3` or `1:*`.
     #[arg(value_name = "SEQUENCE")]
     pub sequence_set: String,
-
-    /// Fetch the envelope (date, subject, from, to, cc, ...).
+    /// Fetch the envelope: date, subject and addresses.
     #[arg(long)]
     pub envelope: bool,
     /// Fetch the MIME body structure tree.
@@ -51,16 +52,16 @@ pub struct ImapFetchCommand {
     /// Fetch the internal (server) date.
     #[arg(long)]
     pub internal_date: bool,
-    /// Fetch the size in octets.
+    /// Fetch the size, in octets.
     #[arg(long)]
     pub size: bool,
-
-    /// Use sequence numbers instead of UIDs.
+    /// Read the sequence set as message numbers rather than UIDs.
     #[arg(long)]
     pub seq: bool,
 }
 
 impl ImapFetchCommand {
+    /// Selects the mailbox unless told not to, then fetches the items.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
@@ -107,25 +108,35 @@ impl ImapFetchCommand {
     }
 }
 
-/// Renderable list of FETCH results, one block per message.
+/// The `imap fetch` output, one block per message.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct FetchedMessages {
+    /// The messages, in the order the server returned them.
     pub messages: Vec<FetchedMessage>,
 }
 
-/// The fetched data items of a single message.
+/// The data items fetched for one message, each `None` when it was not
+/// asked for.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct FetchedMessage {
+    /// The message number in the selected mailbox.
     pub seq: u32,
+    /// The UID.
     pub uid: Option<u32>,
+    /// The flags set on the message.
     pub flags: Option<Vec<String>>,
+    /// The internal date, the received-at, as RFC 3339.
     pub internal_date: Option<String>,
+    /// The size, in octets.
     pub size: Option<u32>,
+    /// The envelope: date, subject and addresses.
     pub envelope: Option<EnvelopeView>,
+    /// The MIME body structure tree.
     pub structure: Option<BodyPart>,
 }
 
 impl FetchedMessage {
+    /// Folds the data items the server returned into one message.
     fn from_items<'a>(seq: u32, items: impl Iterator<Item = MessageDataItem<'a>>) -> Self {
         let mut message = FetchedMessage {
             seq,
@@ -152,18 +163,28 @@ impl FetchedMessage {
     }
 }
 
-/// Display view of a fetched message envelope.
+/// A fetched envelope, its addresses already formatted for display.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct EnvelopeView {
+    /// The `Date:` header.
     pub date: Option<String>,
+    /// The `Subject:` header, RFC 2047 decoded.
     pub subject: Option<String>,
+    /// The `Message-ID:` header.
     pub message_id: Option<String>,
+    /// The `In-Reply-To:` header.
     pub in_reply_to: Option<String>,
+    /// The `From:` addresses.
     pub from: Vec<String>,
+    /// The `Sender:` addresses.
     pub sender: Vec<String>,
+    /// The `Reply-To:` addresses.
     pub reply_to: Vec<String>,
+    /// The `To:` addresses.
     pub to: Vec<String>,
+    /// The `Cc:` addresses.
     pub cc: Vec<String>,
+    /// The `Bcc:` addresses.
     pub bcc: Vec<String>,
 }
 
@@ -187,15 +208,19 @@ impl From<&Envelope<'_>> for EnvelopeView {
 /// One node of a fetched MIME body structure tree.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct BodyPart {
+    /// The part's `Content-Type`.
     pub content_type: String,
+    /// Its filename, when it names one.
     pub name: Option<String>,
+    /// Its size, in octets.
     pub size: Option<usize>,
+    /// Its children, empty for a leaf.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<BodyPart>,
 }
 
-/// Maps a server body structure node to a display part, recursing into
-/// multipart children and message/rfc822 encapsulated structures.
+/// Maps a body structure node onto a display part, recursing through
+/// multipart children and encapsulated messages.
 fn build_part(structure: &BodyStructure<'_>) -> BodyPart {
     match structure {
         BodyStructure::Single { body, .. } => {
@@ -222,6 +247,7 @@ fn build_part(structure: &BodyStructure<'_>) -> BodyPart {
     }
 }
 
+/// Renders a part's `Content-Type` as `type/subtype`.
 fn content_type(specific: &SpecificFields<'_>) -> String {
     match specific {
         SpecificFields::Basic { r#type, subtype } => {
@@ -232,6 +258,7 @@ fn content_type(specific: &SpecificFields<'_>) -> String {
     }
 }
 
+/// Reads a part's filename off its `Content-Type` parameters.
 fn part_name(basic: &BasicFields<'_>) -> Option<String> {
     basic
         .parameter_list
@@ -240,6 +267,7 @@ fn part_name(basic: &BasicFields<'_>) -> Option<String> {
         .map(|(_, value)| istring(value))
 }
 
+/// Renders a fetched flag as its wire spelling.
 fn format_flag(flag: &FlagFetch<'_>) -> String {
     match flag {
         FlagFetch::Flag(flag) => flag.to_string(),
@@ -247,10 +275,12 @@ fn format_flag(flag: &FlagFetch<'_>) -> String {
     }
 }
 
+/// Renders an IMAP string as UTF-8, lossily.
 fn istring(string: &IString<'_>) -> String {
     String::from_utf8_lossy(string.as_ref()).into_owned()
 }
 
+/// Renders a nullable IMAP string, `NIL` coming through as `None`.
 fn nstring(string: &NString<'_>) -> Option<String> {
     string
         .0
@@ -258,6 +288,7 @@ fn nstring(string: &NString<'_>) -> Option<String> {
         .map(|inner| String::from_utf8_lossy(inner.as_ref()).into_owned())
 }
 
+/// Renders a size in human-readable binary units.
 fn format_size(bytes: usize) -> String {
     if bytes >= 1024 * 1024 {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
@@ -305,6 +336,7 @@ impl fmt::Display for FetchedMessages {
     }
 }
 
+/// Writes an envelope as one indented line per header it carries.
 fn write_envelope(f: &mut fmt::Formatter<'_>, env: &EnvelopeView) -> fmt::Result {
     if let Some(date) = &env.date {
         writeln!(f, "  Date: {date}")?;
@@ -340,6 +372,7 @@ fn write_envelope(f: &mut fmt::Formatter<'_>, env: &EnvelopeView) -> fmt::Result
     Ok(())
 }
 
+/// Writes a body structure as an indented tree.
 fn write_body_tree(
     f: &mut fmt::Formatter<'_>,
     part: &BodyPart,

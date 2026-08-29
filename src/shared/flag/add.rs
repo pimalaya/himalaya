@@ -1,3 +1,8 @@
+//! # Flag add
+//!
+//! The `flag add` command, adding flags to the existing set of one or
+//! more messages.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -16,7 +21,7 @@ use crate::{
     },
 };
 
-/// Add flag(s) to message(s) for the active account.
+/// Add flags to messages, keeping the ones already set.
 #[derive(Debug, Parser)]
 pub struct FlagAddCommand {
     #[command(flatten)]
@@ -28,6 +33,7 @@ pub struct FlagAddCommand {
 }
 
 impl FlagAddCommand {
+    /// Adds the flags and reports which ones landed.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -45,6 +51,7 @@ impl FlagAddCommand {
     }
 }
 
+/// The `flag add` output, naming the flags that were added.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct AddedFlags {
     flags: Vec<String>,

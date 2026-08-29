@@ -1,3 +1,8 @@
+//! # Gmail forwarding address settings
+//!
+//! The `gmail settings forwarding-addresses` commands, covering
+//! `users.settings.forwardingAddresses`.
+
 pub mod create;
 pub mod delete;
 pub mod get;
@@ -32,6 +37,7 @@ pub enum GmailSettingsForwardingAddressesCommand {
 }
 
 impl GmailSettingsForwardingAddressesCommand {
+    /// Runs the subcommand against the account's Gmail client.
     pub fn execute(
         self,
         printer: &mut impl Printer,

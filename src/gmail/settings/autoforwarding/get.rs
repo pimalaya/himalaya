@@ -1,3 +1,8 @@
+//! # Gmail auto-forwarding get
+//!
+//! The `gmail settings autoforwarding get` command,
+//! `users.settings.getAutoForwarding`.
+
 use std::fmt;
 
 use anyhow::Result;
@@ -17,6 +22,7 @@ use crate::gmail::{
 pub struct GmailSettingsAutoForwardingGetCommand;
 
 impl GmailSettingsAutoForwardingGetCommand {
+    /// Fetches the auto-forwarding settings and tables them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;
@@ -34,11 +40,10 @@ impl GmailSettingsAutoForwardingGetCommand {
     }
 }
 
-/// Gmail auto-forwarding settings, rendered as aligned text or, under
-/// `--json`, as a structured object instead of a wrapped human string.
+/// The `gmail settings autoforwarding get` output.
 ///
-/// The disposition keeps its Gmail wire spelling, so a value read with
-/// `get` is a value `set` accepts back.
+/// The disposition keeps its Gmail wire spelling, so a value `get` reads
+/// is a value `set` accepts back.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailSettingsAutoForwardingGetOutput {

@@ -1,3 +1,7 @@
+//! # Maildir command
+//!
+//! The `maildir` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -22,7 +26,6 @@ pub enum MaildirCommand {
     Rename(MaildirMailboxRenameCommand),
     Delete(MaildirMailboxDeleteCommand),
     List(MaildirMailboxListCommand),
-
     #[command(subcommand)]
     #[command(visible_alias = "msg", aliases = ["messages", "msgs"])]
     Message(MaildirMessageCommand),
@@ -32,6 +35,7 @@ pub enum MaildirCommand {
 }
 
 impl MaildirCommand {
+    /// Runs the subcommand against the account's Maildir store.
     pub fn execute(
         self,
         printer: &mut impl Printer,

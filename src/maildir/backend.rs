@@ -1,11 +1,10 @@
-//! Maildir adapter for the shared cross-protocol client.
+//! # Maildir backend
 //!
-//! Thin glue over [`MaildirClient`], which wraps io_maildir's
-//! high-level client (`list_maildirs`, `list_entries`, `read_entries`,
-//! `add_flags`/`remove_flags`/`set_flags`, `get`, `store`, `copy`,
-//! `move`). Each method takes and returns the CLI's shared
-//! [`crate::email`] types; the conversion is lifted from the retired
-//! io-email Maildir drivers.
+//! The Maildir adapter of the shared cross-protocol client, glue over the
+//! io-maildir client [`MaildirClient`] wraps.
+//!
+//! Each method takes and returns the CLI's own [`crate::email`] types, so
+//! the work here is converting between those and io-maildir's.
 
 use std::path::Path;
 
@@ -123,8 +122,8 @@ impl MaildirClient {
         let entry = self.get(maildir, id)?;
         let raw = entry.contents().to_vec();
 
-        // Reading the file never renames it; `--seen` adds the `S` flag
-        // (a local rename) so the read stays non-mutating by default.
+        // NOTE: reading the file never renames it, so `--seen` costs the
+        // rename that adds the `S` flag.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
@@ -246,11 +245,10 @@ fn envelope_from_entry(entry: &MaildirFullEntry) -> Envelope {
     }
 }
 
-/// mail-parser msg-id header to the bare ids it names.
+/// Reads a mail-parser msg-id header into the bare ids it names.
 ///
-/// mail-parser knows `In-Reply-To` holds a msg-id list and usually
-/// yields one, but a single id comes back as text, so both shapes are
-/// read.
+/// mail-parser usually yields the list `In-Reply-To` holds, but a single
+/// id comes back as text, so both shapes are read.
 fn ids_from_header(value: &HeaderValue<'_>) -> Vec<String> {
     match value {
         HeaderValue::TextList(ids) => ids

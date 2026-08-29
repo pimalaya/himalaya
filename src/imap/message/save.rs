@@ -1,3 +1,7 @@
+//! # IMAP append
+//!
+//! The `imap append` command, RFC 3501 `APPEND`.
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
@@ -14,29 +18,29 @@ use crate::{
 
 /// Append a message to a mailbox (APPEND, RFC 3501).
 ///
-/// Uploads a message into the given mailbox. The message can be passed
-/// as a positional file path, an inline raw string, or piped via stdin
-/// (see [`MessageArg`] for resolution order).
+/// The message comes from a file path, an inline string or piped standard
+/// input.
 #[derive(Debug, Parser)]
 pub struct ImapMessageSaveCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameArg,
-
-    /// Flags to set on the appended message, as raw IMAP tokens (RFC
-    /// 3501) — this is the raw IMAP API, NOT the shared
-    /// `seen|answered|flagged|draft` enum. System flags keep their
-    /// backslash: `-f '\Seen'`, `-f '\Flagged'`. A bare word is a custom
-    /// keyword: `-f seen` stores the keyword `seen`, not the `\Seen`
-    /// system flag (so `imap search --seen` will NOT match it). Use the
-    /// shared `message add -f seen` for the enum-mapped behaviour.
+    /// Flags to set on the appended message, as raw RFC 3501 tokens.
+    ///
+    /// This is the raw IMAP API, not the shared
+    /// `seen|answered|flagged|draft` enum: a system flag keeps its
+    /// backslash, as in `-f '\Seen'`, and a bare word is a custom
+    /// keyword, so `-f seen` stores the keyword `seen` and `imap search
+    /// --seen` will not match it.
+    ///
+    /// The shared `message add -f seen` is the enum-mapped behaviour.
     #[arg(short, long, num_args = 0..)]
     pub flag: Vec<String>,
-
     #[command(flatten)]
     pub message: MessageArg,
 }
 
 impl ImapMessageSaveCommand {
+    /// Appends the message to the mailbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = self.message.parse()?;

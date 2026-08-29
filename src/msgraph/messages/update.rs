@@ -1,3 +1,8 @@
+//! # Microsoft Graph message update
+//!
+//! The `msgraph messages update` command, patching the mutable fields of
+//! a message.
+
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use io_msgraph::v1::rest::users::messages::{MsgraphImportance, MsgraphMessage};
@@ -12,19 +17,15 @@ pub struct MsgraphMessageUpdateCommand {
     /// The id of the message to update.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// Mark the message as read.
     #[arg(long, conflicts_with = "unread")]
     pub read: bool,
-
     /// Mark the message as unread.
     #[arg(long)]
     pub unread: bool,
-
     /// Set the message importance.
     #[arg(long, value_enum, value_name = "LEVEL")]
     pub importance: Option<ImportanceArg>,
-
     /// Category to set on the message. Can be repeated; replaces the
     /// existing categories.
     #[arg(long = "category", value_name = "NAME")]
@@ -32,6 +33,7 @@ pub struct MsgraphMessageUpdateCommand {
 }
 
 impl MsgraphMessageUpdateCommand {
+    /// Applies the patches to the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         if !self.read && !self.unread && self.importance.is_none() && self.categories.is_empty() {
             bail!(
@@ -65,12 +67,15 @@ impl MsgraphMessageUpdateCommand {
     }
 }
 
-/// Message importance requested by `messages update`.
+/// How important a message is.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum ImportanceArg {
+    /// Below the ordinary.
     Low,
+    /// Ordinary.
     Normal,
+    /// Above the ordinary.
     High,
 }
 

@@ -1,3 +1,7 @@
+//! # Flag command
+//!
+//! The `flag` command, dispatching onto its subcommands.
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
@@ -12,7 +16,7 @@ use crate::{
 
 /// Manage flags using the shared API.
 ///
-/// A flag is acting like a tag, giving information about message state or kind.
+/// A flag acts like a tag, saying what state or kind a message is in.
 #[derive(Debug, Subcommand)]
 pub enum FlagCommand {
     Add(FlagAddCommand),
@@ -22,6 +26,7 @@ pub enum FlagCommand {
 }
 
 impl FlagCommand {
+    /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,
         printer: &mut impl Printer,
