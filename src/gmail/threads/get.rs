@@ -6,7 +6,10 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::{messages::GmailMessageFormat, threads::get::GmailThreadGet};
+use io_gmail::v1::rest::{
+    messages::{GmailMessage, GmailMessageFormat, GmailMessagePayload},
+    threads::get::GmailThreadGet,
+};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -19,6 +22,12 @@ use crate::gmail::{
 
 /// Get a single Gmail thread with all its messages
 /// (users.threads.get).
+///
+/// JSON includes each message's MIME payload when Gmail supplies one,
+/// including bodies and attachment metadata under `--format full`.
+/// `--header` filters the summary headers, not the retained MIME payload.
+/// Keys inside `payload` keep Gmail's camelCase, unlike their kebab-case
+/// siblings, until v3 aligns them.
 #[derive(Debug, Parser)]
 pub struct GmailThreadGetCommand {
     /// The id of the thread to get.
@@ -51,12 +60,7 @@ impl GmailThreadGetCommand {
         let messages = thread
             .messages
             .into_iter()
-            .map(|message| GmailThreadMessageOutput {
-                id: message.id,
-                label_ids: message.label_ids,
-                snippet: message.snippet,
-                headers: message_headers(message.payload, &hs),
-            })
+            .map(|message| GmailThreadMessageOutput::from_message(message, &hs))
             .collect();
 
         printer.out(GmailThreadGetOutput {
@@ -105,4 +109,18 @@ pub(crate) struct GmailThreadMessageOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     snippet: Option<String>,
     headers: Vec<GmailMessageHeaderOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload: Option<GmailMessagePayload>,
+}
+
+impl GmailThreadMessageOutput {
+    fn from_message(message: GmailMessage, headers: &[&str]) -> Self {
+        Self {
+            id: message.id,
+            label_ids: message.label_ids,
+            snippet: message.snippet,
+            headers: message_headers(message.payload.clone(), headers),
+            payload: message.payload,
+        }
+    }
 }
