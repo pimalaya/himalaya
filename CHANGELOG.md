@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `messages-added-details` to `gmail history list --json`, preserving each arrival's message id, optional thread id and supplied label ids alongside the existing message-id arrays.
+
 - A pimdir write now shows on the next read instead of on the next sync.
 
   A pimdir store is a replica the sync engine owns, so Himalaya appends its writes to the store's queue rather than apply them. A read used to project the committed index alone, so flagging a message lost the flag from the listing until Neverest ran.

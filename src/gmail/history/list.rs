@@ -7,7 +7,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_gmail::v1::rest::history::{
-    GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
+    GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
 };
 use pimalaya_cli::printer::Printer;
@@ -17,6 +17,11 @@ use serde::Serialize;
 use crate::{gmail::client::GmailClient, shared::output::Paginated};
 
 /// List the changes applied to the mailbox since a given history id.
+///
+/// JSON includes `history-id`, `history`, and an optional `next_page` cursor.
+/// Each record retains its message-id arrays and adds `messages-added-details`
+/// with each arrival's `id`, nullable `thread-id`, and `label-ids` supplied by
+/// Gmail. Missing labels become an empty array; text output shows counts.
 #[derive(Debug, Parser)]
 pub struct GmailHistoryListCommand {
     /// History id to start listing changes from.
@@ -59,13 +64,7 @@ impl GmailHistoryListCommand {
         let history = resp
             .history
             .into_iter()
-            .map(|record| GmailHistoryRecordOutput {
-                id: record.id,
-                messages_added: message_ids(record.messages_added),
-                messages_deleted: message_ids(record.messages_deleted),
-                labels_added: label_changes(record.labels_added),
-                labels_removed: label_changes(record.labels_removed),
-            })
+            .map(GmailHistoryRecordOutput::from)
             .collect();
 
         let output = GmailHistoryListOutput {
@@ -104,8 +103,8 @@ impl From<HistoryTypeArg> for GmailHistoryType {
 
 /// The `gmail history list` output, one summary line per record.
 ///
-/// The JSON carries the affected message ids where the text shows counts,
-/// driving an incremental sync being what a history listing is for.
+/// JSON carries affected message ids and added-message details; text shows
+/// counts for incremental sync summaries.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct GmailHistoryListOutput {
@@ -145,9 +144,40 @@ impl fmt::Display for GmailHistoryListOutput {
 pub(crate) struct GmailHistoryRecordOutput {
     id: String,
     messages_added: Vec<String>,
+    messages_added_details: Vec<GmailHistoryMessageOutput>,
     messages_deleted: Vec<String>,
     labels_added: Vec<GmailHistoryLabelOutput>,
     labels_removed: Vec<GmailHistoryLabelOutput>,
+}
+
+impl From<GmailHistory> for GmailHistoryRecordOutput {
+    fn from(record: GmailHistory) -> Self {
+        Self {
+            id: record.id,
+            messages_added_details: record
+                .messages_added
+                .iter()
+                .map(|entry| GmailHistoryMessageOutput {
+                    id: entry.message.id.clone(),
+                    thread_id: entry.message.thread_id.clone(),
+                    label_ids: entry.message.label_ids.clone(),
+                })
+                .collect(),
+            messages_added: message_ids(record.messages_added),
+            messages_deleted: message_ids(record.messages_deleted),
+            labels_added: label_changes(record.labels_added),
+            labels_removed: label_changes(record.labels_removed),
+        }
+    }
+}
+
+/// Identity and labels supplied by Gmail for an added message.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailHistoryMessageOutput {
+    id: String,
+    thread_id: Option<String>,
+    label_ids: Vec<String>,
 }
 
 /// Labels added to or removed from one message in a history record.
