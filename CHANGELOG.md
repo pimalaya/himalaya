@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed Gmail draft create/update JSON output to structured draft, message and thread IDs, with schemas for both commands. Text confirmations are unchanged.
+
 - **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim, and `pimdir.namespace` is removed.
 
   `-m imap/INBOX` is what `-m INBOX` used to be, and a listing shows `imap/INBOX` in both columns.

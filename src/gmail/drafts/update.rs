@@ -2,17 +2,22 @@
 //!
 //! The `gmail drafts update` command, `users.drafts.update`.
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_gmail::v1::rest::{
     drafts::{GmailDraft, update::GmailDraftUpdate},
     messages::{GmailMessage, encode_raw},
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
+use crate::{
+    gmail::{client::GmailClient, drafts::create::GmailDraftWriteOutput},
+    shared::message::arg::MessageArg,
+};
 
 /// Update a Gmail draft (users.drafts.update).
+///
+/// JSON output contains `id`, `message-id` and nullable `thread-id`.
 #[derive(Debug, Parser)]
 pub struct GmailDraftUpdateCommand {
     /// The id of the draft to update.
@@ -45,9 +50,14 @@ impl GmailDraftUpdateCommand {
         }
         .response;
 
-        printer.out(Message::new(format!(
-            "Gmail draft `{}` successfully updated",
-            draft.id
-        )))
+        let message = draft
+            .message
+            .ok_or_else(|| anyhow!("Gmail draft response has no message"))?;
+        printer.out(GmailDraftWriteOutput {
+            id: draft.id,
+            message_id: message.id,
+            thread_id: message.thread_id,
+            action: "updated",
+        })
     }
 }
