@@ -65,13 +65,44 @@ impl MessageAddCommand {
 /// The `message add` output, naming the message that was appended.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct MessageAddOutput {
-    id: String,
+    id: Option<String>,
     sent: bool,
 }
 
 impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let suffix = if self.sent { " and sent" } else { "" };
-        write!(f, "Message {} successfully added{suffix}", self.id)
+        match &self.id {
+            Some(id) => write!(f, "Message {id} successfully added{suffix}"),
+            None => write!(f, "Message successfully added{suffix}; id unavailable"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MessageAddOutput;
+
+    #[test]
+    fn reports_an_unavailable_id_as_a_success() {
+        let output = MessageAddOutput {
+            id: None,
+            sent: true,
+        };
+        assert_eq!(
+            output.to_string(),
+            "Message successfully added and sent; id unavailable"
+        );
+    }
+
+    #[test]
+    fn serializes_an_unavailable_id_as_null() {
+        let output = MessageAddOutput {
+            id: None,
+            sent: false,
+        };
+        let json = serde_json::to_value(output).unwrap();
+        assert_eq!(json["id"], serde_json::Value::Null);
+        assert_eq!(json["sent"], false);
     }
 }

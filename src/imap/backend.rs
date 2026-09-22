@@ -250,9 +250,13 @@ impl ImapClient {
             .ok_or_else(|| anyhow!("FETCH returned no body for the requested message"))
     }
 
-    /// Appends a message and returns its UID, from the UIDPLUS
-    /// `APPENDUID` or, failing that, a UID `SEARCH` on its `Message-ID`.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    /// Appends a message and returns the UID when the server exposes it.
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let mbox = parse_mailbox(mailbox)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
 
@@ -267,7 +271,7 @@ impl ImapClient {
         )?;
 
         if let Some((_, uid)) = appenduid {
-            return Ok(uid.to_string());
+            return Ok(Some(uid.to_string()));
         }
 
         // NOTE: without UIDPLUS the UID is recovered by searching the
@@ -277,9 +281,7 @@ impl ImapClient {
             .and_then(|parsed| parsed.message_id().map(str::to_string))
             .filter(|id| !id.is_empty());
         let Some(message_id) = message_id else {
-            bail!(
-                "Cannot resolve appended UID: server lacks UIDPLUS and message has no Message-ID"
-            );
+            return Ok(None);
         };
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
@@ -291,10 +293,7 @@ impl ImapClient {
         let criteria = Vec1::from(SearchKey::Header(field, value));
         let uids = self.search(criteria, ImapMessageSearchOptions { uid: true })?;
 
-        uids.into_iter()
-            .max()
-            .map(|uid| uid.to_string())
-            .ok_or_else(|| anyhow!("Fallback UID search returned no match"))
+        Ok(recovered_uid(uids))
     }
 
     /// Copies a UID set between two mailboxes.
@@ -807,9 +806,16 @@ fn reorder_envelopes(
         .collect()
 }
 
+/// Returns the highest recovered UID, or none when the search found no match.
+fn recovered_uid(uids: impl IntoIterator<Item = NonZeroU32>) -> Option<String> {
+    uids.into_iter().max().map(|uid| uid.to_string())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parse_rfc2822_date;
+    use std::num::NonZeroU32;
+
+    use super::{parse_rfc2822_date, recovered_uid};
 
     #[test]
     fn parses_a_well_formed_date() {
@@ -833,5 +839,16 @@ mod tests {
     fn rejects_empty_and_garbage() {
         assert!(parse_rfc2822_date("   ").is_none());
         assert!(parse_rfc2822_date("not a date").is_none());
+    }
+
+    #[test]
+    fn accepts_an_append_without_a_recovered_uid() {
+        assert_eq!(recovered_uid([]), None);
+    }
+
+    #[test]
+    fn picks_the_highest_recovered_uid() {
+        let uids = [NonZeroU32::new(41).unwrap(), NonZeroU32::new(42).unwrap()];
+        assert_eq!(recovered_uid(uids), Some("42".to_string()));
     }
 }

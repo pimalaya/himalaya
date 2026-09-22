@@ -159,7 +159,12 @@ impl M2dirClient {
 
     /// Stores `raw` under `mailbox`, then writes `flags` to the sidecar.
     /// Returns the content-addressed id.
-    pub fn add_message(&self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    pub fn add_message(
+        &self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let m2dir = self.resolve_m2dir(mailbox)?;
         let entry = self.store(m2dir.clone(), raw)?;
         let id = entry.id().to_string();
@@ -168,7 +173,7 @@ impl M2dirClient {
             self.set_flags(&m2dir, &id, flags_to_m2dir(flags))?;
         }
 
-        Ok(id)
+        Ok(Some(id))
     }
 
     /// Copies every id from `from` to `to` (get + store; flags are not

@@ -304,9 +304,13 @@ impl EmailClient {
         }
     }
 
-    /// Adds a raw message to a mailbox with the given flags, which Gmail
-    /// and Microsoft Graph do not implement.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    /// Adds a raw message, returning the backend id when it can be recovered.
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {

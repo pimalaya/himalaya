@@ -292,7 +292,12 @@ impl PimdirClient {
     /// holds, so one `Message-ID` twice keeps two items. It parks for a
     /// producer, which named a key it does not own and is told so rather than
     /// filed under one it never asked for.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let collection = self.hub_id(mailbox)?;
         let derived = derive(&raw)?;
 
@@ -312,7 +317,7 @@ impl PimdirClient {
             .enqueue(&collection, &action, Some(size), &stamp())
             .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
 
-        Ok(derived.link_id.0)
+        Ok(Some(derived.link_id.0))
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy

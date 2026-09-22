@@ -91,5 +91,7 @@ Taking the owner role briefly is what cancelling costs (pimdir SPEC §15.5); the
 ### Requirement: Append and search gaps
 Gmail and Graph SHALL NOT implement `add_message` (neither API has an append) and SHALL NOT implement shared `search_envelopes`. IMAP, JMAP, Maildir and m2dir implement search (see the search capability).
 
+The shared `add_message` result SHALL carry an optional backend id. An IMAP `APPEND` acknowledged as successful SHALL remain successful when the server omits `APPENDUID` and a fallback search cannot recover the UID, including when the server rewrites the submitted `Message-ID`. The command SHALL report the save without inventing an id, and a requested send SHALL continue. An `APPEND` rejected by the server SHALL remain an error.
+
 ### Requirement: Sending transport
 Backends that self-send (JMAP, Gmail, Graph) SHALL route `send_message` through their own API. Storage backends that cannot send (IMAP, Maildir, m2dir) SHALL send through the account's SMTP transport, adapted in `src/smtp/backend.rs` over io-smtp, which parses the RFC 5321 envelope from the raw message headers.

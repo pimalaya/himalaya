@@ -134,11 +134,16 @@ impl MaildirClient {
 
     /// Stores `raw` under `mailbox`'s `cur/` with `flags`, returning the
     /// assigned Maildir id.
-    pub fn add_message(&self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    pub fn add_message(
+        &self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let maildir_flags = flags_to_maildir(flags);
         let (id, _path) = self.store(maildir, MaildirSubdir::Cur, maildir_flags, raw)?;
-        Ok(id)
+        Ok(Some(id))
     }
 
     /// Copies every id from `from` to `to`.

@@ -217,7 +217,12 @@ impl JmapClient {
 
     /// Uploads `raw` as a blob then imports it into `mailbox` with the
     /// requested keywords. Returns the created email id.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let blob_id = self.upload(raw)?;
 
         let mut mailbox_ids = BTreeMap::new();
@@ -246,7 +251,7 @@ impl JmapClient {
             .get("new")
             .ok_or_else(|| anyhow!("Email/import did not create the imported email"))?;
 
-        Ok(email.id.clone().unwrap_or_default())
+        Ok(Some(email.id.clone().unwrap_or_default()))
     }
 
     /// Copies an email id set into `to` by adding `to`'s mailbox id.

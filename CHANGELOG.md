@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a successful IMAP append being reported as failed when its UID could not be recovered.
+
+  Some servers acknowledge `APPEND` without returning `APPENDUID`, despite advertising UIDPLUS, then rewrite the submitted `Message-ID`. The fallback UID search therefore finds no match even though the message was saved. Himalaya now reports the successful save with an unavailable id and continues the send half of `message send --save`.
+
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
   A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item. One copy was kept and the other recorded on it, mirrored nowhere, so it showed in no listing and could not be read.
