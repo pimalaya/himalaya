@@ -5,7 +5,8 @@
 //!
 //! The RFC 5321 envelope is derived from the message headers: `From:`
 //! becomes the reverse path, and `To:`, `Cc:` and `Bcc:` the forward
-//! paths.
+//! paths. The `Bcc:` field itself is then removed from the transmitted
+//! message (RFC 5322 section 3.6.3), so blind recipients stay blind.
 
 use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
@@ -54,9 +55,49 @@ impl SmtpClient {
         let forward_paths: Vec<SmtpForwardPath<'static>> =
             forwards.into_iter().map(SmtpForwardPath::from).collect();
 
-        self.send(reverse_path, forward_paths, raw)?;
+        self.send(reverse_path, forward_paths, strip_bcc(&raw))?;
         Ok(())
     }
+}
+
+/// Removes every `Bcc:` field, continuation lines included, from the
+/// header section of `raw`, leaving the body untouched.
+///
+/// The envelope already carries the blind recipients; transmitting the
+/// field would disclose them to every other recipient.
+fn strip_bcc(raw: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(raw.len());
+    let mut skipping = false;
+    let mut rest = raw;
+
+    while !rest.is_empty() {
+        let end = rest
+            .iter()
+            .position(|&b| b == b'\n')
+            .map_or(rest.len(), |i| i + 1);
+        let (line, tail) = rest.split_at(end);
+
+        // The first empty line ends the header section.
+        if line == b"\r\n" || line == b"\n" {
+            out.extend_from_slice(rest);
+            return out;
+        }
+
+        let folded = matches!(line.first(), Some(b' ' | b'\t'));
+        if !folded {
+            // RFC 5322 obsolete syntax allows whitespace before the colon.
+            skipping = line
+                .iter()
+                .position(|&b| b == b':')
+                .is_some_and(|colon| line[..colon].trim_ascii_end().eq_ignore_ascii_case(b"bcc"));
+        }
+        if !skipping {
+            out.extend_from_slice(line);
+        }
+        rest = tail;
+    }
+
+    out
 }
 
 /// Flattens a mail-parser address group into bare `local-part@domain`
@@ -91,4 +132,37 @@ fn parse_smtp_mailbox(address: &str) -> Result<SmtpMailbox<'static>> {
         local_part: SmtpLocalPart(Cow::Owned(local.to_string())),
         domain: SmtpEhloDomain::SmtpDomain(SmtpDomain(Cow::Owned(domain.to_string()))),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_bcc;
+
+    #[test]
+    fn removes_the_bcc_field_and_keeps_everything_else() {
+        let raw =
+            b"From: a@x\r\nTo: b@x\r\nBcc: c@x\r\nSubject: s\r\n\r\nBcc: in the body stays\r\n";
+        assert_eq!(
+            strip_bcc(raw),
+            b"From: a@x\r\nTo: b@x\r\nSubject: s\r\n\r\nBcc: in the body stays\r\n"
+        );
+    }
+
+    #[test]
+    fn removes_folded_continuation_lines_and_any_case() {
+        let raw = b"From: a@x\r\nBCC: c@x,\r\n d@x,\r\n\te@x\r\nTo: b@x\r\n\r\nbody\r\n";
+        assert_eq!(strip_bcc(raw), b"From: a@x\r\nTo: b@x\r\n\r\nbody\r\n");
+    }
+
+    #[test]
+    fn removes_the_obsolete_spelling_with_space_before_the_colon() {
+        let raw = b"From: a@x\r\nBcc : c@x\r\nTo: b@x\r\n\r\nbody\r\n";
+        assert_eq!(strip_bcc(raw), b"From: a@x\r\nTo: b@x\r\n\r\nbody\r\n");
+    }
+
+    #[test]
+    fn leaves_a_message_without_bcc_byte_identical() {
+        let raw = b"From: a@x\nTo: b@x\nX-Bccish: keep\n\nbody\n";
+        assert_eq!(strip_bcc(raw), raw.to_vec());
+    }
 }

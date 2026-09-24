@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `Bcc:` field is no longer transmitted over SMTP.
+
+  The SMTP transport built the envelope from `To:`, `Cc:` and `Bcc:` and then sent the message unchanged, so every recipient could read the blind-copied addresses. The field is now removed from the transmitted header section, continuation lines included, after the envelope is derived (RFC 5322 section 3.6.3). The copy kept with `--save` still carries it.
+
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
   A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item. One copy was kept and the other recorded on it, mirrored nowhere, so it showed in no listing and could not be read.
