@@ -23,6 +23,9 @@ The field SHALL NOT take a column in the `envelope list` table, where a column o
 ### Requirement: Network backends
 IMAP, JMAP, Gmail and Microsoft Graph SHALL each adapt their io-* high-level client. IMAP reuses io-imap's `select`/`fetch`/`store`/`copy`/`move`/`append`/`list`/`status`. JMAP reuses io-jmap's `mailbox_get`/`email_query`/`email_get`/`email_set`/`email_import`/`email_submission_set`/`blob_upload`/`blob_download`, addressing mailboxes by their JMAP id. Gmail treats labels as mailboxes over io-gmail's `labels`/`messages` surface; Graph treats mail folders as mailboxes over io-msgraph's `mail_folders`/`messages` surface.
 
+### Requirement: IMAP move without the MOVE extension
+The IMAP adapter's `move_messages` SHALL use `UID MOVE` (RFC 6851) when the server advertises `MOVE`. Otherwise, when it advertises `UIDPLUS` (RFC 4315), it SHALL `UID COPY` the set to the target, then flag the same UIDs `\Deleted` in the source and `UID EXPUNGE` exactly those UIDs, skipping both when the copy affected nothing. With neither extension it SHALL fail, naming both, rather than issue a plain `EXPUNGE` that would remove unrelated `\Deleted` messages.
+
 ### Requirement: Network transport resilience
 The network backends SHALL run over a transport that retries a stream reporting it is not ready (`EAGAIN` on Unix, `EINTR`, and the Windows spelling of an expired deadline) rather than ending the exchange on it. Each read and each write carries its own budget of one minute, so a slow but progressing transfer never runs out of it, and exhausting the budget SHALL fail with a message naming it rather than a raw errno.
 

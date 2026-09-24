@@ -101,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The client-side search evaluation the backend calls was gated on the `maildir` and `m2dir` features alone, so `--no-default-features --features pimdir` did not build. The default feature set was unaffected.
 
+- `message move` and `message delete` now work on IMAP servers without the MOVE extension.
+
+  Moving always sent `UID MOVE` (RFC 6851), which servers that do not advertise MOVE reject, OVH's hosted Dovecot among them. Deleting failed with it, since outside the trash it moves to the trash.
+
+  Without MOVE, the move is now the sequence RFC 6851 describes for such servers: `UID COPY`, then `\Deleted` and a `UID EXPUNGE` of exactly the copied UIDs, which needs UIDPLUS (RFC 4315). With neither extension the move is refused, a plain `EXPUNGE` removing unrelated `\Deleted` messages too.
+
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
   A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item. One copy was kept and the other recorded on it, mirrored nowhere, so it showed in no listing and could not be read.

@@ -309,16 +309,52 @@ impl ImapClient {
         Ok(self.copied_count(copy_uid, ids.len()))
     }
 
-    /// Moves a UID set between two mailboxes, per RFC 6851.
+    /// Moves a UID set between two mailboxes.
+    ///
+    /// With RFC 6851 MOVE this is a single `UID MOVE`. Without it, it is
+    /// the sequence RFC 6851 §1 describes for such servers: `UID COPY`,
+    /// then `\Deleted` and a `UID EXPUNGE` of exactly the copied UIDs,
+    /// which needs RFC 4315 UIDPLUS. A plain `EXPUNGE` would also remove
+    /// every other `\Deleted` message in the source, so without UIDPLUS
+    /// the move is refused rather than approximated.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
-        let sequence_set = parse_uids(ids)?;
 
-        self.select(source, ImapMailboxSelectOptions::default())?;
-        let copy_uid = self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
-
-        Ok(self.copied_count(copy_uid, ids.len()))
+        match MoveStrategy::for_capabilities(self.supports_move(), self.supports_uidplus()) {
+            MoveStrategy::Move => {
+                self.select(source, ImapMailboxSelectOptions::default())?;
+                let copy_uid = self.r#move(
+                    parse_uids(ids)?,
+                    target,
+                    ImapMessageMoveOptions { uid: true },
+                )?;
+                Ok(self.copied_count(copy_uid, ids.len()))
+            }
+            MoveStrategy::CopyThenExpunge => {
+                self.select(source, ImapMailboxSelectOptions::default())?;
+                let copy_uid = self.copy(
+                    parse_uids(ids)?,
+                    target,
+                    ImapMessageCopyOptions { uid: true },
+                )?;
+                let moved = self.copied_count(copy_uid, ids.len());
+                if moved > 0 {
+                    self.store(
+                        parse_uids(ids)?,
+                        StoreType::Add,
+                        vec![ImapFlag::Deleted],
+                        ImapMessageStoreOptions { uid: true },
+                    )?;
+                    self.uid_expunge(parse_uids(ids)?)?;
+                }
+                Ok(moved)
+            }
+            MoveStrategy::Unsupported => bail!(
+                "The IMAP server supports neither MOVE (RFC 6851) nor UIDPLUS (RFC 4315), \
+                 so messages cannot be moved without expunging unrelated ones"
+            ),
+        }
     }
 
     /// Permanently deletes a UID set from the trash, returning whether
@@ -357,6 +393,27 @@ impl ImapClient {
             Some((_, source_uids, _)) => source_uids.len(),
             None if self.supports_uidplus() => 0,
             None => requested,
+        }
+    }
+}
+
+/// How a move runs, decided by what the server advertised.
+#[derive(Debug, PartialEq, Eq)]
+enum MoveStrategy {
+    /// RFC 6851 `UID MOVE`.
+    Move,
+    /// `UID COPY`, `\Deleted`, then `UID EXPUNGE` of the same UIDs.
+    CopyThenExpunge,
+    /// Neither extension: no way to expunge only the moved messages.
+    Unsupported,
+}
+
+impl MoveStrategy {
+    fn for_capabilities(supports_move: bool, supports_uidplus: bool) -> Self {
+        match (supports_move, supports_uidplus) {
+            (true, _) => Self::Move,
+            (false, true) => Self::CopyThenExpunge,
+            (false, false) => Self::Unsupported,
         }
     }
 }
@@ -809,7 +866,35 @@ fn reorder_envelopes(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_rfc2822_date;
+    use super::{MoveStrategy, parse_rfc2822_date};
+
+    #[test]
+    fn moves_natively_when_move_is_advertised() {
+        assert_eq!(
+            MoveStrategy::for_capabilities(true, true),
+            MoveStrategy::Move
+        );
+        assert_eq!(
+            MoveStrategy::for_capabilities(true, false),
+            MoveStrategy::Move
+        );
+    }
+
+    #[test]
+    fn copies_then_expunges_without_move_but_with_uidplus() {
+        assert_eq!(
+            MoveStrategy::for_capabilities(false, true),
+            MoveStrategy::CopyThenExpunge
+        );
+    }
+
+    #[test]
+    fn refuses_without_move_or_uidplus() {
+        assert_eq!(
+            MoveStrategy::for_capabilities(false, false),
+            MoveStrategy::Unsupported
+        );
+    }
 
     #[test]
     fn parses_a_well_formed_date() {
