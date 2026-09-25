@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `sieves://` is accepted for the deployments listening for a handshake straight away, and `unix://` for a local pre-authenticated proxy.
 
+- `imap fetch --body`, the whole message of every UID in the sequence set over one session (`BODY.PEEK[]`, `\Seen` left unset).
+
+  Downloading a mailbox took one `message read` per message, so one login per message, which some providers cut off after a dozen in a row (Yandex closes the TLS session). The JSON output carries the octets byte-exact as the standard Base64 of the `body` field; the plain output prints the size only.
+
 ### Changed
 
 - **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim, and `pimdir.namespace` is removed.

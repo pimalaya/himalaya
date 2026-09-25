@@ -6,6 +6,7 @@ use io_imap::client::ImapClient as _;
 use std::fmt;
 
 use anyhow::Result;
+use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
@@ -55,6 +56,12 @@ pub struct ImapFetchCommand {
     /// Fetch the size, in octets.
     #[arg(long)]
     pub size: bool,
+    /// Fetch the whole message, leaving `\Seen` unset.
+    ///
+    /// The JSON output carries its octets as the standard Base64 of the
+    /// `body` field; the plain output prints its size only.
+    #[arg(long)]
+    pub body: bool,
     /// Read the sequence set as message numbers rather than UIDs.
     #[arg(long)]
     pub seq: bool,
@@ -63,30 +70,11 @@ pub struct ImapFetchCommand {
 impl ImapFetchCommand {
     /// Selects the mailbox unless told not to, then fetches the items.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
+        let names = self.item_names();
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
             client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
-
-        let any = self.envelope || self.structure || self.flags || self.internal_date || self.size;
-        let want_envelope = self.envelope || !any;
-
-        let mut names = vec![MessageDataItemName::Uid];
-        if want_envelope {
-            names.push(MessageDataItemName::Envelope);
-        }
-        if self.structure {
-            names.push(MessageDataItemName::BodyStructure);
-        }
-        if self.flags {
-            names.push(MessageDataItemName::Flags);
-        }
-        if self.internal_date {
-            names.push(MessageDataItemName::InternalDate);
-        }
-        if self.size {
-            names.push(MessageDataItemName::Rfc822Size);
         }
 
         let sequence_set = self.sequence_set.parse()?;
@@ -105,6 +93,46 @@ impl ImapFetchCommand {
             .collect();
 
         printer.out(FetchedMessages { messages })
+    }
+
+    /// The data items to request: the UID always, the envelope when
+    /// nothing else is asked for.
+    fn item_names(&self) -> Vec<MessageDataItemName<'static>> {
+        let any = self.envelope
+            || self.structure
+            || self.flags
+            || self.internal_date
+            || self.size
+            || self.body;
+        let want_envelope = self.envelope || !any;
+
+        let mut names = vec![MessageDataItemName::Uid];
+        if want_envelope {
+            names.push(MessageDataItemName::Envelope);
+        }
+        if self.structure {
+            names.push(MessageDataItemName::BodyStructure);
+        }
+        if self.flags {
+            names.push(MessageDataItemName::Flags);
+        }
+        if self.internal_date {
+            names.push(MessageDataItemName::InternalDate);
+        }
+        if self.size {
+            names.push(MessageDataItemName::Rfc822Size);
+        }
+        if self.body {
+            // `BODY[]` would set `\Seen` as a side effect (RFC 3501
+            // §6.4.5); a bulk download leaves the flag to the user.
+            names.push(MessageDataItemName::BodyExt {
+                section: None,
+                partial: None,
+                peek: true,
+            });
+        }
+
+        names
     }
 }
 
@@ -133,6 +161,8 @@ pub struct FetchedMessage {
     pub envelope: Option<EnvelopeView>,
     /// The MIME body structure tree.
     pub structure: Option<BodyPart>,
+    /// The whole message, as the standard Base64 of its octets.
+    pub body: Option<String>,
 }
 
 impl FetchedMessage {
@@ -155,6 +185,11 @@ impl FetchedMessage {
                     message.internal_date = Some(date.as_ref().to_rfc3339())
                 }
                 MessageDataItem::Rfc822Size(size) => message.size = Some(size),
+                MessageDataItem::BodyExt {
+                    section: None,
+                    origin: None,
+                    data,
+                } => message.body = data.0.map(|data| BASE64_STANDARD.encode(data.as_ref())),
                 _ => {}
             }
         }
@@ -328,6 +363,10 @@ impl fmt::Display for FetchedMessages {
                 writeln!(f, "  Structure:")?;
                 write_body_tree(f, structure, "    ", true)?;
             }
+            if let Some(body) = &message.body {
+                let size = BASE64_STANDARD.decode(body).map_or(0, |bytes| bytes.len());
+                writeln!(f, "  Body: {}", format_size(size))?;
+            }
 
             writeln!(f)?;
         }
@@ -403,4 +442,67 @@ fn write_body_tree(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use base64::{Engine, prelude::BASE64_STANDARD};
+    use clap::Parser;
+    use io_imap::types::{
+        core::{Literal, NString},
+        fetch::{MessageDataItem, MessageDataItemName},
+    };
+
+    use super::{FetchedMessage, ImapFetchCommand};
+
+    fn command(args: &[&str]) -> ImapFetchCommand {
+        ImapFetchCommand::parse_from([&["fetch"], args, &["1:*"]].concat())
+    }
+
+    #[test]
+    fn body_alone_is_peeked_without_envelope() {
+        let names = command(&["--body"]).item_names();
+        assert_eq!(
+            names,
+            vec![
+                MessageDataItemName::Uid,
+                MessageDataItemName::BodyExt {
+                    section: None,
+                    partial: None,
+                    peek: true,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn body_composes_with_flags() {
+        let names = command(&["--body", "--flags"]).item_names();
+        assert!(names.contains(&MessageDataItemName::Flags));
+        assert!(!names.contains(&MessageDataItemName::Envelope));
+        assert_eq!(names.len(), 3);
+    }
+
+    #[test]
+    fn no_flag_still_means_envelope() {
+        let names = command(&[]).item_names();
+        assert_eq!(
+            names,
+            vec![MessageDataItemName::Uid, MessageDataItemName::Envelope]
+        );
+    }
+
+    #[test]
+    fn body_bytes_survive_base64() {
+        // 8-bit octets that are not valid UTF-8 (koi8-r, a bare 0xFF).
+        let raw: &[u8] = b"Subject: x\r\n\r\n\xf0\xd2\xc9\xd7\xc5\xd4 \xff\r\n";
+        let item = MessageDataItem::BodyExt {
+            section: None,
+            origin: None,
+            data: NString::from(Literal::try_from(raw).unwrap()),
+        };
+        let message = FetchedMessage::from_items(1, [item].into_iter());
+        let body = BASE64_STANDARD.decode(message.body.unwrap()).unwrap();
+        assert_eq!(body, raw);
+    }
 }

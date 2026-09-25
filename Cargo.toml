@@ -13,7 +13,7 @@ repository = "https://github.com/pimalaya/himalaya"
 
 [features]
 default = ["rustls-ring", "imap", "smtp", "sieve", "jmap", "gmail", "msgraph", "maildir"]
-imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
+imap = ["dep:base64", "dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
 msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client", "io-msgraph/schemars"]

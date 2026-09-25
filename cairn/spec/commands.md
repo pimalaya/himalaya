@@ -59,3 +59,6 @@ The same composers SHALL end the body with the account's `signature`, introduced
 
 ### Requirement: Raw message input is shared
 A command taking a raw RFC 5322 message SHALL resolve it through the shared `MessageArg`: a file path, an inline value after `--`, or piped stdin. The resolved message is normalised to CRLF and rejected when empty, so no backend receives a zero-length message.
+
+### Requirement: IMAP fetch can return whole messages
+`imap fetch --body` SHALL add `BODY.PEEK[]` (RFC 3501 §6.4.5) to the requested data items, so a caller downloads every message of a sequence set over one session instead of one `message read` per message. The fetch SHALL NOT set `\Seen`. The JSON output SHALL carry the message octets byte-exact as the standard Base64 of the `body` field; the plain rendering SHALL print the size only. `--body` SHALL NOT imply `--envelope`.
