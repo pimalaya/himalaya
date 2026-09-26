@@ -77,7 +77,7 @@ impl ConfigureCommand {
         let default = !existing.as_ref().is_some_and(|config| config.has_default);
         account.default = default;
 
-        let config = GeneratedConfig {
+        let config = ConfigureOutput {
             document: account.render(&name)?,
             name,
             default,
@@ -126,7 +126,7 @@ impl ExistingConfig {
 
 /// The generated account, as the printer takes it.
 #[derive(Serialize, JsonSchema)]
-pub struct GeneratedConfig {
+pub struct ConfigureOutput {
     /// The account name, which is the `[accounts.<name>]` table key.
     name: String,
     /// Whether the account claims the default.
@@ -135,7 +135,7 @@ pub struct GeneratedConfig {
     document: String,
 }
 
-impl fmt::Display for GeneratedConfig {
+impl fmt::Display for ConfigureOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // NOTE: the trailing newline terminates the document, and it is
         // also what flushes the line-buffered stdout.
@@ -201,7 +201,7 @@ fn account_name(base: &str, existing: Option<&ExistingConfig>) -> String {
 
 /// Offers to write the generated account to a configuration file that
 /// does not exist yet, printing it instead when the offer is declined.
-fn save_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedConfig) -> Result<()> {
+fn save_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutput) -> Result<()> {
     let prompt = format!("Save this account to {}?", path.display());
 
     if !prompt::bool(prompt, true)? {
@@ -226,7 +226,7 @@ fn save_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedConfi
 
 /// Offers to append the generated account to the configuration file
 /// already there, printing it instead when the offer is declined.
-fn append_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedConfig) -> Result<()> {
+fn append_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutput) -> Result<()> {
     let prompt = format!("Append account `{}` to {}?", config.name, path.display());
 
     if !prompt::bool(prompt, true)? {
@@ -255,7 +255,7 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: GeneratedCon
 ///
 /// The name matters because it was never asked for: an account that did
 /// not claim the default is reachable through `-a` alone.
-fn print_saved(path: &Path, config: &GeneratedConfig) {
+fn print_saved(path: &Path, config: &ConfigureOutput) {
     let name = &config.name;
 
     eprintln!();

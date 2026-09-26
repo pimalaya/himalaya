@@ -12,7 +12,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use io_pimdir::{PimdirBlobs, PimdirError, PimdirProducer, PimdirReader, PimdirStore};
+use io_pimdir::client::{
+    PimdirError, PimdirStore, blobs::PimdirBlobs, producer::PimdirProducer, reader::PimdirReader,
+};
 
 use crate::{
     account::context::Account,

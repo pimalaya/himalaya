@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Forwarded `vendored` to io-pimdir, which now links the system SQLite by default: a build carrying `--features pimdir` needs sqlite3 on the machine, or `vendored` alongside it to build one from source.
+
+- **BREAKING**: a `pimdir` store written before io-pimdir 0.4 is refused, and Himalaya reads the store's typed summaries.
+
+  io-replica is retired, its sync engine folded into io-pimdir, and the store format moved with it: summaries are typed rows rather than a JSON meta column, and a store from the earlier draft is refused on open, saying to delete it and let Neverest resync. There is no migration, the draft offering none.
+
+  An envelope now carries every `From` and `To` address with its display name, the `In-Reply-To` list and whether the message holds an attachment, straight from the store, and `envelope list` follows the store's newest-first order. A queued creation is rendered from the body it pins, the queued action carrying no summary any more.
+
 - A credential command that several blocks of one account name is now spawned once per run instead of once per block.
 
   `account check` and the wizard connection tests open IMAP, SMTP and ManageSieve in a row, each block resolving its own credential, so a `pass` or `gpg` entry was unlocked as many times as it was named. They now share one resolver, so it unlocks once.
@@ -60,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The `msgraph` one, singular where Graph is plural, is aligned onto Graph: `mail-folder`, `message` and `attachment` become `mail-folders`, `messages` and `attachments`, joining the `child-folders` that already sat under the first.
 
   Every singular spelling stays as a hidden alias, where it used to be shown beside the plural, and `completion`, `manual` and `json-schema` gain the plural aliases they lacked.
+
+- Renamed the type `configure` prints from `GeneratedConfig` to `ConfigureOutput`, the shape the rest of the family uses.
+
+  What the command prints is unchanged. Only the `title` of the `himalaya-configure` JSON Schema follows the new name.
 
 ### Fixed
 

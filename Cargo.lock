@@ -928,7 +928,6 @@ dependencies = [
  "io-msgraph",
  "io-pim-discovery",
  "io-pimdir",
- "io-replica",
  "io-sasl",
  "io-smtp",
  "log",
@@ -1321,12 +1320,13 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.3.0"
-source = "git+https://github.com/pimalaya/io-pimdir#2aee3c9436fec0652535a5544e89aaecf5eceead"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fe9a53f7f303ae84c20591e0a9c7f53880fd7495f4391c08c945c161882e52e"
 dependencies = [
  "blake3",
  "fs4",
- "io-replica",
+ "log",
  "rusqlite",
  "serde",
  "serde_json",
@@ -1340,15 +1340,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea1200e73a98f7a2500af468bb7857a1c78b5b4b453c8d69760c2a61b9df5303"
 dependencies = [
  "base64 0.23.1",
- "log",
- "thiserror",
-]
-
-[[package]]
-name = "io-replica"
-version = "0.4.2"
-source = "git+https://github.com/pimalaya/io-replica#89fd2121b9c1b39e98d6d7669ffec0d0b0380aec"
-dependencies = [
  "log",
  "thiserror",
 ]

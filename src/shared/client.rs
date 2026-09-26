@@ -193,16 +193,22 @@ impl EmailClient {
     /// made. A pimdir store is a replica a sync engine owns, so a saved
     /// message waits in its queue with no id and therefore no envelope,
     /// and the count is what keeps it from reading as lost.
-    #[cfg(backend)]
+    #[cfg(feature = "pimdir")]
     pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
-            #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.queued_messages(mailbox),
             #[allow(unreachable_patterns)]
             _ => Ok(0),
         }
+    }
+
+    /// How many messages the mailbox has staged for creation and not
+    /// pushed yet, always zero without the pimdir backend.
+    #[cfg(all(backend, not(feature = "pimdir")))]
+    pub fn queued_messages(&mut self, _mailbox: &str) -> Result<usize> {
+        Ok(0)
     }
 
     /// Searches a mailbox with the shared query, which Microsoft Graph

@@ -345,6 +345,8 @@ fn discovery_tls() -> Tls {
 
 #[cfg(test)]
 mod tests {
+    use std::slice;
+
     use super::*;
 
     #[test]
@@ -366,7 +368,7 @@ mod tests {
             }
         );
         assert_eq!(
-            caps_of(&[oauth.clone()]),
+            caps_of(slice::from_ref(&oauth)),
             AuthCaps {
                 oauth: true,
                 ..Default::default()

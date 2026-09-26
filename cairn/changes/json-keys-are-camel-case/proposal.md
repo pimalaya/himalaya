@@ -23,7 +23,7 @@ Himalaya is 2.1.0 and `--json` keys are a published contract, so changing them i
 
 Output types only: the types handed to `printer.out` and registered in src/json_schema.rs. Each one gets `#[serde(rename_all = "camelCase")]`, and the existing kebab-case renames on those types go. The reference type is `GmailProfileOutput` in src/gmail/profile/get.rs, whose payload goes from `{email, messages-total, threads-total, history-id}` to `{email, messagesTotal, threadsTotal, historyId}`; the doc comment naming the old spelling moves with it.
 
-Sixty-one distinct types are registered, of which eighteen already carry the `*Output` suffix and forty-three do not (`Envelopes`, `Mailboxes`, `MessagesTable`, `DeleteReport`, `SieveScripts` and the rest). Renaming them to `*Output` is the other half of the same cleanup and belongs in the same major, since both touch the same declarations.
+Sixty-one distinct types are registered, of which nineteen already carry the `*Output` suffix and forty-two do not (`Envelopes`, `Mailboxes`, `MessagesTable`, `DeleteReport`, `SieveScripts` and the rest). Renaming them to `*Output` is the other half of the same cleanup and belongs in the same major, since both touch the same declarations.
 
 Three things are deliberately left alone.
 

@@ -3,9 +3,9 @@
 //! The pimdir adapter of the shared cross-protocol client, reading the
 //! store's index and blobs.
 //!
-//! Envelopes are built from the stored meta with no body read, so an item
-//! whose body is not local still lists and reads as not fetched rather
-//! than as an error.
+//! Envelopes are built from the stored mail summary with no body read,
+//! so an item whose body is not local still lists and reads as not
+//! fetched rather than as an error.
 //!
 //! Writes enqueue actions for the store's owner to apply. Himalaya is a
 //! producer, never the owner: it mutates no index and collects nothing,
@@ -17,19 +17,26 @@
 //! would guess at the sync's convention rather than look it up, and
 //! `mailbox.alias` is how a user avoids typing it.
 
+use std::io::Write;
+
 use anyhow::{Result, anyhow, bail};
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::DateTime;
 use io_pimdir::{
-    PimdirCollection, PimdirItem, PimdirPendingAction,
+    client::{
+        blobs::PimdirBlobWriter,
+        producer::PimdirPendingAction,
+        reader::{PimdirCollection, PimdirItem},
+    },
     codec::PimdirAction,
-    conventions::{self, PimdirDerivation},
-};
-use io_replica::{
-    collection::ReplicaCollectionId,
-    placement::{ReplicaFlags, ReplicaLevel, ReplicaLinkId},
+    collection::PimdirCollectionId,
+    object::{PimdirHash, PimdirObject},
+    placement::PimdirFlags,
+    summary::{
+        PimdirAddress, PimdirSummary,
+        mail::{self, PimdirMailSummary},
+    },
 };
 use log::warn;
-use serde::Deserialize;
 
 use crate::{
     email::{
@@ -48,32 +55,10 @@ const MAIL_KIND: &str = "message/rfc822";
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
 
-/// Whether a collection's declared kind makes it a mailbox.
-///
-/// A kind-less collection counts: a sync predating declared kinds left the
-/// column empty, and refusing those would hide every mailbox of a store
-/// written back then.
+/// Whether a collection's declared kind makes it a mailbox, matched on
+/// the bare media type the way the store reads it.
 pub(crate) fn is_mail(kind: &str) -> bool {
-    kind.is_empty() || kind == MAIL_KIND
-}
-
-/// A reader's view of the `message/rfc822` meta (pimdir SPEC Annex A).
-#[derive(Default, Deserialize)]
-struct MetaView {
-    #[serde(default)]
-    message_id: Option<String>,
-    #[serde(default)]
-    in_reply_to: Vec<String>,
-    #[serde(default)]
-    subject: String,
-    #[serde(default)]
-    from: Option<String>,
-    #[serde(default)]
-    to: Option<String>,
-    #[serde(default)]
-    date: Option<String>,
-    #[serde(default)]
-    size: Option<u64>,
+    kind.split(';').next().unwrap_or_default().trim() == MAIL_KIND
 }
 
 impl PimdirClient {
@@ -139,8 +124,8 @@ impl PimdirClient {
         Ok(mailboxes)
     }
 
-    /// Lists envelopes from `mailbox`, built from the stored meta (no body
-    /// reads), sorted by `Date:` descending then paginated.
+    /// Lists envelopes from `mailbox`, built from the stored summaries (no
+    /// body reads), in the store's newest-first order then paginated.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -149,18 +134,18 @@ impl PimdirClient {
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         let collection = self.hub_id(mailbox)?;
-        let mut envelopes: Vec<Envelope> = self
+        let envelopes: Vec<Envelope> = self
             .scan_items(&collection)?
             .iter()
             .map(envelope_from_item)
             .collect();
-        envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
         Ok(paginate(envelopes, page, page_size))
     }
 
-    /// Searches envelopes in `mailbox`: builds them from meta, applies the
-    /// shared filter/sort/paginate. Body clauses cannot match on an item whose
-    /// body is not local (no bytes to scan); header/flag clauses always do.
+    /// Searches envelopes in `mailbox`: builds them from the summaries,
+    /// applies the shared filter/sort/paginate. Body clauses cannot match on
+    /// an item whose body is not local (no bytes to scan); header/flag
+    /// clauses always do.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -200,8 +185,9 @@ impl PimdirClient {
     /// The mailbox's queued creations, rendered as mail.
     ///
     /// The operator CLI is kind-agnostic and prints ids, hashes and flags.
-    /// This client holds the conventions and the blobs, so it reads the
-    /// sender, subject and date out of the action's own summary.
+    /// A queued add carries no summary, the owner deriving one from the body
+    /// when it applies the action, so this reads the body the action pins
+    /// and derives the same way.
     pub fn queued_envelopes(&mut self, mailbox: &str) -> Result<Vec<PimdirQueued>> {
         let collection = self.hub_id(mailbox)?;
         let queued = self
@@ -209,7 +195,15 @@ impl PimdirClient {
             .pending_creates(&collection)
             .map_err(|err| anyhow!("List queued messages in `{mailbox}`: {err}"))?;
 
-        Ok(queued.iter().filter_map(queued_from_action).collect())
+        let mut rows = Vec::new();
+        for action in &queued {
+            let body = match action.action.object_hash() {
+                Some(hash) => self.blobs.get(hash)?,
+                None => None,
+            };
+            rows.extend(queued_from_action(action, body.as_deref()));
+        }
+        Ok(rows)
     }
 
     /// Reads one message's raw bytes from its content-addressed blob.
@@ -257,20 +251,19 @@ impl PimdirClient {
     ) -> Result<()> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
-        let now = stamp();
 
         for id in ids {
             let seq = self.seq(&collection, id)?;
             let current = self
                 .get(&collection, id)?
                 .map(|item| item.flags)
-                .unwrap_or(ReplicaFlags::Unknown);
+                .unwrap_or(PimdirFlags::Unknown);
             let action = PimdirAction::SetFlags {
                 seq,
                 flags: apply_flag_op(&current, flags, op),
             };
             producer
-                .enqueue(&collection, &action, None, &now)
+                .enqueue(&collection, &action, None)
                 .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
@@ -283,8 +276,9 @@ impl PimdirClient {
     /// it is enqueued, and the queue row pins the object, so nothing collects
     /// a body between the two.
     ///
-    /// The link id is the bare `Message-ID`, and a staged add whose link id
-    /// the collection already holds parks rather than deduplicate or mint a
+    /// The link id is the bare `Message-ID`, derived the way the owner
+    /// derives it from the same body, and a staged add whose link id the
+    /// collection already holds parks rather than deduplicate or mint a
     /// key of its own.
     ///
     /// The store answers its two producers differently on purpose. It mints
@@ -294,25 +288,27 @@ impl PimdirClient {
     /// filed under one it never asked for.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let collection = self.hub_id(mailbox)?;
-        let derived = derive(&raw)?;
+        let link_id = mail::derive(&raw).link_id;
 
         let hash = self.blobs.hash(&raw);
         let writer = self.blobs.writer()?;
         let size = write_blob(writer, &raw, &hash)?;
+        let object = PimdirObject {
+            hash,
+            size: size as usize,
+        };
 
         let mut producer = self.producer()?;
         let action = PimdirAction::Add {
-            link_id: Some(derived.link_id.clone()),
-            flags: to_replica_flags(flags),
-            object: Some(hash),
-            meta: Some(derived.meta),
-            handle: None,
+            link_id: Some(link_id.clone()),
+            flags: flags.iter().map(Flag::raw).collect(),
+            object: Some(object.hash.clone()),
         };
         producer
-            .enqueue(&collection, &action, Some(size), &stamp())
+            .enqueue(&collection, &action, Some(&object))
             .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
 
-        Ok(derived.link_id.0)
+        Ok(link_id.0)
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
@@ -338,12 +334,11 @@ impl PimdirClient {
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<()> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
-        let now = stamp();
 
         for id in ids {
             let seq = self.seq(&collection, id)?;
             producer
-                .enqueue(&collection, &PimdirAction::Remove { seq }, None, &now)
+                .enqueue(&collection, &PimdirAction::Remove { seq }, None)
                 .map_err(|err| anyhow!("Stage delete of `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
@@ -356,17 +351,16 @@ impl PimdirClient {
         from: &str,
         to: &str,
         ids: &[&str],
-        build: fn(i64, ReplicaCollectionId) -> PimdirAction,
+        build: fn(i64, PimdirCollectionId) -> PimdirAction,
     ) -> Result<usize> {
         let source = self.hub_id(from)?;
-        let target = ReplicaCollectionId(self.hub_id(to)?);
+        let target = PimdirCollectionId(self.hub_id(to)?);
         let mut producer = self.producer()?;
-        let now = stamp();
 
         for id in ids {
             let seq = self.seq(&source, id)?;
             producer
-                .enqueue(&source, &build(seq, target.clone()), None, &now)
+                .enqueue(&source, &build(seq, target.clone()), None)
                 .map_err(|err| anyhow!("Stage refile of `{id}` from `{from}` to `{to}`: {err}"))?;
         }
         Ok(ids.len())
@@ -388,21 +382,18 @@ impl PimdirClient {
         }
     }
 
-    /// Pulls every live item of a collection by keyset paging (the read API is
-    /// paginated; the shared list/search commands sort and paginate in memory,
-    /// as the file backends do).
+    /// Pulls every live item of a collection with its summary by keyset
+    /// paging, newest first (the read API is paginated; the shared
+    /// list/search commands paginate in memory, as the file backends do).
     fn scan_items(&self, collection: &str) -> Result<Vec<PimdirItem>> {
-        let mut all = Vec::new();
-        let mut cursor: Option<String> = None;
+        let mut all: Vec<PimdirItem> = Vec::new();
         loop {
+            let after = all.last().map(|item| (item.sort_key.as_str(), item.seq));
             let page = self
                 .store
-                .list_items(collection, cursor.as_deref(), SCAN_BATCH)
+                .list_summaries(collection, after, SCAN_BATCH)
                 .map_err(|err| anyhow!("List items in `{collection}`: {err}"))?;
             let n = page.len();
-            if let Some(last) = page.last() {
-                cursor = Some(last.link_id.0.clone());
-            }
             all.extend(page);
             if n < SCAN_BATCH {
                 break;
@@ -412,17 +403,30 @@ impl PimdirClient {
     }
 }
 
-/// Builds a shared [`Envelope`] from a stored item's meta (no body read). Flags
-/// come from the item; the display fields from the `v: 1` meta.
+/// Builds a shared [`Envelope`] from a stored item (no body read): the
+/// flags from the item, the display fields from its mail summary.
 fn envelope_from_item(item: &PimdirItem) -> Envelope {
-    let view: MetaView = item
-        .meta
-        .as_ref()
-        .and_then(|meta| serde_json::from_str(&meta.0).ok())
-        .unwrap_or_default();
+    // NOTE: the public id is a short store-global integer rather than the
+    // long link id.
+    envelope(
+        item.seq.to_string(),
+        &item.flags,
+        mail_summary(item.summary.as_ref()),
+    )
+}
 
-    let flags = item
-        .flags
+/// The mail summary a read carries, none for an unfetched or non-mail item.
+fn mail_summary(summary: Option<&PimdirSummary>) -> Option<&PimdirMailSummary> {
+    match summary {
+        Some(PimdirSummary::Mail(mail)) => Some(mail),
+        _ => None,
+    }
+}
+
+/// Builds an envelope from a flag set and a mail summary, `id` being the
+/// public `seq`, or empty for a queued creation that has none yet.
+fn envelope(id: String, flags: &PimdirFlags, summary: Option<&PimdirMailSummary>) -> Envelope {
+    let flags = flags
         .known()
         .map(|flags| {
             flags
@@ -431,32 +435,30 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
                 .collect()
         })
         .unwrap_or_default();
-    let from = view
-        .from
-        .map(|email| vec![Address { name: None, email }])
-        .unwrap_or_default();
-    let to = view
-        .to
-        .map(|email| vec![Address { name: None, email }])
-        .unwrap_or_default();
-    let date = view
-        .date
-        .as_deref()
-        .and_then(|d| DateTime::parse_from_rfc3339(d).ok());
+    let mail = summary.cloned().unwrap_or_default();
 
     Envelope {
-        // NOTE: the public id is a short store-global integer rather than the
-        // long link id.
-        id: item.seq.to_string(),
-        message_id: view.message_id,
-        in_reply_to: view.in_reply_to,
+        id,
+        message_id: mail.message_id,
+        in_reply_to: mail.in_reply_to,
         flags,
-        subject: view.subject,
-        from,
-        to,
-        date,
-        size: view.size.unwrap_or(0),
-        has_attachment: None,
+        subject: mail.subject,
+        from: mail.from.into_iter().map(address).collect(),
+        to: mail.to.into_iter().map(address).collect(),
+        date: mail
+            .date
+            .as_deref()
+            .and_then(|date| DateTime::parse_from_rfc3339(date).ok()),
+        size: mail.size.unwrap_or(0),
+        has_attachment: mail.attachment,
+    }
+}
+
+/// A summary's canonical address as the shared one.
+fn address(address: PimdirAddress) -> Address {
+    Address {
+        name: address.name,
+        email: address.address,
     }
 }
 
@@ -470,33 +472,24 @@ pub struct PimdirQueued {
     pub created_at: String,
     /// The process that staged it.
     pub producer: String,
-    /// The message the action carries, built from its `v: 1` summary. It has
+    /// The message the action carries, derived from the body it pins. It has
     /// no `id`: a create has none until the owner applies it.
     pub envelope: Envelope,
 }
 
-/// Builds a queued row from a pending add, skipping every other action.
+/// Builds a queued row from a pending add and the body it pins, skipping
+/// every other action.
 ///
 /// The envelope keeps an empty id on purpose: a create has no public id yet,
 /// and the queue row id belongs to another space than the field every command
 /// reads back.
-fn queued_from_action(queued: &PimdirPendingAction) -> Option<PimdirQueued> {
-    let PimdirAction::Add { flags, meta, .. } = &queued.action else {
+fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Option<PimdirQueued> {
+    let PimdirAction::Add { flags, .. } = &queued.action else {
         return None;
     };
 
-    let item = PimdirItem {
-        seq: 0,
-        link_id: ReplicaLinkId(String::new()),
-        flags: flags.clone(),
-        meta: meta.clone(),
-        sort_key: String::new(),
-        object: None,
-        level: ReplicaLevel::Meta,
-        retention: None,
-    };
-    let mut envelope = envelope_from_item(&item);
-    envelope.id = String::new();
+    let summary = body.map(mail::derive).and_then(|derived| derived.summary);
+    let envelope = envelope(String::new(), flags, mail_summary(summary.as_ref()));
 
     Some(PimdirQueued {
         id: queued.id,
@@ -506,58 +499,32 @@ fn queued_from_action(queued: &PimdirPendingAction) -> Option<PimdirQueued> {
     })
 }
 
-/// Derives the link id, meta and sort key of a message about to be added.
-///
-/// It goes through io-pimdir's conventions, the one implementation of the
-/// spec: two writers of a collection disagreeing about the id of a message
-/// carrying no `Message-ID` would link it twice and store its body twice.
-fn derive(raw: &[u8]) -> Result<PimdirDerivation> {
-    conventions::derive(MAIL_KIND, raw)
-        .ok_or_else(|| anyhow!("pimdir has no conventions for `{MAIL_KIND}`"))
-}
-
 /// Streams `raw` into the blob store under `hash` and commits it durably,
 /// returning the stored size.
-fn write_blob(
-    mut writer: io_pimdir::PimdirBlobWriter,
-    raw: &[u8],
-    hash: &io_replica::object::ReplicaHash,
-) -> Result<u64> {
-    use std::io::Write;
-
+fn write_blob(mut writer: PimdirBlobWriter, raw: &[u8], hash: &PimdirHash) -> Result<u64> {
     writer.write_all(raw)?;
     Ok(writer.commit(hash)?)
 }
 
-/// Now, as the RFC 3339 stamp a queue row records.
-fn stamp() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
-}
-
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
 /// stores. An unknown base holds no markers to build on, so it reads as empty.
-fn apply_flag_op(current: &ReplicaFlags, flags: &[Flag], op: FlagOp) -> ReplicaFlags {
-    let incoming = flags.iter().map(|f| f.raw().to_string());
+fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> PimdirFlags {
+    let incoming = flags.iter().map(|flag| flag.raw().to_string());
     match op {
-        FlagOp::Set => ReplicaFlags::Known(incoming.collect()),
+        FlagOp::Set => incoming.collect(),
         FlagOp::Add => {
             let mut set = current.known().cloned().unwrap_or_default();
             set.extend(incoming);
-            ReplicaFlags::Known(set)
+            PimdirFlags::Known(set)
         }
         FlagOp::Remove => {
             let mut set = current.known().cloned().unwrap_or_default();
             for flag in incoming {
                 set.remove(&flag);
             }
-            ReplicaFlags::Known(set)
+            PimdirFlags::Known(set)
         }
     }
-}
-
-/// A shared flag slice to replica flags (raw wire spellings).
-fn to_replica_flags(flags: &[Flag]) -> ReplicaFlags {
-    ReplicaFlags::Known(flags.iter().map(|f| f.raw().to_string()).collect())
 }
 
 /// Parses a message id, the public `seq`, off the command line, with a clear
@@ -587,31 +554,68 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 mod tests {
     use std::collections::BTreeSet;
 
-    use io_replica::placement::{ReplicaLevel, ReplicaLinkId, ReplicaMeta};
+    use io_pimdir::placement::{PimdirLevel, PimdirLinkId};
 
     use super::*;
 
-    #[test]
-    fn envelope_is_built_from_meta_without_a_body() {
-        let item = PimdirItem {
-            seq: 42,
-            link_id: ReplicaLinkId("x@y".into()),
-            flags: ReplicaFlags::Known(["\\Seen".to_string()].into_iter().collect()),
-            meta: Some(ReplicaMeta(
-                r#"{"v":1,"message_id":"x@y","subject":"Hi","from":"a@x.org","to":"b@x.org","size":99}"#
-                    .into(),
-            )),
+    /// A stored item at the `Meta` tier: a mail summary and no body.
+    fn item(seq: i64, link_id: &str, flags: PimdirFlags, mail: PimdirMailSummary) -> PimdirItem {
+        PimdirItem {
+            seq,
+            link_id: PimdirLinkId(link_id.into()),
+            flags,
             sort_key: String::new(),
             object: None,
-            level: ReplicaLevel::Meta,
+            level: PimdirLevel::Meta,
+            summary: Some(PimdirSummary::Mail(mail)),
             retention: None,
-        };
+        }
+    }
+
+    fn known(flags: &[&str]) -> PimdirFlags {
+        PimdirFlags::from_iter(flags.iter().copied())
+    }
+
+    fn person(address: &str, name: Option<&str>) -> PimdirAddress {
+        PimdirAddress {
+            address: address.into(),
+            name: name.map(String::from),
+        }
+    }
+
+    #[test]
+    fn envelope_is_built_from_the_summary_without_a_body() {
+        let item = item(
+            42,
+            "x@y",
+            known(&["\\Seen"]),
+            PimdirMailSummary {
+                message_id: Some("x@y".into()),
+                in_reply_to: vec!["parent@y".into()],
+                subject: "Hi".into(),
+                date: Some("2026-08-01T10:00:00Z".into()),
+                size: Some(99),
+                attachment: Some(true),
+                from: vec![person("a@x.org", Some("Alice"))],
+                to: vec![person("b@x.org", None)],
+                ..Default::default()
+            },
+        );
         let envelope = envelope_from_item(&item);
         assert_eq!(envelope.id, "42");
+        assert_eq!(envelope.message_id.as_deref(), Some("x@y"));
+        assert_eq!(envelope.in_reply_to, ["parent@y"]);
         assert_eq!(envelope.subject, "Hi");
         assert_eq!(envelope.from[0].email, "a@x.org");
+        assert_eq!(envelope.from[0].name.as_deref(), Some("Alice"));
         assert_eq!(envelope.to[0].email, "b@x.org");
+        assert_eq!(envelope.to[0].name, None);
+        assert_eq!(
+            envelope.date.map(|date| date.to_rfc3339()).as_deref(),
+            Some("2026-08-01T10:00:00+00:00")
+        );
         assert_eq!(envelope.size, 99);
+        assert_eq!(envelope.has_attachment, Some(true));
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
 
@@ -624,22 +628,14 @@ mod tests {
     /// key never shows.
     #[test]
     fn two_items_sharing_a_message_id_project_two_public_ids() {
-        let item = |seq, link_id: &str| PimdirItem {
-            seq,
-            link_id: ReplicaLinkId(link_id.into()),
-            flags: ReplicaFlags::Known(BTreeSet::new()),
-            meta: Some(ReplicaMeta(
-                r#"{"v":1,"message_id":"twice@host","subject":"Twice","from":"a@x.org","size":10}"#
-                    .into(),
-            )),
-            sort_key: String::new(),
-            object: None,
-            level: ReplicaLevel::Meta,
-            retention: None,
+        let twice = || PimdirMailSummary {
+            message_id: Some("twice@host".into()),
+            subject: "Twice".into(),
+            ..Default::default()
         };
 
-        let bare = envelope_from_item(&item(11, "twice@host"));
-        let minted = envelope_from_item(&item(12, "dup:twice@host#1174"));
+        let bare = envelope_from_item(&item(11, "twice@host", known(&[]), twice()));
+        let minted = envelope_from_item(&item(12, "dup:twice@host#1174", known(&[]), twice()));
 
         assert_eq!(bare.message_id.as_deref(), Some("twice@host"));
         assert_eq!(bare.message_id, minted.message_id);
@@ -654,49 +650,23 @@ mod tests {
     fn an_unread_flag_set_renders_as_no_flags_rather_than_panicking() {
         let item = PimdirItem {
             seq: 1,
-            link_id: ReplicaLinkId("x@y".into()),
-            flags: ReplicaFlags::Unknown,
-            meta: None,
+            link_id: PimdirLinkId("x@y".into()),
+            flags: PimdirFlags::Unknown,
             sort_key: String::new(),
             object: None,
-            level: ReplicaLevel::Probed,
+            level: PimdirLevel::Probed,
+            summary: None,
             retention: None,
         };
-        assert!(envelope_from_item(&item).flags.is_empty());
-    }
-
-    /// An added message links the way the store spells it, the bare
-    /// `Message-ID` with nothing prepended, which is what the sync engine
-    /// derives for the same body.
-    ///
-    /// Any other spelling would file a message the collection already holds
-    /// as a second item instead of parking it, which is the answer the store
-    /// owes a producer rather than a source.
-    #[test]
-    fn an_added_message_links_the_way_the_store_spells_it() {
-        let raw = b"Message-ID: <new@host>\r\nSubject: Compose\r\nFrom: a@x.org\r\n\r\nbody";
-        let derived = derive(raw).unwrap();
-        assert_eq!(derived.link_id.0, "new@host");
-        assert!(derived.meta.0.contains("\"v\":1"));
-        assert!(derived.meta.0.contains("Compose"));
-    }
-
-    /// A message with no `Message-ID` falls back to the marked id, which is
-    /// the one case a prefix names.
-    #[test]
-    fn a_message_without_a_message_id_keeps_the_alt_fallback() {
-        let raw = b"Subject: No id\r\nFrom: a@x.org\r\n\r\nbody";
-        let derived = derive(raw).unwrap();
-        assert!(
-            derived.link_id.0.starts_with("alt:"),
-            "got {}",
-            derived.link_id.0,
-        );
+        let envelope = envelope_from_item(&item);
+        assert!(envelope.flags.is_empty());
+        assert_eq!(envelope.id, "1");
+        assert_eq!(envelope.subject, "");
     }
 
     #[test]
     fn flag_ops_add_set_and_remove() {
-        let base = ReplicaFlags::Known(["\\Seen".to_string()].into_iter().collect());
+        let base = known(&["\\Seen"]);
         let flagged = [Flag::from_raw("\\Flagged")];
         let added = apply_flag_op(&base, &flagged, FlagOp::Add);
         assert!(added.contains("\\Seen") && added.contains("\\Flagged"));
@@ -712,39 +682,40 @@ mod tests {
     #[test]
     fn a_flag_op_on_an_unknown_set_stages_a_known_one() {
         let staged = apply_flag_op(
-            &ReplicaFlags::Unknown,
+            &PimdirFlags::Unknown,
             &[Flag::from_raw("\\Seen")],
             FlagOp::Add,
         );
-        assert_eq!(staged.known().map(|f| f.len()), Some(1));
+        assert_eq!(staged.known().map(BTreeSet::len), Some(1));
         assert!(staged.contains("\\Seen"));
     }
+
+    /// A queued add carries no summary, so the row is derived from the body
+    /// the action pins, the way the owner will derive it.
     #[test]
     fn a_queued_creation_renders_as_mail_with_no_id() {
         let queued = PimdirPendingAction {
             id: 7,
             created_at: "2026-08-27T10:00:00Z".into(),
             producer: "himalaya".into(),
+            collection: "INBOX".into(),
             action: PimdirAction::Add {
-                link_id: Some(ReplicaLinkId("draft@x.org".into())),
-                flags: ReplicaFlags::Known(["\\Draft".to_string()].into_iter().collect()),
-                object: None,
-                meta: Some(ReplicaMeta(
-                    r#"{"v":1,"message_id":"draft@x.org","subject":"Re: lunch","to":"alice@x.org","size":12}"#
-                        .into(),
-                )),
-                handle: None,
+                link_id: Some(PimdirLinkId("draft@x.org".into())),
+                flags: known(&["\\Draft"]),
+                object: Some(PimdirHash("cafe".into())),
             },
             attempts: 0,
         };
+        let body = b"Message-ID: <draft@x.org>\r\nSubject: Re: lunch\r\nTo: Alice <alice@x.org>\r\n\r\nbody";
 
-        let queued = queued_from_action(&queued).unwrap();
+        let queued = queued_from_action(&queued, Some(body)).unwrap();
 
         assert_eq!(queued.id, 7);
         assert_eq!(queued.created_at, "2026-08-27T10:00:00Z");
         assert_eq!(queued.envelope.subject, "Re: lunch");
         assert_eq!(queued.envelope.to[0].email, "alice@x.org");
         assert_eq!(queued.envelope.message_id.as_deref(), Some("draft@x.org"));
+        assert!(queued.envelope.flags.iter().any(|f| f.raw() == "\\Draft"));
         // NOTE: the row id names an action rather than a message, so it
         // belongs to another space than the field commands read back.
         assert!(queued.envelope.id.is_empty());
@@ -756,12 +727,13 @@ mod tests {
             id: 8,
             created_at: "2026-08-27T10:00:00Z".into(),
             producer: "himalaya".into(),
+            collection: "INBOX".into(),
             action: PimdirAction::Remove { seq: 42 },
             attempts: 0,
         };
 
         // NOTE: a staged removal addresses a message that exists, so the
         // ordinary listing shows it and nothing is rendered here.
-        assert!(queued_from_action(&queued).is_none());
+        assert!(queued_from_action(&queued, None).is_none());
     }
 }
