@@ -75,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `imap raw` hanging until the stream timed out when the last command was not terminated by an explicit `\r\n` ([#764]).
+
+  The missing terminator was appended as a bare LF, which Gmail never answers. It is now a CRLF, which also fixes commands piped through stdin.
+
 - Fixed IMAP searches with non-ASCII text being rejected by Gmail ([io-imap#3](https://github.com/pimalaya/io-imap/issues/3)).
 
   Bumped io-imap to 0.6.1, which sends `CHARSET UTF-8` with every `SEARCH` again, a fix lost since v1.2.0 (#635).
@@ -1289,6 +1293,7 @@ Few major concepts changed:
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
 [#739]: https://github.com/pimalaya/himalaya/issues/739
+[#764]: https://github.com/pimalaya/himalaya/issues/764
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

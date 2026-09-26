@@ -28,16 +28,45 @@ pub struct ImapRawCommand {
 impl ImapRawCommand {
     /// Sends the commands and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
-        let mut command = self.command.parse()?;
-
-        // NOTE: io-imap rejects an unterminated command, so the newline
-        // the caller may have left off the last one is appended.
-        if !command.ends_with('\n') {
-            command.push('\n');
-        }
-
+        let command = terminate(self.command.parse()?);
         let response = client.raw(command.as_bytes())?;
 
         printer.out(Message::new(response))
+    }
+}
+
+/// Appends the CRLF the caller may have left off the last command.
+///
+/// io-imap rejects an unterminated command, and it has to be a full CRLF:
+/// a bare LF passes io-imap but servers such as Gmail never answer it, so
+/// the exchange would stall until the stream times out.
+fn terminate(mut command: String) -> String {
+    if !command.ends_with("\r\n") {
+        command.push_str("\r\n");
+    }
+
+    command
+}
+
+#[cfg(test)]
+mod tests {
+    use super::terminate;
+
+    #[test]
+    fn unterminated_command_gains_crlf() {
+        assert_eq!(terminate("a1 NOOP".into()), "a1 NOOP\r\n");
+    }
+
+    #[test]
+    fn terminated_command_is_untouched() {
+        assert_eq!(terminate("a1 NOOP\r\n".into()), "a1 NOOP\r\n");
+    }
+
+    #[test]
+    fn last_command_of_a_batch_gains_crlf() {
+        assert_eq!(
+            terminate("a1 SELECT INBOX\r\na2 NOOP".into()),
+            "a1 SELECT INBOX\r\na2 NOOP\r\n",
+        );
     }
 }
