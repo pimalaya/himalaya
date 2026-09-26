@@ -35,13 +35,13 @@ pub struct MessageComposeCommand {
     pub from: Option<String>,
     /// Recipient addresses, the flag repeating or taking a
     /// comma-separated list.
-    #[arg(long, short = 't', value_name = "ADDR", value_delimiter = ',')]
+    #[arg(long, short = 't', value_name = "ADDR")]
     pub to: Vec<String>,
     /// Carbon-copy recipients.
-    #[arg(long, value_name = "ADDR", value_delimiter = ',')]
+    #[arg(long, value_name = "ADDR")]
     pub cc: Vec<String>,
     /// Blind carbon-copy recipients.
-    #[arg(long, value_name = "ADDR", value_delimiter = ',')]
+    #[arg(long, value_name = "ADDR")]
     pub bcc: Vec<String>,
     /// Subject line.
     #[arg(long, short = 's', value_name = "TEXT")]
