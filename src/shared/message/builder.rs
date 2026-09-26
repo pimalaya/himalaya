@@ -96,13 +96,13 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
         builder = builder.from(Address::new_address(name, address));
     }
     if !args.to.is_empty() {
-        builder = builder.to(addresses(args.to));
+        builder = builder.to(addresses(args.to)?);
     }
     if !args.cc.is_empty() {
-        builder = builder.cc(addresses(args.cc));
+        builder = builder.cc(addresses(args.cc)?);
     }
     if !args.bcc.is_empty() {
-        builder = builder.bcc(addresses(args.bcc));
+        builder = builder.bcc(addresses(args.bcc)?);
     }
 
     let parsed_source = source
@@ -219,14 +219,18 @@ fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
     Ok((name, address))
 }
 
-/// Builds an address list out of bare addresses.
-fn addresses(values: &[String]) -> Address<'static> {
-    Address::new_list(
-        values
-            .iter()
-            .map(|s| Address::new_address(None::<&str>, s.clone()))
-            .collect(),
-    )
+/// Builds an address list, splitting any display name apart so
+/// `mail_builder` encodes it rather than stuffing it inside the angle
+/// brackets.
+fn addresses(values: &[String]) -> Result<Address<'static>> {
+    let list: Vec<Address<'static>> = values
+        .iter()
+        .map(|s| {
+            let (name, address) = parse_mailbox(s)?;
+            Ok(Address::new_address(name, address))
+        })
+        .collect::<Result<_>>()?;
+    Ok(Address::new_list(list))
 }
 
 /// Reads the text body from the flag, the file it names, or piped
@@ -670,6 +674,21 @@ Original body line.\r\n";
         let from = msg.from().unwrap().first().unwrap();
         assert_eq!(from.name(), Some("Alice"));
         assert_eq!(from.address(), Some("alice@example.org"));
+    }
+
+    #[test]
+    fn compose_to_keeps_a_spelled_out_display_name_apart() {
+        let to = vec!["Alice <alice@example.org>".to_string()];
+        let raw = build(args("sender@example.org", &to, None, "hi"), None).unwrap();
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        // regression: the whole value used to land inside the brackets
+        assert!(!text.contains("<Alice <alice@example.org>>"));
+
+        let msg = parse(&raw);
+        let to_addr = msg.to().unwrap().first().unwrap();
+        assert_eq!(to_addr.name(), Some("Alice"));
+        assert_eq!(to_addr.address(), Some("alice@example.org"));
     }
 
     #[test]
