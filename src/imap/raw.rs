@@ -30,10 +30,10 @@ impl ImapRawCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mut command = self.command.parse()?;
 
-        // NOTE: io-imap rejects an unterminated command, so the newline
-        // the caller may have left off the last one is appended.
+        // NOTE: io-imap rejects an unterminated command, so the CRLF the
+        // caller may have left off the last one is appended.
         if !command.ends_with('\n') {
-            command.push('\n');
+            command.push_str("\r\n");
         }
 
         let response = client.raw(command.as_bytes())?;
