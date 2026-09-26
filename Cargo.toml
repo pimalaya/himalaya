@@ -45,7 +45,7 @@ chumsky = { version = "0.13", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
-dirs = "6"
+dirs = "7"
 humansize = "2"
 io-gmail = { version = "0.3", default-features = false, optional = true }
 io-imap = { version = "0.6", default-features = false, optional = true }
@@ -59,7 +59,7 @@ io-pimdir = { version = "0.5", default-features = false, features = ["client"], 
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.3", default-features = false, optional = true }
 log = "0.4"
-mail-builder = "0.5"
+mail-builder = "1"
 mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
 mime_guess = "2"
 open = "5"
