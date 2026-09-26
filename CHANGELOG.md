@@ -75,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed IMAP searches with non-ASCII text being rejected by Gmail ([io-imap#3](https://github.com/pimalaya/io-imap/issues/3)).
+
+  Bumped io-imap to 0.6.1, which sends `CHARSET UTF-8` with every `SEARCH` again, a fix lost since v1.2.0 (#635).
+
 - Fixed the `Bcc:` field being transmitted over SMTP, disclosing blind recipients to everyone (#747).
 
   Bumped io-smtp to 0.4, which removes it before `DATA`. The `--save` copy and `smtp send`, whose envelope is explicit, keep it.
