@@ -1383,9 +1383,9 @@ dependencies = [
 
 [[package]]
 name = "io-smtp"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ddc8e2de4fbd05bbb6d7ebed74213bd791a5708b41e762b5f0ac0b410a333dc"
+checksum = "cdcf08397eb5c289658ddf1b05ae3fefe736be0dba9277258b6447558838f74a"
 dependencies = [
  "anyhow",
  "base64 0.23.1",

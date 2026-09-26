@@ -75,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the `Bcc:` field being transmitted over SMTP, disclosing blind recipients to everyone (#747).
+
+  Bumped io-smtp to 0.4, which removes it before `DATA`. The `--save` copy and `smtp send`, whose envelope is explicit, keep it.
+
 - Fixed a local path carrying a `~` or a shell variable being read verbatim.
 
   `maildir.root = "~/Mail"` looked for a directory literally named `~` under the working directory rather than the Maildir the sample documents, and `m2dir.root` and the `tls.cert` of every backend read the same way.

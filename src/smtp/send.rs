@@ -8,8 +8,11 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 use clap::Parser;
-use io_smtp::rfc5321::{
-    SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
+use io_smtp::{
+    message::SmtpMessageSendOptions,
+    rfc5321::{
+        SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
+    },
 };
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -39,10 +42,11 @@ pub struct SmtpSendCommand {
 }
 
 impl SmtpSendCommand {
-    /// Derives the envelope from the headers, then sends the message.
+    /// Sends the message over the explicit envelope, byte for byte.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         let message = self.message.parse()?;
-        client.send(self.mail_from, self.rcpt_to, message.into_bytes())?;
+        let options = SmtpMessageSendOptions { keep_bcc: true };
+        client.send(self.mail_from, self.rcpt_to, message.into_bytes(), options)?;
         printer.out(Message::new("Message successfully sent"))
     }
 }
