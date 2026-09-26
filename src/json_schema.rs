@@ -207,11 +207,11 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-drafts-create",
-            crate::gmail::drafts::create::GmailDraftWriteOutput
+            crate::gmail::drafts::GmailDraftWriteOutput
         );
         insert!(
             "himalaya-gmail-drafts-update",
-            crate::gmail::drafts::create::GmailDraftWriteOutput
+            crate::gmail::drafts::GmailDraftWriteOutput
         );
         insert!(
             "himalaya-gmail-threads-list",
