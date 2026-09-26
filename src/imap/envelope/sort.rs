@@ -7,7 +7,6 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     rfc5256::sort::ImapMessageSortOptions,
@@ -17,6 +16,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

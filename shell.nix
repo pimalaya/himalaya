@@ -7,7 +7,12 @@
 }:
 
 let
-  inherit (pkgs) cargo-deny openssl pkg-config;
+  inherit (pkgs)
+    cargo-deny
+    openssl
+    pkg-config
+    sqlite
+    ;
 
   shell = pimalaya.mkShell {
     inherit
@@ -22,6 +27,7 @@ in
 shell.overrideAttrs (prev: {
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
     openssl
+    sqlite
   ];
 
   nativeBuildInputs = (prev.nativeBuildInputs or [ ]) ++ [
@@ -31,5 +37,6 @@ shell.overrideAttrs (prev: {
   buildInputs = (prev.buildInputs or [ ]) ++ [
     cargo-deny
     openssl
+    sqlite
   ];
 })

@@ -14,9 +14,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use comfy_table::{Color as TableColor, ContentArrangement};
 use crossterm::style::Color;
 use dirs::download_dir;
+use pimalaya_cli::table::{Color as TableColor, ContentArrangement};
 
 use crate::{
     config::{
@@ -158,10 +158,7 @@ impl Account {
     /// system one then to the temporary directory.
     pub fn downloads_dir(&self) -> PathBuf {
         self.downloads_dir
-            .as_ref()
-            .and_then(|dir| dir.to_str())
-            .and_then(|dir| shellexpand::full(dir).ok())
-            .map(|dir| PathBuf::from(dir.to_string()))
+            .clone()
             .or_else(download_dir)
             .unwrap_or_else(temp_dir)
     }

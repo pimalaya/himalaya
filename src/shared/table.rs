@@ -6,7 +6,7 @@
 //! builder, but the option keeps accepting the v7 spelling so existing
 //! configurations stay valid.
 
-use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
+use pimalaya_cli::table::{ContentLineStyle, LineStyle, TableStyle};
 
 /// Default preset: full UTF-8 borders with no divider between rows, the
 /// v7 `UTF8_FULL_CONDENSED`.
@@ -79,7 +79,7 @@ pub fn style_from_preset(preset: &str) -> TableStyle {
 
 #[cfg(test)]
 mod tests {
-    use comfy_table::presets;
+    use pimalaya_cli::table::presets;
 
     use super::{DEFAULT_PRESET, style_from_preset};
 

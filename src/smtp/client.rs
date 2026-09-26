@@ -17,6 +17,7 @@ use io_sasl::mechanism::Sasl;
 use io_smtp::{
     client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain, session::SmtpSessionOpenOptions,
 };
+use pimalaya_config::secret::SecretResolver;
 use url::Url;
 
 use crate::{
@@ -36,6 +37,7 @@ impl SmtpClient {
         let tls = config.tls.into_tls(config.alpn);
         let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
+        let mut resolver = SecretResolver::new();
         let sasl: Option<Sasl> = match config.sasl {
             // NOTE: a `unix://` sirup socket is already authenticated, so
             // no SASL is negotiated over it.
@@ -49,7 +51,7 @@ impl SmtpClient {
                 let port = server
                     .port()
                     .unwrap_or(Inner::default_port(server.scheme()));
-                Some(cfg.try_into_sasl(host, port)?)
+                Some(cfg.try_into_sasl(host, port, &mut resolver)?)
             }
             None => None,
         };

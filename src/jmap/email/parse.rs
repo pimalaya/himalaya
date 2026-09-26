@@ -2,6 +2,8 @@
 //!
 //! The `jmap email parse` command, RFC 8621 `Email/parse`.
 
+use std::fmt;
+
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
@@ -61,8 +63,8 @@ pub(crate) struct ParsedBodies {
     bodies: Vec<String>,
 }
 
-impl std::fmt::Display for ParsedBodies {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ParsedBodies {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for body in &self.bodies {
             write!(f, "{body}")?;
         }

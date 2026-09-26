@@ -6,10 +6,10 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use log::warn;
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

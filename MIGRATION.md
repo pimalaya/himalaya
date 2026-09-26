@@ -129,7 +129,7 @@ The whole `backend.type = "imap"` block collapses into:
 imap.server = "example.com"
 # or imap.server = "imaps://example.com:993"
 # or imap.server = "imap://example.com:143"  (use imap.starttls = true to upgrade)
-# or imap.server = "unix:///run/sirup/example.sock"
+# or imap.server = "unix:///run/user/1000/sirup/example-imap.sock"
 
 imap.tls.provider = "rustls"     # or "native-tls"
 imap.tls.rustls.crypto = "ring"  # or "aws"

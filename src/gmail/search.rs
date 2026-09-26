@@ -75,9 +75,7 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::AfterDate(date) => Ok(format!("-after:{}", date_q(*date))),
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("-from:{}", value_q(pattern))),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Subject(pattern) => {
-            Ok(format!("-subject:{}", value_q(pattern)))
-        }
+        SearchEmailsFilterQuery::Subject(pattern) => Ok(format!("-subject:{}", value_q(pattern))),
         SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(pattern))),
         SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(flag)?)),
     }
@@ -111,7 +109,10 @@ fn flag_q(flag: &Flag) -> Result<String> {
         Some(IanaFlag::Answered) => {
             bail!("Gmail search offers no operator for the answered flag")
         }
-        _ => bail!("Gmail search offers no operator for the {} flag", flag.raw()),
+        _ => bail!(
+            "Gmail search offers no operator for the {} flag",
+            flag.raw()
+        ),
     }
 }
 
@@ -163,9 +164,7 @@ mod tests {
 
     fn q_err(query: &str) -> String {
         let query = SearchEmailsQuery::from_str(query).unwrap();
-        filter_to_q(&query.filter.unwrap())
-            .unwrap_err()
-            .to_string()
+        filter_to_q(&query.filter.unwrap()).unwrap_err().to_string()
     }
 
     #[test]
@@ -187,10 +186,7 @@ mod tests {
     #[test]
     fn conjunctions_flatten_into_whitespace() {
         assert_eq!(q("from f and to t"), "from:f to:t");
-        assert_eq!(
-            q("from f and to t and subject s"),
-            "from:f to:t subject:s",
-        );
+        assert_eq!(q("from f and to t and subject s"), "from:f to:t subject:s",);
     }
 
     #[test]
@@ -222,10 +218,7 @@ mod tests {
 
     #[test]
     fn exact_dates_bracket_the_day() {
-        assert_eq!(
-            q("date 2026-09-08"),
-            "after:2026/09/07 before:2026/09/09",
-        );
+        assert_eq!(q("date 2026-09-08"), "after:2026/09/07 before:2026/09/09",);
         assert_eq!(
             q("not date 2026-09-08"),
             "{-after:2026/09/07 -before:2026/09/09}",

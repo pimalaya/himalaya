@@ -6,8 +6,8 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

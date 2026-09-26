@@ -7,7 +7,6 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, Color, Row, Table};
 use io_jmap::rfc8621::mailbox::{
     JmapMailbox, JmapMailboxRole,
     query::{
@@ -16,6 +15,7 @@ use io_jmap::rfc8621::mailbox::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

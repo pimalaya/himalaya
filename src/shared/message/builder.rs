@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use clap::ValueEnum;
 use mail_builder::{
     MessageBuilder,
@@ -91,18 +91,18 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     let mut builder = MessageBuilder::new();
 
     if let Some(from) = args.from {
-        let (parsed_name, address) = parse_mailbox(from)?;
+        let (parsed_name, address) = parse_mailboxes(from)?.remove(0);
         let name = args.from_name.map(str::to_owned).or(parsed_name);
         builder = builder.from(Address::new_address(name, address));
     }
     if !args.to.is_empty() {
-        builder = builder.to(addresses(args.to));
+        builder = builder.to(addresses(args.to)?);
     }
     if !args.cc.is_empty() {
-        builder = builder.cc(addresses(args.cc));
+        builder = builder.cc(addresses(args.cc)?);
     }
     if !args.bcc.is_empty() {
-        builder = builder.bcc(addresses(args.bcc));
+        builder = builder.bcc(addresses(args.bcc)?);
     }
 
     let parsed_source = source
@@ -185,13 +185,14 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
         .map_err(|err| anyhow!("serialize composed message: {err}"))
 }
 
-/// Splits a mailbox into its display name, when it carries one, and its
-/// address.
+/// Splits an address list into its mailboxes, each with its display
+/// name, when it carries one, and its address.
 ///
 /// Handing mail-builder the whole `Alice <alice@example.org>` as an
-/// address would emit a `From: <Alice <alice@example.org>>` no SMTP
-/// server accepts.
-fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
+/// address would emit a `To: <Alice <alice@example.org>>` no SMTP
+/// server accepts. A comma inside a quoted display name does not split
+/// the list. The returned list is never empty.
+fn parse_mailboxes(value: &str) -> Result<Vec<(Option<String>, String)>> {
     use mail_parser::Address as ParserAddress;
 
     // NOTE: the header parser flushes its last token on the
@@ -200,33 +201,45 @@ fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
     let header = format!("{value}\n");
     let parsed = MessageStream::new(header.as_bytes()).parse_address();
 
-    let mailbox = match &parsed {
-        HeaderValue::Address(ParserAddress::List(list)) => list.first(),
-        HeaderValue::Address(ParserAddress::Group(groups)) => {
-            groups.first().and_then(|group| group.addresses.first())
-        }
-        _ => None,
+    let mailboxes: Vec<_> = match &parsed {
+        HeaderValue::Address(ParserAddress::List(list)) => list.iter().collect(),
+        HeaderValue::Address(ParserAddress::Group(groups)) => groups
+            .iter()
+            .flat_map(|group| group.addresses.iter())
+            .collect(),
+        _ => Vec::new(),
+    };
+
+    if mailboxes.is_empty() {
+        bail!("Could not parse address `{value}`");
     }
-    .ok_or_else(|| anyhow!("Could not parse address `{value}`"))?;
 
-    let address = mailbox
-        .address
-        .as_ref()
-        .ok_or_else(|| anyhow!("Address `{value}` has no email"))?
-        .to_string();
-    let name = mailbox.name.as_ref().map(|name| name.to_string());
+    mailboxes
+        .into_iter()
+        .map(|mailbox| {
+            let address = mailbox
+                .address
+                .as_ref()
+                .ok_or_else(|| anyhow!("Address `{value}` has no email"))?
+                .to_string();
+            let name = mailbox.name.as_ref().map(|name| name.to_string());
 
-    Ok((name, address))
+            Ok((name, address))
+        })
+        .collect()
 }
 
-/// Builds an address list out of bare addresses.
-fn addresses(values: &[String]) -> Address<'static> {
-    Address::new_list(
-        values
-            .iter()
-            .map(|s| Address::new_address(None::<&str>, s.clone()))
-            .collect(),
-    )
+/// Builds one address list out of every mailbox the values carry.
+fn addresses(values: &[String]) -> Result<Address<'static>> {
+    let mut list = Vec::new();
+
+    for value in values {
+        for (name, address) in parse_mailboxes(value)? {
+            list.push(Address::new_address(name, address));
+        }
+    }
+
+    Ok(Address::new_list(list))
 }
 
 /// Reads the text body from the flag, the file it names, or piped
@@ -638,24 +651,28 @@ Original body line.\r\n";
     }
 
     #[test]
-    fn parse_mailbox_splits_name_and_address() {
-        let (name, address) = parse_mailbox("Alice <alice@example.org>").unwrap();
-        assert_eq!(name.as_deref(), Some("Alice"));
-        assert_eq!(address, "alice@example.org");
+    fn parse_mailboxes_splits_name_and_address() {
+        let alice =
+            |name: Option<&str>| vec![(name.map(str::to_owned), "alice@example.org".into())];
 
-        let (name, address) = parse_mailbox("alice@example.org").unwrap();
-        assert_eq!(name, None);
-        assert_eq!(address, "alice@example.org");
+        let mailboxes = parse_mailboxes("Alice <alice@example.org>").unwrap();
+        assert_eq!(mailboxes, alice(Some("Alice")));
 
-        let (name, address) = parse_mailbox("\"Doe, Alice\" <alice@example.org>").unwrap();
-        assert_eq!(name.as_deref(), Some("Doe, Alice"));
-        assert_eq!(address, "alice@example.org");
+        let mailboxes = parse_mailboxes("alice@example.org").unwrap();
+        assert_eq!(mailboxes, alice(None));
 
-        let (name, _) = parse_mailbox("=?utf-8?B?QWxpY2U=?= <alice@example.org>").unwrap();
-        assert_eq!(name.as_deref(), Some("Alice"));
+        let mailboxes = parse_mailboxes("\"Doe, Alice\" <alice@example.org>").unwrap();
+        assert_eq!(mailboxes, alice(Some("Doe, Alice")));
 
-        assert!(parse_mailbox("not-an-address").is_err());
-        assert!(parse_mailbox("").is_err());
+        let mailboxes = parse_mailboxes("=?utf-8?B?QWxpY2U=?= <alice@example.org>").unwrap();
+        assert_eq!(mailboxes, alice(Some("Alice")));
+
+        let mailboxes = parse_mailboxes("alice@example.org, Bob <bob@example.org>").unwrap();
+        assert_eq!(mailboxes[0], (None, "alice@example.org".into()));
+        assert_eq!(mailboxes[1], (Some("Bob".into()), "bob@example.org".into()));
+
+        assert!(parse_mailboxes("not-an-address").is_err());
+        assert!(parse_mailboxes("").is_err());
     }
 
     #[test]
@@ -670,6 +687,38 @@ Original body line.\r\n";
         let from = msg.from().unwrap().first().unwrap();
         assert_eq!(from.name(), Some("Alice"));
         assert_eq!(from.address(), Some("alice@example.org"));
+    }
+
+    #[test]
+    fn compose_to_keeps_a_spelled_out_display_name_apart() {
+        let to = vec!["Alice <alice@example.org>".to_string()];
+        let raw = build(args("sender@example.org", &to, None, "hi"), None).unwrap();
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        // regression: the whole value used to land inside the brackets
+        assert!(!text.contains("<Alice <alice@example.org>>"));
+
+        let msg = parse(&raw);
+        let to_addr = msg.to().unwrap().first().unwrap();
+        assert_eq!(to_addr.name(), Some("Alice"));
+        assert_eq!(to_addr.address(), Some("alice@example.org"));
+    }
+
+    #[test]
+    fn compose_to_keeps_every_mailbox_of_every_value() {
+        let to = vec![
+            "\"Doe, Alice\" <alice@example.org>, bob@example.org".to_string(),
+            "carol@example.org".to_string(),
+        ];
+        let raw = build(args("sender@example.org", &to, None, "hi"), None).unwrap();
+
+        let msg = parse(&raw);
+        let to: Vec<_> = msg.to().unwrap().iter().collect();
+        assert_eq!(to.len(), 3);
+        assert_eq!(to[0].name(), Some("Doe, Alice"));
+        assert_eq!(to[0].address(), Some("alice@example.org"));
+        assert_eq!(to[1].address(), Some("bob@example.org"));
+        assert_eq!(to[2].address(), Some("carol@example.org"));
     }
 
     #[test]

@@ -12,6 +12,7 @@ use std::ops::{Deref, DerefMut};
 use anyhow::{Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use io_jmap::{client::JmapClientStd as Inner, rfc8621::mailbox::get::JmapMailboxGetOptions};
+use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
 
@@ -38,7 +39,7 @@ impl JmapClient {
     pub fn new(config: JmapConfig) -> Result<Self> {
         let tls = config.tls.clone().into_tls(config.alpn.clone());
 
-        let http_auth = jmap_http_auth(config.auth.clone())?;
+        let http_auth = jmap_http_auth(config.auth.clone(), &mut SecretResolver::new())?;
         let url = parse_server_url(&config.server)?;
 
         let mut inner = Inner::connect(&url, &tls, http_auth)?;
@@ -102,7 +103,7 @@ impl JmapClient {
         }
 
         let tls = self.config.tls.clone().into_tls(self.config.alpn.clone());
-        let http_auth = jmap_http_auth(self.config.auth.clone())?;
+        let http_auth = jmap_http_auth(self.config.auth.clone(), &mut SecretResolver::new())?;
         let mut download_client = Inner::connect(download_url, &tls, http_auth)?;
 
         Ok(download_client.blob_download(download_url)?)
@@ -158,16 +159,26 @@ pub fn parse_server_url(server: &str) -> Result<Url> {
 /// Converts a [`JmapAuthConfig`] into the pre-formatted HTTP
 /// `Authorization` header value [`JmapClientStd::connect`] expects.
 ///
+/// The credential goes through `resolver`, so an account naming one
+/// command here and in another block spawns it once.
+///
 /// [`JmapClientStd::connect`]: io_jmap::client::JmapClientStd::connect
-pub fn jmap_http_auth(config: JmapAuthConfig) -> Result<SecretString> {
+pub fn jmap_http_auth(
+    config: JmapAuthConfig,
+    resolver: &mut SecretResolver,
+) -> Result<SecretString> {
     match config {
-        JmapAuthConfig::Header(token) => Ok(token.get()?),
+        JmapAuthConfig::Header(token) => Ok(resolver.resolve(token)?),
         JmapAuthConfig::Bearer { token } => {
-            let token = token.get()?;
+            let token = resolver.resolve(token)?;
             Ok(format!("Bearer {}", token.expose_secret()).into())
         }
         JmapAuthConfig::Basic { username, password } => {
-            let creds = format!("{}:{}", username, password.get()?.expose_secret());
+            let creds = format!(
+                "{}:{}",
+                username,
+                resolver.resolve(password)?.expose_secret()
+            );
             let encoded = BASE64_STANDARD.encode(creds.into_bytes());
             Ok(format!("Basic {encoded}").into())
         }

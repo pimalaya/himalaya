@@ -13,6 +13,7 @@ use io_managesieve::{
     client::ManagesieveClientStd as Inner, session::ManagesieveSessionOpenOptions,
 };
 use io_sasl::mechanism::Sasl;
+use pimalaya_config::secret::SecretResolver;
 use url::Url;
 
 use crate::{
@@ -26,9 +27,11 @@ pub struct SieveClient {
 }
 
 impl SieveClient {
-    /// Opens the ManageSieve session (TCP/TLS/STARTTLS, greeting,
-    /// SASL).
-    pub fn new(config: SieveConfig) -> Result<Self> {
+    /// Opens the ManageSieve session (TCP/TLS/STARTTLS, greeting, SASL),
+    /// resolving its credential through `resolver`, so an account whose
+    /// IMAP, SMTP and ManageSieve blocks name one credential command
+    /// spawns it once.
+    pub fn new(config: SieveConfig, resolver: &mut SecretResolver) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
         let server = parse_sieve_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
@@ -44,7 +47,7 @@ impl SieveClient {
                 let port = server
                     .port()
                     .unwrap_or(Inner::default_port(server.scheme()));
-                Some(cfg.try_into_sasl(host, port)?)
+                Some(cfg.try_into_sasl(host, port, resolver)?)
             }
             None => None,
         };
@@ -100,7 +103,7 @@ pub fn build_sieve_client(
         .take()
         .ok_or_else(|| anyhow!("Sieve config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(account_config));
-    let client = SieveClient::new(sieve_config)?;
+    let client = SieveClient::new(sieve_config, &mut SecretResolver::new())?;
     Ok((account, client))
 }
 

@@ -12,6 +12,7 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_gmail::v1::client::{GmailClientStd as Inner, GmailClientStdConnectOptions};
+use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
@@ -32,7 +33,7 @@ impl GmailClient {
     /// bearer credential and user id.
     pub fn new(config: GmailConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
-        let token = gmail_token(config.auth)?;
+        let token = gmail_token(config.auth, &mut SecretResolver::new())?;
         let options = GmailClientStdConnectOptions {
             tls,
             user_id: config.user_id,
@@ -107,6 +108,9 @@ pub fn build_gmail_client(
 
 /// Resolves the configuration into the bare OAuth 2.0 token, the client
 /// adding the `Bearer ` prefix itself.
-pub fn gmail_token(config: GmailAuthConfig) -> Result<SecretString> {
-    Ok(config.token.get()?)
+///
+/// The token goes through `resolver`, so an account naming one command
+/// here and in another block spawns it once.
+pub fn gmail_token(config: GmailAuthConfig, resolver: &mut SecretResolver) -> Result<SecretString> {
+    Ok(resolver.resolve(config.token)?)
 }

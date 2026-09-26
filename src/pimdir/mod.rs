@@ -15,7 +15,7 @@
 //! applies it, and so no row in a listing, which is what [`queue`] is
 //! for.
 //!
-//! [`PimdirReader`]: io_pimdir::PimdirReader
+//! [`PimdirReader`]: io_pimdir::client::reader::PimdirReader
 
 pub mod backend;
 pub mod cli;

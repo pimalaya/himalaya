@@ -7,9 +7,9 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Color, Row, Table};
 use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

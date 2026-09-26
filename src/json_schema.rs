@@ -79,7 +79,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
 
     insert!(
         "himalaya-configure",
-        crate::wizard::configure::GeneratedConfig
+        crate::wizard::configure::ConfigureOutput
     );
     insert!("himalaya-account-list", crate::account::list::AccountsTable);
     insert!("himalaya-account-check", crate::account::check::CheckReport);

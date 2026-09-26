@@ -615,10 +615,10 @@ fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
         bail!("Empty UID set");
     }
 
-    let uids: Vec<std::num::NonZeroU32> = ids
+    let uids: Vec<NonZeroU32> = ids
         .iter()
         .map(|s| {
-            s.parse::<std::num::NonZeroU32>()
+            s.parse::<NonZeroU32>()
                 .map_err(|_| anyhow!("Invalid message UID `{s}`"))
         })
         .collect::<Result<_>>()?;

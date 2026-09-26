@@ -12,7 +12,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use io_pimdir::{PimdirBlobs, PimdirError, PimdirProducer, PimdirReader, PimdirStore};
+use io_pimdir::client::{
+    PimdirError, PimdirStore, blobs::PimdirBlobs, producer::PimdirProducer, reader::PimdirReader,
+};
 
 use crate::{
     account::context::Account,
@@ -42,11 +44,7 @@ impl PimdirClient {
     /// creating one here would answer a mistyped root with an empty mailbox
     /// list rather than say the path is wrong.
     pub fn new(config: PimdirConfig) -> Result<Self> {
-        // NOTE: the configured root carries its `~` verbatim, and opening it
-        // unexpanded would look for a store at a literal one under the cwd.
-        let root = shellexpand::full(&config.root.to_string_lossy())
-            .map(|expanded| PathBuf::from(expanded.into_owned()))
-            .unwrap_or_else(|_| config.root.clone());
+        let root = config.root.clone();
 
         if !root.join("pimdir.db").exists() {
             return Err(anyhow!(

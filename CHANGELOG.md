@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed Gmail draft create/update JSON output to structured draft, message and thread IDs, with schemas for both commands. Text confirmations are unchanged.
 
+- Forwarded `vendored` to io-pimdir, which now links the system SQLite by default: a build carrying `--features pimdir` needs sqlite3 on the machine, or `vendored` alongside it to build one from source.
+
+- **BREAKING**: a `pimdir` store written before io-pimdir 0.4 is refused, and Himalaya reads the store's typed summaries.
+
+  io-replica is retired, its sync engine folded into io-pimdir, and the store format moved with it: summaries are typed rows rather than a JSON meta column, and a store from the earlier draft is refused on open, saying to delete it and let Neverest resync. There is no migration, the draft offering none.
+
+  An envelope now carries every `From` and `To` address with its display name, the `In-Reply-To` list and whether the message holds an attachment, straight from the store, and `envelope list` follows the store's newest-first order. A queued creation is rendered from the body it pins, the queued action carrying no summary any more.
+
+- A credential command that several blocks of one account name is now spawned once per run instead of once per block.
+
+  `account check` and the wizard connection tests open IMAP, SMTP and ManageSieve in a row, each block resolving its own credential, so a `pass` or `gpg` entry was unlocked as many times as it was named. They now share one resolver, so it unlocks once.
+
+  Two commands count as one only where the configuration wrote them identically: a shell line and the argv spelling of it stay distinct. A run reaching a single backend is unchanged.
+
 - **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim, and `pimdir.namespace` is removed.
 
   `-m imap/INBOX` is what `-m INBOX` used to be, and a listing shows `imap/INBOX` in both columns.
@@ -57,7 +71,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Every singular spelling stays as a hidden alias, where it used to be shown beside the plural, and `completion`, `manual` and `json-schema` gain the plural aliases they lacked.
 
+- Renamed the type `configure` prints from `GeneratedConfig` to `ConfigureOutput`, the shape the rest of the family uses.
+
+  What the command prints is unchanged. Only the `title` of the `himalaya-configure` JSON Schema follows the new name.
+
 ### Fixed
+
+- Fixed `--to`, `--cc` and `--bcc` carrying a display name composing a `To: <Alice <alice@example.org>>` no SMTP server accepts, as `--from` did before ([#727]). Each value is now parsed as an address list, so a comma inside a quoted display name (`"Doe, Alice" <alice@example.org>`) no longer splits it.
+
+- Fixed `imap raw` hanging until the stream timed out when the last command was not terminated by an explicit `\r\n` ([#764]).
+
+- Fixed IMAP searches with non-ASCII text being rejected by Gmail ([io-imap#3](https://github.com/pimalaya/io-imap/issues/3)).
+
+  Bumped io-imap to 0.6.1, which sends `CHARSET UTF-8` with every `SEARCH` again, a fix lost since v1.2.0 (#635).
+
+- Fixed the `Bcc:` field being transmitted over SMTP, disclosing blind recipients to everyone (#747).
+
+  Bumped io-smtp to 0.4, which removes it before `DATA`. The `--save` copy and `smtp send`, whose envelope is explicit, keep it.
+
+- Fixed a local path carrying a `~` or a shell variable being read verbatim.
+
+  `maildir.root = "~/Mail"` looked for a directory literally named `~` under the working directory rather than the Maildir the sample documents, and `m2dir.root` and the `tls.cert` of every backend read the same way.
+
+  Every path key now expands as the configuration is read, so no reader can forget. `pimdir.root` and `downloads-dir` already expanded where they were read, and only moved onto that rule.
+
+- Fixed a `pimdir`-only build failing to compile.
+
+  The client-side search evaluation the backend calls was gated on the `maildir` and `m2dir` features alone, so `--no-default-features --features pimdir` did not build. The default feature set was unaffected.
 
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
@@ -1255,6 +1295,7 @@ Few major concepts changed:
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
 [#739]: https://github.com/pimalaya/himalaya/issues/739
+[#764]: https://github.com/pimalaya/himalaya/issues/764
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

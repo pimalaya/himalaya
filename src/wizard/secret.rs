@@ -10,11 +10,9 @@
 //! Himalaya only reads a secret, never stores one, so a value that is not
 //! there yet surfaces when the account is tested right after.
 
-use std::process::Command;
-
 use anyhow::{Result, bail};
 use pimalaya_cli::wizard::keyring::{self, SecretChoice};
-use pimalaya_config::{command::shell, secret::Secret};
+use pimalaya_config::{command::CommandConfig, secret::Secret};
 
 /// Prompts for a password through the shared keyring picker.
 ///
@@ -35,6 +33,7 @@ pub fn configure_token(label: &str, key_default: &str, oauth: bool) -> Result<Se
     to_secret(keyring::prompt_token(label, key_default, oauth)?)
 }
 
+/// Turns a picker choice into the [`Secret`] the configuration stores.
 fn to_secret(choice: SecretChoice) -> Result<Secret> {
     Ok(match choice {
         SecretChoice::Command(argv) => command_secret(argv)?,
@@ -51,9 +50,10 @@ fn command_secret(argv: Vec<String>) -> Result<Secret> {
         bail!("Empty command for secret");
     };
 
-    let mut cmd = Command::new(program);
-    cmd.args(args);
-    Ok(Secret::Command(cmd))
+    Ok(Secret::Command(CommandConfig::Argv {
+        program: program.clone(),
+        args: args.to_vec(),
+    }))
 }
 
 /// Builds a [`Secret::Command`] from a shell command line, the fallback
@@ -64,7 +64,7 @@ fn shell_secret(line: &str) -> Result<Secret> {
         bail!("Empty shell command for secret");
     }
 
-    Ok(Secret::Command(shell(line)))
+    Ok(Secret::Command(CommandConfig::Shell(line.to_owned())))
 }
 
 #[cfg(test)]

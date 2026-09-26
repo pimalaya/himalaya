@@ -6,12 +6,12 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_gmail::v1::rest::drafts::{
     GmailDraft,
     list::{GmailDraftsList, GmailDraftsListParams},
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

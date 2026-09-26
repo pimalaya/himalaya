@@ -5,14 +5,17 @@
 //!
 //! The RFC 5321 envelope is derived from the message headers: `From:`
 //! becomes the reverse path, and `To:`, `Cc:` and `Bcc:` the forward
-//! paths.
+//! paths. io-smtp then removes the `Bcc:` field from what it transmits.
 
 use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
 
 use anyhow::{Result, anyhow, bail};
-use io_smtp::rfc5321::{
-    SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
+use io_smtp::{
+    message::SmtpMessageSendOptions,
+    rfc5321::{
+        SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
+    },
 };
 use mail_parser::{Address as MailParserAddress, MessageParser};
 
@@ -54,7 +57,12 @@ impl SmtpClient {
         let forward_paths: Vec<SmtpForwardPath<'static>> =
             forwards.into_iter().map(SmtpForwardPath::from).collect();
 
-        self.send(reverse_path, forward_paths, raw)?;
+        self.send(
+            reverse_path,
+            forward_paths,
+            raw,
+            SmtpMessageSendOptions::default(),
+        )?;
         Ok(())
     }
 }
