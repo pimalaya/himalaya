@@ -331,7 +331,7 @@ Backend-agnostic commands run on the account's first configured backend, or the 
 himalaya mailbox list
 himalaya envelope list --page 2
 himalaya envelope search from alice and after 2026-01-01 order by date desc
-himalaya flag add --flag seen 1:3,5
+himalaya flag add --flag seen 1 2 3 5
 himalaya message read 42
 himalaya message copy --from INBOX --to Archives 42
 himalaya attachment download 42
