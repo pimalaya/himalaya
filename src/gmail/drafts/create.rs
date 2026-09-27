@@ -17,7 +17,7 @@ use crate::{
 
 /// Create a Gmail draft (users.drafts.create).
 ///
-/// JSON output contains `id`, `message-id` and nullable `message-id` and `thread-id`.
+/// JSON output contains `id`, and nullable `message-id` and `thread-id`.
 #[derive(Debug, Parser)]
 pub struct GmailDraftCreateCommand {
     /// Thread id to attach the draft to.

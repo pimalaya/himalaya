@@ -17,7 +17,7 @@ use crate::{
 
 /// Update a Gmail draft (users.drafts.update).
 ///
-/// JSON output contains `id`, `message-id` and nullable `message-id` and `thread-id`.
+/// JSON output contains `id`, and nullable `message-id` and `thread-id`.
 #[derive(Debug, Parser)]
 pub struct GmailDraftUpdateCommand {
     /// The id of the draft to update.
