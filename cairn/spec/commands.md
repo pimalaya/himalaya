@@ -62,3 +62,6 @@ A command taking a raw RFC 5322 message SHALL resolve it through the shared `Mes
 
 ### Requirement: Gmail draft writes return identities
 `gmail drafts create` and `gmail drafts update` SHALL serialize the returned draft `id`, and nullable `message-id` and `thread-id`, under `--json`, with schemas registered for both commands. Non-JSON output SHALL retain the existing success sentence. A response without a message SHALL still succeed, with `message-id` and `thread-id` null, since the draft was already written.
+
+### Requirement: Gmail history retains added-message details
+`gmail history list --json` SHALL retain each added message's `id`, nullable `thread-id`, and supplied `label-ids` in a `messages-added-details` array, preserving order and duplicate entries. Missing labels SHALL produce an empty array. The existing `messages-added` id array, other change arrays, pagination, and text counts SHALL remain unchanged. The registered JSON Schema SHALL describe the details array, which SHALL remain present when empty.
