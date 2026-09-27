@@ -9,9 +9,13 @@ pub mod list;
 pub mod send;
 pub mod update;
 
+use core::fmt;
+
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
@@ -54,5 +58,26 @@ impl GmailDraftsCommand {
             Self::Send(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),
         }
+    }
+}
+
+/// Identity of a created or replaced Gmail draft.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailDraftWriteOutput {
+    /// The immutable draft id.
+    pub(crate) id: String,
+    /// The id of the message currently stored in the draft, when present.
+    pub(crate) message_id: Option<String>,
+    /// The thread id returned by Gmail, when present.
+    pub(crate) thread_id: Option<String>,
+    /// The verb used only in the text confirmation.
+    #[serde(skip)]
+    pub(crate) action: &'static str,
+}
+
+impl fmt::Display for GmailDraftWriteOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Gmail draft `{}` successfully {}", self.id, self.action)
     }
 }

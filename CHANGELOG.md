@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed Gmail draft create/update JSON output to structured draft, message and thread IDs, with schemas for both commands. Text confirmations are unchanged.
+
 - Forwarded `vendored` to io-pimdir, which now links the system SQLite by default: a build carrying `--features pimdir` needs sqlite3 on the machine, or `vendored` alongside it to build one from source.
 
 - **BREAKING**: a `pimdir` store written before io-pimdir 0.4 is refused, and Himalaya reads the store's typed summaries.

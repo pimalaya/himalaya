@@ -206,6 +206,14 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::gmail::drafts::get::GmailDraftGetOutput
         );
         insert!(
+            "himalaya-gmail-drafts-create",
+            crate::gmail::drafts::GmailDraftWriteOutput
+        );
+        insert!(
+            "himalaya-gmail-drafts-update",
+            crate::gmail::drafts::GmailDraftWriteOutput
+        );
+        insert!(
             "himalaya-gmail-threads-list",
             Paginated<crate::gmail::threads::list::ThreadsTable>
         );

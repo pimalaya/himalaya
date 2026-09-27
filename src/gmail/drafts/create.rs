@@ -8,11 +8,16 @@ use io_gmail::v1::rest::{
     drafts::{GmailDraft, create::GmailDraftCreate},
     messages::{GmailMessage, encode_raw},
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
+use crate::{
+    gmail::{client::GmailClient, drafts::GmailDraftWriteOutput},
+    shared::message::arg::MessageArg,
+};
 
 /// Create a Gmail draft (users.drafts.create).
+///
+/// JSON output contains `id`, and nullable `message-id` and `thread-id`.
 #[derive(Debug, Parser)]
 pub struct GmailDraftCreateCommand {
     /// Thread id to attach the draft to.
@@ -42,9 +47,15 @@ impl GmailDraftCreateCommand {
         }
         .response;
 
-        printer.out(Message::new(format!(
-            "Gmail draft `{}` successfully created",
-            draft.id
-        )))
+        let (message_id, thread_id) = match draft.message {
+            Some(message) => (Some(message.id), message.thread_id),
+            None => (None, None),
+        };
+        printer.out(GmailDraftWriteOutput {
+            id: draft.id,
+            message_id,
+            thread_id,
+            action: "created",
+        })
     }
 }
