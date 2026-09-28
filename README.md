@@ -150,11 +150,15 @@ nix run github:pimalaya/himalaya
 
 ### Sources
 
+Requires [Rust](https://www.rust-lang.org/tools/install) 1.89 or later:
+
 ```
 git clone https://github.com/pimalaya/himalaya
 cd himalaya
-nix run
+cargo build --release --locked
 ```
+
+The binary lands at `target/release/himalaya`.
 
 ## Configuration
 
