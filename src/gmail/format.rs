@@ -10,17 +10,20 @@ use clap::ValueEnum;
 use io_gmail::v1::rest::messages::GmailMessageFormat;
 
 /// Amount of Gmail message detail to return (`format` query parameter).
+///
+/// Defaults to `metadata`, which carries everything the commands print
+/// without fetching bodies. Ask for `full` to get the MIME payload.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FormatArg {
     /// Identifiers and labels only, without headers or body.
     Minimal,
     /// The parsed payload: headers, MIME structure and bodies.
-    #[default]
     Full,
     /// The whole message as raw RFC 5322 bytes.
     Raw,
     /// Headers only, narrowed down by the `--header` option.
+    #[default]
     Metadata,
 }
 
