@@ -10,7 +10,7 @@ change: imap-move-without-move
 
 ## What landed
 
-**The strategy follows the capabilities the session already caches.** `ImapClient::supports_move()` joins `supports_uidplus()`, and a `MoveStrategy` picks between them: `UID MOVE` with MOVE; `UID COPY`, `\Deleted` and `UID EXPUNGE` of the same UIDs with only UIDPLUS; a refusal with neither, since a plain `EXPUNGE` would take unrelated `\Deleted` messages with it.
+**The path follows the two capabilities the session already caches.** `ImapClient::supports_move()` joins `supports_uidplus()`, and `move_messages` matches on the pair: `UID MOVE` with MOVE; otherwise `UID COPY`, `\Deleted` and, when UIDPLUS is advertised, `UID EXPUNGE` of the source UIDs `COPYUID` reported. Without UIDPLUS the expunge is skipped and logged at debug: the messages stay flagged in the source, which is recoverable and never touches unrelated `\Deleted` messages.
 
 **The fallback reuses what the adapter already had.** `copy`, `store` and `uid_expunge` are the calls `copy_messages` and `delete_messages` make; the count comes from `COPYUID` as for a copy, and nothing is flagged or expunged when the copy affected nothing.
 

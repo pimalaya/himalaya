@@ -15,11 +15,11 @@ Such servers are still common in hosted mail. OVH's shared hosting (Dovecot, `ss
 
 ## What
 
-`move_messages` picks its strategy from the capabilities the session already caches:
+`move_messages` matches on the two capabilities the session already caches:
 
 - **`MOVE`**: `UID MOVE`, unchanged.
-- **no `MOVE`, `UIDPLUS`**: the sequence RFC 6851 §1 describes as what clients do without the extension. It runs `UID COPY` to the target, then flags the source UIDs `\Deleted` and runs `UID EXPUNGE` on exactly those UIDs. `delete_messages` already uses the same `\Deleted` plus `UID EXPUNGE` pair on the trash. The returned count comes from `COPYUID`, as it does for a copy. Nothing is flagged or expunged when the copy affected nothing.
-- **neither**: an error naming both extensions. A plain `EXPUNGE` would also remove every other `\Deleted` message in the source mailbox, so the move is refused rather than approximated.
+- **no `MOVE`**: the sequence RFC 6851 §1 describes as what clients do without the extension. It runs `UID COPY` to the target, then flags `\Deleted` in the source. When the copy returns `COPYUID`, those source UIDs are the ones flagged and, when the server advertises `UIDPLUS` (RFC 4315), `UID EXPUNGE`d. `delete_messages` already uses the same `\Deleted` plus `UID EXPUNGE` pair on the trash. The returned count comes from `COPYUID`, as it does for a copy. Nothing is flagged or expunged when the copy affected nothing.
+- **no `MOVE`, no `UIDPLUS`**: the same copy and flag, then the expunge is skipped and logged at debug. The messages stay flagged in the source, which is recoverable and never touches unrelated `\Deleted` messages. A plain `EXPUNGE` is not issued.
 
 This is not emulating an operation the backend cannot model: copy, flag and expunge are how IMAP expresses a move without the extension, and the adapter already owns all three. `ImapClient` gains `supports_move()` next to `supports_uidplus()`.
 
