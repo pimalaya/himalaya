@@ -15,7 +15,6 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, FixedOffset};
-use log::debug;
 use io_imap::{
     rfc3501::{
         append::ImapMessageAppendOptions,
@@ -41,6 +40,7 @@ use io_imap::{
         status::{StatusDataItem, StatusDataItemName},
     },
 };
+use log::debug;
 use mail_parser::MessageParser;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 
@@ -343,10 +343,8 @@ impl ImapClient {
                     return Ok(0);
                 }
 
-                // NOTE: `COPYUID` names the source UIDs that were actually
-                // copied, which can be a subset of the requested set.
                 let to_remove = match copy_uid {
-                    Some((_, source_uids, _)) => sequence_set_from_uids(source_uids)?,
+                    Some((_, source_uids, _)) => uid_sequence_set(source_uids)?,
                     None => sequence_set,
                 };
 
@@ -661,23 +659,16 @@ fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
 
 /// Parses stringified UIDs into an IMAP [`SequenceSet`].
 fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
-    if ids.is_empty() {
-        bail!("Empty UID set");
-    }
-
-    let uids: Vec<NonZeroU32> = ids
+    let uids = ids
         .iter()
-        .map(|s| {
-            s.parse::<NonZeroU32>()
-                .map_err(|_| anyhow!("Invalid message UID `{s}`"))
-        })
+        .map(|s| s.parse().map_err(|_| anyhow!("Invalid message UID `{s}`")))
         .collect::<Result<_>>()?;
 
-    SequenceSet::try_from(uids).map_err(|_| anyhow!("Invalid UID set"))
+    uid_sequence_set(uids)
 }
 
-/// Builds an IMAP [`SequenceSet`] from `COPYUID` source UIDs.
-fn sequence_set_from_uids(uids: Vec<u32>) -> Result<SequenceSet> {
+/// Builds an IMAP [`SequenceSet`] from numeric UIDs.
+fn uid_sequence_set(uids: Vec<u32>) -> Result<SequenceSet> {
     if uids.is_empty() {
         bail!("Empty UID set");
     }
