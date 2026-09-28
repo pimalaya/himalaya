@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed Gmail draft create/update JSON output to structured draft, message and thread IDs, with schemas for both commands. Text confirmations are unchanged.
 
+- Changed the default `--format` of `gmail messages get`, `gmail drafts get` and `gmail threads get` from `full` to `metadata`.
+
+  None of them prints more than `metadata` returns (id, labels, snippet, headers), so their output is unchanged, and Gmail no longer sends bodies that were thrown away. Pass `--format full` to get a thread's MIME payloads.
+
 - Forwarded `vendored` to io-pimdir, which now links the system SQLite by default: a build carrying `--features pimdir` needs sqlite3 on the machine, or `vendored` alongside it to build one from source.
 
 - **BREAKING**: a `pimdir` store written before io-pimdir 0.4 is refused, and Himalaya reads the store's typed summaries.
@@ -106,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Moving always sent `UID MOVE` (RFC 6851), which servers that do not advertise MOVE reject, OVH's hosted Dovecot among them. Deleting failed with it, since outside the trash it moves to the trash.
 
   Without MOVE, the move is now the sequence RFC 6851 describes for such servers: `UID COPY`, then `\Deleted` and, when UIDPLUS (RFC 4315) is advertised, a `UID EXPUNGE` of the source UIDs `COPYUID` reported. Without UIDPLUS the messages stay flagged `\Deleted` in the source, as `message delete` already does in the trash, so they stay recoverable and unrelated `\Deleted` messages are never touched.
+
+- Preserved message MIME payloads in `gmail threads get --json`, including full-format bodies and attachment metadata ([#750](https://github.com/pimalaya/himalaya/issues/750)).
 
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
