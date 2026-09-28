@@ -15,6 +15,7 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, FixedOffset};
+use log::debug;
 use io_imap::{
     rfc3501::{
         append::ImapMessageAppendOptions,
@@ -309,16 +310,65 @@ impl ImapClient {
         Ok(self.copied_count(copy_uid, ids.len()))
     }
 
-    /// Moves a UID set between two mailboxes, per RFC 6851.
+    /// Moves a UID set between two mailboxes.
+    ///
+    /// With RFC 6851 MOVE this is a single `UID MOVE`. Without it, it is
+    /// the sequence RFC 6851 §1 describes for such servers: `UID COPY`,
+    /// then `\Deleted` and, when RFC 4315 UIDPLUS is advertised, a
+    /// `UID EXPUNGE` of the source UIDs `COPYUID` reported. Without
+    /// UIDPLUS the messages stay flagged in the source, as
+    /// `delete_messages` already does in the trash. A plain `EXPUNGE`
+    /// would also remove every other `\Deleted` message.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
 
         self.select(source, ImapMailboxSelectOptions::default())?;
-        let copy_uid = self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
 
-        Ok(self.copied_count(copy_uid, ids.len()))
+        match (self.supports_move(), self.supports_uidplus()) {
+            (true, _) => {
+                let copy_uid =
+                    self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
+                Ok(self.copied_count(copy_uid, ids.len()))
+            }
+            (false, uidplus) => {
+                let copy_uid = self.copy(
+                    sequence_set.clone(),
+                    target,
+                    ImapMessageCopyOptions { uid: true },
+                )?;
+                let moved = self.copied_count(copy_uid.clone(), ids.len());
+                if moved == 0 {
+                    return Ok(0);
+                }
+
+                // NOTE: `COPYUID` names the source UIDs that were actually
+                // copied, which can be a subset of the requested set.
+                let to_remove = match copy_uid {
+                    Some((_, source_uids, _)) => sequence_set_from_uids(source_uids)?,
+                    None => sequence_set,
+                };
+
+                self.store(
+                    to_remove.clone(),
+                    StoreType::Add,
+                    vec![ImapFlag::Deleted],
+                    ImapMessageStoreOptions { uid: true },
+                )?;
+
+                if uidplus {
+                    self.uid_expunge(to_remove)?;
+                } else {
+                    debug!(
+                        "server lacks UIDPLUS, skipping UID EXPUNGE; \
+                         messages stay flagged \\Deleted in the source"
+                    );
+                }
+
+                Ok(moved)
+            }
+        }
     }
 
     /// Permanently deletes a UID set from the trash, returning whether
@@ -621,6 +671,20 @@ fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
             s.parse::<NonZeroU32>()
                 .map_err(|_| anyhow!("Invalid message UID `{s}`"))
         })
+        .collect::<Result<_>>()?;
+
+    SequenceSet::try_from(uids).map_err(|_| anyhow!("Invalid UID set"))
+}
+
+/// Builds an IMAP [`SequenceSet`] from `COPYUID` source UIDs.
+fn sequence_set_from_uids(uids: Vec<u32>) -> Result<SequenceSet> {
+    if uids.is_empty() {
+        bail!("Empty UID set");
+    }
+
+    let uids: Vec<NonZeroU32> = uids
+        .into_iter()
+        .map(|uid| NonZeroU32::new(uid).ok_or_else(|| anyhow!("Invalid message UID `{uid}`")))
         .collect::<Result<_>>()?;
 
     SequenceSet::try_from(uids).map_err(|_| anyhow!("Invalid UID set"))

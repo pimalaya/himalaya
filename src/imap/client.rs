@@ -88,6 +88,11 @@ impl ImapClient {
     pub fn supports_uidplus(&self) -> bool {
         has_imap_capability!(self.capabilities, UidPlus)
     }
+
+    /// Whether the server advertised RFC 6851 MOVE.
+    pub fn supports_move(&self) -> bool {
+        has_imap_capability!(self.capabilities, Move)
+    }
 }
 
 /// Parses an IMAP server string into a URL.

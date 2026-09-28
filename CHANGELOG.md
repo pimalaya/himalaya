@@ -105,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The client-side search evaluation the backend calls was gated on the `maildir` and `m2dir` features alone, so `--no-default-features --features pimdir` did not build. The default feature set was unaffected.
 
+- `message move` and `message delete` now work on IMAP servers without the MOVE extension.
+
+  Moving always sent `UID MOVE` (RFC 6851), which servers that do not advertise MOVE reject, OVH's hosted Dovecot among them. Deleting failed with it, since outside the trash it moves to the trash.
+
+  Without MOVE, the move is now the sequence RFC 6851 describes for such servers: `UID COPY`, then `\Deleted` and, when UIDPLUS (RFC 4315) is advertised, a `UID EXPUNGE` of the source UIDs `COPYUID` reported. Without UIDPLUS the messages stay flagged `\Deleted` in the source, as `message delete` already does in the trash, so they stay recoverable and unrelated `\Deleted` messages are never touched.
+
 - Preserved message MIME payloads in `gmail threads get --json`, including full-format bodies and attachment metadata ([#750](https://github.com/pimalaya/himalaya/issues/750)).
 
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
