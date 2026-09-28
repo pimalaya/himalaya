@@ -209,16 +209,15 @@ fn quoted_pattern<'a>() -> impl Parser<'a, &'a str, String, ParserError<'a>> + C
     let escapable_chars = ['\\', '"'];
 
     dquote()
-        .then(
+        .ignore_then(
             choice((
                 bslash().ignore_then(one_of(escapable_chars)),
                 none_of(escapable_chars),
             ))
-            .repeated(),
+            .repeated()
+            .collect(),
         )
-        .then(dquote())
-        .to_slice()
-        .map(String::from)
+        .then_ignore(dquote())
 }
 
 fn unquoted_pattern<'a>() -> impl Parser<'a, &'a str, String, ParserError<'a>> + Clone {
@@ -276,14 +275,21 @@ mod tests {
 
         assert_eq!(
             super::quoted_pattern().parse("\"\"").into_result(),
-            Ok("\"\"".into())
+            Ok("".into())
         );
 
         assert_eq!(
             super::quoted_pattern()
                 .parse("\"quoted pattern\"")
                 .into_result(),
-            Ok("\"quoted pattern\"".into()),
+            Ok("quoted pattern".into()),
+        );
+
+        assert_eq!(
+            super::quoted_pattern()
+                .parse("\"escaped \\\" quote\"")
+                .into_result(),
+            Ok("escaped \" quote".into()),
         );
     }
 
@@ -304,7 +310,7 @@ mod tests {
 
         assert_eq!(
             super::from().parse("from \"quoted val\"").into_result(),
-            Ok(From("\"quoted val\"".into())),
+            Ok(From("quoted val".into())),
         );
     }
 
@@ -371,7 +377,7 @@ mod tests {
                 Box::new(From("f".into())),
                 Box::new(Or(
                     Box::new(To("t".into())),
-                    Box::new(Subject("\"s with parens )\"".into()))
+                    Box::new(Subject("s with parens )".into()))
                 )),
             )),
         );
