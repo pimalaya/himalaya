@@ -161,6 +161,13 @@ default = true
 #envelope.list.datetime-fmt = "%F %R%:z"
 #envelope.list.datetime-local-tz = false
 
+# Proxy the network backends connect through, absent their own `<backend>.proxy`
+# block (same keys). Without any, the `all_proxy` and `https_proxy` environment
+# variables are read. The URL takes `socks5://`, `socks5h://` or `http://`.
+#proxy.url = "socks5h://localhost:1080"
+#proxy.username = "alice"
+#proxy.password.command = "pass show proxy"
+
 # --------------------------------------------------------------------------------
 # IMAP config
 # https://www.iana.org/go/rfc9051

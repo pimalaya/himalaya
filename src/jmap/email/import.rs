@@ -17,7 +17,7 @@ use url::Url;
 
 use crate::{
     jmap::{
-        client::{JmapClient, jmap_http_auth},
+        client::{JmapClient, connect_options, jmap_http_auth},
         error::format_set_error,
     },
     shared::message::arg::MessageArg,
@@ -69,13 +69,10 @@ impl JmapEmailImportCommand {
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id
         } else {
-            let tls = client
-                .config
-                .tls
-                .clone()
-                .into_tls(client.config.alpn.clone());
-            let http_auth = jmap_http_auth(client.config.auth.clone(), &mut SecretResolver::new())?;
-            let mut upload_client = JmapClientStd::connect(&upload_url, &tls, http_auth)?;
+            let mut resolver = SecretResolver::new();
+            let http_auth = jmap_http_auth(client.config.auth.clone(), &mut resolver)?;
+            let opts = connect_options(&client.config, &mut resolver)?;
+            let mut upload_client = JmapClientStd::connect(&upload_url, http_auth, opts)?;
             upload_client
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id

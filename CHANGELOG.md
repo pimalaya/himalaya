@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `proxy`, a per-account SOCKS5 or HTTP proxy every network backend connects through, and `<backend>.proxy` to override it for one backend ([#742]).
+
+  The password is a secret like any credential, so it stays out of the URL. Without either, the `all_proxy` and `https_proxy` environment variables are still read.
+
 - Added `--posting-style none` to `message reply` and `message forward`, sending the written body without quoting the source.
 
 - Added a decoded template to `message compose`, `message reply` and `message forward` under `--json` when neither saving nor sending.
@@ -1329,6 +1333,7 @@ Few major concepts changed:
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
 [#739]: https://github.com/pimalaya/himalaya/issues/739
+[#742]: https://github.com/pimalaya/himalaya/issues/742
 [#743]: https://github.com/pimalaya/himalaya/issues/743
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 

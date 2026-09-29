@@ -42,7 +42,7 @@
   - Autoconfiguration (Thunderbird) <sup>[specs](https://wiki.mozilla.org/Thunderbird:Autoconfiguration)</sup>
   - SRV DNS lookups <sup>[rfc6186](https://datatracker.ietf.org/doc/html/rfc6186)</sup>
   - JMAP session resolution <sup>[rfc8620](https://datatracker.ietf.org/doc/html/rfc8620)</sup>
-- **SOCKS5**, **HTTP** proxy support via `$ALL_PROXY` and `$HTTP_PROXY`
+- **SOCKS5**, **HTTP** proxy support, per account or via `$ALL_PROXY` and `$HTTPS_PROXY`
 - **TOML configuration** with multi-account support
 - **JSON** output via `--json`
 

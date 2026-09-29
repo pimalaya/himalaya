@@ -29,6 +29,7 @@ pub fn configure(account_name: &str) -> Result<MsgraphConfig> {
     Ok(MsgraphConfig {
         user_id,
         tls: Default::default(),
+        proxy: None,
         alpn: vec!["http/1.1".to_string()],
         auth: MsgraphAuthConfig { token },
     })

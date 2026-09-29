@@ -10,7 +10,8 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_managesieve::{
-    client::ManagesieveClientStd as Inner, session::ManagesieveSessionOpenOptions,
+    client::{ManagesieveClientStd as Inner, ManagesieveClientStdConnectOptions},
+    session::ManagesieveSessionOpenOptions,
 };
 use io_sasl::mechanism::Sasl;
 use pimalaya_config::secret::SecretResolver;
@@ -18,7 +19,7 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, SieveConfig, parse_server},
+    config::{AccountConfig, Config, ProxyConfig, SieveConfig, parse_server},
 };
 
 /// ManageSieve client wrapping the inner stream for script management.
@@ -53,11 +54,16 @@ impl SieveClient {
         };
         // NOTE: RFC 5804 registers one port and reaches TLS on it through
         // STARTTLS, so a `sieve://` server wants the upgrade by default.
-        let opts = ManagesieveSessionOpenOptions {
-            starttls: config.starttls.unwrap_or(server.scheme() == "sieve"),
-            allow_cleartext_auth: config.allow_cleartext_auth,
+        let opts = ManagesieveClientStdConnectOptions {
+            tls,
+            proxy: ProxyConfig::resolve(config.proxy, resolver)?,
+            sasl,
+            session: ManagesieveSessionOpenOptions {
+                starttls: config.starttls.unwrap_or(server.scheme() == "sieve"),
+                allow_cleartext_auth: config.allow_cleartext_auth,
+            },
         };
-        let (inner, _capabilities) = Inner::connect(&server, &tls, sasl, opts)?;
+        let (inner, _capabilities) = Inner::connect(&server, opts)?;
         Ok(Self { inner })
     }
 }

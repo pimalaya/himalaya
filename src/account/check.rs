@@ -225,14 +225,16 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
 #[cfg(feature = "imap")]
 pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Result<()> {
     use io_imap::{
-        client::{ImapClientStd, default_port},
+        client::{ImapClientStd, ImapClientStdConnectOptions, default_port},
         session::ImapSessionOpenOptions,
     };
     use io_sasl::mechanism::Sasl;
 
-    use crate::imap::{client::parse_imap_server, id::resolve_auto_id_params};
+    use crate::{
+        config::ProxyConfig,
+        imap::{client::parse_imap_server, id::resolve_auto_id_params},
+    };
 
-    let tls = imap_config.tls.clone().into_tls(imap_config.alpn.clone());
     let auto_id = resolve_auto_id_params(&imap_config.id)?;
     let server = parse_imap_server(&imap_config.server)?;
     let sasl: Option<Sasl> = imap_config
@@ -244,12 +246,17 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolv
             cfg.try_into_sasl(host, port, resolver)
         })
         .transpose()?;
-    let opts = ImapSessionOpenOptions {
-        starttls: imap_config.starttls,
-        auto_id,
-        sasl_ir: imap_config.sasl_ir,
+    let opts = ImapClientStdConnectOptions {
+        tls: imap_config.tls.clone().into_tls(imap_config.alpn.clone()),
+        proxy: ProxyConfig::resolve(imap_config.proxy.clone(), resolver)?,
+        sasl,
+        session: ImapSessionOpenOptions {
+            starttls: imap_config.starttls,
+            auto_id,
+            sasl_ir: imap_config.sasl_ir,
+        },
     };
-    let _ = ImapClientStd::connect(&server, &tls, sasl, opts)?;
+    let _ = ImapClientStd::connect(&server, opts)?;
 
     Ok(())
 }
@@ -262,21 +269,23 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolv
 #[cfg(feature = "imap")]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
     use io_imap::{
-        client::{ImapClientStd, default_alpn},
+        client::{ImapClientStd, ImapClientStdConnectOptions, default_alpn},
         rfc3501::capability::available_auth_mechanisms,
         session::ImapSessionOpenOptions,
     };
-    use io_sasl::mechanism::Sasl;
 
     use crate::{config::TlsConfig, imap::client::parse_imap_server};
 
-    let tls = TlsConfig::default().into_tls(default_alpn());
     let server = parse_imap_server(server)?;
-    let opts = ImapSessionOpenOptions {
-        starttls,
+    let opts = ImapClientStdConnectOptions {
+        tls: TlsConfig::default().into_tls(default_alpn()),
+        session: ImapSessionOpenOptions {
+            starttls,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    let (_client, capabilities) = ImapClientStd::connect(&server, &tls, None::<Sasl>, opts)?;
+    let (_client, capabilities) = ImapClientStd::connect(&server, opts)?;
 
     Ok(available_auth_mechanisms(&capabilities))
 }
@@ -289,12 +298,12 @@ fn connect_jmap(
 ) -> Result<()> {
     use io_jmap::client::JmapClientStd;
 
-    use crate::jmap::client::{jmap_http_auth, parse_server_url};
+    use crate::jmap::client::{connect_options, jmap_http_auth, parse_server_url};
 
-    let tls = jmap_config.tls.clone().into_tls(jmap_config.alpn.clone());
     let http_auth = jmap_http_auth(jmap_config.auth.clone(), resolver)?;
+    let opts = connect_options(jmap_config, resolver)?;
     let url = parse_server_url(&jmap_config.server)?;
-    let mut client = JmapClientStd::connect(&url, &tls, http_auth)?;
+    let mut client = JmapClientStd::connect(&url, http_auth, opts)?;
     client.session_get(&url)?;
 
     Ok(())
@@ -309,12 +318,12 @@ fn connect_gmail(
     use io_gmail::v1::client::{GmailClientStd, GmailClientStdConnectOptions};
     use secrecy::ExposeSecret;
 
-    use crate::gmail::client::gmail_token;
+    use crate::{config::ProxyConfig, gmail::client::gmail_token};
 
-    let tls = gmail_config.tls.clone().into_tls(gmail_config.alpn.clone());
     let token = gmail_token(gmail_config.auth.clone(), resolver)?;
     let options = GmailClientStdConnectOptions {
-        tls,
+        tls: gmail_config.tls.clone().into_tls(gmail_config.alpn.clone()),
+        proxy: ProxyConfig::resolve(gmail_config.proxy.clone(), resolver)?,
         user_id: gmail_config.user_id.clone(),
     };
     let mut client = GmailClientStd::connect(token.expose_secret(), options)?;
@@ -332,15 +341,15 @@ fn connect_msgraph(
     use io_msgraph::v1::client::{MsgraphClientStd, MsgraphClientStdConnectOptions};
     use secrecy::ExposeSecret;
 
-    use crate::msgraph::client::msgraph_token;
+    use crate::{config::ProxyConfig, msgraph::client::msgraph_token};
 
-    let tls = msgraph_config
-        .tls
-        .clone()
-        .into_tls(msgraph_config.alpn.clone());
     let token = msgraph_token(msgraph_config.auth.clone(), resolver)?;
     let options = MsgraphClientStdConnectOptions {
-        tls,
+        tls: msgraph_config
+            .tls
+            .clone()
+            .into_tls(msgraph_config.alpn.clone()),
+        proxy: ProxyConfig::resolve(msgraph_config.proxy.clone(), resolver)?,
         user_id: msgraph_config.user_id.clone(),
     };
     let mut client = MsgraphClientStd::connect(token.expose_secret(), options)?;
@@ -385,10 +394,13 @@ pub(crate) fn connect_smtp(
 
     use io_sasl::mechanism::Sasl;
     use io_smtp::{
-        client::SmtpClientStd, rfc5321::SmtpEhloDomain, session::SmtpSessionOpenOptions,
+        client::{SmtpClientStd, SmtpClientStdConnectOptions},
+        rfc5321::SmtpEhloDomain,
+        session::SmtpSessionOpenOptions,
     };
 
-    let tls = smtp_config.tls.clone().into_tls(smtp_config.alpn.clone());
+    use crate::config::ProxyConfig;
+
     let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
     let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
     let sasl: Option<Sasl> = smtp_config
@@ -402,10 +414,15 @@ pub(crate) fn connect_smtp(
             cfg.try_into_sasl(host, port, resolver)
         })
         .transpose()?;
-    let opts = SmtpSessionOpenOptions {
-        starttls: smtp_config.starttls,
+    let opts = SmtpClientStdConnectOptions {
+        tls: smtp_config.tls.clone().into_tls(smtp_config.alpn.clone()),
+        proxy: ProxyConfig::resolve(smtp_config.proxy.clone(), resolver)?,
+        sasl,
+        session: SmtpSessionOpenOptions {
+            starttls: smtp_config.starttls,
+        },
     };
-    let _client = SmtpClientStd::connect(&server, &tls, domain, sasl, opts)?;
+    let _client = SmtpClientStd::connect(&server, domain, opts)?;
 
     Ok(())
 }

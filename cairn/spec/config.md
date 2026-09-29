@@ -52,3 +52,8 @@ A command backing a secret SHALL be spawned once per command run, however many b
 Two commands SHALL count as one only where the configuration wrote them identically: the shell-string form and the argv-array form are distinct even when they run the same program.
 
 The resolved value SHALL live no longer than the run that resolved it, and SHALL never be written to a config file, a log line or a cache.
+
+### Requirement: A proxy is set per account and per backend
+An account's `proxy` SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph) whose own block names no `proxy`, and a backend's own `proxy` SHALL win over it. With neither, the connection SHALL read the `all_proxy` and `https_proxy` environment variables, honouring `no_proxy`.
+
+`proxy.url` SHALL take `socks5://`, `socks5h://` or `http://`. `proxy.username` and `proxy.password` SHALL override the URL's user info, the password being a secret like any credential; a password without a username SHALL be rejected.

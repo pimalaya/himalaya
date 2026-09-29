@@ -11,7 +11,7 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_imap::{
-    client::{ImapClientStd as Inner, default_port},
+    client::{ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
     has_imap_capability,
     session::ImapSessionOpenOptions,
     types::response::Capability,
@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ImapConfig, parse_server},
+    config::{AccountConfig, Config, ImapConfig, ProxyConfig, parse_server},
     imap::id::resolve_auto_id_params,
 };
 
@@ -57,12 +57,17 @@ impl ImapClient {
             }
             None => None,
         };
-        let opts = ImapSessionOpenOptions {
-            starttls: config.starttls,
-            auto_id,
-            sasl_ir: config.sasl_ir,
+        let opts = ImapClientStdConnectOptions {
+            tls,
+            proxy: ProxyConfig::resolve(config.proxy, &mut resolver)?,
+            sasl,
+            session: ImapSessionOpenOptions {
+                starttls: config.starttls,
+                auto_id,
+                sasl_ir: config.sasl_ir,
+            },
         };
-        let (inner, capabilities) = Inner::connect(&server, &tls, sasl, opts)?;
+        let (inner, capabilities) = Inner::connect(&server, opts)?;
         Ok(Self {
             inner,
             capabilities,

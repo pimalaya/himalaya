@@ -11,14 +11,14 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use io_jmap::client::JmapClientStd as Inner;
+use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, parse_server},
+    config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, ProxyConfig, parse_server},
     email::mailbox::{MailboxIndex, MailboxRole},
 };
 
@@ -38,12 +38,12 @@ impl JmapClient {
     /// Establishes the session, discovering the endpoint through
     /// `/.well-known/jmap` when the configuration names an authority.
     pub fn new(config: JmapConfig) -> Result<Self> {
-        let tls = config.tls.clone().into_tls(config.alpn.clone());
-
-        let http_auth = jmap_http_auth(config.auth.clone(), &mut SecretResolver::new())?;
+        let mut resolver = SecretResolver::new();
+        let http_auth = jmap_http_auth(config.auth.clone(), &mut resolver)?;
+        let opts = connect_options(&config, &mut resolver)?;
         let url = parse_server_url(&config.server)?;
 
-        let mut inner = Inner::connect(&url, &tls, http_auth)?;
+        let mut inner = Inner::connect(&url, http_auth, opts)?;
         inner.session_get(&url)?;
 
         Ok(Self {
@@ -92,9 +92,10 @@ impl JmapClient {
             return Ok(self.blob_download(download_url)?);
         }
 
-        let tls = self.config.tls.clone().into_tls(self.config.alpn.clone());
-        let http_auth = jmap_http_auth(self.config.auth.clone(), &mut SecretResolver::new())?;
-        let mut download_client = Inner::connect(download_url, &tls, http_auth)?;
+        let mut resolver = SecretResolver::new();
+        let http_auth = jmap_http_auth(self.config.auth.clone(), &mut resolver)?;
+        let opts = connect_options(&self.config, &mut resolver)?;
+        let mut download_client = Inner::connect(download_url, http_auth, opts)?;
 
         Ok(download_client.blob_download(download_url)?)
     }
@@ -144,6 +145,18 @@ pub fn build_jmap_client(
 /// scheme is rejected.
 pub fn parse_server_url(server: &str) -> Result<Url> {
     parse_server(server, "https", &["http", "https"])
+}
+
+/// Builds the connect options of a `[jmap]` block, its proxy password
+/// going through `resolver`.
+pub fn connect_options(
+    config: &JmapConfig,
+    resolver: &mut SecretResolver,
+) -> Result<JmapClientStdConnectOptions> {
+    Ok(JmapClientStdConnectOptions {
+        tls: config.tls.clone().into_tls(config.alpn.clone()),
+        proxy: ProxyConfig::resolve(config.proxy.clone(), resolver)?,
+    })
 }
 
 /// Converts a [`JmapAuthConfig`] into the pre-formatted HTTP

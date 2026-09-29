@@ -301,6 +301,7 @@ fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
     ImapConfig {
         server: endpoint_server(endpoint),
         tls: Default::default(),
+        proxy: None,
         starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: io_imap::client::default_alpn(),
         sasl: Some(sasl),
@@ -320,6 +321,7 @@ fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
     SmtpConfig {
         server: format!("{scheme}://{}:{}", endpoint.host, endpoint.port),
         tls: Default::default(),
+        proxy: None,
         starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: SmtpClientStd::default_alpn(),
         sasl: Some(sasl),

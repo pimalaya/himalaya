@@ -15,14 +15,16 @@ use std::{
 use anyhow::{Result, anyhow};
 use io_sasl::mechanism::Sasl;
 use io_smtp::{
-    client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain, session::SmtpSessionOpenOptions,
+    client::{SmtpClientStd as Inner, SmtpClientStdConnectOptions},
+    rfc5321::SmtpEhloDomain,
+    session::SmtpSessionOpenOptions,
 };
 use pimalaya_config::secret::SecretResolver;
 use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, SmtpConfig, parse_server},
+    config::{AccountConfig, Config, ProxyConfig, SmtpConfig, parse_server},
 };
 
 /// SMTP client wrapping the inner stream for sending messages.
@@ -55,10 +57,15 @@ impl SmtpClient {
             }
             None => None,
         };
-        let opts = SmtpSessionOpenOptions {
-            starttls: config.starttls,
+        let opts = SmtpClientStdConnectOptions {
+            tls,
+            proxy: ProxyConfig::resolve(config.proxy, &mut resolver)?,
+            sasl,
+            session: SmtpSessionOpenOptions {
+                starttls: config.starttls,
+            },
         };
-        let (inner, _capabilities) = Inner::connect(&server, &tls, domain, sasl, opts)?;
+        let (inner, _capabilities) = Inner::connect(&server, domain, opts)?;
         Ok(Self { inner })
     }
 }

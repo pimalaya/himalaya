@@ -103,6 +103,7 @@ fn jmap_config(server: String, auth: JmapAuthConfig) -> JmapConfig {
     JmapConfig {
         server,
         tls: Default::default(),
+        proxy: None,
         alpn: JmapClientStd::default_alpn(),
         auth,
         identity_id: None,

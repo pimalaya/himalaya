@@ -20,7 +20,11 @@ use pimalaya_config::{
     secret::{Secret, SecretResolver},
     toml::{TomlConfig, shell_expanded_path, shell_expanded_string},
 };
-use pimalaya_stream::tls::{Rustls, RustlsCrypto, Tls, TlsProvider};
+use pimalaya_stream::{
+    proxy::{Proxy, ProxyAuth},
+    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+};
+use secrecy::SecretString;
 use serde::{Deserialize, Deserializer, Serialize};
 use url::Url;
 
@@ -126,7 +130,9 @@ impl TomlConfig for Config {
     }
 
     fn take_named_account(&mut self, name: &str) -> Option<(String, Self::Account)> {
-        self.accounts.remove_entry(name)
+        let (name, mut account) = self.accounts.remove_entry(name)?;
+        account.inherit_proxy();
+        Some((name, account))
     }
 
     fn take_default_account(&mut self) -> Option<(String, Self::Account)> {
@@ -144,12 +150,13 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the listed ones, so a
 /// field added to [`AccountConfig`] can never go missing from a generated
 /// document just because nobody updated this table.
-const RENDER_ORDER: [&str; 18] = [
+const RENDER_ORDER: [&str; 19] = [
     "default",
     "email",
     "display-name",
     "signature",
     "signature-delim",
+    "proxy",
     "imap",
     "jmap",
     "gmail",
@@ -166,6 +173,27 @@ const RENDER_ORDER: [&str; 18] = [
 ];
 
 impl AccountConfig {
+    /// Hands the account proxy to every network backend naming none of
+    /// its own.
+    fn inherit_proxy(&mut self) {
+        let Some(proxy) = &self.proxy else {
+            return;
+        };
+
+        let slots = [
+            self.imap.as_mut().map(|c| &mut c.proxy),
+            self.jmap.as_mut().map(|c| &mut c.proxy),
+            self.gmail.as_mut().map(|c| &mut c.proxy),
+            self.msgraph.as_mut().map(|c| &mut c.proxy),
+            self.smtp.as_mut().map(|c| &mut c.proxy),
+            self.sieve.as_mut().map(|c| &mut c.proxy),
+        ];
+
+        for slot in slots.into_iter().flatten() {
+            slot.get_or_insert_with(|| proxy.clone());
+        }
+    }
+
     /// Renders this account as an `[accounts.<name>]` block.
     ///
     /// What this adds over the serializer is reading order: dotted keys
@@ -284,6 +312,10 @@ pub struct AccountConfig {
     /// `attachment list` rendering options.
     #[serde(default)]
     pub attachment: AttachmentConfig,
+    /// Proxy every network backend of this account goes through, unless
+    /// its own block names one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// The IMAP backend of this account.
     #[allow(unused)]
     pub imap: Option<ImapConfig>,
@@ -559,6 +591,10 @@ pub struct ImapConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// Whether to upgrade the connection with `STARTTLS` after the
     /// greeting, valid only for an `imap://` server.
     #[serde(default, skip_serializing_if = "is_default")]
@@ -710,6 +746,10 @@ pub struct SmtpConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// Whether to upgrade the connection with `STARTTLS` after the
     /// greeting, valid only for an `smtp://` server.
     #[serde(default, skip_serializing_if = "is_default")]
@@ -743,6 +783,10 @@ pub struct SieveConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// Whether to upgrade the connection with `STARTTLS` after the
     /// greeting, unset following the scheme.
     ///
@@ -768,6 +812,60 @@ pub struct SieveConfig {
     pub allow_cleartext_auth: bool,
     /// SASL credentials, see [`ImapConfig::sasl`].
     pub sasl: Option<SaslConfig>,
+}
+
+/// Proxy configuration.
+///
+/// `url` is a `socks5://`, `socks5h://` or `http://` proxy URL. Its user
+/// info authenticates too, but `username` and `password` keep the secret
+/// out of the URL.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ProxyConfig {
+    /// The proxy URL.
+    pub url: String,
+    /// The proxy username, required by `password`.
+    pub username: Option<String>,
+    /// The proxy password.
+    pub password: Option<Secret>,
+}
+
+impl ProxyConfig {
+    /// Resolves an optional configuration, an absent one reading the
+    /// environment at connect time.
+    pub fn resolve(config: Option<Self>, resolver: &mut SecretResolver) -> Result<Proxy> {
+        match config {
+            Some(config) => config.try_into_proxy(resolver),
+            None => Ok(Proxy::System),
+        }
+    }
+
+    /// Resolves the configuration into a runtime [`Proxy`], the password
+    /// going through `resolver`.
+    pub fn try_into_proxy(self, resolver: &mut SecretResolver) -> Result<Proxy> {
+        let mut proxy = Proxy::from_url(&self.url)?;
+
+        let auth = match (self.username, self.password) {
+            (None, None) => return Ok(proxy),
+            (None, Some(_)) => bail!("Proxy password requires a username"),
+            (Some(user), pass) => ProxyAuth {
+                user,
+                pass: match pass {
+                    Some(pass) => resolver.resolve(pass)?,
+                    None => SecretString::default(),
+                },
+            },
+        };
+
+        match &mut proxy {
+            Proxy::Socks5 { auth: slot, .. } | Proxy::Http { auth: slot, .. } => {
+                *slot = Some(auth);
+            }
+            Proxy::None | Proxy::System => {}
+        }
+
+        Ok(proxy)
+    }
 }
 
 /// SSL/TLS configuration.
@@ -1001,6 +1099,10 @@ pub struct JmapConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// ALPN identifiers offered during the TLS handshake, defaulting to
     /// `["http/1.1"]`, JMAP riding on HTTP/1.1.
     ///
@@ -1058,6 +1160,10 @@ pub struct GmailConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// ALPN identifiers offered during the TLS handshake, defaulting to
     /// `["http/1.1"]`, the REST API riding on HTTP/1.1.
     ///
@@ -1108,6 +1214,10 @@ pub struct MsgraphConfig {
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Proxy the connection goes through, falling back to the account one
+    /// and then to the `all_proxy`/`https_proxy` environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
     /// ALPN identifiers offered during the TLS handshake, defaulting to
     /// `["http/1.1"]`, the Graph API riding on HTTP/1.1.
     ///
@@ -1248,6 +1358,32 @@ mod tests {
         assert_eq!(account.email.as_deref(), Some("alice@example.org"));
         assert_eq!(account.display_name.as_deref(), Some("Alice at work"));
         assert_eq!(account.signature_delim.as_deref(), Some("~~~\n"));
+    }
+
+    #[test]
+    fn backends_inherit_the_account_proxy_unless_they_name_one() {
+        let mut config: Config = toml::from_str(
+            r#"
+            [accounts.example]
+            proxy.url = "socks5h://account:1080"
+            imap.server = "imap.example.org"
+            smtp.server = "smtp.example.org"
+            smtp.proxy.url = "http://smtp:3128"
+            "#,
+        )
+        .expect("the proxy blocks must deserialize");
+
+        let (_, account) = config.take_named_account("example").unwrap();
+        let proxy = |proxy: Option<ProxyConfig>| proxy.map(|proxy| proxy.url);
+
+        assert_eq!(
+            proxy(account.imap.unwrap().proxy).as_deref(),
+            Some("socks5h://account:1080")
+        );
+        assert_eq!(
+            proxy(account.smtp.unwrap().proxy).as_deref(),
+            Some("http://smtp:3128")
+        );
     }
 
     #[test]

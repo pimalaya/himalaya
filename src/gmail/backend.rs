@@ -141,7 +141,6 @@ impl GmailClient {
                 max_results: page_size,
                 page_token: page_token.as_deref(),
                 include_spam_trash: spam_trash,
-                ..Default::default()
             };
             match self.messages_list(&params)?.response.next_page_token {
                 Some(token) => page_token = Some(token),
@@ -155,7 +154,6 @@ impl GmailClient {
             max_results: page_size,
             page_token: page_token.as_deref(),
             include_spam_trash: spam_trash,
-            ..Default::default()
         };
         let ids: Vec<String> = self
             .messages_list(&params)?

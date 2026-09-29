@@ -17,7 +17,7 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, GmailAuthConfig, GmailConfig},
+    config::{AccountConfig, Config, GmailAuthConfig, GmailConfig, ProxyConfig},
     email::mailbox::{MailboxIndex, MailboxRole},
 };
 
@@ -33,10 +33,11 @@ impl GmailClient {
     /// Opens a TLS connection to the Gmail REST API with the configured
     /// bearer credential and user id.
     pub fn new(config: GmailConfig) -> Result<Self> {
-        let tls = config.tls.into_tls(config.alpn);
-        let token = gmail_token(config.auth, &mut SecretResolver::new())?;
+        let mut resolver = SecretResolver::new();
+        let token = gmail_token(config.auth, &mut resolver)?;
         let options = GmailClientStdConnectOptions {
-            tls,
+            tls: config.tls.into_tls(config.alpn),
+            proxy: ProxyConfig::resolve(config.proxy, &mut resolver)?,
             user_id: config.user_id,
         };
         let inner = Inner::connect(token.expose_secret(), options)?;

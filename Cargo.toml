@@ -47,17 +47,17 @@ convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "7"
 humansize = "2"
-io-gmail = { version = "0.3", default-features = false, optional = true }
-io-imap = { version = "0.6", default-features = false, optional = true }
-io-jmap = { version = "0.3", default-features = false, optional = true }
+io-gmail = { version = "0.4", default-features = false, optional = true }
+io-imap = { version = "0.7", default-features = false, optional = true }
+io-jmap = { version = "0.4", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
-io-managesieve = { version = "0.1", default-features = false, optional = true }
-io-msgraph = { version = "0.3.1", default-features = false, optional = true }
+io-managesieve = { version = "0.2", default-features = false, optional = true }
+io-msgraph = { version = "0.4", default-features = false, optional = true }
 io-pim-discovery = { version = "0.7", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
 io-pimdir = { version = "0.5", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
-io-smtp = { version = "0.4", default-features = false, optional = true }
+io-smtp = { version = "0.5", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "1"
 mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
