@@ -65,6 +65,20 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-message-delete",
             crate::shared::message::delete::DeleteReport
         );
+        // NOTE: the composers print a `MessageTemplate` when neither
+        // saving nor sending, and a confirmation line otherwise.
+        insert!(
+            "himalaya-message-compose",
+            crate::shared::message::handler::MessageTemplate
+        );
+        insert!(
+            "himalaya-message-reply",
+            crate::shared::message::handler::MessageTemplate
+        );
+        insert!(
+            "himalaya-message-forward",
+            crate::shared::message::handler::MessageTemplate
+        );
         insert!(
             "himalaya-attachment-list",
             crate::shared::attachment::list::Attachments

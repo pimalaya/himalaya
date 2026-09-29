@@ -28,6 +28,9 @@ pub enum PostingStyle {
     Top,
     /// The quoted source body above the written body.
     Bottom,
+    /// The written body alone, the source left unquoted, for a writer
+    /// who already laid the quote out.
+    None,
 }
 
 /// Everything the MIME assembler needs, which each command fills in from
@@ -315,7 +318,7 @@ fn compose_body(
     };
 
     let mut body = match (style, quote.is_empty()) {
-        (_, true) => user_body.to_string(),
+        (PostingStyle::None, _) | (_, true) => user_body.to_string(),
         (PostingStyle::Top, false) => {
             if user_body.is_empty() {
                 quote
@@ -735,6 +738,9 @@ Original body line.\r\n";
             PostingStyle::Bottom,
         );
         assert_eq!(bottom, "wrote:\n> theirs\n\nmine");
+
+        let unquoted = compose_body("mine", "theirs", "wrote:", "", "-- \n", PostingStyle::None);
+        assert_eq!(unquoted, "mine");
 
         let signed = compose_body("mine", "", "", "Alice", "-- \n", PostingStyle::Top);
         assert_eq!(signed, "mine\n\n-- \nAlice");

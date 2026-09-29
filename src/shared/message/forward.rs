@@ -25,7 +25,8 @@ use crate::{
 ///
 /// The source is fetched to pre-fill the `Fwd:` subject and the
 /// `References` header, and to quote the body. The result goes to stdout,
-/// `--save` or `--send`.
+/// `--save` or `--send`. With `--json` and neither, the decoded fields
+/// come out instead, without the signature that sending appends.
 ///
 /// Richer composition is `message read <id>` piped into a standalone
 /// composer, whose output feeds `message send` or `message add`.
@@ -117,8 +118,12 @@ impl MessageForwardCommand {
         let source = client.get_message(&mailbox, &self.id, false)?;
 
         let (from, from_name) = account.resolve_from(self.from.as_deref());
-        let signature =
-            account.resolve_signature(self.signature.as_deref(), self.signature_file.as_deref());
+        let template = printer.is_json() && !self.send && self.save.is_none();
+        let signature_file = self.signature_file.as_deref().filter(|_| !template);
+        let signature = match template {
+            true => None,
+            false => account.resolve_signature(self.signature.as_deref(), signature_file),
+        };
 
         let raw = builder::build(
             BuilderArgs {
@@ -132,7 +137,7 @@ impl MessageForwardCommand {
                 body_file: self.body_file.as_deref(),
                 attach: &self.attach,
                 signature,
-                signature_file: self.signature_file.as_deref(),
+                signature_file,
                 signature_delim: account.signature_delim(),
             },
             Some(SourceArgs {

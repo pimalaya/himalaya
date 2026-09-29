@@ -22,7 +22,9 @@ use crate::{
 /// Compose a new message from flags.
 ///
 /// The RFC 5322 bytes go to stdout, unless `--save` appends a copy to a
-/// mailbox, `--send` pushes the message out, or both.
+/// mailbox, `--send` pushes the message out, or both. With `--json` and
+/// neither, the decoded fields come out instead, without the signature
+/// that sending appends.
 ///
 /// Multipart MIME, MML directives, signing and editor-driven workflows
 /// belong to a standalone composer such as mml, piped into `message send`
@@ -90,8 +92,12 @@ impl MessageComposeCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let (from, from_name) = account.resolve_from(self.from.as_deref());
-        let signature =
-            account.resolve_signature(self.signature.as_deref(), self.signature_file.as_deref());
+        let template = printer.is_json() && !self.send && self.save.is_none();
+        let signature_file = self.signature_file.as_deref().filter(|_| !template);
+        let signature = match template {
+            true => None,
+            false => account.resolve_signature(self.signature.as_deref(), signature_file),
+        };
 
         let raw = builder::build(
             BuilderArgs {
@@ -105,7 +111,7 @@ impl MessageComposeCommand {
                 body_file: self.body_file.as_deref(),
                 attach: &self.attach,
                 signature,
-                signature_file: self.signature_file.as_deref(),
+                signature_file,
                 signature_delim: account.signature_delim(),
             },
             None,

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `--posting-style none` to `message reply` and `message forward`, sending the written body without quoting the source.
+
+- Added a decoded template to `message compose`, `message reply` and `message forward` under `--json` when neither saving nor sending.
+
+  It carries `from`, `to`, `cc`, `bcc`, `subject` and a `body` without the signature, so an editor can lay the message out and hand it back through the flags.
+
 - Added `messages-added-details` to `gmail history list --json`, preserving each arrival's message id, optional thread id and supplied label ids alongside the existing message-id arrays.
 
 - A pimdir write now shows on the next read instead of on the next sync.
@@ -82,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   What the command prints is unchanged. Only the `title` of the `himalaya-configure` JSON Schema follows the new name.
 
 ### Fixed
+
+- Fixed `envelope list` and `envelope search` truncating the ID column under `--max-width`.
+
+  A long id, such as a Maildir file name, came out cut with an ellipsis and was unusable by any follow-up command. The ID column now keeps its content width, and the header, like the rows, stays on one line.
 
 - Fixed `--to`, `--cc` and `--bcc` carrying a display name composing a `To: <Alice <alice@example.org>>` no SMTP server accepts, as `--from` did before ([#727]). Each value is now parsed as an address list, so a comma inside a quoted display name (`"Doe, Alice" <alice@example.org>`) no longer splits it.
 

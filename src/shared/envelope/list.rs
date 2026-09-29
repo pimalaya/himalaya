@@ -9,7 +9,9 @@ use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, CellAlignment, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{
+    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -183,11 +185,13 @@ impl fmt::Display for Envelopes {
         header.push(Cell::new(if self.recipient { "TO" } else { "FROM" }));
         header.push(Cell::new("DATE"));
         header.push(Cell::new("SIZE").set_alignment(CellAlignment::Right));
+        let mut header = Row::from(header);
+        header.max_height(1);
 
         table
             .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from(header))
+            .set_header(header)
             .add_rows(self.envelopes.iter().map(|env| {
                 let mut row = Row::new();
                 row.max_height(1);
@@ -226,6 +230,12 @@ impl fmt::Display for Envelopes {
                 );
                 row
             }));
+
+        // NOTE: an id is what a follow-up command takes, so squeezing
+        // the table into `--max-width` truncates any column but this one.
+        if let Some(column) = table.column_mut(0) {
+            column.set_constraint(ColumnConstraint::ContentWidth);
+        }
 
         if let Some(width) = self.max_width {
             table.set_width(width);
