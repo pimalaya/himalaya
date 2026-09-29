@@ -74,7 +74,7 @@ impl EnvelopeSearchCommand {
             .page_size
             .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let query = parse_query(self.query.as_deref())?;
 
         let envelopes = client.search_envelopes(

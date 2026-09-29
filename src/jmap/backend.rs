@@ -36,7 +36,7 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, MailboxRole},
         search::{
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
@@ -279,20 +279,6 @@ impl JmapClient {
         Ok(count)
     }
 
-    /// The id of the mailbox with role `trash` (RFC 8621), if any.
-    pub fn native_trash(&mut self) -> Result<Option<String>> {
-        let output = self.mailbox_get(JmapMailboxGetOptions {
-            ids: None,
-            properties: None,
-        })?;
-
-        Ok(output
-            .mailboxes
-            .into_iter()
-            .find(|mailbox| matches!(mailbox.role, Some(JmapMailboxRole::Trash)))
-            .and_then(|mailbox| mailbox.id))
-    }
-
     /// Permanently destroys `ids` (`Email/set` destroy).
     pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
         let mut args = JmapEmailSetArgs::default();
@@ -447,6 +433,9 @@ fn mailbox_from(mailbox: JmapMailbox, with_counts: bool) -> Mailbox {
     Mailbox {
         id: mailbox.id.unwrap_or_default(),
         name: mailbox.name.unwrap_or_default(),
+        role: mailbox
+            .role
+            .map(|role| MailboxRole::parse(&role.to_string())),
         total: with_counts.then_some(u64::from(mailbox.total_emails)),
         unread: with_counts.then_some(u64::from(mailbox.unread_emails)),
     }

@@ -41,7 +41,7 @@ impl MessageCopyCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let from = resolve_mailbox_or_default(account, self.from.as_deref())?;
+        let from = resolve_mailbox_or_default(account, self.from.as_deref());
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         let count = client.copy_messages(&from, &to, &ids)?;

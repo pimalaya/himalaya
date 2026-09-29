@@ -18,6 +18,8 @@ use crossterm::style::Color;
 use dirs::download_dir;
 use pimalaya_cli::table::{Color as TableColor, ContentArrangement};
 
+#[cfg(backend)]
+use crate::email::mailbox::{Mailbox, MailboxRole};
 use crate::{
     config::{
         AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
@@ -28,8 +30,6 @@ use crate::{
 
 /// chrono `strftime` format of the envelope DATE column.
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
-/// Alias naming the mailbox a command omitting `-m/--mailbox` runs against.
-const DEFAULT_MAILBOX_ALIAS: &str = "inbox";
 /// Page size of `envelope list` when nothing names one.
 const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
 /// RFC 3676 section 4.3 signature separator.
@@ -207,12 +207,31 @@ impl Account {
             .unwrap_or(name)
     }
 
-    /// Id the `inbox` alias maps to, which is the mailbox a shared command
-    /// omitting `-m/--mailbox` runs against.
-    pub fn default_mailbox(&self) -> Option<&str> {
-        self.mailbox_alias
-            .get(DEFAULT_MAILBOX_ALIAS)
-            .map(String::as_str)
+    /// Overlays the `mailbox.alias.<role>` entries onto the roles the
+    /// backend reported.
+    ///
+    /// An alias naming a listed mailbox id gives it the role and takes it
+    /// from any other mailbox, so the configuration corrects a server
+    /// that mislabels.
+    #[cfg(backend)]
+    pub fn apply_role_aliases(&self, mailboxes: &mut [Mailbox]) {
+        for (key, id) in &self.mailbox_alias {
+            let Some(role) = MailboxRole::known(key) else {
+                continue;
+            };
+
+            if !mailboxes.iter().any(|mailbox| mailbox.id == *id) {
+                continue;
+            }
+
+            for mailbox in mailboxes.iter_mut() {
+                if mailbox.id == *id {
+                    mailbox.role = Some(role.clone());
+                } else if mailbox.role.as_ref() == Some(&role) {
+                    mailbox.role = None;
+                }
+            }
+        }
     }
 
     /// FLAGS glyph of a message lacking `\Seen`, defaulting to `*`.
@@ -293,6 +312,11 @@ impl Account {
     /// Color of the NAME column, defaulting to the v1.2.0 blue.
     pub fn mailboxes_list_table_name_color(&self) -> TableColor {
         map_color_or(self.mailboxes_list_table.name_color, Color::Blue)
+    }
+
+    /// Color of the ROLE column, neutral for want of a v1.2.0 precedent.
+    pub fn mailboxes_list_table_role_color(&self) -> TableColor {
+        map_color_or(self.mailboxes_list_table.role_color, Color::Reset)
     }
 
     /// Color of the TOTAL column, neutral for want of a v1.2.0 precedent.
@@ -389,6 +413,7 @@ fn merge_mailbox_table(
     MailboxListTableConfig {
         id_color: over.id_color.or(base.id_color),
         name_color: over.name_color.or(base.name_color),
+        role_color: over.role_color.or(base.role_color),
         total_color: over.total_color.or(base.total_color),
         unread_color: over.unread_color.or(base.unread_color),
     }
@@ -491,6 +516,34 @@ mod tests {
         Account::from(config)
     }
 
+    #[cfg(backend)]
+    #[test]
+    fn role_aliases_override_the_backend_roles() {
+        let mailbox = |id: &str, role: Option<MailboxRole>| Mailbox {
+            id: id.to_string(),
+            name: id.to_string(),
+            role,
+            total: None,
+            unread: None,
+        };
+        let mut mailboxes = [
+            mailbox("Sent", Some(MailboxRole::Sent)),
+            mailbox("Sent Items", None),
+            mailbox("Old", Some(MailboxRole::Archive)),
+        ];
+
+        let account = account_with_aliases(&[
+            ("sent", "Sent Items"),
+            ("archive", "Missing"),
+            ("work", "Old"),
+        ]);
+        account.apply_role_aliases(&mut mailboxes);
+
+        assert_eq!(mailboxes[0].role, None);
+        assert_eq!(mailboxes[1].role, Some(MailboxRole::Sent));
+        assert_eq!(mailboxes[2].role, Some(MailboxRole::Archive));
+    }
+
     #[test]
     fn resolve_mailbox_returns_alias_target() {
         let account = account_with_aliases(&[("inbox", "INBOX")]);
@@ -521,18 +574,6 @@ mod tests {
     fn resolve_mailbox_falls_back_to_input_when_no_alias() {
         let account = account_with_aliases(&[]);
         assert_eq!(account.resolve_mailbox("INBOX"), "INBOX");
-    }
-
-    #[test]
-    fn default_mailbox_returns_inbox_alias() {
-        let account = account_with_aliases(&[("inbox", "raw-id")]);
-        assert_eq!(account.default_mailbox(), Some("raw-id"));
-    }
-
-    #[test]
-    fn default_mailbox_is_none_without_inbox_alias() {
-        let account = account_with_aliases(&[("sent", "Sent Items")]);
-        assert_eq!(account.default_mailbox(), None);
     }
 
     #[test]

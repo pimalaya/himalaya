@@ -183,6 +183,7 @@ fn mailbox_from(maildir: Maildir) -> Mailbox {
     Mailbox {
         id: maildir.path().to_string(),
         name: maildir.name().unwrap_or("").to_string(),
+        role: None,
         total: None,
         unread: None,
     }

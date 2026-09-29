@@ -87,6 +87,7 @@
 # Per-column colors of the mailboxes table. The values below are the defaults.
 #mailbox.list.table.id-color = "reset"
 #mailbox.list.table.name-color = "blue"
+#mailbox.list.table.role-color = "reset"
 #mailbox.list.table.total-color = "reset"
 #mailbox.list.table.unread-color = "reset"
 
@@ -119,12 +120,12 @@
 # case-insensitive both on lookup and on storage, where ids are stored verbatim,
 # and an account entry overrides the global one of the same name.
 #
-# The `inbox` entry is the implicit default mailbox every shared command falls
-# back to when `-m/--mailbox` is not passed.
-#
-# The wizard pre-fills what it can: JMAP reads the mailbox roles, Gmail and
-# Graph use their well-known ids, and IMAP pins `inbox` alone. The other IMAP
-# special-use roles are not discovered yet, so set them by hand.
+# An entry named after a mailbox role (inbox, sent, drafts, trash, junk,
+# archive, flagged, important) overrides the role the backend reports. JMAP,
+# Gmail and Graph report their roles, IMAP the inbox alone for now, and
+# Maildir, m2dir and pimdir none, so set them by hand there. The `inbox` role
+# is the default mailbox every shared command falls back to when
+# `-m/--mailbox` is not passed.
 #mailbox.alias.inbox = "INBOX"
 #mailbox.alias.sent = "[Gmail]/Sent Mail"
 #mailbox.alias.drafts = "[Gmail]/Drafts"

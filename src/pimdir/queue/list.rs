@@ -45,7 +45,7 @@ impl PimdirQueueListCommand {
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let queued = client.queued_envelopes(&mailbox)?;
 
         printer.out(PimdirQueuedMessages {

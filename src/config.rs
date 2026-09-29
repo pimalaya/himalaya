@@ -329,8 +329,9 @@ pub struct MailboxConfig {
     /// Friendly names mapped to backend-native mailbox ids, resolved
     /// case-insensitively.
     ///
-    /// The `inbox` alias doubles as the implicit default mailbox of a
-    /// shared command omitting `-m/--mailbox`.
+    /// An alias named after a mailbox role overrides the role the backend
+    /// reports, the `inbox` one being the default mailbox of a shared
+    /// command omitting `-m/--mailbox`.
     #[serde(default, rename = "alias", alias = "aliases")]
     pub aliases: HashMap<String, String>,
     /// `mailbox list` rendering options.
@@ -355,6 +356,8 @@ pub struct MailboxListTableConfig {
     pub id_color: Option<Color>,
     /// Color of the NAME column.
     pub name_color: Option<Color>,
+    /// Color of the ROLE column.
+    pub role_color: Option<Color>,
     /// Color of the TOTAL column.
     pub total_color: Option<Color>,
     /// Color of the UNREAD column.

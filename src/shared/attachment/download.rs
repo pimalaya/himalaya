@@ -53,7 +53,7 @@ impl AttachmentDownloadCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let raw = client.get_message(&mailbox, &self.message_id, false)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {

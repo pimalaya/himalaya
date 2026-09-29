@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::mailbox::Mailbox,
+    email::mailbox::{Mailbox, MailboxRole},
     shared::{client::EmailClient, table::style_from_preset},
 };
 
@@ -45,7 +45,8 @@ impl MailboxListCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailboxes = client.list_mailboxes(self.counts)?;
+        let mut mailboxes = client.list_mailboxes(self.counts)?;
+        account.apply_role_aliases(&mut mailboxes);
 
         let mailboxes = Mailboxes {
             preset: account.table_preset().to_string(),
@@ -55,6 +56,7 @@ impl MailboxListCommand {
             colors: MailboxColors {
                 id: account.mailboxes_list_table_id_color(),
                 name: account.mailboxes_list_table_name_color(),
+                role: account.mailboxes_list_table_role_color(),
                 total: account.mailboxes_list_table_total_color(),
                 unread: account.mailboxes_list_table_unread_color(),
             },
@@ -70,6 +72,7 @@ impl MailboxListCommand {
 struct MailboxColors {
     id: Color,
     name: Color,
+    role: Color,
     total: Color,
     unread: Color,
 }
@@ -99,7 +102,7 @@ impl fmt::Display for Mailboxes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
-        let mut header = vec![Cell::new("ID"), Cell::new("NAME")];
+        let mut header = vec![Cell::new("ID"), Cell::new("NAME"), Cell::new("ROLE")];
         if self.with_counts {
             header.push(Cell::new("TOTAL"));
             header.push(Cell::new("UNREAD"));
@@ -114,6 +117,7 @@ impl fmt::Display for Mailboxes {
                 row.max_height(1);
                 row.add_cell(Cell::new(&m.id).fg(self.colors.id));
                 row.add_cell(Cell::new(&m.name).fg(self.colors.name));
+                row.add_cell(role_cell(m.role.as_ref()).fg(self.colors.role));
                 if self.with_counts {
                     row.add_cell(count_cell(m.total).fg(self.colors.total));
                     row.add_cell(count_cell(m.unread).fg(self.colors.unread));
@@ -134,6 +138,14 @@ impl fmt::Display for Mailboxes {
 fn count_cell(value: Option<u64>) -> Cell {
     match value {
         Some(n) => Cell::new(n),
+        None => Cell::new(""),
+    }
+}
+
+/// Renders a role, or an empty cell when the mailbox has none.
+fn role_cell(role: Option<&MailboxRole>) -> Cell {
+    match role {
+        Some(role) => Cell::new(role),
         None => Cell::new(""),
     }
 }

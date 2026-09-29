@@ -18,14 +18,15 @@ use secrecy::{ExposeSecret, SecretString};
 use crate::{
     account::context::Account,
     config::{AccountConfig, Config, GmailAuthConfig, GmailConfig},
+    email::mailbox::{MailboxIndex, MailboxRole},
 };
 
 /// A live Gmail client and the label index it caches.
 pub struct GmailClient {
     inner: Inner,
-    /// The `(id, name)` pairs [`Self::resolve_mailbox_id`] maps names
+    /// The labels [`Self::resolve_mailbox_id`] maps names and roles
     /// through, fetched once and cached for the client's lifetime.
-    label_index: Option<Vec<(String, String)>>,
+    label_index: Option<MailboxIndex>,
 }
 
 impl GmailClient {
@@ -45,32 +46,25 @@ impl GmailClient {
         })
     }
 
-    /// Maps a human label name onto its opaque Gmail label id.
+    /// Maps a label id, name or role onto its opaque Gmail label id.
     ///
-    /// A known id passes through, a name match returns its id, and an
-    /// unknown value goes back as it is so the API surfaces the error. It
-    /// lives here so every backend method stays a pure id consumer.
+    /// It lives here so every backend method stays a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        self.label_index()?.resolve(mailbox)
+    }
+
+    /// The id of the label carrying `role`, `None` when none does.
+    pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
+        self.label_index()?.with_role(role)
+    }
+
+    fn label_index(&mut self) -> Result<&MailboxIndex> {
         if self.label_index.is_none() {
-            let labels = self.labels_list()?.response.labels;
-            let index = labels
-                .into_iter()
-                .map(|label| (label.id, label.name))
-                .collect();
-            self.label_index = Some(index);
+            let labels = self.list_mailboxes(false)?;
+            self.label_index = Some(MailboxIndex(labels));
         }
 
-        let index = self.label_index.as_deref().unwrap_or_default();
-
-        if index.iter().any(|(id, _)| id == mailbox) {
-            return Ok(mailbox.to_string());
-        }
-
-        if let Some((id, _)) = index.iter().find(|(_, name)| name == mailbox) {
-            return Ok(id.clone());
-        }
-
-        Ok(mailbox.to_string())
+        Ok(self.label_index.get_or_insert_default())
     }
 }
 

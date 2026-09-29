@@ -13,14 +13,15 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    email::mailbox::MailboxRole,
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
 /// Delete messages, trash first.
 ///
 /// The messages are moved to the trash, or removed for good when they are
-/// already there. The trash comes from the backend when it names one, and
-/// from `mailbox.alias.trash` otherwise.
+/// already there. The trash comes from `mailbox.alias.trash` when set, and
+/// from the backend's trash role otherwise.
 ///
 /// On an IMAP server without UIDPLUS, removing from the trash only flags
 /// the messages `\Deleted`, and a later expunge reclaims them.
@@ -40,12 +41,12 @@ impl MessageDeleteCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
 
-        let trash = match client.native_trash()? {
-            Some(trash) => trash,
-            None => account.mailbox_alias.get("trash").cloned().ok_or_else(|| {
+        let trash = match account.mailbox_alias.get("trash") {
+            Some(trash) => trash.clone(),
+            None => client.role_mailbox_id(&MailboxRole::Trash)?.ok_or_else(|| {
                 anyhow!(
                     "Cannot determine the trash mailbox; set `mailbox.alias.trash` in your config"
                 )

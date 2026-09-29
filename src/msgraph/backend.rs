@@ -11,12 +11,18 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
-use io_msgraph::v1::rest::users::{
-    mail_folders::{MsgraphMailFolder, list::MsgraphMailFoldersListParams},
-    messages::{
-        MsgraphFlagStatus, MsgraphFollowupFlag, MsgraphImportance, MsgraphMessage,
-        MsgraphRecipient, list::MsgraphMessagesListParams,
+use io_msgraph::v1::{
+    rest::{
+        batch::MsgraphBatchRequest,
+        users::{
+            mail_folders::{MsgraphMailFolder, list::MsgraphMailFoldersListParams},
+            messages::{
+                MsgraphFlagStatus, MsgraphFollowupFlag, MsgraphImportance, MsgraphMessage,
+                MsgraphRecipient, list::MsgraphMessagesListParams,
+            },
+        },
     },
+    send::user_path,
 };
 
 use crate::{
@@ -24,7 +30,7 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, MailboxRole},
     },
     msgraph::client::MsgraphClient,
 };
@@ -32,6 +38,17 @@ use crate::{
 /// OData `$select` for envelope listing: the message fields backing the
 /// shared [`Envelope`], returned in one round-trip.
 const ENVELOPE_SELECT: &str = "id,subject,from,toRecipients,receivedDateTime,isRead,isDraft,hasAttachments,internetMessageId,importance,flag,categories";
+
+/// The well-known folder names carrying a special-use role, a stable Graph
+/// contract accepted in place of a folder id.
+const WELL_KNOWN_FOLDERS: [(&str, MailboxRole); 6] = [
+    ("inbox", MailboxRole::Inbox),
+    ("sentitems", MailboxRole::Sent),
+    ("drafts", MailboxRole::Drafts),
+    ("deleteditems", MailboxRole::Trash),
+    ("junkemail", MailboxRole::Junk),
+    ("archive", MailboxRole::Archive),
+];
 
 impl MsgraphClient {
     /// Lists every Graph mail folder as a mailbox. Graph carries counts
@@ -42,7 +59,51 @@ impl MsgraphClient {
             ..Default::default()
         };
         let folders = self.mail_folders_list(&params)?.response.value;
-        Ok(folders.into_iter().map(mailbox_from).collect())
+        let roles = self.folder_roles()?;
+
+        Ok(folders
+            .into_iter()
+            .map(|folder| {
+                let role = roles
+                    .iter()
+                    .find(|(id, _)| *id == folder.id)
+                    .map(|(_, role)| role.clone());
+                mailbox_from(folder, role)
+            })
+            .collect())
+    }
+
+    /// Resolves the well-known folder names to folder ids in one `$batch`,
+    /// since Graph v1.0 lists folders without them. A name the mailbox
+    /// lacks, such as `archive`, is skipped.
+    fn folder_roles(&mut self) -> Result<Vec<(String, MailboxRole)>> {
+        let user = user_path(&self.user_id);
+        let requests: Vec<_> = WELL_KNOWN_FOLDERS
+            .iter()
+            .map(|(name, _)| MsgraphBatchRequest {
+                id: name.to_string(),
+                method: "GET".into(),
+                url: format!("/{user}/mailFolders/{name}?$select=id"),
+                ..Default::default()
+            })
+            .collect();
+
+        let mut roles = Vec::new();
+
+        for response in self.batch(&requests)?.response.responses {
+            let Some((_, role)) = WELL_KNOWN_FOLDERS
+                .iter()
+                .find(|(name, _)| *name == response.id)
+            else {
+                continue;
+            };
+
+            if let Ok(folder) = response.parse::<MsgraphMailFolder>() {
+                roles.push((folder.id, role.clone()));
+            }
+        }
+
+        Ok(roles)
     }
 
     /// Lists envelopes from the `mailbox` folder (id or well-known name
@@ -138,10 +199,11 @@ impl MsgraphClient {
 
 /// Converts one Graph mail folder into the shared [`Mailbox`] shape;
 /// Graph folders carry their counts inline.
-fn mailbox_from(folder: MsgraphMailFolder) -> Mailbox {
+fn mailbox_from(folder: MsgraphMailFolder, role: Option<MailboxRole>) -> Mailbox {
     Mailbox {
         id: folder.id,
         name: folder.display_name,
+        role,
         total: folder.total_item_count,
         unread: folder.unread_item_count,
     }

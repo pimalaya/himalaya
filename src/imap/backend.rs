@@ -49,7 +49,7 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, MailboxRole},
         search::{
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
@@ -424,6 +424,7 @@ fn is_selectable(row: &ListRow) -> bool {
 
 /// Converts one `LIST` row into the shared [`Mailbox`] shape.
 fn mailbox_from(row: ListRow) -> Mailbox {
+    let role = matches!(row.0, ImapMailbox::Inbox).then_some(MailboxRole::Inbox);
     let name = match row.0 {
         ImapMailbox::Inbox => "Inbox".to_string(),
         ImapMailbox::Other(other) => String::from_utf8_lossy(other.inner().as_ref()).into_owned(),
@@ -432,6 +433,7 @@ fn mailbox_from(row: ListRow) -> Mailbox {
     Mailbox {
         id: name.clone(),
         name,
+        role,
         total: None,
         unread: None,
     }

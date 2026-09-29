@@ -116,6 +116,7 @@ impl PimdirClient {
             mailboxes.push(Mailbox {
                 id: collection.id,
                 name: collection.name,
+                role: None,
                 total,
                 unread: None,
             });

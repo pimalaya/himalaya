@@ -329,7 +329,7 @@ Every command carries its own `--help`, the source of truth for its flags and sy
 
 ### Shared API
 
-Backend-agnostic commands run on the account's first configured backend, or the one picked with `-b/--backend`. When an `inbox` alias is set under `[mailbox.alias]`, `-m/--mailbox` defaults to it.
+Backend-agnostic commands run on the account's first configured backend, or the one picked with `-b/--backend`. `-m/--mailbox` takes a mailbox id, name, alias or role (`inbox`, `sent`, `drafts`, `trash`...), and defaults to the inbox.
 
 ```sh
 himalaya mailbox list

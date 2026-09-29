@@ -23,8 +23,8 @@ Himalaya runs no OAuth 2.0 grant itself, so OAuth SHALL NOT be a standalone list
 ### Requirement: Per-protocol test and shared SMTP credentials
 The discovered IMAP + SMTP flow SHALL test each protocol as it configures it: the IMAP connection is validated first, then, when an SMTP endpoint was discovered, the wizard asks whether SMTP reuses the same credentials (the two may advertise different auth), re-running the SASL prompt for a distinct one, and tests SMTP last. The wizard SHALL NOT invent an SMTP host: when discovery found IMAP but no SMTP, it produces an IMAP-only account (no `smtp` block, no SMTP test) instead of guessing `smtp.<domain>`. IMAP is likewise never guessed. JMAP and the proprietary APIs are validated by the account test. A backend that validates itself inline skips the final account test.
 
-### Requirement: Mailbox alias pre-fill
-The wizard SHALL pre-fill `mailbox.alias.*` so a generated account has a working default mailbox and known special-use targets. JMAP reads the RFC 8621 mailbox roles live over the tested connection. Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, ...) and well-known folder names (`inbox`, `sentitems`, ...). IMAP pins only the reserved `INBOX`; the other IMAP special-use roles are not discovered yet (see provider-quirks).
+### Requirement: No mailbox alias pre-fill
+The wizard SHALL NOT pre-fill `mailbox.alias.*`: the backends report their mailbox roles at runtime, and aliases are the user's overrides.
 
 ### Requirement: The prompted address is kept
 When the wizard's single prompt is answered with an email address rather than a server URL or a folder path, that address SHALL be written as the generated account's `email`. The wizard SHALL NOT prompt for a display name: it discovers, and a name is not discoverable.

@@ -52,7 +52,7 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 #### Envelopes
 
 - `thread` moved to the protocol-specific APIs.
-- `list -f|--folder INBOX` becomes `list -m|--mailbox INBOX`. The flag is optional: when omitted, the id mapped to the `inbox` alias under `[mailbox.alias]` is used.
+- `list -f|--folder INBOX` becomes `list -m|--mailbox INBOX`. The flag is optional: when omitted, the inbox is used.
 - The v1 search query grammar drops the `before <date>` clause. The remaining operators (`and`, `or`, `not`, parens) and the sort suffix (`order by date|from|to|subject [asc|desc]`) are unchanged. Backends advertise the subset they accept, and unsupported clauses fail at parse time. It is now accessible from the `search` command instead of `list`.
 - Default page size moves to `envelope.list.page-size` (per-account, with global fallback). The `-s/--page-size` CLI flag still wins when passed. Hard fallback when neither is set: 25.
 
@@ -109,7 +109,7 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 The v1 `[folder.alias]` block becomes `[mailbox.alias]`. Two behaviour changes on top of the rename:
 
 - Alias names are case-insensitive both on lookup and on storage, so `INBOX = "..."`, `Inbox = "..."` and `inbox = "..."` are equivalent entries.
-- The entry named `inbox` (case-insensitive) is the implicit default mailbox: shared commands fall back to its id when `-m/--mailbox` is omitted. No separate `default-mailbox` key.
+- An entry named after a mailbox role (`inbox`, `sent`, `trash`...) overrides the role the backend reports. The `inbox` one is the default mailbox shared commands fall back to when `-m/--mailbox` is omitted. No separate `default-mailbox` key.
 
 Account-level `[accounts.<name>.mailbox.alias]` entries override same-named global `[mailbox.alias]` entries.
 

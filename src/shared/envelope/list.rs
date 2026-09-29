@@ -70,7 +70,7 @@ impl EnvelopeListCommand {
             .page_size
             .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
         let queued = client.queued_messages(&mailbox)?;

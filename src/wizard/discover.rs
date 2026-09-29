@@ -20,7 +20,7 @@
 //! Himalaya runs no OAuth 2.0 grant of its own. A grant unlocks the
 //! external token brokers behind the API token prompt, and that is all.
 
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 #[cfg(all(feature = "imap", feature = "smtp"))]
@@ -48,8 +48,6 @@ use crate::wizard::imap_smtp;
 use crate::wizard::jmap;
 #[cfg(any(feature = "maildir", feature = "m2dir"))]
 use crate::wizard::local;
-#[cfg(any(feature = "gmail", feature = "msgraph"))]
-use crate::wizard::mailbox;
 #[cfg(feature = "msgraph")]
 use crate::wizard::msgraph;
 use crate::{
@@ -112,25 +110,22 @@ pub fn run() -> Result<(String, AccountConfig)> {
     Ok((account_name, account))
 }
 
-/// The result of a configure flow: the chosen backend, whether it
+/// The result of a configure flow: the chosen backend, and whether it
 /// already validated its connections (so the caller skips the final
-/// account test), and any `mailbox.alias.*` entries discovered from the
-/// server.
+/// account test).
 struct Outcome {
     chosen: Chosen,
     tested: bool,
-    aliases: HashMap<String, String>,
 }
 
 impl Outcome {
-    /// A not-yet-tested outcome with no discovered aliases, for the flows
+    /// A not-yet-tested outcome, for the flows
     /// that defer validation to the final account test (manual entry, the
     /// proprietary APIs, local backends).
     fn untested(chosen: Chosen) -> Self {
         Self {
             chosen,
             tested: false,
-            aliases: HashMap::new(),
         }
     }
 }
@@ -144,11 +139,7 @@ impl Outcome {
 /// The account is left non-default: whether it claims the default depends
 /// on what the configuration already holds, which discovery never reads.
 fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool)> {
-    let Outcome {
-        chosen,
-        tested,
-        aliases,
-    } = if is_path(input) {
+    let Outcome { chosen, tested } = if is_path(input) {
         Outcome::untested(configure_local(input)?)
     } else {
         configure_discovery(account_name, input)?
@@ -176,10 +167,6 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
         #[cfg(feature = "m2dir")]
         Chosen::M2dir(m2dir) => account.m2dir = Some(m2dir),
     }
-
-    // NOTE: the discovered special-use aliases are what lets a shared
-    // command resolve a mailbox without anyone hand-editing ids.
-    account.mailbox.aliases = aliases;
 
     // NOTE: the prompt may already have been answered with an address,
     // so the composers get their `From` without it being typed twice.
@@ -269,9 +256,8 @@ fn stop_undiscovered(input: &str) -> Result<Outcome> {
 }
 
 /// Configures the backend behind a discovered entry. The IMAP+SMTP and
-/// JMAP flows test their connections inline (marking the outcome tested)
-/// and discover their `mailbox.alias.*` on the same session; the others
-/// defer to the final account test and discover no aliases.
+/// JMAP flows test their connections inline (marking the outcome tested),
+/// the others defer to the final account test.
 #[cfg_attr(
     all(
         feature = "imap",
@@ -286,38 +272,28 @@ fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outco
     match &choice.kind {
         #[cfg(all(feature = "imap", feature = "smtp"))]
         DiscoveredKind::ImapSmtp { .. } => {
-            let (imap, smtp, aliases) =
-                imap_smtp::configure_discovered(account_name, email, &choice)?;
+            let (imap, smtp) = imap_smtp::configure_discovered(account_name, email, &choice)?;
             Ok(Outcome {
                 chosen: Chosen::ImapSmtp(Box::new(imap), smtp.map(Box::new)),
                 tested: true,
-                aliases,
             })
         }
         #[cfg(feature = "jmap")]
         DiscoveredKind::Jmap(_) => {
-            let (jmap, aliases) = jmap::configure_discovered(account_name, email, &choice)?;
+            let jmap = jmap::configure_discovered(account_name, email, &choice)?;
             Ok(Outcome {
                 chosen: Chosen::Jmap(Box::new(jmap)),
                 tested: true,
-                aliases,
             })
         }
-        // NOTE: Gmail and Graph name their special-use mailboxes through
-        // platform contracts, so the aliases are pinned without a live
-        // listing and the final account test still runs.
         #[cfg(feature = "gmail")]
-        DiscoveredKind::Gmail => Ok(Outcome {
-            chosen: Chosen::Gmail(gmail::configure(account_name)?),
-            tested: false,
-            aliases: mailbox::gmail_aliases(),
-        }),
+        DiscoveredKind::Gmail => Ok(Outcome::untested(Chosen::Gmail(gmail::configure(
+            account_name,
+        )?))),
         #[cfg(feature = "msgraph")]
-        DiscoveredKind::Msgraph => Ok(Outcome {
-            chosen: Chosen::Msgraph(msgraph::configure(account_name)?),
-            tested: false,
-            aliases: mailbox::msgraph_aliases(),
-        }),
+        DiscoveredKind::Msgraph => Ok(Outcome::untested(Chosen::Msgraph(msgraph::configure(
+            account_name,
+        )?))),
         kind => bail!("Configuration `{kind:?}` is not supported by this build"),
     }
 }
@@ -452,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn discovered_aliases_render_as_a_mailbox_alias_table() {
+    fn mailbox_aliases_render_as_a_mailbox_alias_table() {
         let mut account = AccountConfig {
             email: Some("me@posteo.net".to_string()),
             ..Default::default()

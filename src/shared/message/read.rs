@@ -61,7 +61,7 @@ impl MessageReadCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let raw = client.get_message(&mailbox, &self.id, self.seen)?;
 
         if self.raw {

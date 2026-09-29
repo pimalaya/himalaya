@@ -18,7 +18,7 @@ The IMAP and SMTP SASL OAuth mechanisms SHALL carry the login, not just the toke
 A JMAP provider MAY serve blob downloads from a different host than its API endpoint (Fastmail serves downloads off a user-content host). The JMAP client SHALL open a fresh authenticated connection to the download host rather than reuse the API socket, which the API server would answer with a redirect.
 
 ### Requirement: IMAP special-use is inbox-only for now
-IMAP special-use alias discovery SHALL cover only the reserved `INBOX`. Discovering Sent/Drafts/Trash/Junk/Archive would need LIST `RETURN (SPECIAL-USE)` (RFC 6154), which io-imap cannot yet issue because upstream imap-codec has no support. The other IMAP aliases are set by hand until then.
+IMAP SHALL mark only the reserved `INBOX` with a mailbox role. Reading the Sent/Drafts/Trash/Junk/Archive roles needs LIST `RETURN (SPECIAL-USE)` (RFC 6154), which io-imap cannot yet issue because upstream imap-codec has no LIST-EXTENDED support. The other IMAP roles are set through `mailbox.alias.<role>` until then.
 
 ### Requirement: RFC 2971 ID after auth
 IMAP SHALL support sending an RFC 2971 `ID` command right after authentication, configured by `imap.id.{auto, fields}`, because some providers require it before serving other commands.

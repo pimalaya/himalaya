@@ -23,7 +23,7 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, MailboxRole},
         search::query::SearchEmailsQuery,
     },
     gmail::{client::GmailClient, search},
@@ -266,10 +266,27 @@ fn include_spam_trash(mailbox: &str) -> bool {
 /// Converts one Gmail label into the shared [`Mailbox`] shape.
 fn mailbox_from(label: GmailLabel) -> Mailbox {
     Mailbox {
+        role: label_role(&label.id),
         id: label.id,
         name: label.name,
         total: label.messages_total,
         unread: label.messages_unread,
+    }
+}
+
+/// The special-use role of a label, keyed by the system-label ids every
+/// Gmail account shares. There is no archive label, archiving being the
+/// loss of the `INBOX` one.
+fn label_role(id: &str) -> Option<MailboxRole> {
+    match id {
+        "INBOX" => Some(MailboxRole::Inbox),
+        "SENT" => Some(MailboxRole::Sent),
+        DRAFT => Some(MailboxRole::Drafts),
+        "TRASH" => Some(MailboxRole::Trash),
+        SPAM => Some(MailboxRole::Junk),
+        STARRED => Some(MailboxRole::Flagged),
+        IMPORTANT => Some(MailboxRole::Important),
+        _ => None,
     }
 }
 

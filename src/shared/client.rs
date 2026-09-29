@@ -35,7 +35,10 @@ use crate::pimdir::client::PimdirClient;
 // dispatching on them, where `Flag` also serves the ungated send path.
 #[cfg(backend)]
 use crate::email::{
-    envelope::Envelope, flag::FlagOp, mailbox::Mailbox, search::query::SearchEmailsQuery,
+    envelope::Envelope,
+    flag::FlagOp,
+    mailbox::{Mailbox, MailboxRole},
+    search::query::SearchEmailsQuery,
 };
 use crate::{
     account::context::Account,
@@ -385,23 +388,25 @@ impl EmailClient {
         }
     }
 
-    /// The trash mailbox the backend names on its own, `None` when it
-    /// names none.
+    /// The id of the mailbox the backend marks with `role`, `None` when it
+    /// marks none.
     ///
-    /// JMAP, Gmail and Graph each carry a well-known trash, where IMAP,
-    /// Maildir and m2dir leave the caller to fall back on the
-    /// `mailbox.alias.trash` entry.
+    /// JMAP, Gmail and Graph carry roles, IMAP only the reserved `INBOX`
+    /// until SPECIAL-USE is read, and Maildir, m2dir and pimdir none, the
+    /// caller falling back on the `mailbox.alias.<role>` entry.
     #[cfg(backend)]
-    pub fn native_trash(&mut self) -> Result<Option<String>> {
+    pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(_) => Ok(None),
+            BackendClient::Imap(_) => {
+                Ok((*role == MailboxRole::Inbox).then(|| String::from("INBOX")))
+            }
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.native_trash(),
+            BackendClient::Jmap(client) => client.role_mailbox_id(role),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(_) => Ok(Some(String::from("TRASH"))),
+            BackendClient::Gmail(client) => client.role_mailbox_id(role),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(_) => Ok(Some(String::from("deleteditems"))),
+            BackendClient::Msgraph(client) => client.role_mailbox_id(role),
             #[cfg(feature = "maildir")]
             BackendClient::Maildir(_) => Ok(None),
             #[cfg(feature = "m2dir")]

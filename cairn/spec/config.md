@@ -34,7 +34,7 @@ An account MAY declare a `signature` and the `signature-delim` introducing it, a
 `signature` SHALL be the signature alone. `signature-delim` SHALL default to the RFC 3676 §4.3 `"-- \n"` and SHALL be written verbatim, its own trailing newline included, so a delimiter meant to stand on its own line says so rather than relying on a rule. Both binaries SHALL assemble the block from the same two keys, so one configured value reads the same whichever composes.
 
 ### Requirement: Mailbox aliases
-An account MAY map friendly mailbox names to backend-native ids under `[accounts.<name>.mailbox.alias]`. Alias names are case-insensitive on lookup and on storage. The entry named `inbox` is the implicit default mailbox: a shared command that omits `-m/--mailbox` resolves it. Account-level entries override same-named global entries, and ids are stored verbatim.
+An account MAY map friendly mailbox names to backend-native ids under `[accounts.<name>.mailbox.alias]`. Alias names are case-insensitive on lookup and on storage. `-m/--mailbox` resolves an alias first, then a mailbox role, then passes the value verbatim; a role matching several mailboxes is an error. A shared command that omits `-m/--mailbox` resolves the `inbox` alias, else the `inbox` role. Account-level entries override same-named global entries, and ids are stored verbatim.
 
 ### Requirement: Config never written
 Himalaya SHALL NOT persist config itself. The wizard prints a ready-to-save fragment on stdout; the user redirects it into their config file.

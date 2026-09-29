@@ -4,8 +4,6 @@
 //! which also names the authentication method, so only the credentials
 //! are prompted.
 
-use std::collections::HashMap;
-
 use anyhow::{Result, bail};
 use io_jmap::client::JmapClientStd;
 use pimalaya_cli::{prompt, spinner::Spinner};
@@ -14,7 +12,6 @@ use crate::{
     config::{JmapAuthConfig, JmapConfig},
     jmap::client::JmapClient,
     wizard::{
-        mailbox,
         search::{AuthCaps, Discovered, DiscoveredKind},
         secret,
     },
@@ -26,14 +23,13 @@ const BEARER: &str = "Bearer (API token)";
 /// Configures JMAP from a discovered entry, whose endpoint is pinned.
 ///
 /// The HTTP scheme is picked among the advertised ones, skipped when only
-/// one qualifies, and its credentials prompted. The connection is tested
-/// and the role-based aliases discovered on that same session, so the
-/// caller skips the final account test.
+/// one qualifies, and its credentials prompted. The connection is tested,
+/// so the caller skips the final account test.
 pub fn configure_discovered(
     account_name: &str,
     email: &str,
     discovered: &Discovered,
-) -> Result<(JmapConfig, HashMap<String, String>)> {
+) -> Result<JmapConfig> {
     let DiscoveredKind::Jmap(server) = &discovered.kind else {
         bail!("Expected a JMAP configuration");
     };
@@ -45,29 +41,25 @@ pub fn configure_discovered(
     )?;
 
     let config = jmap_config(server.clone(), auth);
-    let aliases = test_and_discover(&config)?;
+    test_connection(&config)?;
 
-    Ok((config, aliases))
+    Ok(config)
 }
 
-/// Connects to JMAP, which is the connection test, and discovers the
-/// role-based aliases on that same session.
-///
-/// A failed connection is the wizard's error, where a failed listing only
-/// means fewer aliases.
-fn test_and_discover(config: &JmapConfig) -> Result<HashMap<String, String>> {
+/// Connects to JMAP, which is the connection test.
+fn test_connection(config: &JmapConfig) -> Result<()> {
     let spinner = Spinner::start("Testing JMAP connection");
 
-    let mut client = match JmapClient::new(config.clone()) {
-        Ok(client) => client,
+    match JmapClient::new(config.clone()) {
+        Ok(_) => {
+            spinner.success("JMAP connection succeeded");
+            Ok(())
+        }
         Err(err) => {
             spinner.failure("JMAP connection failed");
-            return Err(err);
+            Err(err)
         }
-    };
-
-    spinner.success("JMAP connection succeeded");
-    Ok(mailbox::jmap_aliases(&mut client))
+    }
 }
 
 /// Prompts the HTTP authentication scheme from `caps` (both offered when

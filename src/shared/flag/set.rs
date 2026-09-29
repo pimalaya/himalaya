@@ -40,7 +40,7 @@ impl FlagSetCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
+        let mailbox = self.mailbox.resolve(account);
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 

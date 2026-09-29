@@ -218,6 +218,7 @@ fn mailbox_from(m2dir: M2dir) -> Mailbox {
     Mailbox {
         id: path.as_str().to_string(),
         name: path.file_name().unwrap_or("").to_string(),
+        role: None,
         total: None,
         unread: None,
     }

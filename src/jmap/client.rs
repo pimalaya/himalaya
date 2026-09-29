@@ -11,7 +11,7 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use io_jmap::{client::JmapClientStd as Inner, rfc8621::mailbox::get::JmapMailboxGetOptions};
+use io_jmap::client::JmapClientStd as Inner;
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
@@ -19,6 +19,7 @@ use url::Url;
 use crate::{
     account::context::Account,
     config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, parse_server},
+    email::mailbox::{MailboxIndex, MailboxRole},
 };
 
 /// A live JMAP session and the mailbox index it caches.
@@ -28,9 +29,9 @@ pub struct JmapClient {
     /// session of its own against an upload or download authority the
     /// API one does not cover.
     pub config: JmapConfig,
-    /// The `(id, name)` pairs [`Self::resolve_mailbox_id`] maps names
+    /// The mailboxes [`Self::resolve_mailbox_id`] maps names and roles
     /// through, fetched once and cached for the client's lifetime.
-    mailbox_index: Option<Vec<(String, String)>>,
+    mailbox_index: Option<MailboxIndex>,
 }
 
 impl JmapClient {
@@ -52,36 +53,25 @@ impl JmapClient {
         })
     }
 
-    /// Maps a human mailbox name onto its opaque JMAP id.
+    /// Maps a mailbox id, name or role onto its opaque JMAP id.
     ///
-    /// A known id passes through, a name match returns its id, and an
-    /// unknown value goes back as it is so the server surfaces the error.
     /// It lives here so every backend method stays a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        self.mailbox_index()?.resolve(mailbox)
+    }
+
+    /// The id of the mailbox carrying `role`, `None` when none does.
+    pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
+        self.mailbox_index()?.with_role(role)
+    }
+
+    fn mailbox_index(&mut self) -> Result<&MailboxIndex> {
         if self.mailbox_index.is_none() {
-            let output = self.mailbox_get(JmapMailboxGetOptions {
-                ids: None,
-                properties: None,
-            })?;
-            let index = output
-                .mailboxes
-                .into_iter()
-                .filter_map(|mailbox| Some((mailbox.id?, mailbox.name.unwrap_or_default())))
-                .collect();
-            self.mailbox_index = Some(index);
+            let mailboxes = self.list_mailboxes(false)?;
+            self.mailbox_index = Some(MailboxIndex(mailboxes));
         }
 
-        let index = self.mailbox_index.as_deref().unwrap_or_default();
-
-        if index.iter().any(|(id, _)| id == mailbox) {
-            return Ok(mailbox.to_string());
-        }
-
-        if let Some((id, _)) = index.iter().find(|(_, name)| name == mailbox) {
-            return Ok(id.clone());
-        }
-
-        Ok(mailbox.to_string())
+        Ok(self.mailbox_index.get_or_insert_default())
     }
 
     /// Downloads a blob, whose URL may live on another authority.

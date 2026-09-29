@@ -43,7 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `sieves://` is accepted for the deployments listening for a handshake straight away, and `unix://` for a local pre-authenticated proxy.
 
+- Added the mailbox role (`inbox`, `sent`, `drafts`, `trash`...) to `mailbox list`, as a ROLE column and a `role` JSON field, with the `mailbox.list.table.role-color` option. [#743]
+
+  JMAP reads the mailbox roles, Gmail its system labels and Graph its well-known folders, resolved in one `$batch` request. IMAP marks the inbox alone until SPECIAL-USE is read, and Maildir, m2dir and pimdir mark none. A `mailbox.alias.<role>` entry overrides the role the backend reports.
+
 ### Changed
+
+- `-m/--mailbox` resolves a role after the aliases, so `-m sent` reaches the sent mailbox without an alias. A role carried by several mailboxes is an error naming them.
+
+- An omitted `-m/--mailbox` falls back to the inbox role when no `inbox` alias is set, instead of failing.
+
+- `message delete` takes the trash from `mailbox.alias.trash` first, then from the backend. **Behaviour change**: an alias set on JMAP, Gmail or Graph used to be ignored.
+
+- The wizard no longer pre-fills `mailbox.alias.*`, the backends reporting their roles themselves.
 
 - Changed Gmail draft create/update JSON output to structured draft, message and thread IDs, with schemas for both commands. Text confirmations are unchanged.
 
@@ -1317,6 +1329,7 @@ Few major concepts changed:
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
 [#739]: https://github.com/pimalaya/himalaya/issues/739
+[#743]: https://github.com/pimalaya/himalaya/issues/743
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 
 [core#1]: https://github.com/pimalaya/core/issues/1

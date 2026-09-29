@@ -11,8 +11,6 @@
 //! No SMTP host is ever invented: with nothing discovered the account is
 //! IMAP-only and SMTP is added by hand.
 
-use std::collections::HashMap;
-
 use anyhow::{Result, bail};
 use io_pim_discovery::compose::config::DiscoverySecurity;
 use io_sasl::mechanism::SaslMechanism;
@@ -27,7 +25,6 @@ use crate::{
         SaslPlainConfig, SaslScramSha256Config, SaslXoauth2Config, SmtpConfig,
     },
     wizard::{
-        mailbox,
         search::{AuthCaps, Discovered, DiscoveredKind, TcpEndpoint},
         secret,
     },
@@ -42,8 +39,7 @@ const ANONYMOUS: &str = "ANONYMOUS (no credentials)";
 const OAUTHBEARER: &str = "OAUTHBEARER (username + API token)";
 const XOAUTH2: &str = "XOAUTH2 (username + API token)";
 
-/// Configures IMAP and SMTP from a discovered entry, returning the
-/// aliases beside the two configurations.
+/// Configures IMAP and SMTP from a discovered entry.
 ///
 /// The IMAP mechanism and credentials are prompted and the connection
 /// tested, then SMTP is asked whether it reuses them, configured with a
@@ -55,7 +51,7 @@ pub fn configure_discovered(
     account_name: &str,
     email: &str,
     discovered: &Discovered,
-) -> Result<(ImapConfig, Option<SmtpConfig>, HashMap<String, String>)> {
+) -> Result<(ImapConfig, Option<SmtpConfig>)> {
     let DiscoveredKind::ImapSmtp { imap, smtp } = &discovered.kind else {
         bail!("Expected an IMAP + SMTP configuration");
     };
@@ -81,10 +77,6 @@ pub fn configure_discovered(
     let mut resolver = SecretResolver::new();
     test_connection("IMAP", || check::connect_imap(&imap, &mut resolver))?;
 
-    // NOTE: IMAP has no reliable special-use listing yet (see the mailbox
-    // module), so only the always-present INBOX is pinned as the default.
-    let aliases = mailbox::imap_aliases();
-
     // NOTE: SMTP advertises its mechanisms over EHLO rather than through
     // the IMAP capability probe, so its menu stays keyed on discovery.
     let smtp = match smtp {
@@ -101,7 +93,7 @@ pub fn configure_discovered(
         None => None,
     };
 
-    Ok((imap, smtp, aliases))
+    Ok((imap, smtp))
 }
 
 /// Runs a connection `test` behind a labelled spinner, surfacing a
