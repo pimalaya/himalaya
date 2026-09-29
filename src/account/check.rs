@@ -151,7 +151,11 @@ impl AccountCheckCommand {
         }
 
         if report.backends.is_empty() {
-            bail!("No backend matching `{backend}` is configured for this account");
+            return Err(account_config.no_backend_error(
+                &report.account,
+                backend,
+                Backend::COMPILED,
+            ));
         }
 
         printer.out(report)

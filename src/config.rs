@@ -8,7 +8,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::{Error, Result, anyhow, bail};
 use crossterm::style::Color;
 use io_sasl::{
     login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
@@ -25,8 +25,10 @@ use pimalaya_stream::{
     tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use secrecy::SecretString;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::IgnoredAny};
 use url::Url;
+
+use crate::backend::Backend;
 
 /// Skips a field equal to its type's default, so a wizard-generated
 /// configuration omits defaulted scalars.
@@ -194,6 +196,31 @@ impl AccountConfig {
         }
     }
 
+    /// The error of account `name` where nothing matches `backend`, the
+    /// caller being able to use `supported` alone.
+    ///
+    /// Names the v1 `backend` table when present, it being the likely
+    /// cause.
+    pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
+        let reason = match backend {
+            Backend::Auto => {
+                let supported: Vec<String> = supported.iter().map(|b| format!("`{b}`")).collect();
+                let supported = supported.join(", ");
+                format!("Account `{name}` configures no supported backend ({supported})")
+            }
+            backend if !supported.contains(&backend) => {
+                format!("Backend `{backend}` is not supported by this command or build")
+            }
+            backend => format!("Account `{name}` has no `{backend}` block"),
+        };
+
+        if self.backend.is_some() {
+            anyhow!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
+        } else {
+            anyhow!(reason)
+        }
+    }
+
     /// Renders this account as an `[accounts.<name>]` block.
     ///
     /// What this adds over the serializer is reading order: dotted keys
@@ -343,6 +370,9 @@ pub struct AccountConfig {
     /// The ManageSieve endpoint of this account.
     #[allow(unused)]
     pub sieve: Option<SieveConfig>,
+    /// The v1 `backend` table, kept only to point at MIGRATION.md.
+    #[serde(default, skip_serializing)]
+    pub backend: Option<IgnoredAny>,
 }
 
 /// Envelope-level rendering options.

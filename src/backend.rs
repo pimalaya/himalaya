@@ -40,6 +40,28 @@ pub enum Backend {
 
 #[allow(unused)]
 impl Backend {
+    /// Every backend this build compiles in, `auto` aside.
+    pub const COMPILED: &[Self] = &[
+        #[cfg(feature = "imap")]
+        Self::Imap,
+        #[cfg(feature = "jmap")]
+        Self::Jmap,
+        #[cfg(feature = "gmail")]
+        Self::Gmail,
+        #[cfg(feature = "msgraph")]
+        Self::Msgraph,
+        #[cfg(feature = "maildir")]
+        Self::Maildir,
+        #[cfg(feature = "m2dir")]
+        Self::M2dir,
+        #[cfg(feature = "pimdir")]
+        Self::Pimdir,
+        #[cfg(feature = "smtp")]
+        Self::Smtp,
+        #[cfg(feature = "sieve")]
+        Self::Sieve,
+    ];
+
     /// Whether the IMAP arm of a shared command may run.
     pub fn allows_imap(self) -> bool {
         matches!(self, Self::Auto | Self::Imap)

@@ -92,6 +92,7 @@ impl EmailClient {
     /// usable is configured.
     pub fn new(
         config: Config,
+        name: &str,
         #[allow(unused_mut)] mut account_config: AccountConfig,
         backend: Backend,
     ) -> Result<(Account, Self)> {
@@ -110,7 +111,14 @@ impl EmailClient {
         #[cfg(not(feature = "smtp"))]
         let has_transport = storage.is_some();
         if !has_transport {
-            bail!("No backend matching `{backend}` is configured for this account");
+            // NOTE: ManageSieve holds no mailbox, so no shared command runs on it.
+            let supported: Vec<Backend> = Backend::COMPILED
+                .iter()
+                .copied()
+                .filter(|b| *b != Backend::Sieve)
+                .collect();
+
+            return Err(account_config.no_backend_error(name, backend, &supported));
         }
 
         let account = Account::from(config).merge(Account::from(account_config));

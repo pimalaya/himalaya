@@ -264,37 +264,42 @@ impl Command {
         match self {
             #[cfg(backend)]
             Self::Mailbox(cmd) => {
-                let (config, _name, account_config) =
+                let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                let (mut account, mut client) =
+                    EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(backend)]
             Self::Envelope(cmd) => {
-                let (config, _name, account_config) =
+                let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                let (mut account, mut client) =
+                    EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(backend)]
             Self::Flag(cmd) => {
-                let (config, _name, account_config) =
+                let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                let (mut account, mut client) =
+                    EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(any(backend, feature = "smtp"))]
             Self::Message(cmd) => {
-                let (config, _name, account_config) =
+                let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                let (mut account, mut client) =
+                    EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(backend)]
             Self::Attachment(cmd) => {
-                let (config, _name, account_config) =
+                let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                let (mut account, mut client) =
+                    EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
 

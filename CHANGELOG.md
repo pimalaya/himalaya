@@ -105,6 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the "No backend matching `auto`" error saying nothing of the cause ([#740]). It now names the account and either the supported backends this build compiles in or the missing `<backend>` block, and points at MIGRATION.md when the account still carries the v1 `backend` table.
+
 - Fixed `envelope list` and `envelope search` truncating the ID column under `--max-width`.
 
   A long id, such as a Maildir file name, came out cut with an ellipsis and was unusable by any follow-up command. The ID column now keeps its content width, and the header, like the rows, stays on one line.
@@ -1333,6 +1335,7 @@ Few major concepts changed:
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
 [#739]: https://github.com/pimalaya/himalaya/issues/739
+[#740]: https://github.com/pimalaya/himalaya/issues/740
 [#742]: https://github.com/pimalaya/himalaya/issues/742
 [#743]: https://github.com/pimalaya/himalaya/issues/743
 [#764]: https://github.com/pimalaya/himalaya/issues/764
