@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   JMAP reads the mailbox roles, Gmail its system labels and Graph its well-known folders, resolved in one `$batch` request. IMAP marks the inbox alone until SPECIAL-USE is read, and Maildir, m2dir and pimdir mark none. A `mailbox.alias.<role>` entry overrides the role the backend reports.
 
+- Added `imap fetch --body`, fetching the whole message of every UID in the sequence set over one session (`BODY.PEEK[]`, `\Seen` left unset) ([#762]).
+
+  Downloading a mailbox took one `message read` per message, so one login per message, which some providers cut off after a dozen in a row. The JSON `body` field carries the octets as standard Base64, declared as such in the JSON Schema; the plain output prints the size only.
+
 ### Changed
 
 - `-m/--mailbox` resolves a role after the aliases, so `-m sent` reaches the sent mailbox without an alias. A role carried by several mailboxes is an error naming them.
@@ -1338,6 +1342,7 @@ Few major concepts changed:
 [#740]: https://github.com/pimalaya/himalaya/issues/740
 [#742]: https://github.com/pimalaya/himalaya/issues/742
 [#743]: https://github.com/pimalaya/himalaya/issues/743
+[#762]: https://github.com/pimalaya/himalaya/issues/762
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 
 [core#1]: https://github.com/pimalaya/core/issues/1
