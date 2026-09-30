@@ -1,7 +1,7 @@
 //! # pimdir queue list
 //!
-//! The `pimdir queue list` command, tabling the creations staged in one
-//! mailbox.
+//! The `pimdir queue list` command, tabling the creations and sends staged
+//! in one mailbox.
 
 use std::fmt;
 
@@ -23,11 +23,13 @@ use crate::{
     },
 };
 
-/// List the messages staged for creation in a mailbox.
+/// List the messages staged for creation or sending in a mailbox.
 ///
 /// A saved message waits in the queue until the sync engine applies it and
-/// has no id until then, so `envelope list` cannot show it. This is where it
-/// shows: the row id to cancel it by, when it was queued, and the mail.
+/// has no id until then, so `envelope list` cannot show it. A sent message
+/// waits there until the store's owner sends it, filed under the mailbox it
+/// was saved to or the account's sent alias. This is where both show: the
+/// row id to cancel one by, when it was queued, and the mail.
 ///
 /// Staged flags, moves and deletions need no such view, addressing messages
 /// that already exist.
@@ -38,7 +40,7 @@ pub struct PimdirQueueListCommand {
 }
 
 impl PimdirQueueListCommand {
-    /// Lists the creations staged in the mailbox and tables them.
+    /// Lists the creations and sends staged in the mailbox and tables them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -63,6 +65,7 @@ impl PimdirQueueListCommand {
                     id: queued.id,
                     queued_at: queued.created_at,
                     producer: queued.producer,
+                    send: queued.send,
                     envelope: queued.envelope,
                 })
                 .collect(),
@@ -81,6 +84,8 @@ pub struct PimdirQueuedMessage {
     pub queued_at: String,
     /// The process that staged it.
     pub producer: String,
+    /// Whether the row sends the message rather than files it.
+    pub send: bool,
     /// The mail the action carries, read from its stored summary. Its `id` is
     /// empty, a queued message having none yet.
     pub envelope: Envelope,
@@ -135,6 +140,7 @@ impl fmt::Display for PimdirQueuedMessages {
             .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([
                 Cell::new("ROW"),
+                Cell::new("ACTION"),
                 Cell::new("FLAGS"),
                 Cell::new("SUBJECT"),
                 Cell::new("TO"),
@@ -144,6 +150,7 @@ impl fmt::Display for PimdirQueuedMessages {
                 let mut row = Row::new();
                 row.max_height(1);
                 row.add_cell(Cell::new(queued.id).fg(self.id_color));
+                row.add_cell(Cell::new(if queued.send { "send" } else { "save" }));
                 row.add_cell(Cell::new(format_flags(&queued.envelope.flags, &chars)));
                 row.add_cell(Cell::new(&queued.envelope.subject).fg(self.subject_color));
                 row.add_cell(Cell::new(format_addresses(&queued.envelope.to)).fg(self.from_color));

@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Cancelling is the store owner's write, so it takes that role for the length of the call and reports a sync in flight rather than wait on it.
 
+- Added sending from a pimdir account: the message is queued in the store for its owner to send, the one holding the credentials.
+
+  The row is filed under the `--save` mailbox, else under `mailbox.alias.sent`, and shows in `pimdir queue list`. The command prints its row id, `queueId` under `--json`, which `pimdir queue cancel` takes and the owner reports against.
+
 - Added ManageSieve support behind the `sieve` cargo feature, on by default ([#739]).
 
   An account gains an optional `[sieve]` block, and `himalaya sieve` exposes `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw`.
@@ -62,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An `mbox` block points at a directory of mbox files and, optionally, at the spool (`$MAIL`) shown as `INBOX`. The shared commands read and write it, and `himalaya mbox` exposes the raw file operations. Any mbox file also opens by passing its absolute path as the mailbox. Writes lock the file the way MTAs and MUAs do, flags live in the `Status` and `X-Status` headers mutt and Dovecot use, and an index kept under the XDG cache directory makes a listing read only what changed.
 
 ### Changed
+
+- A pimdir account sends through the store's queue and no longer uses its `smtp` section. **Behaviour change.**
 
 - `-m/--mailbox` resolves a role after the aliases, so `-m sent` reaches the sent mailbox without an alias. A role carried by several mailboxes is an error naming them.
 

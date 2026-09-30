@@ -447,6 +447,10 @@ imap.sasl.plain.password.raw = "***"
 # `imap/INBOX` here and that is what `-m` takes. Alias it to avoid typing it:
 #mailbox.alias.inbox = "imap/INBOX"
 
+# A sent message is queued for the store's owner to send, filed under the
+# `--save` mailbox or else this one; the `smtp` section is not used.
+#mailbox.alias.sent = "imap/Sent"
+
 # --------------------------------------------------------------------------------
 # SMTP config
 # https://www.iana.org/go/rfc5321

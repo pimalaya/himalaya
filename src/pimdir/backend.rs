@@ -37,6 +37,7 @@ use io_pimdir::{
     },
 };
 use log::warn;
+use serde::Serialize;
 
 use crate::{
     email::{
@@ -45,12 +46,16 @@ use crate::{
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
+        submission::SubmissionEnvelope,
     },
     pimdir::client::PimdirClient,
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
 const MAIL_KIND: &str = "message/rfc822";
+
+/// The queue action kind of a message for the store's owner to send.
+const SUBMIT: &str = "submit";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
@@ -170,31 +175,24 @@ impl PimdirClient {
         Ok(paginate(hits, page, page_size))
     }
 
-    /// How many messages the mailbox has queued for creation and not synced
-    /// yet.
+    /// How many messages the mailbox has queued for creation or sending and
+    /// not synced yet.
     ///
-    /// A queued create has no public id until the owner applies it, so it is
-    /// no envelope and has no row. The count is what a listing reports
-    /// instead, so a saved message reads as queued rather than as lost.
+    /// A queued create or send has no public id, so it is no envelope and
+    /// has no row. The count is what a listing reports instead, so a saved
+    /// or sent message reads as queued rather than as lost.
     pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
-        let collection = self.hub_id(mailbox)?;
-        self.store
-            .count_pending_creates(&collection)
-            .map_err(|err| anyhow!("Count queued messages in `{mailbox}`: {err}"))
+        Ok(self.queued_mail(mailbox)?.len())
     }
 
-    /// The mailbox's queued creations, rendered as mail.
+    /// The mailbox's queued creations and sends, rendered as mail.
     ///
     /// The operator CLI is kind-agnostic and prints ids, hashes and flags.
-    /// A queued add carries no summary, the owner deriving one from the body
-    /// when it applies the action, so this reads the body the action pins
-    /// and derives the same way.
+    /// A queued action carries no summary, the owner deriving one from the
+    /// body when it applies the action, so this reads the body the action
+    /// pins and derives the same way.
     pub fn queued_envelopes(&mut self, mailbox: &str) -> Result<Vec<PimdirQueued>> {
-        let collection = self.hub_id(mailbox)?;
-        let queued = self
-            .store
-            .pending_creates(&collection)
-            .map_err(|err| anyhow!("List queued messages in `{mailbox}`: {err}"))?;
+        let queued = self.queued_mail(mailbox)?;
 
         let mut rows = Vec::new();
         for action in &queued {
@@ -312,6 +310,54 @@ impl PimdirClient {
         Ok(link_id.0)
     }
 
+    /// Queues a message for the store's owner to send, returning the queue
+    /// row id.
+    ///
+    /// The body is stored as given, `Bcc:` included, and the row carries the
+    /// envelope derived from its headers, the `submit` intent any owner of
+    /// the store may perform. The owner holds the credentials and sends on its next run;
+    /// nothing leaves from here.
+    ///
+    /// The row is filed under `mailbox`, which must exist: an enqueue
+    /// creates the collection it names, and a send anchored on a made-up
+    /// name would add a mailbox to the store.
+    pub fn send_message(&mut self, mailbox: Option<&str>, raw: Vec<u8>) -> Result<i64> {
+        let Some(mailbox) = mailbox else {
+            bail!(
+                "A pimdir account queues a sent message under a mailbox: \
+                 set `mailbox.alias.sent`, or pass one with `--save`"
+            );
+        };
+        let collection = self.hub_id(mailbox)?;
+        let envelope = SubmissionEnvelope::parse(&raw)?;
+
+        let hash = self.blobs.hash(&raw);
+        let writer = self.blobs.writer()?;
+        let size = write_blob(writer, &raw, &hash)?;
+        let object = PimdirObject {
+            hash,
+            size: size as usize,
+        };
+
+        let payload = SubmitPayload {
+            v: 1,
+            object: &object.hash.0,
+            from: &envelope.from,
+            rcpts: &envelope.rcpts,
+            subject: envelope.subject.as_deref(),
+        };
+        let action = PimdirAction::Unknown {
+            kind: SUBMIT.to_owned(),
+            payload: serde_json::to_string(&payload)?,
+            object_hash: Some(object.hash.clone()),
+        };
+
+        let mut producer = self.producer()?;
+        producer
+            .enqueue(&collection, &action, Some(&object))
+            .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))
+    }
+
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
     /// on the next sync, no body re-upload).
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
@@ -402,6 +448,42 @@ impl PimdirClient {
         }
         Ok(all)
     }
+
+    /// The mailbox's pending creates and sends, in append order: the queued
+    /// rows that are mail with no public id yet.
+    fn queued_mail(&self, mailbox: &str) -> Result<Vec<PimdirPendingAction>> {
+        let collection = self.hub_id(mailbox)?;
+        let pending = self
+            .store
+            .pending_actions(&collection)
+            .map_err(|err| anyhow!("List queued messages in `{mailbox}`: {err}"))?;
+
+        Ok(pending
+            .into_iter()
+            .filter(|queued| is_queued_mail(&queued.action))
+            .collect())
+    }
+}
+
+/// The payload of a `submit` intent, version 1.
+#[derive(Serialize)]
+struct SubmitPayload<'a> {
+    v: u8,
+    object: &'a str,
+    from: &'a str,
+    rcpts: &'a [String],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subject: Option<&'a str>,
+}
+
+/// Whether a queued action is a message waiting for a public id: a create,
+/// or a send the owner performs.
+fn is_queued_mail(action: &PimdirAction) -> bool {
+    match action {
+        PimdirAction::Add { .. } => true,
+        PimdirAction::Unknown { kind, .. } => kind == SUBMIT,
+        _ => false,
+    }
 }
 
 /// Builds a shared [`Envelope`] from a stored item (no body read): the
@@ -463,8 +545,8 @@ fn address(address: PimdirAddress) -> Address {
     }
 }
 
-/// One queued creation, as `pimdir queue list` shows it: the row an operator
-/// acts on, plus the mail the action carries.
+/// One queued creation or send, as `pimdir queue list` shows it: the row an
+/// operator acts on, plus the mail the action carries.
 #[derive(Clone, Debug)]
 pub struct PimdirQueued {
     /// The queue row id, which `pimdir queue cancel` takes.
@@ -473,20 +555,31 @@ pub struct PimdirQueued {
     pub created_at: String,
     /// The process that staged it.
     pub producer: String,
+    /// Whether the row sends the message rather than files it.
+    pub send: bool,
     /// The message the action carries, derived from the body it pins. It has
-    /// no `id`: a create has none until the owner applies it.
+    /// no `id`: a create has none until the owner applies it, a send none at
+    /// all.
     pub envelope: Envelope,
 }
 
-/// Builds a queued row from a pending add and the body it pins, skipping
-/// every other action.
+/// Builds a queued row from a pending add or send and the body it pins,
+/// skipping every other action.
 ///
-/// The envelope keeps an empty id on purpose: a create has no public id yet,
-/// and the queue row id belongs to another space than the field every command
-/// reads back.
+/// The envelope keeps an empty id on purpose: the message has no public id
+/// yet, and the queue row id belongs to another space than the field every
+/// command reads back.
 fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Option<PimdirQueued> {
-    let PimdirAction::Add { flags, .. } = &queued.action else {
-        return None;
+    // NOTE: a send is filed nowhere and carries no flags; it shows as read,
+    // the way a sent copy is saved.
+    let seen: PimdirFlags = [Flag::from_iana(IanaFlag::Seen)]
+        .iter()
+        .map(Flag::raw)
+        .collect();
+    let (send, flags) = match &queued.action {
+        PimdirAction::Add { flags, .. } => (false, flags),
+        action if is_queued_mail(action) => (true, &seen),
+        _ => return None,
     };
 
     let summary = body.map(mail::derive).and_then(|derived| derived.summary);
@@ -496,6 +589,7 @@ fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Opti
         id: queued.id,
         created_at: queued.created_at.clone(),
         producer: queued.producer.clone(),
+        send,
         envelope,
     })
 }
@@ -736,5 +830,100 @@ mod tests {
         // NOTE: a staged removal addresses a message that exists, so the
         // ordinary listing shows it and nothing is rendered here.
         assert!(queued_from_action(&queued, None).is_none());
+    }
+
+    /// A store holding one mail collection, `imap/Sent`, and the client
+    /// reading it.
+    fn sent_store() -> (tempfile::TempDir, PimdirClient) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        store.ensure_collection("imap/Sent", MAIL_KIND).unwrap();
+        drop(store);
+
+        let config = crate::config::PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        };
+        (dir, PimdirClient::new(config).unwrap())
+    }
+
+    const RAW: &[u8] = b"From: a@x.org\r\nTo: b@y.org\r\nBcc: c@y.org\r\nSubject: hi\r\n\r\nhello";
+
+    #[test]
+    fn a_sent_message_is_one_submit_row_with_its_envelope() {
+        let (_dir, mut client) = sent_store();
+
+        let row = client
+            .send_message(Some("imap/Sent"), RAW.to_vec())
+            .unwrap();
+
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, row);
+        let PimdirAction::Unknown {
+            kind,
+            payload,
+            object_hash,
+        } = &pending[0].action
+        else {
+            panic!("expected a submit intent, got {:?}", pending[0].action);
+        };
+        assert_eq!(kind, SUBMIT);
+
+        // NOTE: the `submit` payload a store owner decodes, `object` being
+        // the pinned body by the shared queue convention.
+        let hash = object_hash.as_ref().unwrap();
+        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "v": 1,
+                "object": hash.0,
+                "from": "a@x.org",
+                "rcpts": ["b@y.org", "c@y.org"],
+                "subject": "hi",
+            })
+        );
+
+        // NOTE: the body keeps its Bcc field, which the sending channel
+        // removes; Graph derives its recipients from it.
+        assert_eq!(client.blobs.get(hash).unwrap().as_deref(), Some(RAW));
+
+        let queued = client.queued_envelopes("imap/Sent").unwrap();
+        assert_eq!(queued.len(), 1);
+        assert!(queued[0].send);
+        assert_eq!(queued[0].envelope.subject, "hi");
+        assert_eq!(client.queued_messages("imap/Sent").unwrap(), 1);
+    }
+
+    #[test]
+    fn a_send_with_no_mailbox_stages_nothing() {
+        let (_dir, mut client) = sent_store();
+
+        let err = client.send_message(None, RAW.to_vec()).unwrap_err();
+
+        assert!(err.to_string().contains("mailbox.alias.sent"));
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_send_with_no_recipient_stages_nothing() {
+        let (_dir, mut client) = sent_store();
+        let raw = b"From: a@x.org\r\nSubject: hi\r\n\r\nhello".to_vec();
+
+        assert!(client.send_message(Some("imap/Sent"), raw).is_err());
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
     }
 }

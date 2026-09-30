@@ -18,7 +18,7 @@ use std::{
 
 use anyhow::{Result, bail};
 use mail_parser::{Addr, Address, MessageParser};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -39,9 +39,14 @@ pub enum Outcome {
         id: Option<String>,
         /// Whether it was sent as well as saved.
         sent: bool,
+        /// The queue row id of a send deferred to the store's owner.
+        queued: Option<i64>,
     },
     /// Sent without being saved, the send path returning no id.
-    Sent,
+    Sent {
+        /// The queue row id of a send deferred to the store's owner.
+        queued: Option<i64>,
+    },
 }
 
 /// Saves the bytes, sends them, or both, printing nothing.
@@ -62,21 +67,29 @@ pub fn apply(
         return Ok(Outcome::Stdout);
     }
 
-    let saved_id = match save {
-        Some(name) => {
-            let mailbox = account.resolve_mailbox(name);
-            Some(client.add_message(mailbox, flags, raw.clone())?)
-        }
+    let mailbox = save.map(|name| account.resolve_mailbox(name));
+    let saved_id = match mailbox {
+        Some(mailbox) => Some(client.add_message(mailbox, flags, raw.clone())?),
         None => None,
     };
 
-    if send {
-        client.send_message(raw)?;
-    }
+    // NOTE: a deferred send is filed under the saved copy's mailbox, else
+    // under the one the account names as sent.
+    let queued = match send {
+        true => {
+            let sent = mailbox.or_else(|| account.mailbox_alias.get("sent").map(String::as_str));
+            client.send_message(sent, raw)?
+        }
+        false => None,
+    };
 
     Ok(match saved_id {
-        Some(id) => Outcome::Saved { id, sent: send },
-        None => Outcome::Sent,
+        Some(id) => Outcome::Saved {
+            id,
+            sent: send,
+            queued,
+        },
+        None => Outcome::Sent { queued },
     })
 }
 
@@ -102,13 +115,45 @@ pub fn route(
         save,
         send,
     )?;
-    let msg = match outcome {
+    let (message, queue_id) = match outcome {
         Outcome::Stdout => return Ok(()),
-        Outcome::Saved { sent: true, .. } => "Message successfully saved and sent",
-        Outcome::Saved { sent: false, .. } => "Message successfully saved",
-        Outcome::Sent => "Message successfully sent",
+        Outcome::Saved {
+            sent: true,
+            queued: Some(row),
+            ..
+        } => (
+            "Message successfully saved and queued for sending",
+            Some(row),
+        ),
+        Outcome::Saved { sent: true, .. } => ("Message successfully saved and sent", None),
+        Outcome::Saved { sent: false, .. } => ("Message successfully saved", None),
+        Outcome::Sent { queued: Some(row) } => {
+            ("Message successfully queued for sending", Some(row))
+        }
+        Outcome::Sent { queued: None } => ("Message successfully sent", None),
     };
-    printer.out(Message::new(msg))
+    printer.out(MessageRouteOutput {
+        message: message.to_owned(),
+        queue_id,
+    })
+}
+
+/// The confirmation line of a saved or sent message.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageRouteOutput {
+    /// What happened, for a human.
+    pub message: String,
+    /// The queue row id of a send deferred to the store's owner, which
+    /// `pimdir queue cancel` takes and the engine reports against.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_id: Option<i64>,
+}
+
+impl fmt::Display for MessageRouteOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 /// The decoded fields of a composed message, which an editor lays out

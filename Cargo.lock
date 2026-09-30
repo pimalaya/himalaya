@@ -974,6 +974,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "shellexpand",
+ "tempfile",
  "toml",
  "uds_windows",
  "url",

@@ -3,9 +3,9 @@
 //! The SMTP adapter of the shared cross-protocol client, a send-only
 //! transport for the storage backends that cannot send themselves.
 //!
-//! The RFC 5321 envelope is derived from the message headers: `From:`
-//! becomes the reverse path, and `To:`, `Cc:` and `Bcc:` the forward
-//! paths. io-smtp then removes the `Bcc:` field from what it transmits.
+//! The RFC 5321 envelope comes from [`SubmissionEnvelope`], derived from
+//! the message headers. io-smtp then removes the `Bcc:` field from what
+//! it transmits.
 
 use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
@@ -17,45 +17,20 @@ use io_smtp::{
         SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
     },
 };
-use mail_parser::{Address as MailParserAddress, MessageParser};
 
-use crate::smtp::client::SmtpClient;
+use crate::{email::submission::SubmissionEnvelope, smtp::client::SmtpClient};
 
 impl SmtpClient {
     /// Runs the RFC 5321 mail transaction (MAIL FROM / RCPT TO / DATA)
     /// for `raw`, deriving the envelope from its headers.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
-        let (reverse, forwards) = {
-            let parsed = MessageParser::default()
-                .parse_headers(&raw)
-                .ok_or_else(|| anyhow!("Could not parse raw RFC 5322 message"))?;
-
-            let reverse = parsed
-                .from()
-                .and_then(first_address)
-                .ok_or_else(|| anyhow!("No `From:` header found in raw message"))?;
-            let reverse = parse_smtp_mailbox(&reverse)?;
-
-            let mut forwards = Vec::new();
-            for group in [parsed.to(), parsed.cc(), parsed.bcc()]
-                .into_iter()
-                .flatten()
-            {
-                for address in addresses(group) {
-                    forwards.push(parse_smtp_mailbox(&address)?);
-                }
-            }
-
-            (reverse, forwards)
-        };
-
-        if forwards.is_empty() {
-            bail!("No `To:` / `Cc:` / `Bcc:` recipients found in raw message");
-        }
-
-        let reverse_path = SmtpReversePath::SmtpMailbox(reverse);
-        let forward_paths: Vec<SmtpForwardPath<'static>> =
-            forwards.into_iter().map(SmtpForwardPath::from).collect();
+        let envelope = SubmissionEnvelope::parse(&raw)?;
+        let reverse_path = SmtpReversePath::SmtpMailbox(parse_smtp_mailbox(&envelope.from)?);
+        let forward_paths = envelope
+            .rcpts
+            .iter()
+            .map(|rcpt| Ok(SmtpForwardPath::from(parse_smtp_mailbox(rcpt)?)))
+            .collect::<Result<Vec<_>>>()?;
 
         self.send(
             reverse_path,
@@ -65,25 +40,6 @@ impl SmtpClient {
         )?;
         Ok(())
     }
-}
-
-/// Flattens a mail-parser address group into bare `local-part@domain`
-/// strings.
-fn addresses(group: &MailParserAddress<'_>) -> Vec<String> {
-    group
-        .clone()
-        .into_list()
-        .into_iter()
-        .filter_map(|address| {
-            let email = address.address?.into_owned();
-            (!email.is_empty()).then_some(email)
-        })
-        .collect()
-}
-
-/// First address in a group; picks the `From:` envelope sender.
-fn first_address(group: &MailParserAddress<'_>) -> Option<String> {
-    addresses(group).into_iter().next()
 }
 
 /// Parses `local-part@domain` into an owned SMTP mailbox.

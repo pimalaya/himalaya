@@ -55,23 +55,35 @@ impl MessageAddCommand {
         let raw = self.message.parse()?.into_bytes();
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let outcome = handler::apply(account, client, raw, &flags, Some(&self.mailbox), self.send)?;
-        let Outcome::Saved { id, sent } = outcome else {
+        let Outcome::Saved { id, sent, queued } = outcome else {
             unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
         };
-        printer.out(MessageAddOutput { id, sent })
+        printer.out(MessageAddOutput {
+            id,
+            sent,
+            queue_id: queued,
+        })
     }
 }
 
 /// The `message add` output, naming the message that was appended.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct MessageAddOutput {
     id: Option<String>,
     sent: bool,
+    /// The queue row id of a send deferred to the store's owner.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    queue_id: Option<i64>,
 }
 
 impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let suffix = if self.sent { " and sent" } else { "" };
+        let suffix = match (self.sent, self.queue_id) {
+            (true, Some(_)) => " and queued for sending",
+            (true, None) => " and sent",
+            (false, _) => "",
+        };
         match &self.id {
             Some(id) => write!(f, "Message {id} successfully added{suffix}"),
             None => write!(f, "Message successfully added{suffix}, id unavailable"),

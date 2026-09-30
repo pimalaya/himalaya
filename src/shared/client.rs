@@ -485,23 +485,34 @@ impl EmailClient {
 
     /// Sends a raw message through the storage backend when it can send,
     /// and through the SMTP transport otherwise.
-    pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
+    ///
+    /// A backend that defers the send to its store's owner files it under
+    /// `mailbox` and returns the queue row id; every other one sends at
+    /// once, ignores `mailbox` and returns `None`.
+    #[cfg_attr(not(feature = "pimdir"), allow(unused_variables))]
+    pub fn send_message(&mut self, mailbox: Option<&str>, raw: Vec<u8>) -> Result<Option<i64>> {
         match &mut self.storage {
             #[cfg(feature = "jmap")]
-            Some(BackendClient::Jmap(client)) => return client.send_message(raw),
+            Some(BackendClient::Jmap(client)) => return client.send_message(raw).map(|()| None),
             #[cfg(feature = "gmail")]
-            Some(BackendClient::Gmail(client)) => return client.send_message(raw),
+            Some(BackendClient::Gmail(client)) => return client.send_message(raw).map(|()| None),
             #[cfg(feature = "msgraph")]
-            Some(BackendClient::Msgraph(client)) => return client.send_message(raw),
+            Some(BackendClient::Msgraph(client)) => return client.send_message(raw).map(|()| None),
+            #[cfg(feature = "pimdir")]
+            Some(BackendClient::Pimdir(client)) => {
+                return client.send_message(mailbox, raw).map(Some);
+            }
             _ => {}
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp_client_mut()? {
-            return smtp.send_message(raw);
+            return smtp.send_message(raw).map(|()| None);
         }
 
-        bail!("No send-capable backend (JMAP/Gmail/Graph) or SMTP is configured for this account")
+        bail!(
+            "No send-capable backend (JMAP/Gmail/Graph/pimdir) or SMTP is configured for this account"
+        )
     }
 
     /// Connects the SMTP transport on first use, `None` when none is

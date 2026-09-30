@@ -57,6 +57,11 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-message-add",
             crate::shared::message::add::MessageAddOutput
         );
+        // NOTE: `message send` prints the confirmation line only.
+        insert!(
+            "himalaya-message-send",
+            crate::shared::message::handler::MessageRouteOutput
+        );
         insert!(
             "himalaya-message-read",
             crate::shared::message::read::MessageView
