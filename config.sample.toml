@@ -52,6 +52,11 @@
 # false, which keeps the wire offset.
 #envelope.list.datetime-local-tz = false
 
+# Render recent dates relative to today, in the local timezone: the time of day
+# for today, `yesterday`, then the weekday for the past week. Older dates fall
+# back to `datetime-fmt`. Defaults to false.
+#envelope.list.datetime-relative = false
+
 # Default page size of `envelope list`. The `-s/--page-size` flag wins when
 # passed, and 25 is the hard fallback.
 #envelope.list.page-size = 50
@@ -160,6 +165,7 @@ default = true
 #table.arrangement = "dynamic"
 #envelope.list.datetime-fmt = "%F %R%:z"
 #envelope.list.datetime-local-tz = false
+#envelope.list.datetime-relative = false
 
 # Proxy the network backends connect through, absent their own `<backend>.proxy`
 # block (same keys). Without any, the `all_proxy` and `https_proxy` environment

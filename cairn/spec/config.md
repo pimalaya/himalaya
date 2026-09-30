@@ -60,3 +60,6 @@ An account's `proxy` SHALL apply to every network backend of that account (IMAP,
 
 ### Requirement: A v1 account layout is named, not silently ignored
 Unknown keys SHALL stay tolerated, the file being shared with himalaya-tui. When no configured backend matches `--backend`, the error SHALL name the account and, under `auto`, the backends the command supports in this build; under a named backend, the missing block, or that the backend is unsupported. An account carrying the v1 `backend` table, which no v2 binary reads, SHALL load as if the table were absent, and that error SHALL name the table and point at MIGRATION.md.
+
+### Requirement: Envelope dates MAY render relative to today
+`envelope.list.datetime-relative`, settable globally and per account, SHALL render the DATE column of `envelope list` and `envelope search` relative to today in the local timezone: the time of day (`%R`) for today, `yesterday` for the day before, the weekday (`%A`) for the five days before that, and `datetime-fmt` for anything older or dated in the future. It SHALL default to `false`, and SHALL NOT change the `--json` output, which keeps the exact date.

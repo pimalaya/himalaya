@@ -94,6 +94,7 @@ impl EnvelopeSearchCommand {
             max_width: self.max_width,
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
+            datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
             chars: FlagChars {

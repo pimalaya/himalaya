@@ -5,7 +5,7 @@
 use std::{collections::BTreeSet, fmt};
 
 use anyhow::Result;
-use chrono::{DateTime, FixedOffset, Local};
+use chrono::{DateTime, FixedOffset, Local, NaiveDate};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
@@ -81,6 +81,7 @@ impl EnvelopeListCommand {
             max_width: self.max_width,
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
+            datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
             chars: FlagChars {
@@ -153,6 +154,9 @@ pub struct Envelopes {
     /// Whether a date is converted to the local timezone first.
     #[serde(skip)]
     pub datetime_local_tz: bool,
+    /// Whether a recent date renders relative to today.
+    #[serde(skip)]
+    pub datetime_relative: bool,
     /// Whether recipients are drawn instead of senders.
     #[serde(skip)]
     pub recipient: bool,
@@ -175,6 +179,7 @@ pub struct Envelopes {
 
 impl fmt::Display for Envelopes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let today = Local::now().date_naive();
         let mut table = Table::new();
 
         let mut header = vec![Cell::new("ID"), Cell::new("FLAGS")];
@@ -215,14 +220,7 @@ impl fmt::Display for Envelopes {
                 };
                 row.add_cell(Cell::new(format_addresses(addresses)).fg(from_or_to_color));
 
-                row.add_cell(
-                    Cell::new(format_date(
-                        env.date,
-                        &self.datetime_fmt,
-                        self.datetime_local_tz,
-                    ))
-                    .fg(self.colors.date),
-                );
+                row.add_cell(Cell::new(self.format_date(env.date, today)).fg(self.colors.date));
                 row.add_cell(
                     Cell::new(format_size(env.size, BINARY))
                         .fg(self.colors.size)
@@ -301,19 +299,100 @@ pub fn format_addresses(addrs: &[Address]) -> String {
         .join(", ")
 }
 
-/// Renders a date with the configured format, in the local timezone when
-/// asked for.
-pub(super) fn format_date(
-    date: Option<DateTime<FixedOffset>>,
-    fmt: &str,
-    local_tz: bool,
-) -> String {
-    let Some(date) = date else {
-        return String::new();
-    };
-    if local_tz {
-        date.with_timezone(&Local).format(fmt).to_string()
-    } else {
-        date.format(fmt).to_string()
+impl Envelopes {
+    /// Renders a date with the configured format, in the local timezone
+    /// when asked for, or relative to `today` when recent and asked for.
+    fn format_date(&self, date: Option<DateTime<FixedOffset>>, today: NaiveDate) -> String {
+        let Some(date) = date else {
+            return String::new();
+        };
+
+        if self.datetime_relative {
+            let date = date.with_timezone(&Local);
+
+            return match (today - date.date_naive()).num_days() {
+                0 => date.format("%R").to_string(),
+                1 => String::from("yesterday"),
+                2..7 => date.format("%A").to_string(),
+                _ => date.format(&self.datetime_fmt).to_string(),
+            };
+        }
+
+        if self.datetime_local_tz {
+            date.with_timezone(&Local)
+                .format(&self.datetime_fmt)
+                .to_string()
+        } else {
+            date.format(&self.datetime_fmt).to_string()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
+    use pimalaya_cli::table::{Color, ContentArrangement};
+
+    use super::{EnvelopeColors, Envelopes, FlagChars};
+
+    fn envelopes(relative: bool) -> Envelopes {
+        Envelopes {
+            preset: String::new(),
+            arrangement: ContentArrangement::Disabled,
+            max_width: None,
+            datetime_fmt: String::from("%F"),
+            datetime_local_tz: false,
+            datetime_relative: relative,
+            recipient: false,
+            with_attachment: false,
+            chars: FlagChars {
+                unseen: '*',
+                replied: 'R',
+                flagged: '!',
+                attachment: '@',
+            },
+            colors: EnvelopeColors {
+                id: Color::Reset,
+                flags: Color::Reset,
+                att: Color::Reset,
+                subject: Color::Reset,
+                from: Color::Reset,
+                to: Color::Reset,
+                date: Color::Reset,
+                size: Color::Reset,
+            },
+            queued: 0,
+            envelopes: Vec::new(),
+        }
+    }
+
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 9, 30).unwrap()
+    }
+
+    fn local(y: i32, m: u32, d: u32, h: u32, min: u32) -> Option<DateTime<FixedOffset>> {
+        let naive = NaiveDate::from_ymd_opt(y, m, d)?.and_hms_opt(h, min, 0)?;
+        Some(Local.from_local_datetime(&naive).single()?.fixed_offset())
+    }
+
+    #[test]
+    fn relative_date_follows_age() {
+        let envelopes = envelopes(true);
+        let render = |date| envelopes.format_date(date, today());
+
+        assert_eq!(render(local(2026, 9, 30, 11, 35)), "11:35");
+        assert_eq!(render(local(2026, 9, 29, 11, 35)), "yesterday");
+        assert_eq!(render(local(2026, 9, 26, 11, 35)), "Saturday");
+        assert_eq!(render(local(2026, 9, 23, 11, 35)), "2026-09-23");
+        assert_eq!(render(None), "");
+    }
+
+    #[test]
+    fn absolute_date_ignores_age() {
+        let envelopes = envelopes(false);
+        let date = local(2026, 9, 30, 11, 35);
+        let expected = date.unwrap().format("%F").to_string();
+
+        assert_eq!(envelopes.format_date(date, today()), expected);
     }
 }

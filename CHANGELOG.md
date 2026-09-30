@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `envelope.list.datetime-relative`, rendering recent dates relative to today: the time for today, `yesterday`, then the weekday for the past week, older dates falling back to `datetime-fmt` ([#510]).
+
 - Added `proxy`, a per-account SOCKS5 or HTTP proxy every network backend connects through, and `<backend>.proxy` to override it for one backend ([#742]).
 
   The password is a secret like any credential, so it stays out of the URL. Without either, the `all_proxy` and `https_proxy` environment variables are still read.
@@ -1313,6 +1315,7 @@ Few major concepts changed:
 [#492]: https://github.com/pimalaya/himalaya/issues/492
 [#496]: https://github.com/pimalaya/himalaya/issues/496
 [#508]: https://github.com/pimalaya/himalaya/issues/508
+[#510]: https://github.com/pimalaya/himalaya/issues/510
 [#515]: https://github.com/pimalaya/himalaya/issues/515
 [#518]: https://github.com/pimalaya/himalaya/issues/518
 [#522]: https://github.com/pimalaya/himalaya/issues/522

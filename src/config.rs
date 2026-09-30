@@ -502,6 +502,10 @@ pub struct EnvelopeListConfig {
     /// Whether the `Date:` offset is converted to the local timezone
     /// before formatting, the default `false` keeping the wire offset.
     pub datetime_local_tz: Option<bool>,
+    /// Whether a recent date renders relative to today in the local
+    /// timezone (time of day, `yesterday`, weekday), an older one falling
+    /// back to `datetime-fmt`, the default `false` never doing so.
+    pub datetime_relative: Option<bool>,
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
