@@ -340,6 +340,19 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
     }
 
+    #[cfg(feature = "mbox")]
+    {
+        insert!("himalaya-mbox-list", crate::mbox::list::MboxesTable);
+        insert!(
+            "himalaya-mbox-flag-list",
+            crate::mbox::flag::list::FlagsTable
+        );
+        insert!(
+            "himalaya-mbox-message-save",
+            crate::mbox::message::save::StoredMessage
+        );
+    }
+
     #[cfg(feature = "m2dir")]
     {
         insert!("himalaya-m2dir-list", crate::m2dir::list::M2dirsTable);

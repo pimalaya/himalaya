@@ -16,7 +16,7 @@ Everything below documents only what differs from the Pimalaya standards.
 Himalaya is the CLI front-end of the Pimalaya email stack, a thin shell driving the sans-I/O io- libraries. Triage before patching, since protocol and storage fixes usually belong upstream:
 
 - IMAP, JMAP, Gmail, Microsoft Graph and SMTP wire semantics belong in [io-imap](https://github.com/pimalaya/io-imap), [io-jmap](https://github.com/pimalaya/io-jmap), [io-gmail](https://github.com/pimalaya/io-gmail), [io-msgraph](https://github.com/pimalaya/io-msgraph) and [io-smtp](https://github.com/pimalaya/io-smtp);
-- local storage semantics belong in [io-maildir](https://github.com/pimalaya/io-maildir) and [io-m2dir](https://github.com/pimalaya/io-m2dir);
+- local storage semantics belong in [io-maildir](https://github.com/pimalaya/io-maildir), [io-m2dir](https://github.com/pimalaya/io-m2dir) and [io-mbox](https://github.com/pimalaya/io-mbox);
 - account discovery consumed by the wizard belongs in [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery);
 - the commands, rendering, composition, the wizard and the shared cross-protocol surface live here.
 
@@ -24,7 +24,7 @@ The clap, printer, prompt and spinner primitives come from [pimalaya/cli](https:
 
 ## Feature matrix
 
-Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`), the ManageSieve service protocol (`sieve`), the setup `wizard`, and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`), all on by default. Build a reduced set to check the feature gates still hold when touching them:
+Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph` and `maildir` on by default, `m2dir`, `mbox` and `pimdir` off), the ManageSieve service protocol (`sieve`), the setup `wizard`, and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`). Build a reduced set to check the feature gates still hold when touching them:
 
 ```sh
 cargo build --no-default-features --features imap,smtp,rustls-ring

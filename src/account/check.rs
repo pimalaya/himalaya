@@ -4,6 +4,8 @@
 //! backend so a credential or an endpoint fails here rather than in the
 //! middle of a real command.
 
+#[cfg(feature = "mbox")]
+use std::fs::File;
 use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, bail};
@@ -130,6 +132,15 @@ impl AccountCheckCommand {
                 .push(BackendCheck::from("m2dir", connect_m2dir(m2dir_config)));
         }
 
+        #[cfg(feature = "mbox")]
+        if backend.allows_mbox()
+            && let Some(mbox_config) = &account_config.mbox
+        {
+            report
+                .backends
+                .push(BackendCheck::from("mbox", connect_mbox(mbox_config)));
+        }
+
         #[cfg(feature = "smtp")]
         if backend.allows_smtp()
             && let Some(smtp_config) = &account_config.smtp
@@ -210,6 +221,11 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
     #[cfg(feature = "m2dir")]
     if let Some(m2dir_config) = &account_config.m2dir {
         connect_m2dir(m2dir_config)?;
+    }
+
+    #[cfg(feature = "mbox")]
+    if let Some(mbox_config) = &account_config.mbox {
+        connect_mbox(mbox_config)?;
     }
 
     #[cfg(feature = "smtp")]
@@ -370,6 +386,26 @@ fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> 
             "Maildir root `{}` does not exist or is not a directory",
             maildir_config.root.display()
         );
+    }
+
+    Ok(())
+}
+
+/// Checks that the mbox root is a directory and the spool, when set, a
+/// readable file.
+#[cfg(feature = "mbox")]
+fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
+    if !mbox_config.root.is_dir() {
+        bail!(
+            "Mbox root `{}` does not exist or is not a directory",
+            mbox_config.root.display()
+        );
+    }
+
+    if let Some(inbox) = &mbox_config.inbox
+        && let Err(err) = File::open(inbox)
+    {
+        bail!("Cannot open mbox spool `{}`: {err}", inbox.display());
     }
 
     Ok(())

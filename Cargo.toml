@@ -12,7 +12,7 @@ homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "imap", "smtp", "sieve", "jmap", "gmail", "msgraph", "maildir"]
+default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "maildir", "mbox", "sieve"]
 imap = ["dep:base64", "dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
@@ -21,6 +21,7 @@ smtp = ["dep:io-smtp", "dep:mail-parser"]
 sieve = ["dep:io-managesieve", "io-managesieve/client", "io-managesieve/scram"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "io-maildir/client", "io-maildir/parser"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "io-m2dir/client"]
+mbox = ["dep:io-mbox", "dep:mail-parser", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
 pimdir = ["dep:io-pimdir", "dep:mail-parser"]
 native-tls = ["pimalaya-stream/native-tls", "io-pim-discovery/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-gmail?/native-tls", "io-msgraph?/native-tls", "io-smtp?/native-tls", "io-managesieve?/native-tls"]
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-pim-discovery/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-gmail?/rustls-aws", "io-msgraph?/rustls-aws", "io-smtp?/rustls-aws", "io-managesieve?/rustls-aws"]
@@ -52,6 +53,7 @@ io-imap = { version = "0.7", default-features = false, optional = true }
 io-jmap = { version = "0.4", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
+io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.4", default-features = false, optional = true }
 io-pim-discovery = { version = "0.7", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
@@ -72,6 +74,7 @@ schemars = { version = "1", features = ["chrono04"] }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
+sha2 = { version = "0.11", optional = true }
 shellexpand = "3.1"
 toml = "1.1"
 url = { version = "2.2", features = ["serde"] }

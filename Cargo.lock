@@ -406,6 +406,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-oid"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
+
+[[package]]
 name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -577,6 +583,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer",
+ "const-oid",
  "crypto-common",
  "ctutils",
 ]
@@ -945,6 +952,7 @@ dependencies = [
  "io-m2dir",
  "io-maildir",
  "io-managesieve",
+ "io-mbox",
  "io-msgraph",
  "io-pim-discovery",
  "io-pimdir",
@@ -964,6 +972,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sha2",
  "shellexpand",
  "toml",
  "uds_windows",
@@ -1294,6 +1303,21 @@ dependencies = [
  "secrecy",
  "thiserror",
  "url",
+]
+
+[[package]]
+name = "io-mbox"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a16f63a47571e7f95d804fdce2ea161bbb8cb0017d74192aea99d477d535b915"
+dependencies = [
+ "libc",
+ "log",
+ "mail-parser",
+ "memchr",
+ "serde",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]

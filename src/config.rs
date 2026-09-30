@@ -152,7 +152,7 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the listed ones, so a
 /// field added to [`AccountConfig`] can never go missing from a generated
 /// document just because nobody updated this table.
-const RENDER_ORDER: [&str; 19] = [
+const RENDER_ORDER: [&str; 20] = [
     "default",
     "email",
     "display-name",
@@ -165,6 +165,7 @@ const RENDER_ORDER: [&str; 19] = [
     "msgraph",
     "maildir",
     "m2dir",
+    "mbox",
     "pimdir",
     "smtp",
     "sieve",
@@ -361,6 +362,9 @@ pub struct AccountConfig {
     /// The m2dir backend of this account.
     #[allow(unused)]
     pub m2dir: Option<M2dirConfig>,
+    /// The mbox backend of this account.
+    #[allow(unused)]
+    pub mbox: Option<MboxConfig>,
     /// The pimdir backend of this account.
     #[allow(unused)]
     pub pimdir: Option<PimdirConfig>,
@@ -743,6 +747,85 @@ pub struct M2dirConfig {
     /// The m2dir root, one directory per mailbox below it.
     #[serde(deserialize_with = "shell_expanded_path")]
     pub root: PathBuf,
+}
+
+/// mbox configuration: a directory of mbox files, plus the spool.
+#[allow(unused)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MboxConfig {
+    /// The directory holding the mbox files, one file per mailbox,
+    /// walked recursively.
+    #[serde(deserialize_with = "shell_expanded_path")]
+    pub root: PathBuf,
+    /// The spool surfaced as the `INBOX` mailbox, typically `$MAIL`,
+    /// wherever it lives.
+    #[serde(
+        default,
+        deserialize_with = "opt_shell_expanded_path",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub inbox: Option<PathBuf>,
+    /// The variant new messages are written in, and whose quoting reads
+    /// undo.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub format: MboxFormatConfig,
+    /// Whether the children of mailbox `a` live in `a.sbd`, as
+    /// Thunderbird lays them out, rather than in `a`.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub thunderbird: bool,
+    /// The locks every write takes.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub lock: MboxLockConfig,
+}
+
+/// One of the four mbox variants.
+///
+/// Mirrors io-mbox's `MboxFormat`, kept local so the config schema does
+/// not depend on any backend crate.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MboxFormatConfig {
+    /// `From ` lines quoted with one `>`, lossy.
+    Mboxo,
+    /// Reversible quoting of `>*From ` lines.
+    #[default]
+    Mboxrd,
+    /// mboxo quoting plus a `Content-Length` header.
+    Mboxcl,
+    /// No quoting, a `Content-Length` header delimits the body.
+    Mboxcl2,
+}
+
+/// Per-account `mbox.lock.*` options, both locks taken by default.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MboxLockConfig {
+    /// Whether to take the `<mbox>.lock` dotlock, which a spool
+    /// directory the user cannot write to refuses.
+    #[serde(default = "default_true")]
+    pub dotlock: bool,
+    /// Whether to take the fcntl lock.
+    #[serde(default = "default_true")]
+    pub fcntl: bool,
+    /// Seconds to wait for a lock another process holds, 10 when
+    /// unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
+}
+
+impl Default for MboxLockConfig {
+    fn default() -> Self {
+        Self {
+            dotlock: true,
+            fcntl: true,
+            timeout: None,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// pimdir configuration, a local store read as an offline cache.
@@ -1320,6 +1403,38 @@ mod tests {
     }
 
     #[test]
+    fn mbox_root_alone_takes_both_locks_and_writes_mboxrd() {
+        let config: MboxConfig = toml::from_str(r#"root = "/tmp/mail""#).unwrap();
+
+        assert_eq!(config.inbox, None);
+        assert_eq!(config.format, MboxFormatConfig::Mboxrd);
+        assert!(!config.thunderbird);
+        assert_eq!(config.lock, MboxLockConfig::default());
+        assert!(config.lock.dotlock && config.lock.fcntl);
+    }
+
+    #[test]
+    fn mbox_options_parse() {
+        let config: MboxConfig = toml::from_str(
+            r#"
+                root = "/tmp/mail"
+                inbox = "/var/mail/me"
+                format = "mboxcl2"
+                thunderbird = true
+                lock.dotlock = false
+                lock.timeout = 30
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.inbox, Some(PathBuf::from("/var/mail/me")));
+        assert_eq!(config.format, MboxFormatConfig::Mboxcl2);
+        assert!(config.thunderbird);
+        assert!(!config.lock.dotlock && config.lock.fcntl);
+        assert_eq!(config.lock.timeout, Some(30));
+    }
+
+    #[test]
     fn sieve_config_defaults_to_no_alpn_and_refuses_cleartext_auth() {
         let config: SieveConfig = toml::from_str(
             r#"
@@ -1427,10 +1542,17 @@ mod tests {
         let maildir: MaildirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
         let m2dir: M2dirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
         let pimdir: PimdirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
+        let mbox: MboxConfig = toml::from_str(
+            r#"root = "~/Mail"
+inbox = "~/spool""#,
+        )
+        .unwrap();
 
         assert_eq!(maildir.root, home.join("Mail"));
         assert_eq!(m2dir.root, home.join("Mail"));
         assert_eq!(pimdir.root, home.join("Mail"));
+        assert_eq!(mbox.root, home.join("Mail"));
+        assert_eq!(mbox.inbox, Some(home.join("spool")));
     }
 
     #[test]

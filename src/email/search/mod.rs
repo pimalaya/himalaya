@@ -5,7 +5,12 @@
 //! run it with.
 
 pub mod error;
-#[cfg(any(feature = "maildir", feature = "m2dir", feature = "pimdir"))]
+#[cfg(any(
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox",
+    feature = "pimdir"
+))]
 pub mod eval;
 pub mod filter;
 pub mod parser;

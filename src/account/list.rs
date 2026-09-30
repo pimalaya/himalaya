@@ -123,6 +123,9 @@ impl AccountRow {
         if account.m2dir.is_some() {
             backends.push("m2dir");
         }
+        if account.mbox.is_some() {
+            backends.push("mbox");
+        }
         if account.smtp.is_some() {
             backends.push("smtp");
         }

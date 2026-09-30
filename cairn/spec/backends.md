@@ -16,7 +16,7 @@ The shared `Envelope` SHALL carry `message_id` and `in_reply_to`, the RFC 5322 �
 
 `in_reply_to` SHALL be a list, the grammar being `1*msg-id`, and every id in it SHALL be normalised exactly as `message_id` is (angle brackets and surrounding whitespace stripped), so the two compare byte-for-byte whatever backend surfaced them.
 
-Each backend SHALL source the field from the response its listing already makes, and SHALL leave it empty rather than issue a request of its own: IMAP from the `ENVELOPE` (RFC 3501 §7.4.2, 9th element), JMAP from the `inReplyTo` property of `Email/get`, Gmail from the metadata headers, Maildir and m2dir from the parsed message, and pimdir from the stored summary. Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
+Each backend SHALL source the field from the response its listing already makes, and SHALL leave it empty rather than issue a request of its own: IMAP from the `ENVELOPE` (RFC 3501 §7.4.2, 9th element), JMAP from the `inReplyTo` property of `Email/get`, Gmail from the metadata headers, Maildir, m2dir and mbox from the parsed message, and pimdir from the stored summary. Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
 
 The field SHALL NOT take a column in the `envelope list` table, where a column of raw msg-ids would be noise; it rides the JSON output.
 
@@ -33,6 +33,21 @@ Opening a connection SHALL arm a socket read deadline matching that budget, so a
 
 ### Requirement: Local storage backends
 Maildir, m2dir and pimdir SHALL adapt io-maildir, io-m2dir and io-pimdir. Maildir stores added messages under `cur/` and SHALL read an entry's flags through io-maildir rather than parsing the filename itself, so the meaning of a Maildir name is decided in the library that owns the format. m2dir is content-addressed with no native copy or move, so those are a get plus a store (plus a delete for move), and its flags live in a `.meta/<id>.flags` sidecar. m2dir mailbox `rename` and message `copy`/`move` remain unavailable until io-m2dir supports them. pimdir is an offline cache the sync engine populates, io-pimdir implementing both the store and the engine: reads project the store's items with their typed mail summaries (pimdir STORAGE Annex A) without body reads, and writes are actions queued for the store's owner to apply and a later sync to propagate, never direct SQL.
+
+### Requirement: mbox backend
+The mbox backend SHALL adapt io-mbox over the full shared operation set. A mailbox is one mbox file: `mbox.root` is walked recursively, the mailbox `a/b` being the file `a/b` below it (`a.sbd/b` with `mbox.thunderbird`), and `mbox.inbox`, when set, is the spool shown as `INBOX` and marked with the inbox role. An absolute path passed as a mailbox SHALL open that file, so any mbox reads without configuring it. The raw `mbox` command SHALL expose create, rename, delete and list of mbox files, message save, copy and move, and the six flag letters of the `Status` and `X-Status` headers.
+
+### Requirement: An mbox message is its content id
+The mbox backend SHALL address a message by its io-mbox content id, a hash of the message with the flag and metadata fields left out, so a flag write by Himalaya or any other client keeps it. An id the index no longer holds SHALL fail naming the mailbox. An append SHALL report the id the synced index gives the new message, numbered like any duplicate.
+
+### Requirement: mbox flags interoperate
+Shared flags SHALL map onto `Status: R` (seen), `X-Status: A`, `F`, `T` and `D` (answered, flagged, draft, deleted), any other flag going to `X-Keywords`. A message marked seen SHALL be marked old (`O`) too, as mutt writes it, since GNU mail lists a `Status: R` alone as new. A shared `flag set` SHALL keep the `O` a message carries, no shared flag naming it.
+
+### Requirement: mbox writes lock and rewrite in place
+Every mbox write SHALL go through io-mbox under the dotlock and the fcntl lock, each one skippable through `mbox.lock.dotlock` and `mbox.lock.fcntl`, waiting `mbox.lock.timeout` seconds for a busy one. Flag changes and removals SHALL rewrite the file in place, the whole set of messages a command names in one rewrite. A move SHALL copy then remove, so an interruption leaves the messages in both files.
+
+### Requirement: mbox reads go through a cache
+The mbox backend SHALL keep, per file, the io-mbox scan index and the envelope of every message already parsed, under `<XDG cache>/himalaya/mbox/`. Every operation SHALL sync the index first, so an unchanged file is not scanned and a delivery is scanned alone, and a listing SHALL parse only the messages the cache lacks. The cache SHALL be disposable: a missing, stale or unreadable one is rebuilt, failing to write one is not an error, and a read finding its entry stale SHALL rebuild the index and retry once.
 
 ### Requirement: Maildir surfaces custom keywords on demand
 The Maildir backend SHALL surface custom (non-IANA) keywords on read when told which convention the mailbox uses, so a keyword written by dovecot, mbsync, OfflineIMAP, mutt or notmuch matches a `flag <name>` search as it does on the network backends. `maildir.keywords.dovecot` SHALL resolve the lowercase info-section slot letters through the resolved mailbox's own `dovecot-keywords` file, and `maildir.keywords.header` SHALL read keywords from `X-Keywords` (comma-separated) or `X-Label` (space-separated). Both default to off, and with both off the flag set SHALL be exactly the six standard info-section letters as before.
@@ -98,12 +113,12 @@ Taking the owner role briefly is what cancelling costs (pimdir SPEC §15.5); the
 - THEN the row shows that subject and recipient, and an empty message id
 
 ### Requirement: Append and search gaps
-Gmail and Graph SHALL NOT implement `add_message` (neither API has an append) and SHALL NOT implement shared `search_envelopes`. IMAP, JMAP, Maildir and m2dir implement search (see the search capability).
+Gmail and Graph SHALL NOT implement `add_message` (neither API has an append) and SHALL NOT implement shared `search_envelopes`. IMAP, JMAP, Maildir, m2dir and mbox implement search (see the search capability).
 
 The shared `add_message` result SHALL carry an optional id, absent only when an IMAP or JMAP server acknowledges the write without reporting one. An IMAP `APPEND` acknowledged by the server SHALL stay a success when neither `APPENDUID` (RFC 4315) nor the fallback `Message-ID` search yields a UID, and a requested send SHALL go on. An `APPEND` rejected by the server SHALL stay an error.
 
 ### Requirement: Sending transport
-Backends that self-send (JMAP, Gmail, Graph) SHALL route `send_message` through their own API. Storage backends that cannot send (IMAP, Maildir, m2dir) SHALL send through the account's SMTP transport, adapted in `src/smtp/backend.rs` over io-smtp, which parses the RFC 5321 envelope from the raw message headers. The transmitted message SHALL NOT carry the `Bcc:` field (RFC 5322 3.6.3), which io-smtp removes after the envelope is derived. The protocol-level `smtp send` SHALL transmit its message verbatim, its envelope being explicit.
+Backends that self-send (JMAP, Gmail, Graph) SHALL route `send_message` through their own API. Storage backends that cannot send (IMAP, Maildir, m2dir, mbox) SHALL send through the account's SMTP transport, adapted in `src/smtp/backend.rs` over io-smtp, which parses the RFC 5321 envelope from the raw message headers. The transmitted message SHALL NOT carry the `Bcc:` field (RFC 5322 3.6.3), which io-smtp removes after the envelope is derived. The protocol-level `smtp send` SHALL transmit its message verbatim, its envelope being explicit.
 
 ### Requirement: Mailbox role
-A shared mailbox SHALL carry an optional role (inbox, all, archive, drafts, flagged, important, junk, sent, subscribed, trash, or a verbatim unknown one), shown by `mailbox list` in its table and JSON output. JMAP reads it from the mailbox `role`, Gmail from its fixed system-label ids, Microsoft Graph from its well-known folder names resolved to folder ids in one `$batch` request, and IMAP marks only `INBOX`. Maildir, m2dir and pimdir have no native role. A `mailbox.alias.<role>` entry overrides the native role of the mailbox it names, and `message delete` takes its trash from that alias before the backend's trash role.
+A shared mailbox SHALL carry an optional role (inbox, all, archive, drafts, flagged, important, junk, sent, subscribed, trash, or a verbatim unknown one), shown by `mailbox list` in its table and JSON output. JMAP reads it from the mailbox `role`, Gmail from its fixed system-label ids, Microsoft Graph from its well-known folder names resolved to folder ids in one `$batch` request, and IMAP marks only `INBOX`, as mbox marks its spool when one is configured. Maildir, m2dir and pimdir have no native role. A `mailbox.alias.<role>` entry overrides the native role of the mailbox it names, and `message delete` takes its trash from that alias before the backend's trash role.

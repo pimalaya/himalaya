@@ -127,8 +127,8 @@
 #
 # An entry named after a mailbox role (inbox, sent, drafts, trash, junk,
 # archive, flagged, important) overrides the role the backend reports. JMAP,
-# Gmail and Graph report their roles, IMAP the inbox alone for now, and
-# Maildir, m2dir and pimdir none, so set them by hand there. The `inbox` role
+# Gmail and Graph report their roles, IMAP and mbox the inbox alone for now,
+# and Maildir, m2dir and pimdir none, so set them by hand there. The `inbox` role
 # is the default mailbox every shared command falls back to when
 # `-m/--mailbox` is not passed.
 #mailbox.alias.inbox = "INBOX"
@@ -385,6 +385,41 @@ imap.sasl.plain.password.raw = "***"
 
 # Reading keywords is not a round trip: no command can name a custom keyword, so
 # `flag set` replaces the whole set and drops the ones the message carried.
+
+# --------------------------------------------------------------------------------
+# mbox config
+# https://manpages.debian.org/bookworm/mutt/mbox.5.en.html
+# --------------------------------------------------------------------------------
+
+# The directory holding the mbox files, one file per mailbox, walked
+# recursively: `lists/rust` is the file `lists/rust` below it. Any other mbox
+# file opens too, by passing its absolute path as the mailbox.
+#mbox.root = "~/Mail/example"
+
+# The spool, surfaced as the `INBOX` mailbox wherever it lives. Unset, the
+# `INBOX` mailbox is the file named so below the root.
+#mbox.inbox = "$MAIL"
+
+# The variant new messages are written in, and whose quoting reads undo:
+# `mboxo`, `mboxrd` (default), `mboxcl` or `mboxcl2`.
+#mbox.format = "mboxrd"
+
+# Lay the children of mailbox `a` out in the directory `a.sbd`, as
+# Thunderbird does, rather than in `a`. Off by default.
+#mbox.thunderbird = true
+
+# Every write takes the `<mbox>.lock` dotlock, then an fcntl lock, as MTAs and
+# MUAs agree on. A spool directory the user cannot write to (Debian's
+# /var/mail outside the `mail` group) refuses the dotlock: turn it off there,
+# the fcntl lock remaining. The timeout is how many seconds to wait for a lock
+# another process holds, 10 by default.
+#mbox.lock.dotlock = false
+#mbox.lock.fcntl = true
+#mbox.lock.timeout = 10
+
+# Himalaya keeps an index of each mbox file and the envelopes it already read
+# under the XDG cache directory (~/.cache/himalaya/mbox), so a listing reads
+# only what changed. Deleting it is always safe.
 
 # --------------------------------------------------------------------------------
 # pimdir config

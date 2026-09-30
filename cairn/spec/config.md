@@ -9,7 +9,7 @@ status: current
 Himalaya is configured through TOML: a top-level block plus named account blocks, one table per account under `[accounts.<name>]`, each carrying optional per-backend sub-blocks. The config schema is a set of pure DTOs (`*Config` types) mirroring the nested TOML shape; the selected account is flattened into a runtime `Account` view that commands consume. Config files stay user-owned: Himalaya never writes them.
 
 ### Requirement: Multi-account schema
-The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`) and optional service sub-blocks for `smtp` and `sieve`.
+The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`, `mbox`, `pimdir`) and optional service sub-blocks for `smtp` and `sieve`.
 
 The `sieve` block SHALL accept `sieve://`, `sieves://`, and `unix://` servers, and SHALL expose the shared TLS and SASL vocabulary, every mechanism the other backends accept reaching ManageSieve too.
 
@@ -39,8 +39,11 @@ An account MAY map friendly mailbox names to backend-native ids under `[accounts
 ### Requirement: Config never written
 Himalaya SHALL NOT persist config itself. The wizard prints a ready-to-save fragment on stdout; the user redirects it into their config file.
 
+### Requirement: The mbox block
+An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `inbox` (the spool), `format` (`mboxo`, `mboxrd` by default, `mboxcl`, `mboxcl2`, which also decides whether `Content-Length` is trusted on read), `thunderbird` (the `.sbd` layout, off by default) and `lock.dotlock`, `lock.fcntl` (both on by default) and `lock.timeout`.
+
 ### Requirement: Path keys expand as the configuration is read
-Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `m2dir.root`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
+Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `m2dir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
 
 An expansion that fails, an undefined variable being the case, SHALL leave the raw value untouched rather than fail the load.
 

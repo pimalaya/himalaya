@@ -15,7 +15,7 @@ fn main() {
     println!("cargo::rustc-check-cfg=cfg(backend)");
 
     let backend = [
-        "IMAP", "JMAP", "GMAIL", "MSGRAPH", "MAILDIR", "M2DIR", "PIMDIR",
+        "IMAP", "JMAP", "GMAIL", "MSGRAPH", "MAILDIR", "M2DIR", "MBOX", "PIMDIR",
     ]
     .iter()
     .any(|feature| env::var_os(format!("CARGO_FEATURE_{feature}")).is_some());

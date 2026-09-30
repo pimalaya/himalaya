@@ -17,7 +17,8 @@
 //! ## Backends and plumbing
 //!
 //! The network backends are io-imap, io-jmap, io-gmail, io-msgraph,
-//! io-smtp and io-managesieve, the local ones io-maildir and io-m2dir.
+//! io-smtp and io-managesieve, the local ones io-maildir, io-m2dir, io-mbox
+//! and io-pimdir.
 //! Account discovery comes from io-pim-discovery: Mozilla autoconfig,
 //! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve.
 //!
@@ -34,7 +35,7 @@
 //! serves the active account.
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
-//! m2dir, smtp, sieve) each expose the full surface of one backend,
+//! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend,
 //! including operations the shared API cannot model. The meta commands
 //! cover account configuration, completions, man pages and JSON Schemas.
 //!
@@ -95,6 +96,8 @@ mod json_schema;
 mod m2dir;
 #[cfg(feature = "maildir")]
 mod maildir;
+#[cfg(feature = "mbox")]
+mod mbox;
 #[cfg(feature = "msgraph")]
 mod msgraph;
 #[cfg(feature = "pimdir")]

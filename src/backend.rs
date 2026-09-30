@@ -30,6 +30,8 @@ pub enum Backend {
     Maildir,
     /// Pin the command to the account's m2dir backend.
     M2dir,
+    /// Pin the command to the account's mbox backend.
+    Mbox,
     /// Pin the command to the account's pimdir backend.
     Pimdir,
     /// Pin the command to the account's SMTP backend.
@@ -54,6 +56,8 @@ impl Backend {
         Self::Maildir,
         #[cfg(feature = "m2dir")]
         Self::M2dir,
+        #[cfg(feature = "mbox")]
+        Self::Mbox,
         #[cfg(feature = "pimdir")]
         Self::Pimdir,
         #[cfg(feature = "smtp")]
@@ -92,6 +96,11 @@ impl Backend {
         matches!(self, Self::Auto | Self::M2dir)
     }
 
+    /// Whether the mbox arm of a shared command may run.
+    pub fn allows_mbox(self) -> bool {
+        matches!(self, Self::Auto | Self::Mbox)
+    }
+
     /// Whether the pimdir arm of a shared command may run.
     pub fn allows_pimdir(self) -> bool {
         matches!(self, Self::Auto | Self::Pimdir)
@@ -118,6 +127,7 @@ impl fmt::Display for Backend {
             Self::Msgraph => write!(f, "msgraph"),
             Self::Maildir => write!(f, "maildir"),
             Self::M2dir => write!(f, "m2dir"),
+            Self::Mbox => write!(f, "mbox"),
             Self::Pimdir => write!(f, "pimdir"),
             Self::Smtp => write!(f, "smtp"),
             Self::Sieve => write!(f, "sieve"),

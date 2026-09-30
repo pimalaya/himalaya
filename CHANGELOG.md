@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Downloading a mailbox took one `message read` per message, so one login per message, which some providers cut off after a dozen in a row. The JSON `body` field carries the octets as standard Base64, declared as such in the JSON Schema; the plain output prints the size only.
 
+- Added the mbox backend, behind the `mbox` cargo feature (off by default), over the new io-mbox library ([#697]).
+
+  An `mbox` block points at a directory of mbox files and, optionally, at the spool (`$MAIL`) shown as `INBOX`. The shared commands read and write it, and `himalaya mbox` exposes the raw file operations. Any mbox file also opens by passing its absolute path as the mailbox. Writes lock the file the way MTAs and MUAs do, flags live in the `Status` and `X-Status` headers mutt and Dovecot use, and an index kept under the XDG cache directory makes a listing read only what changed.
+
 ### Changed
 
 - `-m/--mailbox` resolves a role after the aliases, so `-m sent` reaches the sent mailbox without an alias. A role carried by several mailboxes is an error naming them.
@@ -108,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed the type `configure` prints from `GeneratedConfig` to `ConfigureOutput`, the shape the rest of the family uses.
 
   What the command prints is unchanged. Only the `title` of the `himalaya-configure` JSON Schema follows the new name.
+
+### Removed
+
+- Removed the `mbox` alias of the `mailbox` command: `himalaya mbox` now runs the new mbox backend command. Scripts should call the command by its name, `himalaya mailbox`, rather than by an alias.
 
 ### Fixed
 
@@ -1335,6 +1343,7 @@ Few major concepts changed:
 [#632]: https://github.com/pimalaya/himalaya/issues/632
 [#634]: https://github.com/pimalaya/himalaya/issues/634
 [#637]: https://github.com/pimalaya/himalaya/issues/637
+[#697]: https://github.com/pimalaya/himalaya/issues/697
 [#721]: https://github.com/pimalaya/himalaya/issues/721
 [#723]: https://github.com/pimalaya/himalaya/issues/723
 [#727]: https://github.com/pimalaya/himalaya/issues/727
