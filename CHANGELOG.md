@@ -109,6 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a successful IMAP append being reported as failed when its UID could not be recovered ([#759]).
+
+  A server may acknowledge `APPEND` without `APPENDUID`, even with UIDPLUS, and some (QQ Exmail) also rewrite the `Message-ID` the fallback search looks for. The save now succeeds with an unknown id, so `message send --save` goes on to send, and `message add --json` can return `"id": null`.
+
 - Fixed the "No backend matching `auto`" error saying nothing of the cause ([#740]). It now names the account and either the supported backends this build compiles in or the missing `<backend>` block, and points at MIGRATION.md when the account still carries the v1 `backend` table.
 
 - Fixed `envelope list` and `envelope search` truncating the ID column under `--max-width`.
@@ -1342,6 +1346,7 @@ Few major concepts changed:
 [#740]: https://github.com/pimalaya/himalaya/issues/740
 [#742]: https://github.com/pimalaya/himalaya/issues/742
 [#743]: https://github.com/pimalaya/himalaya/issues/743
+[#759]: https://github.com/pimalaya/himalaya/issues/759
 [#762]: https://github.com/pimalaya/himalaya/issues/762
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 

@@ -322,8 +322,14 @@ impl EmailClient {
     }
 
     /// Adds a raw message to a mailbox with the given flags, which Gmail
-    /// and Microsoft Graph do not implement.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    /// and Microsoft Graph do not implement. Returns the new message id,
+    /// absent when an IMAP or JMAP server does not report it.
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
@@ -332,11 +338,11 @@ impl EmailClient {
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.add_message(mailbox, flags, raw),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.add_message(mailbox, flags, raw),
+            BackendClient::Maildir(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "m2dir")]
-            BackendClient::M2dir(client) => client.add_message(mailbox, flags, raw),
+            BackendClient::M2dir(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.add_message(mailbox, flags, raw),
+            BackendClient::Pimdir(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(_) => bail!("Gmail does not support adding messages"),
             #[cfg(feature = "msgraph")]

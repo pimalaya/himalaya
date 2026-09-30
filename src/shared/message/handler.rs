@@ -34,8 +34,9 @@ pub enum Outcome {
     Stdout,
     /// Saved to a mailbox, and sent too when asked.
     Saved {
-        /// The id the backend assigned the new message.
-        id: String,
+        /// The id the backend assigned the new message, absent when it
+        /// did not report one.
+        id: Option<String>,
         /// Whether it was sent as well as saved.
         sent: bool,
     },

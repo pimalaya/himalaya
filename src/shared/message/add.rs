@@ -65,13 +65,16 @@ impl MessageAddCommand {
 /// The `message add` output, naming the message that was appended.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct MessageAddOutput {
-    id: String,
+    id: Option<String>,
     sent: bool,
 }
 
 impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let suffix = if self.sent { " and sent" } else { "" };
-        write!(f, "Message {} successfully added{suffix}", self.id)
+        match &self.id {
+            Some(id) => write!(f, "Message {id} successfully added{suffix}"),
+            None => write!(f, "Message successfully added{suffix}, id unavailable"),
+        }
     }
 }

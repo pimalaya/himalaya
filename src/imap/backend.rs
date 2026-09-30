@@ -253,7 +253,15 @@ impl ImapClient {
 
     /// Appends a message and returns its UID, from the UIDPLUS
     /// `APPENDUID` or, failing that, a UID `SEARCH` on its `Message-ID`.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    ///
+    /// RFC 4315 §3 makes `APPENDUID` a SHOULD, so an acknowledged append
+    /// whose UID cannot be recovered is still a success, with no UID.
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<Option<String>> {
         let mbox = parse_mailbox(mailbox)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
 
@@ -268,34 +276,36 @@ impl ImapClient {
         )?;
 
         if let Some((_, uid)) = appenduid {
-            return Ok(uid.to_string());
+            return Ok(Some(uid.to_string()));
         }
 
-        // NOTE: without UIDPLUS the UID is recovered by searching the
-        // message's own `Message-ID`, which it therefore has to carry.
+        // NOTE: without `APPENDUID`, which a server may omit even with
+        // UIDPLUS, the UID is recovered by searching the message's own
+        // `Message-ID`, which it therefore has to carry.
         let message_id = MessageParser::default()
             .parse_headers(&raw)
             .and_then(|parsed| parsed.message_id().map(str::to_string))
             .filter(|id| !id.is_empty());
         let Some(message_id) = message_id else {
-            bail!(
-                "Cannot resolve appended UID: server lacks UIDPLUS and message has no Message-ID"
-            );
+            debug!("no APPENDUID and no Message-ID to search, appended UID unknown");
+            return Ok(None);
         };
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
 
         let field =
             AString::try_from("Message-ID").map_err(|_| anyhow!("Invalid IMAP search header"))?;
-        let value = AString::try_from(message_id)
+        let value = AString::try_from(message_id.clone())
             .map_err(|_| anyhow!("Invalid IMAP search Message-ID value"))?;
         let criteria = Vec1::from(SearchKey::Header(field, value));
         let uids = self.search(criteria, ImapMessageSearchOptions { uid: true })?;
 
-        uids.into_iter()
-            .max()
-            .map(|uid| uid.to_string())
-            .ok_or_else(|| anyhow!("Fallback UID search returned no match"))
+        let uid = uids.into_iter().max().map(|uid| uid.to_string());
+        if uid.is_none() {
+            debug!("no APPENDUID and no match for {message_id}, appended UID unknown");
+        }
+
+        Ok(uid)
     }
 
     /// Copies a UID set between two mailboxes.
