@@ -28,21 +28,37 @@ pimalaya.mkDefault (
         buildPackages,
       }:
 
+      let
+        inherit (pkgs) sqlite;
+
+        buildFeatures = lib.splitString "," features;
+
+        systemSqlite =
+          (defaultFeatures || builtins.elem "pimdir" buildFeatures)
+          && !builtins.elem "vendored" buildFeatures;
+
+      in
       (pkgs.callPackage "${nixpkgs}/pkgs/by-name/hi/himalaya/package.nix" {
-        inherit lib rustPlatform;
-        # the nixpkgs derivation runs the binary it just built, which needs
-        # a native one when cross compiling
+        inherit lib rustPlatform buildFeatures;
         buildPackages = buildPackages // {
           inherit himalaya;
         };
         installShellCompletions = false;
         installManPages = false;
         buildNoDefaultFeatures = !defaultFeatures;
-        buildFeatures = lib.splitString "," features;
       })
       # HACK: needed until the v2.1.0 derivation lands on nixpkgs's master
       .overrideAttrs
-        {
+        (drv: {
+          buildInputs = (drv.buildInputs or [ ]) ++ lib.optional systemSqlite sqlite;
+
+          # pkg-config hands the linker libsqlite3 but no rpath, leaving a
+          # binary that cannot find it: not in postInstall, which runs it, nor
+          # once installed.
+          env = (drv.env or { }) // {
+            NIX_LDFLAGS = lib.optionalString systemSqlite ("-rpath " + lib.getLib sqlite + "/lib");
+          };
+
           postInstall =
             let
               inherit (pkgs) stdenv;
@@ -58,7 +74,7 @@ pimalaya.mkDefault (
               ${exe} manual -d "$out"/share/man
               ${exe} json-schema -d "$out"/share/schemas
             '';
-        }
+        })
     );
   }
   // removeAttrs args [ "pimalaya" ]
