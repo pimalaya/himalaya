@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `messages-added-details` to `gmail history list --json`, preserving each arrival's message id, optional thread id and supplied label ids alongside the existing message-id arrays.
 
+- Added `message add` on Gmail, inserting the raw message through `messages.insert` with the mailbox and flags as labels, dated by its `Date:` header.
+
+- Added `envelope search` on Microsoft Graph, its filter translated to a KQL `$search`. Flag clauses are refused, Graph accepting no `$filter` beside `$search`, and the sort applies within the page.
+
 - A pimdir write now shows on the next read instead of on the next sync.
 
   A pimdir store is a replica the sync engine owns, so Himalaya appends its writes to the store's queue rather than apply them. A read used to project the committed index alone, so flagging a message lost the flag from the listing until Neverest ran.
@@ -89,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   None of them prints more than `metadata` returns (id, labels, snippet, headers), so their output is unchanged, and Gmail no longer sends bodies that were thrown away. Pass `--format full` to get a thread's MIME payloads.
 
-- Forwarded `vendored` to io-pimdir, which now links the system SQLite by default: a build carrying `--features pimdir` needs sqlite3 on the machine, or `vendored` alongside it to build one from source.
+- Forwarded `vendored` to io-pimdir and turned it on by default, so `cargo install` builds SQLite from source and needs none on the machine. Drop it to link the system SQLite and save about 1 MB; it also vendors OpenSSL when `native-tls` is on. The Nix builds still link the store's SQLite.
 
 - **BREAKING**: a `pimdir` store written before io-pimdir 0.4 is refused, and Himalaya reads the store's typed summaries.
 

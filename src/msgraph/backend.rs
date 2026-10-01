@@ -5,11 +5,11 @@
 //!
 //! Graph is folder-based, and a shared flag maps onto a scalar field of
 //! the message, `isRead` or the follow-up flag, or onto its categories.
-//! There is no `add_message`.
+//! There is no `add_message`: a MIME message Graph creates stays a draft.
 
 use std::collections::BTreeSet;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset};
 use io_msgraph::v1::{
     rest::{
@@ -18,12 +18,14 @@ use io_msgraph::v1::{
             mail_folders::{MsgraphMailFolder, list::MsgraphMailFoldersListParams},
             messages::{
                 MsgraphFlagStatus, MsgraphFollowupFlag, MsgraphImportance, MsgraphMessage,
-                MsgraphRecipient, list::MsgraphMessagesListParams,
+                MsgraphRecipient,
+                list::{MsgraphMessagesListParams, MsgraphMessagesListResponse},
             },
         },
     },
-    send::user_path,
+    send::{MsgraphSend, user_path},
 };
+use url::Url;
 
 use crate::{
     email::{
@@ -31,8 +33,9 @@ use crate::{
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
+        search::{eval::sort_envelopes, query::SearchEmailsQuery},
     },
-    msgraph::client::MsgraphClient,
+    msgraph::{client::MsgraphClient, search},
 };
 
 /// OData `$select` for envelope listing: the message fields backing the
@@ -131,6 +134,52 @@ impl MsgraphClient {
         let messages = self.messages_list(Some(mailbox), &params)?.response.value;
 
         Ok(messages.into_iter().map(envelope_from).collect())
+    }
+
+    /// Searches the `mailbox` folder with the shared query, its filter
+    /// translated to a KQL `$search`.
+    ///
+    /// Graph refuses `$skip` and `$orderby` beside `$search`, so a page is
+    /// reached through the paging links and sorted locally, newest first
+    /// by default since Graph answers in relevance order.
+    pub fn search_envelopes(
+        &mut self,
+        mailbox: &str,
+        query: Option<&SearchEmailsQuery>,
+        page: Option<u32>,
+        page_size: Option<u32>,
+        with_attachment: bool,
+    ) -> Result<Vec<Envelope>> {
+        let sort = query.and_then(|query| query.sort.as_deref());
+
+        let Some(filter) = query.and_then(|query| query.filter.as_ref()) else {
+            let mut envelopes = self.list_envelopes(mailbox, page, page_size, with_attachment)?;
+            sort_envelopes(&mut envelopes, sort);
+            return Ok(envelopes);
+        };
+
+        let search = search::filter_to_search(filter)?;
+        let params = MsgraphMessagesListParams {
+            top: page_size,
+            select: Some(ENVELOPE_SELECT),
+            search: Some(&search),
+            ..Default::default()
+        };
+        let mut response = self.messages_list(Some(mailbox), &params)?.response;
+
+        for _ in 1..page.unwrap_or(1).max(1) {
+            let Some(next) = response.next_link else {
+                return Ok(Vec::new());
+            };
+            let url = Url::parse(&next).context("Cannot parse the message paging link")?;
+            let coroutine = MsgraphSend::<MsgraphMessagesListResponse>::get(&self.auth, url);
+            response = self.run(coroutine)?.response;
+        }
+
+        let mut envelopes: Vec<Envelope> = response.value.into_iter().map(envelope_from).collect();
+        sort_envelopes(&mut envelopes, sort);
+
+        Ok(envelopes)
     }
 
     /// Adds, sets, or removes `flags` on a message id set via one

@@ -48,6 +48,8 @@
 
 > [!TIP]
 > Himalaya is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate backend support. The default feature set is declared in [Cargo.toml](./Cargo.toml).
+>
+> The default `vendored` feature builds SQLite from source; leave it out (`--no-default-features --features …`) to link the system one.
 
 ## Installation
 

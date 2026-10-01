@@ -14,7 +14,8 @@ use chrono::{DateTime, FixedOffset};
 use io_gmail::v1::rest::{
     labels::GmailLabel,
     messages::{
-        GmailMessage, GmailMessageFormat, decode_raw, encode_raw, list::GmailMessagesListParams,
+        GmailInternalDateSource, GmailMessage, GmailMessageFormat, decode_raw, encode_raw,
+        insert::GmailMessageInsert, list::GmailMessagesListParams,
     },
 };
 
@@ -212,6 +213,32 @@ impl GmailClient {
         }
 
         Ok(raw)
+    }
+
+    /// Appends a raw message under the `mailbox` label through
+    /// `messages.insert`, returning the id Gmail assigned.
+    ///
+    /// The flags become labels, an unseen message carrying `UNREAD`, and
+    /// the message's own `Date:` dates it, as an IMAP `APPEND` would.
+    /// Inserting files the message without sending it or running filters.
+    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+        let (mut label_ids, _) = label_patch(flags, FlagOp::Set);
+        label_ids.insert(0, mailbox.to_string());
+
+        let message = GmailMessage {
+            raw: Some(encode_raw(&raw)),
+            label_ids,
+            ..Default::default()
+        };
+        let coroutine = GmailMessageInsert::new(
+            &self.auth,
+            &self.user_id,
+            &message,
+            Some(GmailInternalDateSource::DateHeader),
+            false,
+        )?;
+
+        Ok(self.run(coroutine)?.response.id)
     }
 
     /// Copies a message id set into `to` by adding `to`'s label. `from`

@@ -139,8 +139,8 @@ The command SHALL report the queue row id, and its text SHALL say the message is
 ### Requirement: The queue view shows queued sends
 `himalaya pimdir queue list` SHALL render a queued `submit` as a message, derived from the body it pins as a create is, marked as a send, beside the queued creates of the same mailbox. The count an envelope listing reports SHALL include the mailbox's queued sends.
 
-### Requirement: Append and search gaps
-Gmail and Graph SHALL NOT implement `add_message` (neither API has an append) and SHALL NOT implement shared `search_envelopes`. IMAP, JMAP, Maildir, m2dir and mbox implement search (see the search capability).
+### Requirement: Append gap
+Graph SHALL NOT implement `add_message`: a MIME message it creates stays a draft. Gmail SHALL implement it through `messages.insert`, the mailbox and the flags becoming labels and the `Date:` header dating the message, without sending it or running filters. Every backend implements `search_envelopes` (see the search capability).
 
 The shared `add_message` result SHALL carry an optional id, absent only when an IMAP or JMAP server acknowledges the write without reporting one. An IMAP `APPEND` acknowledged by the server SHALL stay a success when neither `APPENDUID` (RFC 4315) nor the fallback `Message-ID` search yields a UID, and a requested send SHALL go on. An `APPEND` rejected by the server SHALL stay an error.
 

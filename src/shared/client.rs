@@ -232,8 +232,7 @@ impl EmailClient {
         Ok(0)
     }
 
-    /// Searches a mailbox with the shared query, which Microsoft Graph
-    /// does not implement.
+    /// Searches a mailbox with the shared query.
     #[cfg(backend)]
     pub fn search_envelopes(
         &mut self,
@@ -275,8 +274,8 @@ impl EmailClient {
                 client.search_envelopes(mailbox, query, page, page_size, with_attachment)
             }
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(_) => {
-                bail!("Microsoft Graph does not support the shared envelope search")
+            BackendClient::Msgraph(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
             }
         }
     }
@@ -364,7 +363,7 @@ impl EmailClient {
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(_) => bail!("Gmail does not support adding messages"),
+            BackendClient::Gmail(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(_) => bail!("Microsoft Graph does not support adding messages"),
             // NOTE: `storage_mut` bails first in a send-only build, so
