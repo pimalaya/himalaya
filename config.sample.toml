@@ -35,6 +35,12 @@
 # Directory attachments are downloaded to, falling back to `$TMPDIR`.
 #downloads-dir = "~/downloads"
 
+# Mailbox a sent message is copied to when `--save` is not passed, `--no-save`
+# skipping it for one send. A name, alias or role; `true` stands for `sent`.
+# Leave it unset on Gmail and Microsoft Graph, which file the sent message
+# themselves.
+#message.send.save-copy = "sent"
+
 # One character per table component, a space skipping it.
 # https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
 #table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
@@ -161,6 +167,7 @@ default = true
 
 # Per-account overrides for the global options above.
 #downloads-dir = "~/downloads/example"
+#message.send.save-copy = "sent"
 #table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
 #table.arrangement = "dynamic"
 #envelope.list.datetime-fmt = "%F %R%:z"
@@ -305,6 +312,11 @@ imap.sasl.plain.password.raw = "***"
 # `drafts`-role one is used; `himalaya jmap mailbox query --role drafts` finds
 # its id.
 #jmap.drafts-mailbox-id = "M0123abc"
+
+# Mailbox a sent message is moved to once submitted, losing its `$draft`
+# keyword. Unset, the `sent`-role one is used; without one, the message stays
+# in the drafts mailbox as a sent message.
+#jmap.sent-mailbox-id = "M4567def"
 
 # --------------------------------------------------------------------------------
 # Gmail config

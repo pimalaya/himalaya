@@ -22,9 +22,9 @@ use io_jmap::{
             query::{
                 JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
             },
-            set::JmapEmailSetArgs,
+            set::{JmapEmailPatch, JmapEmailSetArgs},
         },
-        email_submission::set::JmapEmailSubmissionCreate,
+        email_submission::set::{JmapEmailSubmissionCreate, JmapEmailSubmissionSetArgs},
         identity::get::JmapIdentityGetOptions,
         mailbox::{JmapMailbox, JmapMailboxRole, get::JmapMailboxGetOptions},
     },
@@ -303,17 +303,20 @@ impl JmapClient {
     /// Queues a message for delivery: upload, import as a draft, then
     /// `EmailSubmission/set` under the sending identity.
     ///
-    /// The identity and the drafts mailbox come from the configuration
-    /// when it names them, and from the account's default identity and
-    /// `drafts`-role mailbox otherwise.
+    /// The identity and the mailboxes come from the configuration when it
+    /// names them, and from the account's default identity and the
+    /// `drafts`- and `sent`-role mailboxes otherwise. Once submitted, the
+    /// server moves the email to the sent mailbox, unsets `$draft` and sets
+    /// `$seen` (RFC 8621 section 7.5 `onSuccessUpdateEmail`), so it does
+    /// not stay behind as a draft.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
         let identity_id = self.resolve_identity_id()?;
-        let drafts_id = self.resolve_drafts_mailbox_id()?;
+        let (drafts_id, sent_id) = self.resolve_send_mailbox_ids()?;
 
         let blob_id = self.upload(raw)?;
 
         let mut mailbox_ids = BTreeMap::new();
-        mailbox_ids.insert(drafts_id, true);
+        mailbox_ids.insert(drafts_id.clone(), true);
         let mut keywords = BTreeMap::new();
         keywords.insert("$draft".to_string(), true);
 
@@ -346,7 +349,19 @@ impl JmapClient {
                 envelope: None,
             },
         );
-        let output = self.email_submission_set(submissions)?;
+
+        let mut sent = JmapEmailPatch::default()
+            .unset_keyword("$draft")
+            .set_keyword("$seen");
+        if let Some(sent_id) = sent_id {
+            sent = sent.remove_from_mailbox(drafts_id).add_to_mailbox(sent_id);
+        }
+
+        let output = self.email_submission_set(JmapEmailSubmissionSetArgs {
+            create: submissions,
+            on_success_update_email: Some(BTreeMap::from([("#outgoing".to_string(), sent)])),
+            on_success_destroy_email: None,
+        })?;
         if !output.not_created.is_empty() {
             bail!("EmailSubmission/set did not submit the email");
         }
@@ -373,29 +388,40 @@ impl JmapClient {
             })
     }
 
-    /// Resolves the drafts mailbox to stage outgoing mail in: the
-    /// configured `drafts_mailbox_id`, else the mailbox carrying the
-    /// `drafts` role (`Mailbox/get`).
-    fn resolve_drafts_mailbox_id(&mut self) -> Result<String> {
-        if let Some(id) = self.config.drafts_mailbox_id.clone() {
-            return Ok(id);
+    /// Resolves the mailbox outgoing mail is staged in and the one it is
+    /// filed under once sent: the configured `drafts_mailbox_id` and
+    /// `sent_mailbox_id`, else the mailboxes carrying the `drafts` and
+    /// `sent` roles, read with one `Mailbox/get`.
+    ///
+    /// Only the drafts mailbox is required, a server without a sent one
+    /// leaving the sent message where it was staged.
+    fn resolve_send_mailbox_ids(&mut self) -> Result<(String, Option<String>)> {
+        let mut drafts = self.config.drafts_mailbox_id.clone();
+        let mut sent = self.config.sent_mailbox_id.clone();
+
+        if drafts.is_none() || sent.is_none() {
+            let output = self.mailbox_get(JmapMailboxGetOptions {
+                ids: None,
+                properties: None,
+            })?;
+
+            for mailbox in output.mailboxes {
+                match mailbox.role {
+                    Some(JmapMailboxRole::Drafts) if drafts.is_none() => drafts = mailbox.id,
+                    Some(JmapMailboxRole::Sent) if sent.is_none() => sent = mailbox.id,
+                    _ => {}
+                }
+            }
         }
 
-        let output = self.mailbox_get(JmapMailboxGetOptions {
-            ids: None,
-            properties: None,
+        let drafts = drafts.ok_or_else(|| {
+            anyhow!(
+                "JMAP send found no `drafts`-role mailbox; \
+                 set `drafts_mailbox_id` in the account config"
+            )
         })?;
-        output
-            .mailboxes
-            .into_iter()
-            .find(|mailbox| matches!(mailbox.role, Some(JmapMailboxRole::Drafts)))
-            .and_then(|mailbox| mailbox.id)
-            .ok_or_else(|| {
-                anyhow!(
-                    "JMAP send found no `drafts`-role mailbox; \
-                     set `drafts_mailbox_id` in the account config"
-                )
-            })
+
+        Ok((drafts, sent))
     }
 
     /// Uploads `raw` as a `message/rfc822` blob, returning its blob id.

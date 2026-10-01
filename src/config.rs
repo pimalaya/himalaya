@@ -116,6 +116,9 @@ pub struct Config {
     /// `attachment list` rendering options.
     #[serde(default)]
     pub attachment: AttachmentConfig,
+    /// Fallback for [`AccountConfig::message`].
+    #[serde(default)]
+    pub message: MessageConfig,
     /// `account list` rendering options, global only: the listing of
     /// accounts belongs to no account, so nothing overrides it.
     #[serde(default)]
@@ -152,7 +155,7 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the listed ones, so a
 /// field added to [`AccountConfig`] can never go missing from a generated
 /// document just because nobody updated this table.
-const RENDER_ORDER: [&str; 20] = [
+const RENDER_ORDER: [&str; 21] = [
     "default",
     "email",
     "display-name",
@@ -172,6 +175,7 @@ const RENDER_ORDER: [&str; 20] = [
     "mailbox",
     "envelope",
     "attachment",
+    "message",
     "table",
 ];
 
@@ -340,6 +344,9 @@ pub struct AccountConfig {
     /// `attachment list` rendering options.
     #[serde(default)]
     pub attachment: AttachmentConfig,
+    /// Message sending options.
+    #[serde(default)]
+    pub message: MessageConfig,
     /// Proxy every network backend of this account goes through, unless
     /// its own block names one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -428,6 +435,39 @@ pub struct MailboxListTableConfig {
     pub total_color: Option<Color>,
     /// Color of the UNREAD column.
     pub unread_color: Option<Color>,
+}
+
+/// Message options under `message.*`.
+///
+/// Unknown keys are accepted rather than denied, so the rest of a v1
+/// `[message]` table (`read`, `write`, `delete`...) keeps loading.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct MessageConfig {
+    /// Sending options.
+    #[serde(default)]
+    pub send: MessageSendConfig,
+}
+
+/// Sending options under `message.send.*`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct MessageSendConfig {
+    /// Mailbox a sent message is copied to when `--save` is not passed.
+    ///
+    /// Leave it unset on Gmail and Microsoft Graph, which file the sent
+    /// message themselves.
+    pub save_copy: Option<SaveCopyConfig>,
+}
+
+/// The `message.send.save-copy` value.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum SaveCopyConfig {
+    /// `true` for the `sent` mailbox, `false` for no copy, the v1 form.
+    Enabled(bool),
+    /// A mailbox name, alias or role.
+    Mailbox(String),
 }
 
 /// `attachment list` rendering options.
@@ -1240,6 +1280,11 @@ pub struct JmapConfig {
     /// Required for JMAP send alone, and discoverable with `himalaya jmap
     /// mailbox query --role drafts`.
     pub drafts_mailbox_id: Option<String>,
+    /// Mailbox id a sent message is moved to once submitted, defaulting
+    /// to the `sent`-role mailbox.
+    ///
+    /// Discoverable with `himalaya jmap mailbox query --role sent`.
+    pub sent_mailbox_id: Option<String>,
 }
 
 /// JMAP authentication configuration.

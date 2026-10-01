@@ -108,5 +108,6 @@ fn jmap_config(server: String, auth: JmapAuthConfig) -> JmapConfig {
         auth,
         identity_id: None,
         drafts_mailbox_id: None,
+        sent_mailbox_id: None,
     }
 }

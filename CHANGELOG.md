@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `message.send.save-copy`, the mailbox a sent message is copied to when `--save` is not passed, and `--no-save` on `message send`, `compose`, `reply` and `forward` to skip it.
+
+  It takes a mailbox name, alias or role, and the v1 `true` still reads as the `sent` mailbox. Leave it unset on Gmail and Microsoft Graph, which file the sent message themselves.
+
 - Added `envelope.list.datetime-relative`, rendering recent dates relative to today: the time for today, `yesterday`, then the weekday for the past week, older dates falling back to `datetime-fmt` ([#510]).
 
 - Added `proxy`, a per-account SOCKS5 or HTTP proxy every network backend connects through, and `<backend>.proxy` to override it for one backend ([#742]).
@@ -66,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An `mbox` block points at a directory of mbox files and, optionally, at the spool (`$MAIL`) shown as `INBOX`. The shared commands read and write it, and `himalaya mbox` exposes the raw file operations. Any mbox file also opens by passing its absolute path as the mailbox. Writes lock the file the way MTAs and MUAs do, flags live in the `Status` and `X-Status` headers mutt and Dovecot use, and an index kept under the XDG cache directory makes a listing read only what changed.
 
 ### Changed
+
+- Saving and sending at once (`--save` with `--send`, `message send --save`, `message add --send`) now sends first, so a failed send leaves no copy behind. A save failing after the send reports that the message was sent.
 
 - A pimdir account sends through the store's queue and no longer uses its `smtp` section. **Behaviour change.**
 
@@ -125,9 +131,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a message sent over JMAP staying in the drafts mailbox as a draft.
+
+  The submission now asks the server to move it to the sent mailbox, unset `$draft` and set `$seen` once sent (RFC 8621 section 7.5 `onSuccessUpdateEmail`). The sent mailbox is the `sent`-role one, or the new `jmap.sent-mailbox-id`; without either, the message only loses `$draft`.
+
 - Fixed a successful IMAP append being reported as failed when its UID could not be recovered ([#759]).
 
-  A server may acknowledge `APPEND` without `APPENDUID`, even with UIDPLUS, and some (QQ Exmail) also rewrite the `Message-ID` the fallback search looks for. The save now succeeds with an unknown id, so `message send --save` goes on to send, and `message add --json` can return `"id": null`.
+  A server may acknowledge `APPEND` without `APPENDUID`, even with UIDPLUS, and some (QQ Exmail) also rewrite the `Message-ID` the fallback search looks for. The save now succeeds with an unknown id, and `message add --json` can return `"id": null`.
 
 - Fixed the "No backend matching `auto`" error saying nothing of the cause ([#740]). It now names the account and either the supported backends this build compiles in or the missing `<backend>` block, and points at MIGRATION.md when the account still carries the v1 `backend` table.
 
@@ -141,7 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed IMAP searches with non-ASCII text being rejected by Gmail ([io-imap#3](https://github.com/pimalaya/io-imap/issues/3)).
 
-  Bumped io-imap to 0.6.1, which sends `CHARSET UTF-8` with every `SEARCH` again, a fix lost since v1.2.0 (#635).
+  Bumped io-imap to 0.7.1, whose `SEARCH` carries `CHARSET UTF-8` when its criteria hold non-ASCII text, a fix lost since v1.2.0 (#635). An ASCII search sends no charset, Outlook rejecting the UTF-8 one ([#769]).
 
 - Fixed the `Bcc:` field being transmitted over SMTP, disclosing blind recipients to everyone (#747).
 
@@ -1367,6 +1377,7 @@ Few major concepts changed:
 [#759]: https://github.com/pimalaya/himalaya/issues/759
 [#762]: https://github.com/pimalaya/himalaya/issues/762
 [#764]: https://github.com/pimalaya/himalaya/issues/764
+[#769]: https://github.com/pimalaya/himalaya/issues/769
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

@@ -1230,9 +1230,9 @@ dependencies = [
 
 [[package]]
 name = "io-imap"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ae85f32a2430a3533ca168618b5058fcce00f8169f43e11759e1839d5ef7978"
+checksum = "df059b417ac8888b21787a4464a146260aba38d59f0d1945cd3b727777eb8297"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1248,9 +1248,9 @@ dependencies = [
 
 [[package]]
 name = "io-jmap"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfba5d15f9451ed373c5fbdb9280dc94da0ee9de313615bc05ee8d7068a61a16"
+checksum = "cac88102ac3621a7da2dc6a306c5251c293f2c5b0c16fbc08ccea1fad849188b"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1340,9 +1340,9 @@ dependencies = [
 
 [[package]]
 name = "io-pim-discovery"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da1a1cd982a92647cd760d2fa84f9695e496526bba22a95c69e3e8460681ba69"
+checksum = "091245d7c51eee2b93a613f95e3615b164377364819e7506f61f62bf1e5643cc"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1942,9 +1942,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pimalaya-cli"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4db8af1fd7b9ffa9bed65ccc090f3cf3e06ef4e30d9138261081196f5271033"
+checksum = "df3482c0af710d2f95f8cdbe660a8d89eaa361ac07daed47cb28b00e0c5d6289"
 dependencies = [
  "anyhow",
  "clap",
@@ -3140,9 +3140,9 @@ dependencies = [
 
 [[package]]
 name = "yoke-derive"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33811428bee40dbceb6d545e95754741d17a6aef9a4849f0fd62e2ba4f412a78"
+checksum = "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71"
 dependencies = [
  "proc-macro2",
  "quote",

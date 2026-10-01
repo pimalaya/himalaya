@@ -19,12 +19,13 @@ use dirs::download_dir;
 use pimalaya_cli::table::{Color as TableColor, ContentArrangement};
 
 #[cfg(backend)]
-use crate::email::mailbox::{Mailbox, MailboxRole};
+use crate::email::mailbox::Mailbox;
 use crate::{
     config::{
         AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
-        MailboxListTableConfig, TableArrangementConfig,
+        MailboxListTableConfig, SaveCopyConfig, TableArrangementConfig,
     },
+    email::mailbox::MailboxRole,
     shared::table::DEFAULT_PRESET,
 };
 
@@ -77,6 +78,8 @@ pub struct Account {
     /// Mailbox aliases, keys lowercased, an account entry overwriting the
     /// global one of the same name.
     pub mailbox_alias: HashMap<String, String>,
+    /// Mailbox a sent message is copied to when `--save` is not passed.
+    pub save_copy: Option<SaveCopyConfig>,
 }
 
 impl Account {
@@ -116,6 +119,7 @@ impl Account {
             ),
 
             mailbox_alias,
+            save_copy: other.save_copy.or(self.save_copy),
         }
     }
 
@@ -146,6 +150,28 @@ impl Account {
             (Some(signature), _) => Some(signature),
             (None, Some(_)) => None,
             (None, None) => self.signature.as_deref(),
+        }
+    }
+
+    /// Resolves the mailbox a composed message is saved to.
+    ///
+    /// `--save` wins, and `--no-save` skips the configured copy. A
+    /// message that is not sent is saved only when asked, the configured
+    /// copy being about sent mail.
+    pub fn resolve_save<'a>(
+        &'a self,
+        over: Option<&'a str>,
+        no_save: bool,
+        send: bool,
+    ) -> Option<&'a str> {
+        if over.is_some() || no_save || !send {
+            return over;
+        }
+
+        match self.save_copy.as_ref()? {
+            SaveCopyConfig::Enabled(true) => Some(MailboxRole::Sent.as_str()),
+            SaveCopyConfig::Enabled(false) => None,
+            SaveCopyConfig::Mailbox(mailbox) => Some(mailbox),
         }
     }
 
@@ -477,6 +503,7 @@ impl From<Config> for Account {
             attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
+            save_copy: config.message.send.save_copy,
         }
     }
 }
@@ -503,6 +530,7 @@ impl From<AccountConfig> for Account {
             attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
+            save_copy: config.message.send.save_copy,
         }
     }
 }
@@ -637,6 +665,45 @@ mod tests {
             account.resolve_signature(None, Some(Path::new("/tmp/sig"))),
             None,
         );
+    }
+
+    #[test]
+    fn resolve_save_falls_back_on_the_copy_only_when_sending() {
+        let config: AccountConfig = toml::from_str(
+            r#"
+            message.send.save-copy = "Sent Items"
+            "#,
+        )
+        .unwrap();
+        let account = Account::from(config);
+
+        assert_eq!(account.resolve_save(None, false, true), Some("Sent Items"));
+        assert_eq!(account.resolve_save(None, false, false), None);
+        assert_eq!(
+            account.resolve_save(Some("Archive"), false, true),
+            Some("Archive")
+        );
+        assert_eq!(account.resolve_save(None, true, true), None);
+    }
+
+    #[test]
+    fn save_copy_reads_a_v1_boolean_beside_v1_keys() {
+        let global: AccountConfig = toml::from_str(
+            r#"
+            message.send.save-copy = true
+            message.send.backend = "smtp"
+            message.read.format = "plain"
+            "#,
+        )
+        .unwrap();
+        let global = Account::from(global);
+
+        assert_eq!(global.resolve_save(None, false, true), Some("sent"));
+
+        let per_account: AccountConfig = toml::from_str("message.send.save-copy = false").unwrap();
+        let account = global.merge(Account::from(per_account));
+
+        assert_eq!(account.resolve_save(None, false, true), None);
     }
 
     #[test]

@@ -25,9 +25,13 @@ use crate::{
 /// input.
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
-    /// Append a copy of the sent message to this mailbox name or alias.
+    /// Append a copy of the sent message to this mailbox name, alias or
+    /// role, overriding `message.send.save-copy`.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
+    /// Skip the copy `message.send.save-copy` configures.
+    #[arg(long, conflicts_with = "save")]
+    pub no_save: bool,
     #[command(flatten)]
     pub message: MessageArg,
 }
@@ -41,6 +45,7 @@ impl MessageSendCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
-        handler::route(printer, account, client, raw, self.save.as_deref(), true)
+        let save = account.resolve_save(self.save.as_deref(), self.no_save, true);
+        handler::route(printer, account, client, raw, save, true)
     }
 }

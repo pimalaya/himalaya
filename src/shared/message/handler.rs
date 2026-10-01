@@ -16,7 +16,7 @@ use std::{
     io::{Write, stdout},
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use mail_parser::{Addr, Address, MessageParser};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -49,10 +49,11 @@ pub enum Outcome {
     },
 }
 
-/// Saves the bytes, sends them, or both, printing nothing.
+/// Sends the bytes, saves them, or both, printing nothing.
 ///
 /// Saving resolves the mailbox through the account's aliases and attaches
-/// the given flags. With neither asked for, the bytes go to stdout.
+/// the given flags. Both asked for, the send goes first, so a failed send
+/// leaves no copy behind. With neither, the bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -68,19 +69,25 @@ pub fn apply(
     }
 
     let mailbox = save.map(|name| account.resolve_mailbox(name));
-    let saved_id = match mailbox {
-        Some(mailbox) => Some(client.add_message(mailbox, flags, raw.clone())?),
-        None => None,
-    };
 
     // NOTE: a deferred send is filed under the saved copy's mailbox, else
     // under the one the account names as sent.
     let queued = match send {
         true => {
             let sent = mailbox.or_else(|| account.mailbox_alias.get("sent").map(String::as_str));
-            client.send_message(sent, raw)?
+            client.send_message(sent, raw.clone())?
         }
         false => None,
+    };
+
+    let saved_id = match mailbox {
+        Some(mailbox) if send => Some(
+            client
+                .add_message(mailbox, flags, raw)
+                .with_context(|| format!("Message sent, but saving a copy to {mailbox} failed"))?,
+        ),
+        Some(mailbox) => Some(client.add_message(mailbox, flags, raw)?),
+        None => None,
     };
 
     Ok(match saved_id {

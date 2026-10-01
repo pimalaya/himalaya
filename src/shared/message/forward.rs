@@ -95,10 +95,13 @@ pub struct MessageForwardCommand {
     /// Nothing is substituted in it, so pass the literal string wanted.
     #[arg(long = "quote-headline", short = 'Q', value_name = "TEXT")]
     pub quote_headline: Option<String>,
-    /// Append a copy of the composed message to this mailbox name or
-    /// alias.
+    /// Append a copy of the composed message to this mailbox name, alias
+    /// or role, overriding `message.send.save-copy` when sending.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
+    /// Skip the copy `message.send.save-copy` configures.
+    #[arg(long, conflicts_with = "save")]
+    pub no_save: bool,
     /// Send the composed message, which combines with `--save` to keep a
     /// copy too.
     #[arg(long)]
@@ -153,7 +156,7 @@ impl MessageForwardCommand {
             account,
             client,
             raw,
-            self.save.as_deref(),
+            account.resolve_save(self.save.as_deref(), self.no_save, self.send),
             self.send,
         )
     }

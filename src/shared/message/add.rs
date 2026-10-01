@@ -36,8 +36,8 @@ pub struct MessageAddCommand {
     /// Flags to set on the new message.
     #[arg(long = "flag", short = 'f', value_name = "FLAG", num_args = 0..)]
     pub flag: Vec<FlagArg>,
-    /// Send the message once appended, which is `message send --save`
-    /// the other way round.
+    /// Send the message too, before appending it, as `message send
+    /// --save` does.
     #[arg(long)]
     pub send: bool,
     #[command(flatten)]
