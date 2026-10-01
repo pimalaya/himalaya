@@ -29,7 +29,17 @@ pimalaya.mkDefault (
       }:
 
       let
-        inherit (pkgs) sqlite;
+        inherit (pkgs) sqlite stdenv windows;
+
+        # NOTE: nixpkgs' mingw sqlite fails its pthread probe and compiles
+        # single-threaded, defining no sqlite3_mutex_* rusqlite links against
+        sqlite' =
+          if stdenv.hostPlatform.isWindows then
+            sqlite.overrideAttrs (old: {
+              buildInputs = (old.buildInputs or [ ]) ++ [ windows.pthreads ];
+            })
+          else
+            sqlite;
 
         buildFeatures = lib.splitString "," features;
 
@@ -50,13 +60,13 @@ pimalaya.mkDefault (
       # HACK: needed until the v2.1.0 derivation lands on nixpkgs's master
       .overrideAttrs
         (drv: {
-          buildInputs = (drv.buildInputs or [ ]) ++ lib.optional systemSqlite sqlite;
+          buildInputs = (drv.buildInputs or [ ]) ++ lib.optional systemSqlite sqlite';
 
           # pkg-config hands the linker libsqlite3 but no rpath, leaving a
           # binary that cannot find it: not in postInstall, which runs it, nor
           # once installed.
           env = (drv.env or { }) // {
-            NIX_LDFLAGS = lib.optionalString systemSqlite ("-rpath " + lib.getLib sqlite + "/lib");
+            NIX_LDFLAGS = lib.optionalString systemSqlite ("-rpath " + lib.getLib sqlite' + "/lib");
           };
 
           postInstall =
