@@ -62,13 +62,6 @@ pimalaya.mkDefault (
         (drv: {
           buildInputs = (drv.buildInputs or [ ]) ++ lib.optional systemSqlite sqlite';
 
-          # pkg-config hands the linker libsqlite3 but no rpath, leaving a
-          # binary that cannot find it: not in postInstall, which runs it, nor
-          # once installed.
-          env = (drv.env or { }) // {
-            NIX_LDFLAGS = lib.optionalString systemSqlite ("-rpath " + lib.getLib sqlite' + "/lib");
-          };
-
           postInstall =
             let
               inherit (pkgs) stdenv;
