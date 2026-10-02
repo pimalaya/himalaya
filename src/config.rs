@@ -18,14 +18,14 @@ use io_sasl::{
 use pimalaya_cli::table::ContentArrangement;
 use pimalaya_config::{
     secret::{Secret, SecretResolver},
-    toml::{TomlConfig, shell_expanded_path, shell_expanded_string},
+    toml::{TomlConfig, opt_shell_expanded_path, shell_expanded_path, shell_expanded_string},
 };
 use pimalaya_stream::{
     proxy::{Proxy, ProxyAuth},
     tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use secrecy::SecretString;
-use serde::{Deserialize, Deserializer, Serialize, de::IgnoredAny};
+use serde::{Deserialize, Serialize, de::IgnoredAny};
 use url::Url;
 
 use crate::backend::Backend;
@@ -34,15 +34,6 @@ use crate::backend::Backend;
 /// configuration omits defaulted scalars.
 fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
-}
-
-/// Expands a leading tilde and any shell variable in an optional path,
-/// as [`shell_expanded_path`] does for a mandatory one.
-///
-/// TODO: drop this for `pimalaya_config::toml::opt_shell_expanded_path`
-/// once pimalaya-config ships an optional variant.
-fn opt_shell_expanded_path<'de, D: Deserializer<'de>>(de: D) -> Result<Option<PathBuf>, D::Error> {
-    shell_expanded_path(de).map(Some)
 }
 
 fn is_default_imap_alpn(alpn: &[String]) -> bool {
