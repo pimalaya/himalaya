@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.2.0] - 2026-10-02
+## [2.2.1] - 2026-10-02
 
 ### Added
 
@@ -206,6 +206,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed maildir flag writes doing nothing to a message still unread in a mailbox's `new` directory ([#637]).
 
   `message read --seen` and `flag add` reported success and left the message untouched, a Maildir name in `new` having nowhere to carry a flag. The message now moves to `cur` under the same id with its flags in the name, which is the transition every Maildir client performs.
+
+## [2.2.0] - 2026-10-02
+
+Tagged and released on GitHub, but never published to crates.io: the upload failed on `Cargo.toml` declaring six keywords, one over the limit. Its changes ship in [2.2.1].
 
 ## [2.1.0] - 2026-08-16
 
@@ -1388,7 +1392,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.2.0...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/pimalaya/himalaya/compare/v2.1.0...v2.2.1
 [2.2.0]: https://github.com/pimalaya/himalaya/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/pimalaya/himalaya/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/pimalaya/himalaya/compare/v1.2.0...v2.0.0

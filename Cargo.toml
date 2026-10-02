@@ -1,13 +1,13 @@
 [package]
 name = "himalaya"
 description = "CLI to manage emails"
-version = "2.2.0"
+version = "2.2.1"
 authors = ["Clément DOUIN (soywod) <pimalaya.org@posteo.net>"]
 rust-version = "1.89"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 categories = ["command-line-utilities", "email"]
-keywords = ["cli", "email", "imap", "maildir", "sieve", "smtp"]
+keywords = ["cli", "mail", "imap", "smtp", "jmap"]
 homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
