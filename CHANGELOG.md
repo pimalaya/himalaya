@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-02
+
 ### Added
 
 - Added `message.send.save-copy`, the mailbox a sent message is copied to when `--save` is not passed, and `--no-save` on `message send`, `compose`, `reply` and `forward` to skip it.
@@ -115,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The stripping was therefore a guess at the sync engine's convention, needing a config key wherever it could not decide. The id is now the only spelling, as it already is for JMAP's opaque ids, and `mailbox.alias.inbox = "imap/INBOX"` is how you stop typing it.
 
-- **BREAKING**: renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias.
+- Renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias.
 
   `imap flags`, `maildir messages`, `maildir flags`, `m2dir messages` and `m2dir flags` become `imap flag`, `maildir message`, `maildir flag`, `m2dir message` and `m2dir flag`. Every old spelling keeps working, hidden from `--help`.
 
@@ -1386,7 +1388,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.1.0...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/pimalaya/himalaya/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/pimalaya/himalaya/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/pimalaya/himalaya/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/pimalaya/himalaya/compare/v1.1.0...v1.2.0
