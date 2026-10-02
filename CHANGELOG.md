@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed terminal escape sequences in subjects, sender names and attachment names reaching the terminal through `envelope list`, `envelope search` and `attachment list`. Control characters are now shown as `�`; the JSON output is unchanged.
+
 ## [2.2.1] - 2026-10-02
 
 ### Added
