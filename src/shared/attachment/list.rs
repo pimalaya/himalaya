@@ -10,7 +10,7 @@ use clap::Parser;
 use humansize::{BINARY, format_size};
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -171,11 +171,14 @@ impl fmt::Display for Attachments {
             .add_rows(self.attachments.iter().map(|a| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&a.id).fg(self.colors.id));
+                row.add_cell(Cell::new(sanitize(&a.id)).fg(self.colors.id));
                 row.add_cell(
-                    Cell::new(a.filename.as_deref().unwrap_or("")).fg(self.colors.filename),
+                    Cell::new(sanitize(a.filename.as_deref().unwrap_or("")))
+                        .fg(self.colors.filename),
                 );
-                row.add_cell(Cell::new(a.mime.as_deref().unwrap_or("")).fg(self.colors.r#type));
+                row.add_cell(
+                    Cell::new(sanitize(a.mime.as_deref().unwrap_or(""))).fg(self.colors.r#type),
+                );
                 row.add_cell(Cell::new(format_size(a.size, BINARY)).fg(self.colors.size));
                 if self.with_inline {
                     row.add_cell(
@@ -183,7 +186,9 @@ impl fmt::Display for Attachments {
                     );
                 }
                 if self.with_path {
-                    row.add_cell(Cell::new(a.path.as_deref().unwrap_or("")).fg(self.colors.path));
+                    row.add_cell(
+                        Cell::new(sanitize(a.path.as_deref().unwrap_or(""))).fg(self.colors.path),
+                    );
                 }
                 row
             }));
@@ -201,4 +206,43 @@ pub(super) fn mime_string(part: &MessagePart<'_>) -> Option<String> {
         Some(sub) => format!("{}/{}", ct.c_type, sub),
         None => ct.c_type.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use pimalaya_cli::table::{Color, ContentArrangement};
+
+    use super::{Attachment, AttachmentColors, Attachments};
+
+    #[test]
+    fn control_characters_from_the_sender_are_not_printed() {
+        let attachments = Attachments {
+            preset: String::new(),
+            arrangement: ContentArrangement::Disabled,
+            with_inline: false,
+            with_path: true,
+            colors: AttachmentColors {
+                id: Color::Reset,
+                filename: Color::Reset,
+                r#type: Color::Reset,
+                size: Color::Reset,
+                inline: Color::Reset,
+                path: Color::Reset,
+            },
+            attachments: vec![Attachment {
+                id: String::from("1"),
+                filename: Some(String::from("invoice\x1b]8;;https://example.org\x07.pdf")),
+                mime: Some(String::from("application/pdf\x1b[8m")),
+                size: 0,
+                inline: false,
+                path: Some(String::from("/tmp/invoice\x1b[2J.pdf")),
+            }],
+        };
+
+        let output = attachments.to_string();
+
+        assert!(!output.contains('\x1b'), "{output:?}");
+        assert!(!output.contains('\x07'), "{output:?}");
+        assert!(output.contains("invoice"), "{output:?}");
+    }
 }

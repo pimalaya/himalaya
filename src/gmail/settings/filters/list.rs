@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::list::{GmailFiltersList, GmailFiltersListResponse};
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -88,7 +88,7 @@ impl fmt::Display for FiltersTable {
 
                 let mut row = Row::new();
                 row.max_height(1)
-                    .add_cell(Cell::new(&filter.id).fg(Color::Reset))
+                    .add_cell(Cell::new(sanitize(&filter.id)).fg(Color::Reset))
                     .add_cell(Cell::new(criteria).fg(Color::Reset))
                     .add_cell(Cell::new(action).fg(Color::Reset));
                 row

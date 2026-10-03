@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::{GmailFilter, get::GmailFilterGet};
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -49,7 +49,7 @@ pub(crate) struct GmailSettingsFilterGetOutput(GmailFilter);
 
 impl fmt::Display for GmailSettingsFilterGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Id: {}", self.0.id)?;
+        writeln!(f, "Id: {}", sanitize(&self.0.id))?;
 
         if let Some(criteria) = &self.0.criteria {
             let summary = criteria_summary(criteria);

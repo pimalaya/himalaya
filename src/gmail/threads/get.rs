@@ -10,7 +10,7 @@ use io_gmail::v1::rest::{
     messages::{GmailMessage, GmailMessageFormat, GmailMessagePayload},
     threads::get::GmailThreadGet,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -82,14 +82,19 @@ pub(crate) struct GmailThreadGetOutput {
 
 impl fmt::Display for GmailThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Thread id: {}", self.id)?;
+        writeln!(f, "Thread id: {}", sanitize(&self.id))?;
 
         for message in &self.messages {
             let snippet = message.snippet.as_deref().unwrap_or("");
-            writeln!(f, "- {}: {snippet}", message.id)?;
+            writeln!(f, "- {}: {}", sanitize(&message.id), sanitize(snippet))?;
 
             for header in &message.headers {
-                writeln!(f, "  {}: {}", header.name, header.value)?;
+                writeln!(
+                    f,
+                    "  {}: {}",
+                    sanitize(&header.name),
+                    sanitize(&header.value)
+                )?;
             }
         }
 

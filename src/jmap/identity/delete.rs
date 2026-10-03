@@ -6,7 +6,10 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::JmapIdentitySetArgs;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::{
+    printer::{Message, Printer},
+    table::sanitize,
+};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};
 
@@ -33,7 +36,7 @@ impl JmapIdentityDeleteCommand {
             let mut msg = String::from("Destroy JMAP identities error");
 
             for (id, err) in output.not_destroyed {
-                msg.push_str(&format!("\n  `{id}`"));
+                msg.push_str(&format!("\n  `{}`", sanitize(&id)));
                 msg.push_str(&format_set_error(&err));
             }
 

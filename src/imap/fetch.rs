@@ -18,7 +18,7 @@ use io_imap::{
         flag::FlagFetch,
     },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
@@ -362,10 +362,10 @@ impl fmt::Display for FetchedMessages {
                 } else {
                     flags.join(" ")
                 };
-                writeln!(f, "  Flags: {flags}")?;
+                writeln!(f, "  Flags: {}", sanitize(&flags))?;
             }
             if let Some(date) = &message.internal_date {
-                writeln!(f, "  Internal date: {date}")?;
+                writeln!(f, "  Internal date: {}", sanitize(date))?;
             }
             if let Some(size) = message.size {
                 writeln!(f, "  Size: {}", format_size(size as usize))?;
@@ -391,34 +391,34 @@ impl fmt::Display for FetchedMessages {
 /// Writes an envelope as one indented line per header it carries.
 fn write_envelope(f: &mut fmt::Formatter<'_>, env: &EnvelopeView) -> fmt::Result {
     if let Some(date) = &env.date {
-        writeln!(f, "  Date: {date}")?;
+        writeln!(f, "  Date: {}", sanitize(date))?;
     }
     if let Some(subject) = &env.subject {
-        writeln!(f, "  Subject: {subject}")?;
+        writeln!(f, "  Subject: {}", sanitize(subject))?;
     }
     if !env.from.is_empty() {
-        writeln!(f, "  From: {}", env.from.join(", "))?;
+        writeln!(f, "  From: {}", sanitize(&env.from.join(", ")))?;
     }
     if !env.sender.is_empty() {
-        writeln!(f, "  Sender: {}", env.sender.join(", "))?;
+        writeln!(f, "  Sender: {}", sanitize(&env.sender.join(", ")))?;
     }
     if !env.reply_to.is_empty() {
-        writeln!(f, "  Reply-To: {}", env.reply_to.join(", "))?;
+        writeln!(f, "  Reply-To: {}", sanitize(&env.reply_to.join(", ")))?;
     }
     if !env.to.is_empty() {
-        writeln!(f, "  To: {}", env.to.join(", "))?;
+        writeln!(f, "  To: {}", sanitize(&env.to.join(", ")))?;
     }
     if !env.cc.is_empty() {
-        writeln!(f, "  Cc: {}", env.cc.join(", "))?;
+        writeln!(f, "  Cc: {}", sanitize(&env.cc.join(", ")))?;
     }
     if !env.bcc.is_empty() {
-        writeln!(f, "  Bcc: {}", env.bcc.join(", "))?;
+        writeln!(f, "  Bcc: {}", sanitize(&env.bcc.join(", ")))?;
     }
     if let Some(message_id) = &env.message_id {
-        writeln!(f, "  Message-ID: {message_id}")?;
+        writeln!(f, "  Message-ID: {}", sanitize(message_id))?;
     }
     if let Some(in_reply_to) = &env.in_reply_to {
-        writeln!(f, "  In-Reply-To: {in_reply_to}")?;
+        writeln!(f, "  In-Reply-To: {}", sanitize(in_reply_to))?;
     }
 
     Ok(())
@@ -433,9 +433,9 @@ fn write_body_tree(
 ) -> fmt::Result {
     let connector = if is_last { "└─ " } else { "├─ " };
 
-    let mut desc = part.content_type.clone();
+    let mut desc = sanitize(&part.content_type).into_owned();
     if let Some(name) = &part.name {
-        desc.push_str(&format!(" \"{name}\""));
+        desc.push_str(&format!(" \"{}\"", sanitize(name)));
     }
     if let Some(size) = part.size {
         desc.push_str(&format!(" ({})", format_size(size)));

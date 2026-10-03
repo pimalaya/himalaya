@@ -10,7 +10,7 @@ use clap::Parser;
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{
-    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table,
+    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, sanitize,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -200,7 +200,7 @@ impl fmt::Display for Envelopes {
             .add_rows(self.envelopes.iter().map(|env| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&env.id).fg(self.colors.id));
+                row.add_cell(Cell::new(sanitize(&env.id)).fg(self.colors.id));
                 row.add_cell(
                     Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags),
                 );
@@ -210,7 +210,7 @@ impl fmt::Display for Envelopes {
                             .fg(self.colors.att),
                     );
                 }
-                row.add_cell(Cell::new(&env.subject).fg(self.colors.subject));
+                row.add_cell(Cell::new(sanitize(&env.subject)).fg(self.colors.subject));
 
                 let addresses = if self.recipient { &env.to } else { &env.from };
                 let from_or_to_color = if self.recipient {
@@ -218,7 +218,9 @@ impl fmt::Display for Envelopes {
                 } else {
                     self.colors.from
                 };
-                row.add_cell(Cell::new(format_addresses(addresses)).fg(from_or_to_color));
+                row.add_cell(
+                    Cell::new(sanitize(&format_addresses(addresses))).fg(from_or_to_color),
+                );
 
                 row.add_cell(Cell::new(self.format_date(env.date, today)).fg(self.colors.date));
                 row.add_cell(
@@ -333,7 +335,7 @@ mod tests {
     use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
     use pimalaya_cli::table::{Color, ContentArrangement};
 
-    use super::{EnvelopeColors, Envelopes, FlagChars};
+    use super::{Address, Envelope, EnvelopeColors, Envelopes, FlagChars};
 
     fn envelopes(relative: bool) -> Envelopes {
         Envelopes {
@@ -385,6 +387,33 @@ mod tests {
         assert_eq!(render(local(2026, 9, 26, 11, 35)), "Saturday");
         assert_eq!(render(local(2026, 9, 23, 11, 35)), "2026-09-23");
         assert_eq!(render(None), "");
+    }
+
+    #[test]
+    fn control_characters_from_the_sender_are_not_printed() {
+        let mut envelopes = envelopes(false);
+        envelopes.envelopes.push(Envelope {
+            id: String::from("1"),
+            message_id: None,
+            in_reply_to: Vec::new(),
+            flags: Default::default(),
+            // Writes the clipboard (OSC 52), then clears the screen.
+            subject: String::from("Hi\x1b]52;c;ZWNobyBoaQ==\x07\x1b[2J"),
+            from: vec![Address {
+                name: Some(String::from("Eve\x1b[8m")),
+                email: String::from("eve@example.org"),
+            }],
+            to: Vec::new(),
+            date: None,
+            size: 0,
+            has_attachment: None,
+        });
+
+        let output = envelopes.to_string();
+
+        assert!(!output.contains('\x1b'), "{output:?}");
+        assert!(!output.contains('\x07'), "{output:?}");
+        assert!(output.contains("Hi"), "{output:?}");
     }
 
     #[test]

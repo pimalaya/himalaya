@@ -11,7 +11,7 @@ use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -142,8 +142,8 @@ impl fmt::Display for MailFoldersTable {
 
                 let mut row = Row::new();
                 row.max_height(1)
-                    .add_cell(Cell::new(&folder.id).fg(self.colors.id))
-                    .add_cell(Cell::new(&folder.display_name).fg(self.colors.name))
+                    .add_cell(Cell::new(sanitize(&folder.id)).fg(self.colors.id))
+                    .add_cell(Cell::new(sanitize(&folder.display_name)).fg(self.colors.name))
                     .add_cell(Cell::new(total).fg(self.colors.total))
                     .add_cell(Cell::new(unread).fg(self.colors.unread))
                     .add_cell(Cell::new(children));

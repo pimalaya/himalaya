@@ -4,6 +4,7 @@
 //! shows.
 
 use io_gmail::v1::rest::settings::filters::{GmailFilterAction, GmailFilterCriteria};
+use pimalaya_cli::table::sanitize;
 
 /// Best-effort one-line summary of a filter's match criteria.
 pub fn criteria_summary(criteria: &GmailFilterCriteria) -> String {
@@ -26,7 +27,7 @@ pub fn criteria_summary(criteria: &GmailFilterCriteria) -> String {
     if criteria.has_attachment == Some(true) {
         parts.push("has_attachment".to_string());
     }
-    parts.join(" ")
+    sanitize(&parts.join(" ")).into_owned()
 }
 
 /// Best-effort one-line summary of a filter's action.
@@ -41,5 +42,5 @@ pub fn action_summary(action: &GmailFilterAction) -> String {
     if let Some(forward) = &action.forward {
         parts.push(format!("forward={forward}"));
     }
-    parts.join(" ")
+    sanitize(&parts.join(" ")).into_owned()
 }

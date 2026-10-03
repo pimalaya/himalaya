@@ -35,7 +35,7 @@ strip = "symbols"
 panic = "abort"
 
 [build-dependencies]
-pimalaya-cli = { version = "0.2", default-features = false, features = ["build"] }
+pimalaya-cli = { version = "0.2.6", default-features = false, features = ["build"] }
 
 [dev-dependencies]
 tempfile = "3"
@@ -69,7 +69,7 @@ mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optiona
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"
-pimalaya-cli = { version = "0.2", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
+pimalaya-cli = { version = "0.2.6", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
 pimalaya-config = { version = "0.2.1", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
+
 ## [2.2.1] - 2026-10-02
 
 ### Added

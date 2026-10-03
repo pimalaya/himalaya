@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::get_vacation::GmailVacationGet;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -74,7 +74,7 @@ impl fmt::Display for GmailSettingsVacationGetOutput {
         writeln!(f, "Auto reply: {auto_reply}")?;
 
         if let Some(subject) = &self.response_subject {
-            writeln!(f, "Subject: {subject}")?;
+            writeln!(f, "Subject: {}", sanitize(subject))?;
         }
         if let Some(body) = &self.response_body_plain_text {
             writeln!(f, "Body: {body}")?;
@@ -89,10 +89,10 @@ impl fmt::Display for GmailSettingsVacationGetOutput {
             writeln!(f, "Restrict to domain: {}", yes_no(restrict))?;
         }
         if let Some(start) = &self.start_time {
-            writeln!(f, "Start: {start}")?;
+            writeln!(f, "Start: {}", sanitize(start))?;
         }
         if let Some(end) = &self.end_time {
-            writeln!(f, "End: {end}")?;
+            writeln!(f, "End: {}", sanitize(end))?;
         }
 
         Ok(())

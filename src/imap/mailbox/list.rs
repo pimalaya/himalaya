@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table};
+use pimalaya_cli::table::{Cell, Color, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -100,10 +100,10 @@ impl fmt::Display for MailboxesTable {
                     .unwrap_or_default();
 
                 row.max_height(1)
-                    .add_cell(Cell::new(&mbox.name).fg(self.name_color))
-                    .add_cell(Cell::new(&mbox.delimiter))
+                    .add_cell(Cell::new(sanitize(&mbox.name)).fg(self.name_color))
+                    .add_cell(Cell::new(sanitize(&mbox.delimiter)))
                     .add_cell(Cell::new(role))
-                    .add_cell(Cell::new(mbox.attributes.join(", ")));
+                    .add_cell(Cell::new(sanitize(&mbox.attributes.join(", "))));
 
                 row
             }));
