@@ -10,18 +10,20 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, bail};
 use clap::Parser;
-#[cfg(feature = "imap")]
+#[cfg(all(feature = "imap", feature = "wizard"))]
 use io_sasl::mechanism::SaslMechanism;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::{secret::SecretResolver, toml::TomlConfig};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[cfg(feature = "wizard")]
+use crate::config::AccountConfig;
 #[cfg(feature = "imap")]
 use crate::config::ImapConfig;
 use crate::{
     backend::Backend,
-    config::{AccountConfig, Config},
+    config::{Config, NO_CONFIG_HINT},
 };
 
 /// Validate the account configuration.
@@ -43,10 +45,7 @@ impl AccountCheckCommand {
     ) -> Result<()> {
         let mut config = match Config::from_paths_or_default(config_paths)? {
             Some(config) => config,
-            None => bail!(
-                "No configuration found. Run bare `himalaya` to launch the wizard \
-                 and generate one."
-            ),
+            None => bail!("No configuration found, {NO_CONFIG_HINT}"),
         };
 
         let (name, account_config) = config
@@ -178,6 +177,7 @@ impl AccountCheckCommand {
 /// The wizard runs it over a freshly built account, so a bad credential
 /// or endpoint stops it rather than yielding a configuration that cannot
 /// connect.
+#[cfg(feature = "wizard")]
 pub fn test_account(account_config: &AccountConfig) -> Result<()> {
     // NOTE: one resolver for the whole account, as in `account check`.
     #[cfg_attr(
@@ -286,7 +286,7 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolv
 ///
 /// The wizard offers what comes back rather than the whole list, and the
 /// connection is dropped without ever authenticating.
-#[cfg(feature = "imap")]
+#[cfg(all(feature = "imap", feature = "wizard"))]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
     use io_imap::{
         client::{ImapClientStd, ImapClientStdConnectOptions, default_alpn},

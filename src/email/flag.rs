@@ -106,16 +106,19 @@ impl Flag {
     }
 
     /// Whether this is `\Draft`.
+    #[cfg(feature = "gmail")]
     pub fn is_draft(&self) -> bool {
         matches!(self.iana, Some(IanaFlag::Draft))
     }
 
     /// Whether this is `$Junk`.
+    #[cfg(feature = "gmail")]
     pub fn is_junk(&self) -> bool {
         matches!(self.iana, Some(IanaFlag::Junk))
     }
 
     /// Whether this is `$Important`.
+    #[cfg(any(feature = "gmail", feature = "msgraph"))]
     pub fn is_important(&self) -> bool {
         matches!(self.iana, Some(IanaFlag::Important))
     }

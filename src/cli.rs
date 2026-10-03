@@ -10,6 +10,8 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
+#[cfg(feature = "wizard")]
+use pimalaya_cli::prompt;
 use pimalaya_cli::{
     clap::{
         args::{AccountFlag, JsonFlag, LogFlags},
@@ -18,7 +20,6 @@ use pimalaya_cli::{
     },
     footer, long_version,
     printer::Printer,
-    prompt,
 };
 use pimalaya_config::toml::TomlConfig;
 
@@ -51,12 +52,13 @@ use crate::shared::{client::EmailClient, message::cli::MessageCommand};
 use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
+#[cfg(feature = "wizard")]
+use crate::wizard::{self, configure::ConfigureCommand};
 use crate::{
     account::cli::AccountCommand,
     backend::Backend,
-    config::{AccountConfig, Config},
+    config::{AccountConfig, Config, NO_CONFIG_HINT},
     json_schema,
-    wizard::{self, configure::ConfigureCommand, discover::CONFIG_SAMPLE_URL},
 };
 
 /// Top-level command-line interface parser.
@@ -146,6 +148,7 @@ pub enum Command {
     #[command(subcommand)]
     Sieve(SieveCommand),
     /// Configure an account interactively.
+    #[cfg(feature = "wizard")]
     #[command(visible_alias = "wizard")]
     Configure(ConfigureCommand),
     #[command(subcommand)]
@@ -181,6 +184,7 @@ pub struct ConfigPathsArg {
 /// A hook rather than a gate: declining decides nothing, and what happens
 /// next is the business of the caller, a bare invocation or a command
 /// that needs an account.
+#[cfg(feature = "wizard")]
 pub fn offer_configuration(
     printer: &mut impl Printer,
     config_paths: &[PathBuf],
@@ -195,6 +199,17 @@ pub fn offer_configuration(
     ConfigureCommand.execute(printer, config_paths)?;
 
     Ok(true)
+}
+
+/// Offers nothing in a build without the wizard, so the caller falls back
+/// to what it does when the offer is declined.
+#[cfg(not(feature = "wizard"))]
+pub fn offer_configuration(
+    _printer: &mut impl Printer,
+    _config_paths: &[PathBuf],
+    _path: &Path,
+) -> Result<bool> {
+    Ok(false)
 }
 
 /// Resolves the account a command runs against, returning the leftover
@@ -226,7 +241,7 @@ fn resolve_account(
             match Config::from_paths_or_default(config_paths)? {
                 Some(config) => config,
                 None => bail!(
-                    "No configuration found at {}, run `himalaya configure` to generate one or write it by hand: {CONFIG_SAMPLE_URL}",
+                    "No configuration found at {}, {NO_CONFIG_HINT}",
                     path.display(),
                 ),
             }
@@ -379,6 +394,7 @@ impl Command {
                 cmd.execute(printer, &mut account, &mut client)
             }
 
+            #[cfg(feature = "wizard")]
             Self::Configure(cmd) => cmd.execute(printer, config_paths),
             Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
             Self::Completion(cmd) => cmd.execute(printer, Cli::command()),

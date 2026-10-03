@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::map_color_or,
-    config::{AccountConfig, Config, TableArrangementConfig},
+    config::{AccountConfig, Config, NO_CONFIG_HINT, TableArrangementConfig},
     shared::table::style_from_preset,
 };
 
@@ -83,10 +83,7 @@ struct AccountColors {
 fn load_config(paths: &[PathBuf]) -> Result<Config> {
     match Config::from_paths_or_default(paths)? {
         Some(config) => Ok(config),
-        None => anyhow::bail!(
-            "No configuration found. Run bare `himalaya` to launch the wizard \
-             and generate one."
-        ),
+        None => anyhow::bail!("No configuration found, {NO_CONFIG_HINT}"),
     }
 }
 

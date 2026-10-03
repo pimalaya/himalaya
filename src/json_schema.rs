@@ -102,6 +102,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
     }
 
+    #[cfg(feature = "wizard")]
     insert!(
         "himalaya-configure",
         crate::wizard::configure::ConfigureOutput

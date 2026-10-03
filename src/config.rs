@@ -30,6 +30,22 @@ use url::Url;
 
 use crate::backend::Backend;
 
+/// The documented sample configuration, shown in the welcome banner and
+/// pointed at when no configuration is found.
+#[cfg(feature = "wizard")]
+pub const CONFIG_SAMPLE_URL: &str =
+    "https://github.com/pimalaya/himalaya/blob/master/config.sample.toml";
+
+/// How to get a configuration, for the errors meeting none.
+#[cfg(feature = "wizard")]
+pub const NO_CONFIG_HINT: &str = "run bare `himalaya` to launch the wizard, or write one by hand: \
+     https://github.com/pimalaya/himalaya/blob/master/config.sample.toml";
+
+/// How to get a configuration, for the errors meeting none.
+#[cfg(not(feature = "wizard"))]
+pub const NO_CONFIG_HINT: &str = "write one by hand: \
+     https://github.com/pimalaya/himalaya/blob/master/config.sample.toml";
+
 /// Skips a field equal to its type's default, so a wizard-generated
 /// configuration omits defaulted scalars.
 fn is_default<T: Default + PartialEq>(value: &T) -> bool {
@@ -146,6 +162,7 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the listed ones, so a
 /// field added to [`AccountConfig`] can never go missing from a generated
 /// document just because nobody updated this table.
+#[cfg(feature = "wizard")]
 const RENDER_ORDER: [&str; 21] = [
     "default",
     "email",
@@ -223,6 +240,7 @@ impl AccountConfig {
     /// come out alphabetically, burying `imap.server` under the
     /// credentials authenticating against it. Groups are reordered and
     /// each endpoint lifted to the top of its own.
+    #[cfg(feature = "wizard")]
     pub fn render(&self, name: &str) -> Result<String> {
         // NOTE: borrowed rather than built into a `Config`, which would
         // mean cloning the account, and so deriving `Clone` down every

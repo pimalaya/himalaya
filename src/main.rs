@@ -107,6 +107,7 @@ mod shared;
 mod sieve;
 #[cfg(feature = "smtp")]
 mod smtp;
+#[cfg(feature = "wizard")]
 mod wizard;
 
 use std::{

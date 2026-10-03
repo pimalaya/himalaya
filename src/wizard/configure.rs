@@ -33,8 +33,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    config::Config,
-    wizard::discover::{self, CONFIG_SAMPLE_URL},
+    config::{CONFIG_SAMPLE_URL, Config},
+    wizard::discover,
 };
 
 /// Configure an account interactively.
