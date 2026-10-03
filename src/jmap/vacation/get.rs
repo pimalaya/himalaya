@@ -11,7 +11,7 @@ use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
 };
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::table::{Cell, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -83,15 +83,15 @@ impl fmt::Display for VacationTable {
         ]));
 
         if let Some(d) = &v.from_date {
-            table.add_row(Row::from([Cell::new("From"), Cell::new(d)]));
+            table.add_row(Row::from([Cell::new("From"), Cell::new(sanitize(d))]));
         }
 
         if let Some(d) = &v.to_date {
-            table.add_row(Row::from([Cell::new("To"), Cell::new(d)]));
+            table.add_row(Row::from([Cell::new("To"), Cell::new(sanitize(d))]));
         }
 
         if let Some(s) = &v.subject {
-            table.add_row(Row::from([Cell::new("Subject"), Cell::new(s)]));
+            table.add_row(Row::from([Cell::new("Subject"), Cell::new(sanitize(s))]));
         }
 
         if let Some(b) = &v.text_body {

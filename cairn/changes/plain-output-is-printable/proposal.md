@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: plain-output-is-printable
-status: active
+status: landed
 created: 2026-10-02
 ---
 
@@ -13,6 +13,4 @@ The tables print subjects, display names, filenames and other strings exactly as
 
 ## What
 
-`printable` in src/shared/table.rs replaces every control character (C0, DEL and C1) with U+FFFD, and borrows the string when there is none. It is applied at the cell, where a string from a message or a server is rendered, so the data and the `--json` output keep the original string.
-
-This change starts with the listings whose content any sender controls, `envelope list` and `envelope search` (one renderer) and `attachment list`. The other plain renderings of server-supplied strings are listed in the tasks and follow once the approach is agreed.
+`pimalaya_cli::table::sanitize` (pimalaya-cli 0.2.6, shared with cardamum and calendula) replaces every control character (C0, DEL and C1) and the bidi controls with U+FFFD, and borrows the string when there is none. It is applied where a single-line field from a message or a server is rendered: the envelope, attachment, mailbox, ID, pimdir queue, JMAP, Gmail and Graph outputs. Message bodies keep their tabs and newlines; the binary check of `write_bytes_or_save` now also refuses DEL and C1 on a terminal. The data and the `--json` output keep the original strings.

@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, get::GmailSendAsGet};
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,13 +45,13 @@ pub(crate) struct GmailSettingsSendAsGetOutput(GmailSendAs);
 
 impl fmt::Display for GmailSettingsSendAsGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Email: {}", self.0.send_as_email)?;
+        writeln!(f, "Email: {}", sanitize(&self.0.send_as_email))?;
 
         if let Some(display_name) = &self.0.display_name {
-            writeln!(f, "Name: {display_name}")?;
+            writeln!(f, "Name: {}", sanitize(display_name))?;
         }
         if let Some(reply_to_address) = &self.0.reply_to_address {
-            writeln!(f, "Reply-To: {reply_to_address}")?;
+            writeln!(f, "Reply-To: {}", sanitize(reply_to_address))?;
         }
         if let Some(signature) = &self.0.signature {
             writeln!(f, "Signature: {signature}")?;

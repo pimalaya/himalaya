@@ -5,9 +5,13 @@ change: plain-output-is-printable
 
 # Tasks
 
-- [x] `printable` in src/shared/table.rs, with unit tests.
+- [x] `sanitize` in pimalaya-cli 0.2.6, replacing the local `printable`.
 - [x] `envelope list` and `envelope search`: id, subject, and the FROM or TO names.
 - [x] `attachment list`: id, filename, type and path.
-- [ ] Review and convert the other renderings of server-supplied strings: src/imap/fetch.rs, src/imap/mailbox/list.rs, src/imap/id.rs, src/pimdir/queue/list.rs, src/jmap/identity/delete.rs, src/jmap/vacation/get.rs, src/gmail/threads/get.rs, src/gmail/threads/list.rs, src/gmail/settings/sendas/get.rs, src/gmail/settings/vacation/get.rs, src/gmail/settings/filters/summary.rs, src/msgraph/attachments/list.rs, src/msgraph/mail_folders/list.rs.
-- [ ] Check the binary-content test in src/shared/output.rs, which lets DEL and C1 bytes through to the terminal.
-- [ ] Fold the delta into [cairn/spec/commands.md](../../spec/commands.md); write the log entry.
+- [x] IMAP: `imap fetch` headers and structure, `imap mailbox list`, `imap id`.
+- [x] `pimdir queue list`: subject and recipients.
+- [x] JMAP: set errors (`format_set_error`), `jmap identity delete`, `jmap vacation get`.
+- [x] Gmail: `threads get`, `threads list`, `settings sendas get`, `settings vacation get`, filter ids and summaries.
+- [x] Graph: `attachments list`, `mail-folders list`.
+- [x] The binary check of src/shared/output.rs also refuses DEL and C1.
+- [x] Fold the delta into [cairn/spec/commands.md](../../spec/commands.md); write [cairn/log/2026-10-03-plain-output-is-printable.md](../../log/2026-10-03-plain-output-is-printable.md).

@@ -16,7 +16,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::table::{Cell, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -101,9 +101,9 @@ impl fmt::Display for ServerIdTable {
 
         for (key, val) in &self.server_id {
             table.add_row(Row::from([
-                Cell::new(key),
+                Cell::new(sanitize(key)),
                 match val {
-                    Some(val) => Cell::new(val),
+                    Some(val) => Cell::new(sanitize(val)),
                     None => Cell::new(""),
                 },
             ]));

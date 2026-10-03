@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table};
+use pimalaya_cli::table::{Cell, Color, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -152,8 +152,10 @@ impl fmt::Display for PimdirQueuedMessages {
                 row.add_cell(Cell::new(queued.id).fg(self.id_color));
                 row.add_cell(Cell::new(if queued.send { "send" } else { "save" }));
                 row.add_cell(Cell::new(format_flags(&queued.envelope.flags, &chars)));
-                row.add_cell(Cell::new(&queued.envelope.subject).fg(self.subject_color));
-                row.add_cell(Cell::new(format_addresses(&queued.envelope.to)).fg(self.from_color));
+                row.add_cell(Cell::new(sanitize(&queued.envelope.subject)).fg(self.subject_color));
+                row.add_cell(
+                    Cell::new(sanitize(&format_addresses(&queued.envelope.to))).fg(self.from_color),
+                );
                 row.add_cell(Cell::new(&queued.queued_at).fg(self.date_color));
                 row
             }));

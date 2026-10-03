@@ -1,13 +1,10 @@
 //! # Table
 //!
-//! Maps the `table.preset` string onto a comfy-table [`TableStyle`], and
-//! makes the strings a server or a sender controls safe to put in a cell.
+//! Maps the `table.preset` string onto a comfy-table [`TableStyle`].
 //!
 //! comfy-table v8 dropped the positional preset string for a typed
 //! builder, but the option keeps accepting the v7 spelling so existing
 //! configurations stay valid.
-
-use std::borrow::Cow;
 
 use pimalaya_cli::table::{ContentLineStyle, LineStyle, TableStyle};
 
@@ -80,49 +77,11 @@ pub fn style_from_preset(preset: &str) -> TableStyle {
         })
 }
 
-/// Replaces the control characters of `text` with U+FFFD.
-///
-/// A subject, a display name or a filename reaches the table as the
-/// sender wrote it, so an escape sequence in it would be interpreted by
-/// the terminal: rewriting the clipboard (OSC 52), hiding text or clearing
-/// the screen. The JSON output keeps the original string.
-pub fn printable(text: &str) -> Cow<'_, str> {
-    if !text.chars().any(char::is_control) {
-        return Cow::Borrowed(text);
-    }
-
-    text.chars()
-        .map(|c| {
-            if c.is_control() {
-                char::REPLACEMENT_CHARACTER
-            } else {
-                c
-            }
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use pimalaya_cli::table::presets;
 
-    use super::{DEFAULT_PRESET, printable, style_from_preset};
-
-    #[test]
-    fn printable_borrows_clean_text() {
-        assert!(matches!(
-            printable("Re: café ☕"),
-            Cow::Borrowed("Re: café ☕")
-        ));
-    }
-
-    #[test]
-    fn printable_replaces_control_characters() {
-        // ESC and BEL (C0), DEL, and the single-byte CSI (C1).
-        assert_eq!(printable("a\x1b[2Jb\x07c\x7fd\u{9b}e\tf"), "a�[2Jb�c�d�e�f");
-    }
+    use super::{DEFAULT_PRESET, style_from_preset};
 
     // NOTE: equality with the v8 constant across all six line styles is
     // what proves the character-to-slot mapping.

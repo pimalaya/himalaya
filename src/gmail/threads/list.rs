@@ -11,7 +11,7 @@ use io_gmail::v1::rest::threads::{
     list::{GmailThreadsList, GmailThreadsListParams},
 };
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -105,9 +105,9 @@ impl fmt::Display for ThreadsTable {
             .add_rows(self.threads.iter().map(|t| {
                 let mut row = Row::new();
                 row.max_height(1)
-                    .add_cell(Cell::new(&t.id).fg(Color::Reset))
-                    .add_cell(Cell::new(t.snippet.as_deref().unwrap_or("")))
-                    .add_cell(Cell::new(t.history_id.as_deref().unwrap_or("")));
+                    .add_cell(Cell::new(sanitize(&t.id)).fg(Color::Reset))
+                    .add_cell(Cell::new(sanitize(t.snippet.as_deref().unwrap_or(""))))
+                    .add_cell(Cell::new(sanitize(t.history_id.as_deref().unwrap_or(""))));
                 row
             }));
 

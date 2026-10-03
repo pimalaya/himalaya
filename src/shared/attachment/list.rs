@@ -10,17 +10,13 @@ use clap::Parser;
 use humansize::{BINARY, format_size};
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    shared::{
-        client::EmailClient,
-        mailbox::arg::MailboxArg,
-        table::{printable, style_from_preset},
-    },
+    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
 /// List the attachments of one message.
@@ -175,13 +171,13 @@ impl fmt::Display for Attachments {
             .add_rows(self.attachments.iter().map(|a| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(printable(&a.id)).fg(self.colors.id));
+                row.add_cell(Cell::new(sanitize(&a.id)).fg(self.colors.id));
                 row.add_cell(
-                    Cell::new(printable(a.filename.as_deref().unwrap_or("")))
+                    Cell::new(sanitize(a.filename.as_deref().unwrap_or("")))
                         .fg(self.colors.filename),
                 );
                 row.add_cell(
-                    Cell::new(printable(a.mime.as_deref().unwrap_or(""))).fg(self.colors.r#type),
+                    Cell::new(sanitize(a.mime.as_deref().unwrap_or(""))).fg(self.colors.r#type),
                 );
                 row.add_cell(Cell::new(format_size(a.size, BINARY)).fg(self.colors.size));
                 if self.with_inline {
@@ -191,7 +187,7 @@ impl fmt::Display for Attachments {
                 }
                 if self.with_path {
                     row.add_cell(
-                        Cell::new(printable(a.path.as_deref().unwrap_or(""))).fg(self.colors.path),
+                        Cell::new(sanitize(a.path.as_deref().unwrap_or(""))).fg(self.colors.path),
                     );
                 }
                 row

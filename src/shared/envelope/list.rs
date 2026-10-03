@@ -10,7 +10,7 @@ use clap::Parser;
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{
-    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table,
+    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, sanitize,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -18,11 +18,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::{address::Address, envelope::Envelope, flag::Flag},
-    shared::{
-        client::EmailClient,
-        mailbox::arg::MailboxArg,
-        table::{printable, style_from_preset},
-    },
+    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
 /// List the envelopes of a mailbox, most recent first.
@@ -204,7 +200,7 @@ impl fmt::Display for Envelopes {
             .add_rows(self.envelopes.iter().map(|env| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(printable(&env.id)).fg(self.colors.id));
+                row.add_cell(Cell::new(sanitize(&env.id)).fg(self.colors.id));
                 row.add_cell(
                     Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags),
                 );
@@ -214,7 +210,7 @@ impl fmt::Display for Envelopes {
                             .fg(self.colors.att),
                     );
                 }
-                row.add_cell(Cell::new(printable(&env.subject)).fg(self.colors.subject));
+                row.add_cell(Cell::new(sanitize(&env.subject)).fg(self.colors.subject));
 
                 let addresses = if self.recipient { &env.to } else { &env.from };
                 let from_or_to_color = if self.recipient {
@@ -223,7 +219,7 @@ impl fmt::Display for Envelopes {
                     self.colors.from
                 };
                 row.add_cell(
-                    Cell::new(printable(&format_addresses(addresses))).fg(from_or_to_color),
+                    Cell::new(sanitize(&format_addresses(addresses))).fg(from_or_to_color),
                 );
 
                 row.add_cell(Cell::new(self.format_date(env.date, today)).fg(self.colors.date));

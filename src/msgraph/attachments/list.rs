@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
 use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -117,9 +117,9 @@ impl fmt::Display for AttachmentsTable {
 
                 let mut row = Row::new();
                 row.max_height(1)
-                    .add_cell(Cell::new(&attachment.id).fg(self.colors.id))
-                    .add_cell(Cell::new(name).fg(self.colors.name))
-                    .add_cell(Cell::new(content_type).fg(self.colors.content_type))
+                    .add_cell(Cell::new(sanitize(&attachment.id)).fg(self.colors.id))
+                    .add_cell(Cell::new(sanitize(&name)).fg(self.colors.name))
+                    .add_cell(Cell::new(sanitize(&content_type)).fg(self.colors.content_type))
                     .add_cell(Cell::new(size).fg(self.colors.size))
                     .add_cell(Cell::new(inline).fg(self.colors.inline));
                 row

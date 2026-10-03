@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed terminal escape sequences in subjects, sender names and attachment names reaching the terminal through `envelope list`, `envelope search` and `attachment list`. Control characters are now shown as `�`; the JSON output is unchanged.
+- Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
 
 ## [2.2.1] - 2026-10-02
 
