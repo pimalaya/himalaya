@@ -22,6 +22,7 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     email::flag::{Flag, IanaFlag},
@@ -53,7 +54,8 @@ pub enum Outcome {
 ///
 /// Saving resolves the mailbox through the account's aliases and attaches
 /// the given flags. Both asked for, the send goes first, so a failed send
-/// leaves no copy behind. With neither, the bytes go to stdout.
+/// leaves no copy behind; a send deferred to the store's owner asks it
+/// for the copy instead. With neither, the bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -72,15 +74,18 @@ pub fn apply(
 
     // NOTE: a deferred send is filed under the saved copy's mailbox, else
     // under the one the account names as sent.
-    let queued = match send {
+    let (queued, carried) = match send {
         true => {
             let sent = mailbox.or_else(|| account.mailbox_alias.get("sent").map(String::as_str));
-            client.send_message(sent, raw.clone())?
+            client.send_message(sent, raw.clone(), mailbox.is_some())?
         }
-        false => None,
+        false => (None, false),
     };
 
+    // NOTE: a send deferred to the store's owner carries its copy, filed
+    // once the message is sent, so nothing is saved here.
     let saved_id = match mailbox {
+        Some(_) if carried => Some(None),
         Some(mailbox) if send => Some(
             client
                 .add_message(mailbox, flags, raw)
@@ -139,9 +144,12 @@ pub fn route(
         }
         Outcome::Sent { queued: None } => ("Message successfully sent", None),
     };
-    printer.out(MessageRouteOutput {
-        message: message.to_owned(),
-        queue_id,
+    printer.out(Noted {
+        output: MessageRouteOutput {
+            message: message.to_owned(),
+            queue_id,
+        },
+        notes: client.take_notes(),
     })
 }
 

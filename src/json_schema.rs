@@ -47,20 +47,26 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-envelope-search",
             crate::shared::envelope::list::Envelopes
         );
-        insert!("himalaya-flag-add", crate::shared::flag::add::AddedFlags);
-        insert!("himalaya-flag-set", crate::shared::flag::set::SetFlags);
+        insert!(
+            "himalaya-flag-add",
+            crate::shared::note::Noted<crate::shared::flag::add::AddedFlags>
+        );
+        insert!(
+            "himalaya-flag-set",
+            crate::shared::note::Noted<crate::shared::flag::set::SetFlags>
+        );
         insert!(
             "himalaya-flag-remove",
-            crate::shared::flag::remove::RemovedFlags
+            crate::shared::note::Noted<crate::shared::flag::remove::RemovedFlags>
         );
         insert!(
             "himalaya-message-add",
-            crate::shared::message::add::MessageAddOutput
+            crate::shared::note::Noted<crate::shared::message::add::MessageAddOutput>
         );
         // NOTE: `message send` prints the confirmation line only.
         insert!(
             "himalaya-message-send",
-            crate::shared::message::handler::MessageRouteOutput
+            crate::shared::note::Noted<crate::shared::message::handler::MessageRouteOutput>
         );
         insert!(
             "himalaya-message-read",
@@ -68,7 +74,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-message-delete",
-            crate::shared::message::delete::DeleteReport
+            crate::shared::note::Noted<crate::shared::message::delete::DeleteReport>
         );
         // NOTE: the composers print a `MessageTemplate` when neither
         // saving nor sending, and a confirmation line otherwise.

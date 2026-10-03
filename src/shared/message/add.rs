@@ -11,6 +11,7 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     email::flag::Flag,
@@ -58,10 +59,13 @@ impl MessageAddCommand {
         let Outcome::Saved { id, sent, queued } = outcome else {
             unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
         };
-        printer.out(MessageAddOutput {
-            id,
-            sent,
-            queue_id: queued,
+        printer.out(Noted {
+            output: MessageAddOutput {
+                id,
+                sent,
+                queue_id: queued,
+            },
+            notes: client.take_notes(),
         })
     }
 }

@@ -12,8 +12,13 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use io_pimdir::client::{
-    PimdirError, PimdirStore, blobs::PimdirBlobs, producer::PimdirProducer, reader::PimdirReader,
+use io_pimdir::{
+    client::{
+        PimdirError, PimdirStore, blobs::PimdirBlobs, producer::PimdirProducer,
+        reader::PimdirReader,
+    },
+    codec::PimdirAction,
+    object::PimdirObject,
 };
 
 use crate::{
@@ -35,6 +40,9 @@ pub struct PimdirClient {
     /// The account grouping this client's collections (pimdir SPEC §9.2), or
     /// `None` in a store holding a single ungrouped account.
     pub(crate) account: Option<String>,
+    /// What the writes so far came back with, a capability their source
+    /// supports in part (pimdir STORAGE §15.6).
+    pub(crate) notes: Vec<String>,
 }
 
 impl PimdirClient {
@@ -67,7 +75,29 @@ impl PimdirClient {
             blobs,
             root,
             account,
+            notes: Vec::new(),
         })
+    }
+
+    /// Queues `action` through `producer`, keeping the notes it comes back
+    /// with: a capability its source supports in part (pimdir STORAGE
+    /// §15.6).
+    pub(crate) fn enqueue(
+        &mut self,
+        producer: &mut PimdirProducer,
+        collection: &str,
+        action: &PimdirAction,
+        object: Option<&PimdirObject>,
+    ) -> Result<i64, PimdirError> {
+        let partials = producer.check(collection, action)?;
+        let id = producer.enqueue(collection, action, object)?;
+        self.notes.extend(partials.iter().map(ToString::to_string));
+        Ok(id)
+    }
+
+    /// Takes the notes the writes so far came back with.
+    pub fn take_notes(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.notes)
     }
 
     /// Opens a producer for the length of one staging batch.
@@ -105,6 +135,69 @@ impl PimdirClient {
             ),
             err => anyhow!("Cancel queued action {id}: {err}"),
         })
+    }
+}
+
+impl PimdirClient {
+    /// The source performing an intent `capability` for this account
+    /// (pimdir STORAGE §15.6), `None` in a store whose sources declare
+    /// nothing, where the owner picks as it always did.
+    ///
+    /// Several candidates and no recorded choice is the user's to settle:
+    /// Himalaya never picks one.
+    pub(crate) fn performer(
+        &self,
+        producer: &PimdirProducer,
+        collection: &str,
+        capability: &str,
+    ) -> Result<Option<String>> {
+        let declared = producer
+            .capabilities(collection)
+            .map_err(|err| anyhow!("Read the capabilities of `{collection}`: {err}"))?
+            .iter()
+            .any(|source| source.declared.is_some());
+        if !declared {
+            return Ok(None);
+        }
+
+        match producer.performer(collection, capability, None) {
+            Ok(source) => Ok(Some(source)),
+            Err(PimdirError::Ambiguous { candidates, .. }) => Err(anyhow!(
+                "Several sources can perform {capability} for this account ({}): \
+                 choose one with `himalaya pimdir performer {capability} <SOURCE>`",
+                candidates.join(", "),
+            )),
+            Err(err) => Err(anyhow!("{err}")),
+        }
+    }
+
+    /// The sources able to perform `capability` for this account, and the
+    /// one the user chose among them, if any.
+    pub fn performers(&self, capability: &str) -> Result<(Vec<String>, Option<String>)> {
+        self.store
+            .performers(self.account.as_deref(), capability)
+            .map_err(|err| anyhow!("Read who performs {capability}: {err}"))
+    }
+
+    /// Records `source` as the performer of `capability` for this account,
+    /// or withdraws the choice when `None`, applied on the owner's next run.
+    pub fn set_performer(&self, capability: &str, source: Option<&str>) -> Result<()> {
+        let anchor = self
+            .store
+            .list_collections_by_account(self.account.as_deref())
+            .map_err(|err| anyhow!("List the account's collections: {err}"))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("The account holds no collection yet: run a sync first"))?;
+        let action = PimdirAction::SetPerformer {
+            capability: capability.to_owned(),
+            source: source.map(String::from),
+        };
+
+        self.producer()?
+            .enqueue(&anchor.id, &action, None)
+            .map_err(|err| anyhow!("Queue the choice of performer: {err}"))?;
+        Ok(())
     }
 }
 

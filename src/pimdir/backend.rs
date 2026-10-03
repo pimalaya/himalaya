@@ -22,6 +22,7 @@ use std::io::Write;
 use anyhow::{Result, anyhow, bail};
 use chrono::DateTime;
 use io_pimdir::{
+    capability,
     client::{
         blobs::PimdirBlobWriter,
         producer::PimdirPendingAction,
@@ -261,8 +262,7 @@ impl PimdirClient {
                 seq,
                 flags: apply_flag_op(&current, flags, op),
             };
-            producer
-                .enqueue(&collection, &action, None)
+            self.enqueue(&mut producer, &collection, &action, None)
                 .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
@@ -303,8 +303,7 @@ impl PimdirClient {
             flags: flags.iter().map(Flag::raw).collect(),
             object: Some(object.hash.clone()),
         };
-        producer
-            .enqueue(&collection, &action, Some(&object))
+        self.enqueue(&mut producer, &collection, &action, Some(&object))
             .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
 
         Ok(link_id.0)
@@ -321,7 +320,20 @@ impl PimdirClient {
     /// The row is filed under `mailbox`, which must exist: an enqueue
     /// creates the collection it names, and a send anchored on a made-up
     /// name would add a mailbox to the store.
-    pub fn send_message(&mut self, mailbox: Option<&str>, raw: Vec<u8>) -> Result<i64> {
+    ///
+    /// With `copy`, the intent asks the owner to file a copy in `mailbox`
+    /// once the message is sent (pimdir STORAGE Annex B.2), so a failed
+    /// send leaves no copy behind. An owner that declares nothing predates
+    /// the field and would ignore it, so the copy is left to the caller
+    /// there, as before.
+    ///
+    /// Returns the queue row id, and whether the intent carries the copy.
+    pub fn send_message(
+        &mut self,
+        mailbox: Option<&str>,
+        raw: Vec<u8>,
+        copy: bool,
+    ) -> Result<(i64, bool)> {
         let Some(mailbox) = mailbox else {
             bail!(
                 "A pimdir account queues a sent message under a mailbox: \
@@ -339,12 +351,18 @@ impl PimdirClient {
             size: size as usize,
         };
 
+        let mut producer = self.producer()?;
+        let source = self.performer(&producer, &collection, capability::MAIL_SUBMIT)?;
+        let carried = copy && source.is_some();
+
         let payload = SubmitPayload {
             v: 1,
             object: &object.hash.0,
             from: &envelope.from,
             rcpts: &envelope.rcpts,
             subject: envelope.subject.as_deref(),
+            source: source.as_deref(),
+            copy: carried.then_some(collection.as_str()),
         };
         let action = PimdirAction::Unknown {
             kind: SUBMIT.to_owned(),
@@ -352,10 +370,10 @@ impl PimdirClient {
             object_hash: Some(object.hash.clone()),
         };
 
-        let mut producer = self.producer()?;
-        producer
-            .enqueue(&collection, &action, Some(&object))
-            .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))
+        let id = self
+            .enqueue(&mut producer, &collection, &action, Some(&object))
+            .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))?;
+        Ok((id, carried))
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
@@ -384,9 +402,13 @@ impl PimdirClient {
 
         for id in ids {
             let seq = self.seq(&collection, id)?;
-            producer
-                .enqueue(&collection, &PimdirAction::Remove { seq }, None)
-                .map_err(|err| anyhow!("Stage delete of `{id}` in `{mailbox}`: {err}"))?;
+            self.enqueue(
+                &mut producer,
+                &collection,
+                &PimdirAction::Remove { seq },
+                None,
+            )
+            .map_err(|err| anyhow!("Stage delete of `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
     }
@@ -406,8 +428,7 @@ impl PimdirClient {
 
         for id in ids {
             let seq = self.seq(&source, id)?;
-            producer
-                .enqueue(&source, &build(seq, target.clone()), None)
+            self.enqueue(&mut producer, &source, &build(seq, target.clone()), None)
                 .map_err(|err| anyhow!("Stage refile of `{id}` from `{from}` to `{to}`: {err}"))?;
         }
         Ok(ids.len())
@@ -474,6 +495,10 @@ struct SubmitPayload<'a> {
     rcpts: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
     subject: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    copy: Option<&'a str>,
 }
 
 /// Whether a queued action is a message waiting for a public id: a create,
@@ -853,8 +878,8 @@ mod tests {
     fn a_sent_message_is_one_submit_row_with_its_envelope() {
         let (_dir, mut client) = sent_store();
 
-        let row = client
-            .send_message(Some("imap/Sent"), RAW.to_vec())
+        let (row, _) = client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), false)
             .unwrap();
 
         let pending = client.store.pending_actions("imap/Sent").unwrap();
@@ -897,10 +922,66 @@ mod tests {
     }
 
     #[test]
+    fn a_send_asking_for_a_copy_leaves_it_to_the_caller_on_an_undeclared_owner() {
+        let (_dir, mut client) = sent_store();
+
+        let (_, carried) = client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), true)
+            .unwrap();
+
+        // NOTE: an owner predating capabilities would ignore `copy`.
+        assert!(!carried);
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
+            panic!("expected a submit intent, got {:?}", pending[0].action);
+        };
+        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert!(payload.get("copy").is_none());
+    }
+
+    #[test]
+    fn a_send_asking_for_a_copy_carries_it_in_the_intent() {
+        let (dir, mut client) = sent_store();
+        let mut store = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        store
+            .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
+                collection: io_pimdir::collection::PimdirCollectionId("imap/Sent".into()),
+                checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
+            }])
+            .unwrap();
+        let declaration: Vec<_> = [capability::MAIL_SUBMIT, capability::MAIL_SUBMIT_COPY]
+            .into_iter()
+            .map(|name| io_pimdir::capability::PimdirCapability {
+                collection: None,
+                name: name.to_string(),
+                support: io_pimdir::capability::PimdirSupport::Full,
+                detail: None,
+            })
+            .collect();
+        store.declare("imap", &declaration).unwrap();
+        drop(store);
+
+        let (_, carried) = client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), true)
+            .unwrap();
+        assert!(carried);
+
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1, "the copy rides on the submit, not an add");
+        let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
+            panic!("expected a submit intent, got {:?}", pending[0].action);
+        };
+        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(payload["copy"], "imap/Sent");
+    }
+
+    #[test]
     fn a_send_with_no_mailbox_stages_nothing() {
         let (_dir, mut client) = sent_store();
 
-        let err = client.send_message(None, RAW.to_vec()).unwrap_err();
+        let err = client.send_message(None, RAW.to_vec(), false).unwrap_err();
 
         assert!(err.to_string().contains("mailbox.alias.sent"));
         assert!(
@@ -917,7 +998,7 @@ mod tests {
         let (_dir, mut client) = sent_store();
         let raw = b"From: a@x.org\r\nSubject: hi\r\n\r\nhello".to_vec();
 
-        assert!(client.send_message(Some("imap/Sent"), raw).is_err());
+        assert!(client.send_message(Some("imap/Sent"), raw, false).is_err());
         assert!(
             client
                 .store

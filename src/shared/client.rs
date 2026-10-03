@@ -482,31 +482,56 @@ impl EmailClient {
         }
     }
 
+    /// Takes the notes the writes so far came back with: a capability their
+    /// source supports in part, on pimdir alone.
+    pub fn take_notes(&mut self) -> Vec<String> {
+        match &mut self.storage {
+            #[cfg(feature = "pimdir")]
+            Some(BackendClient::Pimdir(client)) => client.take_notes(),
+            _ => Vec::new(),
+        }
+    }
+
     /// Sends a raw message through the storage backend when it can send,
     /// and through the SMTP transport otherwise.
     ///
     /// A backend that defers the send to its store's owner files it under
-    /// `mailbox` and returns the queue row id; every other one sends at
-    /// once, ignores `mailbox` and returns `None`.
+    /// `mailbox` and returns the queue row id, and with `copy` asks the owner
+    /// to file the copy there once sent; every other one sends at once,
+    /// ignores `mailbox` and `copy`, and returns `None`. The flag says
+    /// whether the copy went with the send, else it is the caller's.
     #[cfg_attr(not(feature = "pimdir"), allow(unused_variables))]
-    pub fn send_message(&mut self, mailbox: Option<&str>, raw: Vec<u8>) -> Result<Option<i64>> {
+    pub fn send_message(
+        &mut self,
+        mailbox: Option<&str>,
+        raw: Vec<u8>,
+        copy: bool,
+    ) -> Result<(Option<i64>, bool)> {
         match &mut self.storage {
             #[cfg(feature = "jmap")]
-            Some(BackendClient::Jmap(client)) => return client.send_message(raw).map(|()| None),
+            Some(BackendClient::Jmap(client)) => {
+                return client.send_message(raw).map(|()| (None, false));
+            }
             #[cfg(feature = "gmail")]
-            Some(BackendClient::Gmail(client)) => return client.send_message(raw).map(|()| None),
+            Some(BackendClient::Gmail(client)) => {
+                return client.send_message(raw).map(|()| (None, false));
+            }
             #[cfg(feature = "msgraph")]
-            Some(BackendClient::Msgraph(client)) => return client.send_message(raw).map(|()| None),
+            Some(BackendClient::Msgraph(client)) => {
+                return client.send_message(raw).map(|()| (None, false));
+            }
             #[cfg(feature = "pimdir")]
             Some(BackendClient::Pimdir(client)) => {
-                return client.send_message(mailbox, raw).map(Some);
+                return client
+                    .send_message(mailbox, raw, copy)
+                    .map(|(id, carried)| (Some(id), carried));
             }
             _ => {}
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp_client_mut()? {
-            return smtp.send_message(raw).map(|()| None);
+            return smtp.send_message(raw).map(|()| (None, false));
         }
 
         bail!(

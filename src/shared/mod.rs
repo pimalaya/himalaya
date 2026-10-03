@@ -19,6 +19,7 @@ pub mod flag;
 #[cfg(backend)]
 pub mod mailbox;
 pub mod message;
+pub mod note;
 #[cfg(any(feature = "gmail", feature = "msgraph"))]
 pub mod output;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
