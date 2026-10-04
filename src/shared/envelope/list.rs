@@ -73,7 +73,6 @@ impl EnvelopeListCommand {
         let mailbox = self.mailbox.resolve(account);
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
-        let queued = client.queued_messages(&mailbox)?;
 
         let envelopes = Envelopes {
             preset: account.table_preset().to_string(),
@@ -100,7 +99,6 @@ impl EnvelopeListCommand {
                 date: account.envelopes_list_table_date_color(),
                 size: account.envelopes_list_table_size_color(),
             },
-            queued,
             envelopes,
         };
 
@@ -167,12 +165,6 @@ pub struct Envelopes {
     pub(super) chars: FlagChars,
     #[serde(skip)]
     pub(super) colors: EnvelopeColors,
-    /// Messages staged for creation and not pushed yet, which have no id
-    /// and so no row.
-    ///
-    /// Zero for every backend whose writes reach the server as they are
-    /// made.
-    pub queued: usize,
     /// The envelopes of this page.
     pub envelopes: Vec<Envelope>,
 }
@@ -242,15 +234,7 @@ impl fmt::Display for Envelopes {
         }
 
         writeln!(f)?;
-        writeln!(f, "{table}")?;
-
-        // NOTE: a queued message has no row, so saying how many there are
-        // is what keeps a saved one from reading as a lost one.
-        match self.queued {
-            0 => Ok(()),
-            1 => writeln!(f, "1 queued message, see `himalaya pimdir queue list`"),
-            n => writeln!(f, "{n} queued messages, see `himalaya pimdir queue list`"),
-        }
+        writeln!(f, "{table}")
     }
 }
 
@@ -363,7 +347,6 @@ mod tests {
                 date: Color::Reset,
                 size: Color::Reset,
             },
-            queued: 0,
             envelopes: Vec::new(),
         }
     }

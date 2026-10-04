@@ -11,7 +11,6 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     email::flag::{Flag, FlagOp},
@@ -48,10 +47,7 @@ impl FlagAddCommand {
         client.store_flags(&mailbox, &ids, &flags, FlagOp::Add)?;
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(Noted {
-            output: AddedFlags { flags },
-            notes: client.take_notes(),
-        })
+        printer.out(AddedFlags { flags })
     }
 }
 

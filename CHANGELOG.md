@@ -11,16 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added the `wizard` cargo feature, on by default, gating the interactive configuration: the `configure` command and the offer a first run makes. A build without it drops the prompts and the dependencies only they use, and a missing configuration points at the documented sample instead.
 - Added the `pimdir performer` command, showing which sources can perform a capability such as `mail.submit` for the account and recording the user's choice among them (pimdir draft-03, STORAGE §15.6).
-- Added notes to the pimdir writes: a write passing on a source that supports it only in part ends with a `Note:` line, and a `notes` array under `--json`.
 
 ### Changed
 
-- Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen.
+- Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen. A write a source supports only in part logs a warning.
 - Changed a pimdir send asking for a copy to carry it in the queued send, so the copy is filed only once the message is sent; a store whose owner declares no capabilities still gets the copy queued beside the send.
 
 ### Fixed
 
 - Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
+- Fixed pimdir queue details leaking into the shared outputs: `envelope list` no longer reports a `queued` count, and `message send`, `message add --send` and the composers no longer print a `queueId`. `himalaya pimdir queue list` shows what is queued, and a queued send logs its row id at info level.
 
 ## [2.2.1] - 2026-10-02
 

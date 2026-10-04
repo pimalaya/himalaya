@@ -7,7 +7,6 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     shared::{
@@ -51,9 +50,6 @@ impl MessageMoveCommand {
             1 => "1 message successfully moved".to_string(),
             n => format!("{n} messages successfully moved"),
         };
-        printer.out(Noted {
-            output: Message::new(message),
-            notes: client.take_notes(),
-        })
+        printer.out(Message::new(message))
     }
 }

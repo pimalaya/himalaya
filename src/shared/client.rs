@@ -207,31 +207,6 @@ impl EmailClient {
         }
     }
 
-    /// How many messages the mailbox has staged for creation and not
-    /// pushed yet.
-    ///
-    /// Zero for every backend whose writes reach the server as they are
-    /// made. A pimdir store is a replica a sync engine owns, so a saved
-    /// message waits in its queue with no id and therefore no envelope,
-    /// and the count is what keeps it from reading as lost.
-    #[cfg(feature = "pimdir")]
-    pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
-        let mailbox = self.resolve_mailbox_id(mailbox)?;
-        let mailbox = mailbox.as_str();
-        match self.storage_mut()? {
-            BackendClient::Pimdir(client) => client.queued_messages(mailbox),
-            #[allow(unreachable_patterns)]
-            _ => Ok(0),
-        }
-    }
-
-    /// How many messages the mailbox has staged for creation and not
-    /// pushed yet, always zero without the pimdir backend.
-    #[cfg(all(backend, not(feature = "pimdir")))]
-    pub fn queued_messages(&mut self, _mailbox: &str) -> Result<usize> {
-        Ok(0)
-    }
-
     /// Searches a mailbox with the shared query.
     #[cfg(backend)]
     pub fn search_envelopes(
@@ -482,56 +457,39 @@ impl EmailClient {
         }
     }
 
-    /// Takes the notes the writes so far came back with: a capability their
-    /// source supports in part, on pimdir alone.
-    pub fn take_notes(&mut self) -> Vec<String> {
-        match &mut self.storage {
-            #[cfg(feature = "pimdir")]
-            Some(BackendClient::Pimdir(client)) => client.take_notes(),
-            _ => Vec::new(),
-        }
-    }
-
     /// Sends a raw message through the storage backend when it can send,
     /// and through the SMTP transport otherwise.
     ///
-    /// A backend that defers the send to its store's owner files it under
-    /// `mailbox` and returns the queue row id, and with `copy` asks the owner
-    /// to file the copy there once sent; every other one sends at once,
-    /// ignores `mailbox` and `copy`, and returns `None`. The flag says
-    /// whether the copy went with the send, else it is the caller's.
+    /// `mailbox` is the sent mailbox, and `copy` asks for the message to
+    /// be filed there. A backend may file that copy itself as part of the
+    /// send and return `true`; most ignore both and return `false`, the
+    /// copy being the caller's.
     #[cfg_attr(not(feature = "pimdir"), allow(unused_variables))]
     pub fn send_message(
         &mut self,
         mailbox: Option<&str>,
         raw: Vec<u8>,
         copy: bool,
-    ) -> Result<(Option<i64>, bool)> {
+    ) -> Result<bool> {
         match &mut self.storage {
             #[cfg(feature = "jmap")]
-            Some(BackendClient::Jmap(client)) => {
-                return client.send_message(raw).map(|()| (None, false));
-            }
+            Some(BackendClient::Jmap(client)) => return client.send_message(raw).map(|()| false),
             #[cfg(feature = "gmail")]
-            Some(BackendClient::Gmail(client)) => {
-                return client.send_message(raw).map(|()| (None, false));
-            }
+            Some(BackendClient::Gmail(client)) => return client.send_message(raw).map(|()| false),
             #[cfg(feature = "msgraph")]
             Some(BackendClient::Msgraph(client)) => {
-                return client.send_message(raw).map(|()| (None, false));
+                return client.send_message(raw).map(|()| false);
             }
             #[cfg(feature = "pimdir")]
             Some(BackendClient::Pimdir(client)) => {
-                return client
-                    .send_message(mailbox, raw, copy)
-                    .map(|(id, carried)| (Some(id), carried));
+                return client.send_message(mailbox, raw, copy);
             }
             _ => {}
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp_client_mut()? {
-            return smtp.send_message(raw).map(|()| (None, false));
+            return smtp.send_message(raw).map(|()| false);
         }
 
         bail!(

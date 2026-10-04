@@ -11,7 +11,6 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     email::mailbox::MailboxRole,
@@ -71,10 +70,7 @@ impl MessageDeleteCommand {
             DeleteReport::new(DeleteAction::MovedToTrash, moved)
         };
 
-        printer.out(Noted {
-            output: report,
-            notes: client.take_notes(),
-        })
+        printer.out(report)
     }
 }
 

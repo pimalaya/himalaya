@@ -20,6 +20,7 @@ use io_pimdir::{
     codec::PimdirAction,
     object::PimdirObject,
 };
+use log::warn;
 
 use crate::{
     account::context::Account,
@@ -40,9 +41,6 @@ pub struct PimdirClient {
     /// The account grouping this client's collections (pimdir SPEC §9.2), or
     /// `None` in a store holding a single ungrouped account.
     pub(crate) account: Option<String>,
-    /// What the writes so far came back with, a capability their source
-    /// supports in part (pimdir STORAGE §15.6).
-    pub(crate) notes: Vec<String>,
 }
 
 impl PimdirClient {
@@ -75,15 +73,13 @@ impl PimdirClient {
             blobs,
             root,
             account,
-            notes: Vec::new(),
         })
     }
 
-    /// Queues `action` through `producer`, keeping the notes it comes back
-    /// with: a capability its source supports in part (pimdir STORAGE
-    /// §15.6).
+    /// Queues `action` through `producer`, warning about each capability
+    /// its source supports in part (pimdir STORAGE §15.6).
     pub(crate) fn enqueue(
-        &mut self,
+        &self,
         producer: &mut PimdirProducer,
         collection: &str,
         action: &PimdirAction,
@@ -91,13 +87,10 @@ impl PimdirClient {
     ) -> Result<i64, PimdirError> {
         let partials = producer.check(collection, action)?;
         let id = producer.enqueue(collection, action, object)?;
-        self.notes.extend(partials.iter().map(ToString::to_string));
+        for partial in &partials {
+            warn!("{partial}");
+        }
         Ok(id)
-    }
-
-    /// Takes the notes the writes so far came back with.
-    pub fn take_notes(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.notes)
     }
 
     /// Opens a producer for the length of one staging batch.

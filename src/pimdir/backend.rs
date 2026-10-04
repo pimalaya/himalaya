@@ -37,7 +37,7 @@ use io_pimdir::{
         mail::{self, PimdirMailSummary},
     },
 };
-use log::warn;
+use log::{info, warn};
 use serde::Serialize;
 
 use crate::{
@@ -176,16 +176,6 @@ impl PimdirClient {
         Ok(paginate(hits, page, page_size))
     }
 
-    /// How many messages the mailbox has queued for creation or sending and
-    /// not synced yet.
-    ///
-    /// A queued create or send has no public id, so it is no envelope and
-    /// has no row. The count is what a listing reports instead, so a saved
-    /// or sent message reads as queued rather than as lost.
-    pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
-        Ok(self.queued_mail(mailbox)?.len())
-    }
-
     /// The mailbox's queued creations and sends, rendered as mail.
     ///
     /// The operator CLI is kind-agnostic and prints ids, hashes and flags.
@@ -309,8 +299,7 @@ impl PimdirClient {
         Ok(link_id.0)
     }
 
-    /// Queues a message for the store's owner to send, returning the queue
-    /// row id.
+    /// Queues a message for the store's owner to send.
     ///
     /// The body is stored as given, `Bcc:` included, and the row carries the
     /// envelope derived from its headers, the `submit` intent any owner of
@@ -327,13 +316,13 @@ impl PimdirClient {
     /// the field and would ignore it, so the copy is left to the caller
     /// there, as before.
     ///
-    /// Returns the queue row id, and whether the intent carries the copy.
+    /// Returns whether the intent carries the copy.
     pub fn send_message(
         &mut self,
         mailbox: Option<&str>,
         raw: Vec<u8>,
         copy: bool,
-    ) -> Result<(i64, bool)> {
+    ) -> Result<bool> {
         let Some(mailbox) = mailbox else {
             bail!(
                 "A pimdir account queues a sent message under a mailbox: \
@@ -373,7 +362,8 @@ impl PimdirClient {
         let id = self
             .enqueue(&mut producer, &collection, &action, Some(&object))
             .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))?;
-        Ok((id, carried))
+        info!("message queued for sending as action {id}, see `himalaya pimdir queue list`");
+        Ok(carried)
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
@@ -878,13 +868,12 @@ mod tests {
     fn a_sent_message_is_one_submit_row_with_its_envelope() {
         let (_dir, mut client) = sent_store();
 
-        let (row, _) = client
+        client
             .send_message(Some("imap/Sent"), RAW.to_vec(), false)
             .unwrap();
 
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, row);
         let PimdirAction::Unknown {
             kind,
             payload,
@@ -918,14 +907,13 @@ mod tests {
         assert_eq!(queued.len(), 1);
         assert!(queued[0].send);
         assert_eq!(queued[0].envelope.subject, "hi");
-        assert_eq!(client.queued_messages("imap/Sent").unwrap(), 1);
     }
 
     #[test]
     fn a_send_asking_for_a_copy_leaves_it_to_the_caller_on_an_undeclared_owner() {
         let (_dir, mut client) = sent_store();
 
-        let (_, carried) = client
+        let carried = client
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
             .unwrap();
 
@@ -963,7 +951,7 @@ mod tests {
         store.declare("imap", &declaration).unwrap();
         drop(store);
 
-        let (_, carried) = client
+        let carried = client
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
             .unwrap();
         assert!(carried);

@@ -11,6 +11,9 @@ Each backend is a `<Proto>Client` wrapper that derefs onto the io-* `*Std` clien
 ### Requirement: Shared operation set
 The shared adapters SHALL cover, per backend: `list_mailboxes`, `list_envelopes`, `search_envelopes`, `store_flags`, `get_message`, `add_message`, `copy_messages`, `move_messages`, and `send_message`. A backend that cannot model an operation opts out of it rather than emulating it.
 
+### Requirement: Shared outputs carry no backend details
+The output of a shared command SHALL NOT carry a field that only one backend fills. A backend detail worth showing SHALL be logged by that backend's adapter or shown by its own namespace.
+
 ### Requirement: The envelope carries its threading pointers
 The shared `Envelope` SHALL carry `message_id` and `in_reply_to`, the RFC 5322 §3.6.4 identity of a message and of the message(s) it replies to, so a client can pair a reply with its parent from a listing rather than by reading bodies.
 
@@ -98,9 +101,7 @@ A write SHALL be staged as a queued `PimdirAction` through a producer handle (`s
 An added message SHALL derive its link id through io-pimdir's mail derivation (`summary::mail::derive`), the one implementation of SPEC Annex A.1, which is the bare `Message-ID` with nothing prepended, and SHALL name it on the queued `Add`. The action carries no summary: the owner derives the summary and the sort key from the body when it applies the action, through the same call, so the two never disagree. A staged `Add` whose link id the collection already holds SHALL park (pimdir SPEC §15.3): it neither deduplicates against the stored copy nor mints a second key. Minting is the store's answer to what a source hands over; parking is its answer to a producer authoring a message the collection already has.
 
 ### Requirement: A queued creation is reported, not listed
-A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window.
-
-An envelope listing SHALL report how many creations the mailbox has queued and name the command that shows them, so a saved message that is not in the list reads as queued rather than as lost. A backend that stages nothing reports none, which every backend whose writes reach the server as they are made does. An envelope *search* SHALL report none whatever the backend: a queued creation is never matched against the query, so a count its filter never saw would be misleading.
+A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window. `himalaya pimdir queue list` is where queued creations show.
 
 ### Requirement: The pimdir subcommand reads and retracts the queue
 Himalaya SHALL carry a `pimdir` subcommand for what the operator CLI cannot do without knowing mail. `queue list` SHALL render a queued creation as a message (flags, subject, recipient, and when it was queued, from the row's `created_at`) where the kind-agnostic `pimdir` binary can only print ids and hashes. The queued action carries no summary, so the row SHALL be derived from the body the action pins, through the same derivation the owner applies; an action pinning no body renders with its flags alone. `queue cancel` SHALL retract one row through io-pimdir's scoped owner operation, confirming first unless `--yes`.
@@ -119,12 +120,12 @@ The payload SHALL be `v: 1` JSON carrying `object` (the body hash), `from`, `rcp
 
 The row SHALL anchor on the `--save` mailbox when one is given, else on the mailbox `mailbox.alias.sent` names; with neither, the send SHALL be refused, naming the alias to set, rather than create a collection.
 
-The command SHALL report the queue row id, and its text SHALL say the message is queued for sending, not sent.
+The command SHALL NOT report the queue row id in its output; the pimdir backend SHALL log it at info level.
 
 #### Scenario: A send made offline waits in the queue
 - GIVEN a pimdir account with `mailbox.alias.sent` set and no network
 - WHEN a message is sent
-- THEN one `submit` row is queued on the sent mailbox with the message's envelope, and the command prints its row id
+- THEN one `submit` row is queued on the sent mailbox with the message's envelope
 
 #### Scenario: A Bcc recipient is in the envelope
 - GIVEN a message with `To: a@x.org` and `Bcc: b@x.org`
@@ -137,7 +138,7 @@ The command SHALL report the queue row id, and its text SHALL say the message is
 - THEN nothing is staged and the error names `mailbox.alias.sent`
 
 ### Requirement: The queue view shows queued sends
-`himalaya pimdir queue list` SHALL render a queued `submit` as a message, derived from the body it pins as a create is, marked as a send, beside the queued creates of the same mailbox. The count an envelope listing reports SHALL include the mailbox's queued sends.
+`himalaya pimdir queue list` SHALL render a queued `submit` as a message, derived from the body it pins as a create is, marked as a send, beside the queued creates of the same mailbox.
 
 ### Requirement: Append gap
 Graph SHALL NOT implement `add_message`: a MIME message it creates stays a draft. Gmail SHALL implement it through `messages.insert`, the mailbox and the flags becoming labels and the `Date:` header dating the message, without sending it or running filters. Every backend implements `search_envelopes` (see the search capability).

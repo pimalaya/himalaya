@@ -22,7 +22,6 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::shared::note::Noted;
 use crate::{
     account::context::Account,
     email::flag::{Flag, IanaFlag},
@@ -40,22 +39,17 @@ pub enum Outcome {
         id: Option<String>,
         /// Whether it was sent as well as saved.
         sent: bool,
-        /// The queue row id of a send deferred to the store's owner.
-        queued: Option<i64>,
     },
     /// Sent without being saved, the send path returning no id.
-    Sent {
-        /// The queue row id of a send deferred to the store's owner.
-        queued: Option<i64>,
-    },
+    Sent,
 }
 
 /// Sends the bytes, saves them, or both, printing nothing.
 ///
 /// Saving resolves the mailbox through the account's aliases and attaches
 /// the given flags. Both asked for, the send goes first, so a failed send
-/// leaves no copy behind; a send deferred to the store's owner asks it
-/// for the copy instead. With neither, the bytes go to stdout.
+/// leaves no copy behind, unless the backend files the copy itself as
+/// part of the send. With neither, the bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -72,18 +66,14 @@ pub fn apply(
 
     let mailbox = save.map(|name| account.resolve_mailbox(name));
 
-    // NOTE: a deferred send is filed under the saved copy's mailbox, else
-    // under the one the account names as sent.
-    let (queued, carried) = match send {
+    let carried = match send {
         true => {
             let sent = mailbox.or_else(|| account.mailbox_alias.get("sent").map(String::as_str));
             client.send_message(sent, raw.clone(), mailbox.is_some())?
         }
-        false => (None, false),
+        false => false,
     };
 
-    // NOTE: a send deferred to the store's owner carries its copy, filed
-    // once the message is sent, so nothing is saved here.
     let saved_id = match mailbox {
         Some(_) if carried => Some(None),
         Some(mailbox) if send => Some(
@@ -96,12 +86,8 @@ pub fn apply(
     };
 
     Ok(match saved_id {
-        Some(id) => Outcome::Saved {
-            id,
-            sent: send,
-            queued,
-        },
-        None => Outcome::Sent { queued },
+        Some(id) => Outcome::Saved { id, sent: send },
+        None => Outcome::Sent,
     })
 }
 
@@ -127,29 +113,14 @@ pub fn route(
         save,
         send,
     )?;
-    let (message, queue_id) = match outcome {
+    let message = match outcome {
         Outcome::Stdout => return Ok(()),
-        Outcome::Saved {
-            sent: true,
-            queued: Some(row),
-            ..
-        } => (
-            "Message successfully saved and queued for sending",
-            Some(row),
-        ),
-        Outcome::Saved { sent: true, .. } => ("Message successfully saved and sent", None),
-        Outcome::Saved { sent: false, .. } => ("Message successfully saved", None),
-        Outcome::Sent { queued: Some(row) } => {
-            ("Message successfully queued for sending", Some(row))
-        }
-        Outcome::Sent { queued: None } => ("Message successfully sent", None),
+        Outcome::Saved { sent: true, .. } => "Message successfully saved and sent",
+        Outcome::Saved { sent: false, .. } => "Message successfully saved",
+        Outcome::Sent => "Message successfully sent",
     };
-    printer.out(Noted {
-        output: MessageRouteOutput {
-            message: message.to_owned(),
-            queue_id,
-        },
-        notes: client.take_notes(),
+    printer.out(MessageRouteOutput {
+        message: message.to_owned(),
     })
 }
 
@@ -159,10 +130,6 @@ pub fn route(
 pub struct MessageRouteOutput {
     /// What happened, for a human.
     pub message: String,
-    /// The queue row id of a send deferred to the store's owner, which
-    /// `pimdir queue cancel` takes and the engine reports against.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub queue_id: Option<i64>,
 }
 
 impl fmt::Display for MessageRouteOutput {
