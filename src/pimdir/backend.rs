@@ -264,7 +264,7 @@ impl PimdirClient {
     }
 
     /// Stages a locally-authored message for the next sync to upload,
-    /// returning the link id it is stored under.
+    /// returning its queue row and the link id it is stored under.
     ///
     /// The body lands in the blob store durably before the action referencing
     /// it is enqueued, and the queue row pins the object, so nothing collects
@@ -280,7 +280,12 @@ impl PimdirClient {
     /// holds, so one `Message-ID` twice keeps two items. It parks for a
     /// producer, which named a key it does not own and is told so rather than
     /// filed under one it never asked for.
-    pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+    pub fn add_message(
+        &mut self,
+        mailbox: &str,
+        flags: &[Flag],
+        raw: Vec<u8>,
+    ) -> Result<PimdirStaged> {
         let collection = self.hub_id(mailbox)?;
         let link_id = mail::derive(&raw).link_id;
 
@@ -298,10 +303,14 @@ impl PimdirClient {
             flags: flags.iter().map(Flag::raw).collect(),
             object: Some(object.hash.clone()),
         };
-        self.enqueue(&mut producer, &collection, &action, Some(&object))
+        let queue_id = self
+            .enqueue(&mut producer, &collection, &action, Some(&object))
             .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
 
-        Ok(link_id.0)
+        Ok(PimdirStaged {
+            queue_id,
+            message_id: link_id.0,
+        })
     }
 
     /// Queues a message for the store's owner to send.
@@ -321,13 +330,14 @@ impl PimdirClient {
     /// the field and would ignore it, so the copy is left to the caller
     /// there, as before.
     ///
-    /// Returns whether the intent carries the copy.
+    /// Returns the queue row, the message's link id, and whether the intent
+    /// carries the copy.
     pub fn send_message(
         &mut self,
         mailbox: Option<&str>,
         raw: Vec<u8>,
         copy: bool,
-    ) -> Result<bool> {
+    ) -> Result<PimdirSubmitted> {
         let Some(mailbox) = mailbox else {
             bail!(
                 "A pimdir account queues a sent message under a mailbox: \
@@ -368,7 +378,58 @@ impl PimdirClient {
             .enqueue(&mut producer, &collection, &action, Some(&object))
             .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))?;
         info!("message queued for sending as action {id}, see `himalaya pimdir queue list`");
-        Ok(carried)
+        Ok(PimdirSubmitted {
+            staged: PimdirStaged {
+                queue_id: id,
+                message_id: mail::derive(&raw).link_id.0,
+            },
+            carried,
+        })
+    }
+
+    /// Where queue row `id` stands, `None` when the account's queue holds no
+    /// such row: applied, cancelled, or never staged.
+    pub fn queue_row(&self, id: i64) -> Result<Option<PimdirRow>> {
+        let collections: Vec<String> = self
+            .store
+            .list_collections_by_account(self.account.as_deref())
+            .map_err(|err| anyhow!("List the account's collections: {err}"))?
+            .into_iter()
+            .map(|collection| collection.id)
+            .collect();
+        let ours = |collection: &str| collections.iter().any(|id| id == collection);
+
+        let pending = self
+            .store
+            .list_pending_actions()
+            .map_err(|err| anyhow!("List the queue: {err}"))?;
+        if let Some(row) = pending
+            .into_iter()
+            .find(|row| row.id == id && ours(&row.collection))
+        {
+            return Ok(Some(PimdirRow {
+                id,
+                collection: row.collection,
+                kind: row.action.kind().to_owned(),
+                attempts: row.attempts,
+                error: None,
+            }));
+        }
+
+        let parked = self
+            .store
+            .parked_actions()
+            .map_err(|err| anyhow!("List the parked actions: {err}"))?;
+        Ok(parked
+            .into_iter()
+            .find(|row| row.id == id && ours(&row.collection))
+            .map(|row| PimdirRow {
+                id,
+                collection: row.collection,
+                kind: row.action,
+                attempts: row.attempts,
+                error: Some(row.error),
+            }))
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
@@ -563,6 +624,40 @@ fn address(address: PimdirAddress) -> Address {
         name: address.name,
         email: address.address,
     }
+}
+
+/// A message staged for the owner: the queue row it waits in, and the link
+/// id it is filed under once applied.
+#[derive(Clone, Debug)]
+pub struct PimdirStaged {
+    /// The queue row id, which `pimdir queue show` and `cancel` take.
+    pub queue_id: i64,
+    /// The bare `Message-ID` the message is stored under.
+    pub message_id: String,
+}
+
+/// A message queued for sending.
+#[derive(Clone, Debug)]
+pub struct PimdirSubmitted {
+    /// The `submit` row and the message's link id.
+    pub staged: PimdirStaged,
+    /// Whether the intent carries the copy, filed by the owner once sent.
+    pub carried: bool,
+}
+
+/// One row still in the queue, pending or parked.
+#[derive(Clone, Debug)]
+pub struct PimdirRow {
+    /// The queue row id.
+    pub id: i64,
+    /// The collection the row is anchored on.
+    pub collection: String,
+    /// The action kind (`add`, `submit`…).
+    pub kind: String,
+    /// Apply attempts so far.
+    pub attempts: i64,
+    /// Why the owner parked it, `None` while pending.
+    pub error: Option<String>,
 }
 
 /// One queued creation or send, as `pimdir queue list` shows it: the row an
@@ -923,7 +1018,7 @@ mod tests {
             .unwrap();
 
         // NOTE: an owner predating capabilities would ignore `copy`.
-        assert!(!carried);
+        assert!(!carried.carried);
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
             panic!("expected a submit intent, got {:?}", pending[0].action);
@@ -959,7 +1054,7 @@ mod tests {
         let carried = client
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
             .unwrap();
-        assert!(carried);
+        assert!(carried.carried);
 
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1, "the copy rides on the submit, not an add");
@@ -999,5 +1094,51 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    const DRAFT: &[u8] =
+        b"Message-ID: <d1@x.org>\r\nFrom: a@x.org\r\nTo: b@y.org\r\nSubject: hi\r\n\r\nhello";
+
+    #[test]
+    fn an_added_message_names_its_queue_row_and_message_id() {
+        let (_dir, mut client) = sent_store();
+
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+
+        assert_eq!(staged.message_id, "d1@x.org");
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, staged.queue_id);
+    }
+
+    #[test]
+    fn a_sent_message_names_its_queue_row_and_message_id() {
+        let (_dir, mut client) = sent_store();
+
+        let sent = client
+            .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)
+            .unwrap();
+
+        assert_eq!(sent.staged.message_id, "d1@x.org");
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending[0].id, sent.staged.queue_id);
+    }
+
+    #[test]
+    fn a_queue_row_is_found_while_pending_and_gone_once_cancelled() {
+        let (_dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+
+        let row = client.queue_row(staged.queue_id).unwrap().unwrap();
+        assert_eq!(row.collection, "imap/Sent");
+        assert_eq!(row.kind, "add");
+        assert!(row.error.is_none());
+
+        assert!(client.cancel_queued(staged.queue_id).unwrap());
+        assert!(client.queue_row(staged.queue_id).unwrap().is_none());
     }
 }

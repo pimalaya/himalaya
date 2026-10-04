@@ -336,7 +336,9 @@ impl EmailClient {
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.add_message(mailbox, flags, raw).map(Some),
+            BackendClient::Pimdir(client) => client
+                .add_message(mailbox, flags, raw)
+                .map(|staged| Some(staged.message_id)),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "msgraph")]
@@ -482,7 +484,9 @@ impl EmailClient {
             }
             #[cfg(feature = "pimdir")]
             Some(BackendClient::Pimdir(client)) => {
-                return client.send_message(mailbox, raw, copy);
+                return client
+                    .send_message(mailbox, raw, copy)
+                    .map(|sent| sent.carried);
             }
             _ => {}
         }

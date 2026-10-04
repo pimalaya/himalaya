@@ -382,6 +382,18 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-pimdir-queue-cancel",
             crate::pimdir::queue::cancel::PimdirQueueCancelled
         );
+        insert!(
+            "himalaya-pimdir-queue-show",
+            crate::pimdir::queue::show::PimdirQueueRow
+        );
+        insert!(
+            "himalaya-pimdir-message-add",
+            crate::pimdir::message::add::PimdirMessageAdded
+        );
+        insert!(
+            "himalaya-pimdir-message-send",
+            crate::pimdir::message::send::PimdirMessageSent
+        );
     }
 
     schemas

@@ -6,3 +6,4 @@
 pub mod cancel;
 pub mod cli;
 pub mod list;
+pub mod show;

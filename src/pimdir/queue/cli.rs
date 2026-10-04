@@ -10,7 +10,10 @@ use crate::{
     account::context::Account,
     pimdir::{
         client::PimdirClient,
-        queue::{cancel::PimdirQueueCancelCommand, list::PimdirQueueListCommand},
+        queue::{
+            cancel::PimdirQueueCancelCommand, list::PimdirQueueListCommand,
+            show::PimdirQueueShowCommand,
+        },
     },
 };
 
@@ -27,6 +30,7 @@ use crate::{
 pub enum PimdirQueueCommand {
     #[command(alias = "ls")]
     List(PimdirQueueListCommand),
+    Show(PimdirQueueShowCommand),
     Cancel(PimdirQueueCancelCommand),
 }
 
@@ -40,6 +44,7 @@ impl PimdirQueueCommand {
     ) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::Show(cmd) => cmd.execute(printer, client),
             Self::Cancel(cmd) => cmd.execute(printer, client),
         }
     }

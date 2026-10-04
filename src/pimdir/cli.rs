@@ -9,7 +9,8 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     pimdir::{
-        client::PimdirClient, performer::PimdirPerformerCommand, queue::cli::PimdirQueueCommand,
+        client::PimdirClient, message::cli::PimdirMessageCommand,
+        performer::PimdirPerformerCommand, queue::cli::PimdirQueueCommand,
     },
 };
 
@@ -22,6 +23,8 @@ use crate::{
 pub enum PimdirCommand {
     #[command(subcommand)]
     Queue(PimdirQueueCommand),
+    #[command(subcommand)]
+    Message(PimdirMessageCommand),
     Performer(PimdirPerformerCommand),
 }
 
@@ -35,6 +38,7 @@ impl PimdirCommand {
     ) -> Result<()> {
         match self {
             Self::Queue(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, account, client),
             Self::Performer(cmd) => cmd.execute(printer, client),
         }
     }
