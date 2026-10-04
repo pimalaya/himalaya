@@ -7,4 +7,4 @@ change: pimdir-queue-row
 - [x] `pimdir message add`, `pimdir message send`, `pimdir queue show`, their JSON Schemas
 - [x] Tests: rows named on add and send, found while pending, gone once cancelled
 - [x] Fold into spec/backends.md, log, CHANGELOG
-- [ ] `applied` with `seq` once io-pimdir records the row's outcome
+- [x] `applied` with `seq` once io-pimdir records the row's outcome (pimdir-queue-receipts)

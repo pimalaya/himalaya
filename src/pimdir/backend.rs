@@ -25,7 +25,7 @@ use io_pimdir::{
     capability,
     client::{
         blobs::PimdirBlobWriter,
-        producer::PimdirPendingAction,
+        producer::{PimdirActionStatus, PimdirPendingAction},
         reader::{PimdirCollection, PimdirItem},
     },
     codec::PimdirAction,
@@ -58,14 +58,6 @@ const MAIL_KIND: &str = "message/rfc822";
 
 /// The queue action kind of a message for the store's owner to send.
 const SUBMIT: &str = "submit";
-
-/// The queue action kind asking the store's owner to create a collection
-/// on its server (pimdir STORAGE Annex B.2).
-const COLLECTION_CREATE: &str = "collection-create";
-
-/// The intent capability `collection-create` is bound to.
-// NOTE: io-pimdir 0.6 does not name it yet.
-const COLLECTION_CREATE_CAPABILITY: &str = "collection.create";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
@@ -395,49 +387,32 @@ impl PimdirClient {
         })
     }
 
-    /// Where queue row `id` stands, `None` when the account's queue holds no
-    /// such row: applied, cancelled, or never staged.
-    pub fn queue_row(&self, id: i64) -> Result<Option<PimdirRow>> {
-        let collections: Vec<String> = self
+    /// Where queue row `id` stands (pimdir STORAGE §15.4): pending, parked,
+    /// applied with the item an `add` created, or unknown. A row anchored on
+    /// another account's collection reads as unknown.
+    pub fn queue_row(&self, id: i64) -> Result<PimdirActionStatus> {
+        let status = self
+            .store
+            .action_status(id)
+            .map_err(|err| anyhow!("Read queue row {id}: {err}"))?;
+        let collection = match &status {
+            PimdirActionStatus::Pending { collection, .. }
+            | PimdirActionStatus::Parked { collection, .. }
+            | PimdirActionStatus::Applied { collection, .. } => collection,
+            PimdirActionStatus::Unknown => return Ok(status),
+        };
+
+        let ours = self
             .store
             .list_collections_by_account(self.account.as_deref())
             .map_err(|err| anyhow!("List the account's collections: {err}"))?
-            .into_iter()
-            .map(|collection| collection.id)
-            .collect();
-        let ours = |collection: &str| collections.iter().any(|id| id == collection);
-
-        let pending = self
-            .store
-            .list_pending_actions()
-            .map_err(|err| anyhow!("List the queue: {err}"))?;
-        if let Some(row) = pending
-            .into_iter()
-            .find(|row| row.id == id && ours(&row.collection))
-        {
-            return Ok(Some(PimdirRow {
-                id,
-                collection: row.collection,
-                kind: row.action.kind().to_owned(),
-                attempts: row.attempts,
-                error: None,
-            }));
-        }
-
-        let parked = self
-            .store
-            .parked_actions()
-            .map_err(|err| anyhow!("List the parked actions: {err}"))?;
-        Ok(parked
-            .into_iter()
-            .find(|row| row.id == id && ours(&row.collection))
-            .map(|row| PimdirRow {
-                id,
-                collection: row.collection,
-                kind: row.action,
-                attempts: row.attempts,
-                error: Some(row.error),
-            }))
+            .iter()
+            .any(|ours| &ours.id == collection);
+        Ok(if ours {
+            status
+        } else {
+            PimdirActionStatus::Unknown
+        })
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
@@ -471,10 +446,6 @@ impl PimdirClient {
     /// nothing has an owner predating the intent, which would never perform
     /// it, so the creation is refused there rather than left to wait.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<PimdirCreated> {
-        if name.trim().is_empty() || name.chars().any(char::is_control) {
-            bail!("A mailbox name cannot be empty nor hold control characters");
-        }
-
         // NOTE: a name the server already holds is its to refuse: the row
         // parks, and `pimdir queue show` says why.
         let parent = parent.map(|parent| self.hub_id(parent)).transpose()?;
@@ -491,27 +462,16 @@ impl PimdirClient {
         };
 
         let mut producer = self.producer()?;
-        let Some(source) = self.performer(&producer, &anchor, COLLECTION_CREATE_CAPABILITY)? else {
+        let Some(source) = self.performer(&producer, &anchor, capability::COLLECTION_CREATE)?
+        else {
             bail!(
                 "The sources of this store declare no capabilities, so its sync engine \
                  cannot create a mailbox"
             );
         };
 
-        let payload = CollectionCreatePayload {
-            v: 1,
-            source: &source,
-            name,
-            parent: parent.as_deref(),
-        };
-        let action = PimdirAction::Unknown {
-            kind: COLLECTION_CREATE.to_owned(),
-            payload: serde_json::to_string(&payload)?,
-            object_hash: None,
-        };
-
-        let queue_id = self
-            .enqueue(&mut producer, &anchor, &action, None)
+        let queue_id = producer
+            .enqueue_collection_create(&anchor, name, parent.as_deref(), Some(&source))
             .map_err(|err| anyhow!("Queue the creation of `{name}`: {err}"))?;
         Ok(PimdirCreated { queue_id, source })
     }
@@ -718,31 +678,6 @@ pub struct PimdirCreated {
     pub queue_id: i64,
     /// The source that creates the mailbox on its server.
     pub source: String,
-}
-
-/// The payload of a `collection-create` intent, version 1.
-#[derive(Serialize)]
-struct CollectionCreatePayload<'a> {
-    v: u8,
-    source: &'a str,
-    name: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    parent: Option<&'a str>,
-}
-
-/// One row still in the queue, pending or parked.
-#[derive(Clone, Debug)]
-pub struct PimdirRow {
-    /// The queue row id.
-    pub id: i64,
-    /// The collection the row is anchored on.
-    pub collection: String,
-    /// The action kind (`add`, `submit`…).
-    pub kind: String,
-    /// Apply attempts so far.
-    pub attempts: i64,
-    /// Why the owner parked it, `None` while pending.
-    pub error: Option<String>,
 }
 
 /// One queued creation or send, as `pimdir queue list` shows it: the row an
@@ -1196,19 +1131,51 @@ mod tests {
     }
 
     #[test]
-    fn a_queue_row_is_found_while_pending_and_gone_once_cancelled() {
+    fn a_queue_row_is_pending_then_unknown_once_cancelled() {
         let (_dir, mut client) = sent_store();
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
 
-        let row = client.queue_row(staged.queue_id).unwrap().unwrap();
-        assert_eq!(row.collection, "imap/Sent");
-        assert_eq!(row.kind, "add");
-        assert!(row.error.is_none());
+        let PimdirActionStatus::Pending {
+            collection, kind, ..
+        } = client.queue_row(staged.queue_id).unwrap()
+        else {
+            panic!("expected a pending row");
+        };
+        assert_eq!(collection, "imap/Sent");
+        assert_eq!(kind, "add");
 
         assert!(client.cancel_queued(staged.queue_id).unwrap());
-        assert!(client.queue_row(staged.queue_id).unwrap().is_none());
+        assert_eq!(
+            client.queue_row(staged.queue_id).unwrap(),
+            PimdirActionStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn an_applied_add_names_the_seq_it_created() {
+        let (dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+
+        let PimdirActionStatus::Applied {
+            collection, seq, ..
+        } = client.queue_row(staged.queue_id).unwrap()
+        else {
+            panic!("expected an applied row");
+        };
+        assert_eq!(collection, "imap/Sent");
+        let seq = seq.expect("an add names the item it created");
+        let item = client.get("imap/Sent", &seq.to_string()).unwrap().unwrap();
+        assert_eq!(item.seq, seq);
     }
 
     /// Declares `names` for the `imap` source syncing `imap/Sent`.
@@ -1237,7 +1204,7 @@ mod tests {
     #[test]
     fn a_mailbox_creation_is_one_intent_naming_its_performer() {
         let (dir, mut client) = sent_store();
-        declare(dir.path(), &[COLLECTION_CREATE_CAPABILITY]);
+        declare(dir.path(), &[capability::COLLECTION_CREATE]);
 
         let created = client.create_mailbox("Projets", Some("imap/Sent")).unwrap();
 
@@ -1248,7 +1215,7 @@ mod tests {
         let PimdirAction::Unknown { kind, payload, .. } = &pending[0].action else {
             panic!("expected an intent, got {:?}", pending[0].action);
         };
-        assert_eq!(kind, COLLECTION_CREATE);
+        assert_eq!(kind, "collection-create");
         let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
         assert_eq!(
             payload,
@@ -1264,7 +1231,7 @@ mod tests {
     #[test]
     fn a_mailbox_creation_at_the_top_has_no_parent() {
         let (dir, mut client) = sent_store();
-        declare(dir.path(), &[COLLECTION_CREATE_CAPABILITY]);
+        declare(dir.path(), &[capability::COLLECTION_CREATE]);
 
         client.create_mailbox("Projets", None).unwrap();
 
