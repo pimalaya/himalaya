@@ -12,8 +12,8 @@ use serde::Serialize;
 
 use crate::pimdir::client::PimdirClient;
 
-/// Show where one queue row stands, by the id `pimdir message add` or
-/// `pimdir message send` printed.
+/// Show where one queue row stands, by the id `pimdir message add`,
+/// `pimdir message send` or `pimdir mailbox create` printed.
 ///
 /// A row is `pending` until the sync engine applies it, `parked` when the
 /// engine gave up on it (with why), and `gone` once the queue no longer

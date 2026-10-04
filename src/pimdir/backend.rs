@@ -59,6 +59,14 @@ const MAIL_KIND: &str = "message/rfc822";
 /// The queue action kind of a message for the store's owner to send.
 const SUBMIT: &str = "submit";
 
+/// The queue action kind asking the store's owner to create a collection
+/// on its server (pimdir STORAGE Annex B.2).
+const COLLECTION_CREATE: &str = "collection-create";
+
+/// The intent capability `collection-create` is bound to.
+// NOTE: io-pimdir 0.6 does not name it yet.
+const COLLECTION_CREATE_CAPABILITY: &str = "collection.create";
+
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
 
@@ -450,6 +458,64 @@ impl PimdirClient {
         })
     }
 
+    /// Queues the creation of mailbox `name` for the store's owner, under
+    /// the mailbox `parent` when given, returning the queue row and the
+    /// source that performs it.
+    ///
+    /// The intent is anchored on `parent`, else on the account's first
+    /// mailbox: a mailbox that does not exist yet has no collection to file
+    /// a row under, and an enqueue on a made-up id would create one in the
+    /// store. The new mailbox arrives with the sync that performs it.
+    ///
+    /// The performer is named as for a send. A store whose sources declare
+    /// nothing has an owner predating the intent, which would never perform
+    /// it, so the creation is refused there rather than left to wait.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<PimdirCreated> {
+        if name.trim().is_empty() || name.chars().any(char::is_control) {
+            bail!("A mailbox name cannot be empty nor hold control characters");
+        }
+
+        // NOTE: a name the server already holds is its to refuse: the row
+        // parks, and `pimdir queue show` says why.
+        let parent = parent.map(|parent| self.hub_id(parent)).transpose()?;
+        let anchor = match &parent {
+            Some(parent) => parent.clone(),
+            None => {
+                let mut ids: Vec<String> =
+                    self.mail_collections()?.into_iter().map(|c| c.id).collect();
+                ids.sort();
+                ids.into_iter()
+                    .next()
+                    .ok_or_else(|| anyhow!("The account holds no mailbox yet: run a sync first"))?
+            }
+        };
+
+        let mut producer = self.producer()?;
+        let Some(source) = self.performer(&producer, &anchor, COLLECTION_CREATE_CAPABILITY)? else {
+            bail!(
+                "The sources of this store declare no capabilities, so its sync engine \
+                 cannot create a mailbox"
+            );
+        };
+
+        let payload = CollectionCreatePayload {
+            v: 1,
+            source: &source,
+            name,
+            parent: parent.as_deref(),
+        };
+        let action = PimdirAction::Unknown {
+            kind: COLLECTION_CREATE.to_owned(),
+            payload: serde_json::to_string(&payload)?,
+            object_hash: None,
+        };
+
+        let queue_id = self
+            .enqueue(&mut producer, &anchor, &action, None)
+            .map_err(|err| anyhow!("Queue the creation of `{name}`: {err}"))?;
+        Ok(PimdirCreated { queue_id, source })
+    }
+
     /// Deletes each id from `mailbox`, staged as `Remove` (the next sync pushes
     /// it as the backend's own disposal).
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<()> {
@@ -643,6 +709,25 @@ pub struct PimdirSubmitted {
     pub staged: PimdirStaged,
     /// Whether the intent carries the copy, filed by the owner once sent.
     pub carried: bool,
+}
+
+/// A mailbox creation queued for the owner.
+#[derive(Clone, Debug)]
+pub struct PimdirCreated {
+    /// The `collection-create` row.
+    pub queue_id: i64,
+    /// The source that creates the mailbox on its server.
+    pub source: String,
+}
+
+/// The payload of a `collection-create` intent, version 1.
+#[derive(Serialize)]
+struct CollectionCreatePayload<'a> {
+    v: u8,
+    source: &'a str,
+    name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent: Option<&'a str>,
 }
 
 /// One row still in the queue, pending or parked.
@@ -1030,26 +1115,10 @@ mod tests {
     #[test]
     fn a_send_asking_for_a_copy_carries_it_in_the_intent() {
         let (dir, mut client) = sent_store();
-        let mut store = io_pimdir::client::PimdirStore::open(dir.path())
-            .unwrap()
-            .for_source("imap");
-        store
-            .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
-                collection: io_pimdir::collection::PimdirCollectionId("imap/Sent".into()),
-                checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
-            }])
-            .unwrap();
-        let declaration: Vec<_> = [capability::MAIL_SUBMIT, capability::MAIL_SUBMIT_COPY]
-            .into_iter()
-            .map(|name| io_pimdir::capability::PimdirCapability {
-                collection: None,
-                name: name.to_string(),
-                support: io_pimdir::capability::PimdirSupport::Full,
-                detail: None,
-            })
-            .collect();
-        store.declare("imap", &declaration).unwrap();
-        drop(store);
+        declare(
+            dir.path(),
+            &[capability::MAIL_SUBMIT, capability::MAIL_SUBMIT_COPY],
+        );
 
         let carried = client
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
@@ -1140,5 +1209,89 @@ mod tests {
 
         assert!(client.cancel_queued(staged.queue_id).unwrap());
         assert!(client.queue_row(staged.queue_id).unwrap().is_none());
+    }
+
+    /// Declares `names` for the `imap` source syncing `imap/Sent`.
+    fn declare(dir: &std::path::Path, names: &[&str]) {
+        let mut store = io_pimdir::client::PimdirStore::open(dir)
+            .unwrap()
+            .for_source("imap");
+        store
+            .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
+                collection: io_pimdir::collection::PimdirCollectionId("imap/Sent".into()),
+                checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
+            }])
+            .unwrap();
+        let declaration: Vec<_> = names
+            .iter()
+            .map(|name| io_pimdir::capability::PimdirCapability {
+                collection: None,
+                name: name.to_string(),
+                support: io_pimdir::capability::PimdirSupport::Full,
+                detail: None,
+            })
+            .collect();
+        store.declare("imap", &declaration).unwrap();
+    }
+
+    #[test]
+    fn a_mailbox_creation_is_one_intent_naming_its_performer() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[COLLECTION_CREATE_CAPABILITY]);
+
+        let created = client.create_mailbox("Projets", Some("imap/Sent")).unwrap();
+
+        assert_eq!(created.source, "imap");
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, created.queue_id);
+        let PimdirAction::Unknown { kind, payload, .. } = &pending[0].action else {
+            panic!("expected an intent, got {:?}", pending[0].action);
+        };
+        assert_eq!(kind, COLLECTION_CREATE);
+        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "v": 1,
+                "source": "imap",
+                "name": "Projets",
+                "parent": "imap/Sent",
+            })
+        );
+    }
+
+    #[test]
+    fn a_mailbox_creation_at_the_top_has_no_parent() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[COLLECTION_CREATE_CAPABILITY]);
+
+        client.create_mailbox("Projets", None).unwrap();
+
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
+            panic!("expected an intent, got {:?}", pending[0].action);
+        };
+        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert!(payload.get("parent").is_none());
+    }
+
+    #[test]
+    fn a_mailbox_creation_no_source_performs_stages_nothing() {
+        let (dir, mut client) = sent_store();
+
+        // NOTE: an undeclared owner predates the intent.
+        assert!(client.create_mailbox("Projets", None).is_err());
+
+        declare(dir.path(), &[capability::MAIL_SUBMIT]);
+        assert!(client.create_mailbox("Projets", None).is_err());
+        assert!(client.create_mailbox("", None).is_err());
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
     }
 }

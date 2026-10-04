@@ -394,6 +394,10 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-pimdir-message-send",
             crate::pimdir::message::send::PimdirMessageSent
         );
+        insert!(
+            "himalaya-pimdir-mailbox-create",
+            crate::pimdir::mailbox::create::PimdirMailboxCreated
+        );
     }
 
     schemas

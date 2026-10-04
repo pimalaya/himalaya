@@ -20,6 +20,7 @@
 pub mod backend;
 pub mod cli;
 pub mod client;
+pub mod mailbox;
 pub mod message;
 pub mod performer;
 pub mod queue;
