@@ -17,10 +17,10 @@ use crate::pimdir::client::PimdirClient;
 /// `pimdir message send` or `pimdir mailbox create` printed.
 ///
 /// A row is `pending` until the sync engine applies it, `parked` when the
-/// engine gave up on it (with why), and `applied` once done, with the id
-/// of the message an add created. The store keeps what became of an
-/// applied row for seven days; past that, and for a cancelled row, the
-/// state is `unknown`.
+/// engine gave up on it (with why), and `applied` once done, a message
+/// sent or a mailbox created included, with the id of the message an add
+/// created. The store keeps what became of an applied row for seven days;
+/// past that, and for a cancelled row, the state is `unknown`.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueShowCommand {
     /// The queue row id.
@@ -44,7 +44,8 @@ pub enum PimdirQueueState {
     Pending,
     /// Given up on by the sync engine; `error` says why.
     Parked,
-    /// Applied by the sync engine; `seq` is the message an add created.
+    /// Applied or performed by the sync engine (a message sent, a mailbox
+    /// created); `seq` is the message an add created.
     Applied,
     /// Neither queued nor known applied: cancelled, or applied long ago.
     Unknown,

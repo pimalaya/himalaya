@@ -1154,6 +1154,33 @@ mod tests {
     }
 
     #[test]
+    fn a_sent_message_reads_applied_once_its_sender_acknowledges_it() {
+        let (dir, mut client) = sent_store();
+        let sent = client
+            .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)
+            .unwrap();
+
+        // NOTE: what the sync engine does once the message has left (pimdir
+        // STORAGE §15.5): the intent goes, its receipt stays.
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        assert!(
+            owner
+                .acknowledge_action(sent.staged.queue_id, None)
+                .unwrap()
+        );
+        drop(owner);
+
+        let PimdirActionStatus::Applied {
+            collection, seq, ..
+        } = client.queue_row(sent.staged.queue_id).unwrap()
+        else {
+            panic!("expected a sent row to read applied");
+        };
+        assert_eq!(collection, "imap/Sent");
+        assert_eq!(seq, None);
+    }
+
+    #[test]
     fn an_applied_add_names_the_seq_it_created() {
         let (dir, mut client) = sent_store();
         let staged = client
