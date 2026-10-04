@@ -49,6 +49,7 @@ use crate::{
         search::{eval, query::SearchEmailsQuery},
         submission::SubmissionEnvelope,
     },
+    error::{CodedError, ErrorCode},
     pimdir::client::PimdirClient,
 };
 
@@ -206,10 +207,14 @@ impl PimdirClient {
             bail!("Message `{id}` not found in `{mailbox}`");
         };
         let Some(hash) = item.object else {
-            bail!(
-                "Message `{id}` in `{mailbox}` is not downloaded yet (body not fetched); \
-                 run a sync to hydrate it"
-            );
+            return Err(CodedError::new(
+                ErrorCode::BodyPending,
+                format!(
+                    "Message `{id}` in `{mailbox}` is not downloaded yet (body not fetched); \
+                     run a sync to hydrate it"
+                ),
+            )
+            .into());
         };
         let bytes = self
             .blobs
