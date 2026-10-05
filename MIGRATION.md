@@ -94,9 +94,10 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 
 #### Global and per-account options
 
-- Removed `display-name`, `signature`, `signature-delim`: composition left the CLI.
-- Only `downloads-dir` remains for the `attachments download` command.
-- The `message`, `template` and `pgp` top-level entries are removed. Composition and rendering happen outside himalaya now (see the README for the recommended shell-pipeline shapes).
+- `display-name`, `signature`, `signature-delim` and `downloads-dir` keep their v1 meaning, except that `signature` is the signature text only: a v1 file path is no longer read, pass `--signature-file` instead.
+- The `template` and `pgp` top-level entries are removed. Rendering and PGP happen outside himalaya now (see the README for the recommended shell-pipeline shapes).
+- The `message` table only reads `message.send.save-copy`, `message.reply.posting-style` and `message.forward.posting-style`; the rest of a v1 `[message]` table is ignored rather than rejected.
+- Rename `template.reply.posting-style` → `message.reply.posting-style` and `template.forward.posting-style` → `message.forward.posting-style`, taking `top`, `bottom` or `none`. v1's `interleaved` is gone: use `none` and write the reply inside the quoted block yourself. v1's forward `attached` has no v2 equivalent.
 
 #### Table customization
 

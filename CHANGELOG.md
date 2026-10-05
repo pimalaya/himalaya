@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `message.reply.posting-style` and `message.forward.posting-style`, global or per account, the posting style used when `--posting-style` is not passed ([#772]).
 - Added the role of a pimdir mailbox (pimdir draft-04, io-pimdir `ef8eae0`): `mailbox list` shows the role the sync engine recorded from the server (`collections.role`), and a role name (`inbox`, `sent`, `drafts`, `trash`, …) addresses its mailbox in every command, as on IMAP and JMAP.
 - Fixed `pimdir mailbox create` refusing a store whose collections the sync engine only declared (`neverest sync --declare-only`): the account's candidates count as a declaration, not only the sources syncing the anchor.
 - Added a stable `code` to the `--json` error output for failures a caller is expected to act on, found anywhere in the error chain. The first is `body-pending`: a pimdir message listed but whose body is not downloaded yet.
@@ -1408,6 +1409,7 @@ Few major concepts changed:
 [#762]: https://github.com/pimalaya/himalaya/issues/762
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 [#769]: https://github.com/pimalaya/himalaya/issues/769
+[#772]: https://github.com/pimalaya/himalaya/issues/772
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

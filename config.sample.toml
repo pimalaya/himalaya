@@ -41,6 +41,11 @@
 # themselves.
 #message.send.save-copy = "sent"
 
+# Posting style of `message reply` and `message forward` when `--posting-style`
+# is not passed: `top`, `bottom` or `none`, defaulting to `top`.
+#message.reply.posting-style = "bottom"
+#message.forward.posting-style = "top"
+
 # One character per table component, a space skipping it.
 # https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
 #table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
@@ -168,6 +173,8 @@ default = true
 # Per-account overrides for the global options above.
 #downloads-dir = "~/downloads/example"
 #message.send.save-copy = "sent"
+#message.reply.posting-style = "bottom"
+#message.forward.posting-style = "top"
 #table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
 #table.arrangement = "dynamic"
 #envelope.list.datetime-fmt = "%F %R%:z"

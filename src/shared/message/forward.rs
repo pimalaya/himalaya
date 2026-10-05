@@ -11,11 +11,12 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
+    config::PostingStyle,
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::{
-            builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
+            builder::{self, BuilderArgs, SourceArgs, SourceMode},
             handler,
         },
     },
@@ -82,14 +83,10 @@ pub struct MessageForwardCommand {
     /// Where the quoted source body sits relative to the written one.
     ///
     /// Interleaved posting is left to the writer: put the message inside
-    /// the quoted block.
-    #[arg(
-        long = "posting-style",
-        short = 'P',
-        value_name = "STYLE",
-        default_value = "top"
-    )]
-    pub posting_style: PostingStyle,
+    /// the quoted block. Defaults to `message.forward.posting-style`, then
+    /// to `top`.
+    #[arg(long = "posting-style", short = 'P', value_name = "STYLE")]
+    pub posting_style: Option<PostingStyle>,
     /// Plain-text headline placed before the quoted source body.
     ///
     /// Nothing is substituted in it, so pass the literal string wanted.
@@ -146,7 +143,7 @@ impl MessageForwardCommand {
             Some(SourceArgs {
                 raw: &source,
                 mode: SourceMode::Forward,
-                posting_style: self.posting_style,
+                posting_style: account.resolve_forward_posting_style(self.posting_style),
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
             }),
         )?;

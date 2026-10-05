@@ -9,6 +9,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Error, Result, anyhow, bail};
+use clap::ValueEnum;
 use crossterm::style::Color;
 use io_sasl::{
     login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
@@ -456,6 +457,35 @@ pub struct MessageConfig {
     /// Sending options.
     #[serde(default)]
     pub send: MessageSendConfig,
+    /// `message reply` options.
+    #[serde(default)]
+    pub reply: MessageQuoteConfig,
+    /// `message forward` options.
+    #[serde(default)]
+    pub forward: MessageQuoteConfig,
+}
+
+/// Quoting options under `message.reply.*` and `message.forward.*`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct MessageQuoteConfig {
+    /// Posting style when `--posting-style` is not passed.
+    pub posting_style: Option<PostingStyle>,
+}
+
+/// Where a quoted source body sits relative to the written one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+#[clap(rename_all = "kebab-case")]
+pub enum PostingStyle {
+    /// The written body above the quoted source body.
+    #[default]
+    Top,
+    /// The quoted source body above the written body.
+    Bottom,
+    /// The written body alone, the source left unquoted, for a writer
+    /// who already laid the quote out.
+    None,
 }
 
 /// Sending options under `message.send.*`.

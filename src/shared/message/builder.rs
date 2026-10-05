@@ -13,25 +13,13 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
-use clap::ValueEnum;
 use mail_builder::{
     MessageBuilder,
     headers::{address::Address, raw::Raw},
 };
 use mail_parser::{HeaderValue, MessageParser, parsers::MessageStream};
 
-/// Where a quoted source body sits relative to the written one.
-#[derive(Clone, Copy, Debug, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum PostingStyle {
-    /// The written body above the quoted source body.
-    Top,
-    /// The quoted source body above the written body.
-    Bottom,
-    /// The written body alone, the source left unquoted, for a writer
-    /// who already laid the quote out.
-    None,
-}
+use crate::config::PostingStyle;
 
 /// Everything the MIME assembler needs, which each command fills in from
 /// its own clap struct.

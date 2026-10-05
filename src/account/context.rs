@@ -23,7 +23,7 @@ use crate::email::mailbox::Mailbox;
 use crate::{
     config::{
         AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
-        MailboxListTableConfig, SaveCopyConfig, TableArrangementConfig,
+        MailboxListTableConfig, PostingStyle, SaveCopyConfig, TableArrangementConfig,
     },
     email::mailbox::MailboxRole,
     shared::table::DEFAULT_PRESET,
@@ -80,6 +80,12 @@ pub struct Account {
     pub mailbox_alias: HashMap<String, String>,
     /// Mailbox a sent message is copied to when `--save` is not passed.
     pub save_copy: Option<SaveCopyConfig>,
+    /// Posting style of `message reply` when `--posting-style` is not
+    /// passed.
+    pub reply_posting_style: Option<PostingStyle>,
+    /// Posting style of `message forward` when `--posting-style` is not
+    /// passed.
+    pub forward_posting_style: Option<PostingStyle>,
 }
 
 impl Account {
@@ -120,6 +126,8 @@ impl Account {
 
             mailbox_alias,
             save_copy: other.save_copy.or(self.save_copy),
+            reply_posting_style: other.reply_posting_style.or(self.reply_posting_style),
+            forward_posting_style: other.forward_posting_style.or(self.forward_posting_style),
         }
     }
 
@@ -173,6 +181,18 @@ impl Account {
             SaveCopyConfig::Enabled(false) => None,
             SaveCopyConfig::Mailbox(mailbox) => Some(mailbox),
         }
+    }
+
+    /// Resolves the posting style of `message reply`, `--posting-style`
+    /// winning and `top` answering when nothing is configured.
+    pub fn resolve_reply_posting_style(&self, over: Option<PostingStyle>) -> PostingStyle {
+        over.or(self.reply_posting_style).unwrap_or_default()
+    }
+
+    /// Resolves the posting style of `message forward`, `--posting-style`
+    /// winning and `top` answering when nothing is configured.
+    pub fn resolve_forward_posting_style(&self, over: Option<PostingStyle>) -> PostingStyle {
+        over.or(self.forward_posting_style).unwrap_or_default()
     }
 
     /// Separator written before the signature, verbatim, defaulting to
@@ -504,6 +524,8 @@ impl From<Config> for Account {
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,
+            reply_posting_style: config.message.reply.posting_style,
+            forward_posting_style: config.message.forward.posting_style,
         }
     }
 }
@@ -531,6 +553,8 @@ impl From<AccountConfig> for Account {
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,
+            reply_posting_style: config.message.reply.posting_style,
+            forward_posting_style: config.message.forward.posting_style,
         }
     }
 }
@@ -704,6 +728,38 @@ mod tests {
         let account = global.merge(Account::from(per_account));
 
         assert_eq!(account.resolve_save(None, false, true), None);
+    }
+
+    #[test]
+    fn resolve_posting_style_lets_the_flag_win_over_the_config() {
+        let global: Config = toml::from_str(
+            r#"
+            message.reply.posting-style = "bottom"
+            message.forward.posting-style = "none"
+            accounts = {}
+            "#,
+        )
+        .unwrap();
+        let per_account: AccountConfig =
+            toml::from_str(r#"message.reply.posting-style = "none""#).unwrap();
+        let account = Account::from(global).merge(Account::from(per_account));
+
+        assert_eq!(
+            account.resolve_reply_posting_style(None),
+            PostingStyle::None
+        );
+        assert_eq!(
+            account.resolve_forward_posting_style(None),
+            PostingStyle::None
+        );
+        assert_eq!(
+            account.resolve_reply_posting_style(Some(PostingStyle::Top)),
+            PostingStyle::Top,
+        );
+        assert_eq!(
+            Account::default().resolve_reply_posting_style(None),
+            PostingStyle::Top,
+        );
     }
 
     #[test]
