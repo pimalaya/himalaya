@@ -144,11 +144,15 @@ impl PimdirClient {
         collection: &str,
         capability: &str,
     ) -> Result<Option<String>> {
+        // NOTE: a collection the sync engine only declared (`neverest sync
+        // --declare-only`) has no source syncing it yet, so the account's
+        // candidates count too.
         let declared = producer
             .capabilities(collection)
             .map_err(|err| anyhow!("Read the capabilities of `{collection}`: {err}"))?
             .iter()
-            .any(|source| source.declared.is_some());
+            .any(|source| source.declared.is_some())
+            || !self.performers(capability)?.0.is_empty();
         if !declared {
             return Ok(None);
         }
