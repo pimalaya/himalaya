@@ -1364,7 +1364,7 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.6.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=8c83c0486fafc67a9598052cfee6df8017e84e8f#8c83c0486fafc67a9598052cfee6df8017e84e8f"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=ef8eae06a2088d9cf805cbfbc62287abd4d6f1ea#ef8eae06a2088d9cf805cbfbc62287abd4d6f1ea"
 dependencies = [
  "blake3",
  "fs4",

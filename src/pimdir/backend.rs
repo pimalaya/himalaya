@@ -45,7 +45,7 @@ use crate::{
         address::Address,
         envelope::Envelope,
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, MailboxRole},
         search::{eval, query::SearchEmailsQuery},
         submission::SubmissionEnvelope,
     },
@@ -123,7 +123,7 @@ impl PimdirClient {
             mailboxes.push(Mailbox {
                 id: collection.id,
                 name: collection.name,
-                role: None,
+                role: collection.role.as_deref().map(MailboxRole::parse),
                 total,
                 unread: None,
             });
@@ -787,6 +787,48 @@ mod tests {
     use io_pimdir::placement::{PimdirLevel, PimdirLinkId};
 
     use super::*;
+    use crate::config::PimdirConfig;
+
+    /// A mailbox carries the role its server stated, which the sync engine
+    /// recorded in the store (pimdir STORAGE §14), and none otherwise.
+    #[test]
+    fn a_mailbox_lists_the_role_its_store_records() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let store = io_pimdir::client::PimdirStore::open(dir.path())
+                .unwrap()
+                .for_account("work");
+            for id in ["imap/INBOX", "imap/Sent Items", "imap/Work"] {
+                store.ensure_collection(id, MAIL_KIND).unwrap();
+            }
+            store
+                .set_collection_role("imap/INBOX", Some("inbox"))
+                .unwrap();
+            store
+                .set_collection_role("imap/Sent Items", Some("sent"))
+                .unwrap();
+        }
+
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+        let roles: Vec<(String, Option<MailboxRole>)> = client
+            .list_mailboxes(false)
+            .unwrap()
+            .into_iter()
+            .map(|mailbox| (mailbox.id, mailbox.role))
+            .collect();
+        assert_eq!(
+            roles,
+            [
+                ("imap/INBOX".into(), Some(MailboxRole::Inbox)),
+                ("imap/Sent Items".into(), Some(MailboxRole::Sent)),
+                ("imap/Work".into(), None),
+            ]
+        );
+    }
 
     /// A stored item at the `Meta` tier: a mail summary and no body.
     fn item(seq: i64, link_id: &str, flags: PimdirFlags, mail: PimdirMailSummary) -> PimdirItem {

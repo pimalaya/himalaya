@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the role of a pimdir mailbox (pimdir draft-04, io-pimdir `ef8eae0`): `mailbox list` shows the role the sync engine recorded from the server (`collections.role`), and a role name (`inbox`, `sent`, `drafts`, `trash`, …) addresses its mailbox in every command, as on IMAP and JMAP.
 - Added a stable `code` to the `--json` error output for failures a caller is expected to act on, found anywhere in the error chain. The first is `body-pending`: a pimdir message listed but whose body is not downloaded yet.
 - Added the `wizard` cargo feature, on by default, gating the interactive configuration: the `configure` command and the offer a first run makes. A build without it drops the prompts and the dependencies only they use, and a missing configuration points at the documented sample instead.
 - Added `pimdir message add` and `pimdir message send`, staging as the shared commands do and printing the queue row with the `Message-ID`, and `pimdir queue show <ROW>`, saying whether a row is pending, parked (with why), applied (with the id of the message an add created; a message sent or a mailbox created once the sync engine acknowledges it) or unknown.
