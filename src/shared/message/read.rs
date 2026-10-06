@@ -194,6 +194,23 @@ pub struct MessageHeaders {
     pub precedence: Option<String>,
     /// The `Auto-Submitted` header as found, decoded.
     pub auto_submitted: Option<String>,
+    /// The entries of each address header that are not readable as an
+    /// address, dropped from the lists above.
+    pub invalid: InvalidAddresses,
+}
+
+/// The entries of the address headers that are not readable as an
+/// address, as decoded text, in header order. A group name is not an
+/// entry, nor is an empty group.
+#[derive(Debug, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InvalidAddresses {
+    pub to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
+    pub reply_to: Vec<String>,
+    pub from: Vec<String>,
+    pub sender: Vec<String>,
 }
 
 impl MessageHeaders {
@@ -201,13 +218,28 @@ impl MessageHeaders {
         let headers = &message.root_part().headers;
         let text = |name| header::unstructured(message, headers, name);
 
+        let mut invalid = InvalidAddresses::default();
+        let (from, from_invalid) = addresses(message, "From");
+        let (to, to_invalid) = addresses(message, "To");
+        let (cc, cc_invalid) = addresses(message, "Cc");
+        let (bcc, bcc_invalid) = addresses(message, "Bcc");
+        let (reply_to, reply_to_invalid) = addresses(message, "Reply-To");
+        let (sender, sender_invalid) = addresses(message, "Sender");
+        invalid.from = from_invalid;
+        invalid.to = to_invalid;
+        invalid.cc = cc_invalid;
+        invalid.bcc = bcc_invalid;
+        invalid.reply_to = reply_to_invalid;
+        invalid.sender = sender_invalid;
+
         Self {
-            from: addresses(message, "From"),
-            to: addresses(message, "To"),
-            cc: addresses(message, "Cc"),
-            bcc: addresses(message, "Bcc"),
-            reply_to: addresses(message, "Reply-To"),
-            sender: addresses(message, "Sender"),
+            from,
+            to,
+            cc,
+            bcc,
+            reply_to,
+            sender,
+            invalid,
             subject: text("Subject"),
             date: message.date().and_then(rfc3339),
             message_id: message.message_id().and_then(id),
@@ -254,16 +286,29 @@ pub struct MessagePartView {
 
 /// An address header as a list, read from its raw bytes: groups
 /// flattened, names unquoted and RFC 2047 decoded, entries without a
-/// valid email dropped.
-fn addresses(message: &Message, name: &str) -> Vec<MailAddress> {
+/// valid email dropped and returned beside the list as decoded text.
+fn addresses(message: &Message, name: &str) -> (Vec<MailAddress>, Vec<String>) {
+    let mut valid = Vec::new();
+    let mut invalid = Vec::new();
+
     let Some(value) = header::raw_text(message, &message.root_part().headers, name) else {
-        return Vec::new();
+        return (valid, invalid);
     };
 
-    split_addresses(&value)
-        .iter()
-        .filter_map(|item| mailbox(item))
-        .collect()
+    for item in split_addresses(&value) {
+        // NOTE: what is left of an empty group, or of a list ending in a
+        // separator, holds nothing and is no entry.
+        if strip_comments(&item).trim().is_empty() {
+            continue;
+        }
+
+        match mailbox(&item) {
+            Some(address) => valid.push(address),
+            None => invalid.push(header::decode_words(item.trim()).trim().to_owned()),
+        }
+    }
+
+    (valid, invalid)
 }
 
 /// Splits an address list on the commas and semicolons outside quotes,
@@ -784,6 +829,7 @@ mod tests {
                 "date",
                 "from",
                 "inReplyTo",
+                "invalid",
                 "listId",
                 "listUnsubscribe",
                 "messageId",
@@ -1274,5 +1320,75 @@ mod tests {
             assert_eq!(json["parts"][0]["mime"], "text/plain", "{ctype}");
             assert_eq!(json["text"], "D\u{e9}j\u{e0}", "{ctype}");
         }
+    }
+
+    #[test]
+    fn unreadable_entries_are_listed_apart() {
+        let raw = b"From: alice@example.com\r\n\
+            To: Team: Bob <bob@example.com>, carol@example.com;, nobody\r\n\
+            Cc: a@localhost, \"john doe\"@example.com, =?UTF-8?Q?Caf=C3=A9?=\r\n\
+            Bcc: Undisclosed-recipients:;\r\n\
+            Reply-To: Empty:;, (a comment), dave@example.org,\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["to"],
+            serde_json::json!([
+                { "name": "Bob", "email": "bob@example.com" },
+                { "name": null, "email": "carol@example.com" },
+            ])
+        );
+        assert_eq!(
+            json["headers"]["invalid"],
+            serde_json::json!({
+                "to": ["nobody"],
+                "cc": ["a@localhost", "\"john doe\"@example.com", "Caf\u{e9}"],
+                "bcc": [],
+                "replyTo": [],
+                "from": [],
+                "sender": [],
+            })
+        );
+        assert_eq!(json["headers"]["cc"], serde_json::json!([]));
+        assert_eq!(json["headers"]["bcc"], serde_json::json!([]));
+        assert_eq!(
+            json["headers"]["replyTo"],
+            serde_json::json!([{ "name": null, "email": "dave@example.org" }])
+        );
+    }
+
+    #[test]
+    fn valid_headers_list_no_invalid_entry() {
+        let raw = b"From: Alice <alice@example.com>\r\n\
+            To: bob@example.com, \"Dupont, Anne\" <anne@example.com>\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        for field in ["to", "cc", "bcc", "replyTo", "from", "sender"] {
+            assert_eq!(
+                json["headers"]["invalid"][field],
+                serde_json::json!([]),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_entries_are_in_header_order() {
+        let raw = b"To: x, alice@example.com, y <y@nowhere>, Zed\r\n\r\nbody\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["invalid"]["to"],
+            serde_json::json!(["x", "y <y@nowhere>", "Zed"])
+        );
     }
 }
