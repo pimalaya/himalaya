@@ -256,12 +256,14 @@ imap.sasl.plain.password.raw = "***"
 
 # SASL-IR, unset following the advertised capability. `false` waits for the
 # server's continuation request rather than inline the credentials, which
-# Coremail (126.com, 163.com) needs: it advertises SASL-IR falsely.
+# Coremail (126.com, 163.com) needs: it advertises SASL-IR falsely. 163.com
+# also refuses `AUTHENTICATE PLAIN`, take `imap.sasl.login` there.
 # https://www.rfc-editor.org/rfc/rfc4959.html
 #imap.sasl-ir = false
 
 # Exchange an `ID` straight after authentication, which mail.qq.com, fastmail,
-# 126.com and 163.com want.
+# 126.com and 163.com want. 163.com answers `ID NIL` with OK and then refuses
+# the next command with `Unsafe Login`, so give it some `imap.id.fields`.
 # https://www.rfc-editor.org/rfc/rfc2971.html
 #imap.id.auto = false
 
