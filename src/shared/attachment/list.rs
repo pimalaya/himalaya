@@ -127,7 +127,7 @@ impl Attachment {
         let part = leaf.part;
         Self {
             id: leaf.id,
-            filename: part::filename(part),
+            filename: part::filename(message, part),
             mime: mime_string(part),
             size: part::bytes(message, part).len() as u64,
             inline: part

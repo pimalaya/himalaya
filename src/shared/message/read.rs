@@ -13,10 +13,7 @@ use anyhow::Result;
 use chrono::{FixedOffset, NaiveDate, TimeZone};
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use mail_parser::{
-    Addr, Address, ContentType, HeaderValue, Message, MessagePart, MimeHeaders,
-    parsers::MessageStream,
-};
+use mail_parser::{Addr, Address, ContentType, HeaderValue, Message, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::{Message as PrinterMessage, Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -26,7 +23,10 @@ use crate::{
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
-        message::part::{self, PartRole},
+        message::{
+            header,
+            part::{self, PartRole},
+        },
     },
 };
 
@@ -122,21 +122,21 @@ impl MessageReadOutput {
         let mut parts = Vec::new();
 
         for leaf in part::leaves(&message) {
-            let role = part::role(leaf.part);
+            let role = part::role(&message, leaf.part);
             let mime = part::mime(leaf.part);
 
             if role == PartRole::Body {
                 if mime == "text/plain" {
-                    texts.push(part::text(leaf.part));
+                    texts.push(part::text(&message, leaf.part));
                 } else if mime == "text/html" && html.is_none() {
-                    html = Some(part::text(leaf.part));
+                    html = Some(part::text(&message, leaf.part));
                 }
             }
 
             parts.push(MessagePartView {
                 id: leaf.id,
                 role,
-                filename: part::filename(leaf.part),
+                filename: part::filename(&message, leaf.part),
                 size: part::bytes(&message, leaf.part).len() as u64,
                 content_id: part::content_id(leaf.part),
                 charset: part::charset(leaf.part),
@@ -194,26 +194,25 @@ pub struct MessageHeaders {
 
 impl MessageHeaders {
     fn new(message: &Message) -> Self {
+        let headers = &message.root_part().headers;
+        let text = |name| header::unstructured(message, headers, name);
+
         Self {
-            from: addresses(message.from()),
-            to: addresses(message.to()),
-            cc: addresses(message.cc()),
-            bcc: addresses(message.bcc()),
-            reply_to: addresses(message.reply_to()),
-            sender: addresses(message.sender()),
-            subject: message
-                .subject()
-                .map(str::trim)
-                .filter(|subject| !subject.is_empty())
-                .map(str::to_owned),
+            from: addresses(message, "From"),
+            to: addresses(message, "To"),
+            cc: addresses(message, "Cc"),
+            bcc: addresses(message, "Bcc"),
+            reply_to: addresses(message, "Reply-To"),
+            sender: addresses(message, "Sender"),
+            subject: text("Subject"),
             date: message.date().and_then(rfc3339),
             message_id: message.message_id().and_then(id),
             in_reply_to: ids(message.in_reply_to()).into_iter().next(),
             references: ids(message.references()),
-            list_id: unstructured(message, "List-ID"),
-            list_unsubscribe: unstructured(message, "List-Unsubscribe"),
-            precedence: unstructured(message, "Precedence"),
-            auto_submitted: unstructured(message, "Auto-Submitted"),
+            list_id: text("List-ID"),
+            list_unsubscribe: text("List-Unsubscribe"),
+            precedence: text("Precedence"),
+            auto_submitted: text("Auto-Submitted"),
         }
     }
 }
@@ -249,32 +248,162 @@ pub struct MessagePartView {
     pub method: Option<String>,
 }
 
-/// An address header as a list, groups flattened and entries without a
+/// An address header as a list, read from its raw bytes: groups
+/// flattened, names unquoted and RFC 2047 decoded, entries without a
 /// valid email dropped.
-fn addresses(address: Option<&Address>) -> Vec<MailAddress> {
-    let Some(address) = address else {
+fn addresses(message: &Message, name: &str) -> Vec<MailAddress> {
+    let Some(value) = header::raw_text(message, &message.root_part().headers, name) else {
         return Vec::new();
     };
 
-    address
+    split_addresses(&value)
         .iter()
-        .filter_map(|addr| {
-            let email = addr.address.as_deref()?.trim();
-            if !is_email(email) {
-                return None;
-            }
-            let name = addr
-                .name
-                .as_deref()
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-                .map(str::to_owned);
-            Some(MailAddress {
-                name,
-                email: email.to_owned(),
-            })
-        })
+        .filter_map(|item| mailbox(item))
         .collect()
+}
+
+/// Splits an address list on the commas and semicolons outside quotes,
+/// comments and angle brackets, dropping group names.
+fn split_addresses(value: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut current = String::new();
+    let (mut quoted, mut escaped, mut comment, mut angle) = (false, false, 0usize, false);
+
+    for c in value.chars() {
+        if escaped {
+            current.push(c);
+            escaped = false;
+            continue;
+        }
+        if c == '\\' && (quoted || comment > 0) {
+            current.push(c);
+            escaped = true;
+            continue;
+        }
+        if quoted {
+            quoted = c != '"';
+            current.push(c);
+            continue;
+        }
+        if comment > 0 {
+            match c {
+                '(' => comment += 1,
+                ')' => comment -= 1,
+                _ => (),
+            }
+            current.push(c);
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '(' => comment = 1,
+            '<' => angle = true,
+            '>' => angle = false,
+            ',' | ';' if !angle => {
+                items.push(std::mem::take(&mut current));
+                continue;
+            }
+            ':' if !angle => {
+                // NOTE: what precedes is a group name.
+                current.clear();
+                continue;
+            }
+            _ => (),
+        }
+        current.push(c);
+    }
+
+    items.push(current);
+    items
+}
+
+/// One address of a list: `email`, `<email>` or `name <email>`.
+fn mailbox(item: &str) -> Option<MailAddress> {
+    let item = strip_comments(item);
+    let item = item.trim();
+
+    let (name, email) = match (item.find('<'), item.rfind('>')) {
+        (Some(open), Some(close)) if open < close => (&item[..open], &item[open + 1..close]),
+        _ => ("", item),
+    };
+
+    let email = email.trim();
+    if !is_email(email) {
+        return None;
+    }
+
+    let name = header::decode_words(&unquote(name));
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    Some(MailAddress {
+        name: (!name.is_empty()).then_some(name),
+        email: email.to_owned(),
+    })
+}
+
+/// A value without its comments, quoted strings left alone.
+fn strip_comments(value: &str) -> String {
+    let mut out = String::new();
+    let (mut quoted, mut escaped, mut comment) = (false, false, 0usize);
+
+    for c in value.chars() {
+        if comment > 0 {
+            match (escaped, c) {
+                (true, _) => escaped = false,
+                (false, '\\') => escaped = true,
+                (false, '(') => comment += 1,
+                (false, ')') => {
+                    comment -= 1;
+                    if comment == 0 {
+                        out.push(' ');
+                    }
+                }
+                _ => (),
+            }
+            continue;
+        }
+        if quoted {
+            match (escaped, c) {
+                (true, _) => escaped = false,
+                (false, '\\') => escaped = true,
+                (false, '"') => quoted = false,
+                _ => (),
+            }
+            out.push(c);
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '(' => {
+                comment = 1;
+                continue;
+            }
+            _ => (),
+        }
+        out.push(c);
+    }
+
+    out
+}
+
+/// A display name without its quotes and backslash escapes.
+fn unquote(value: &str) -> String {
+    let mut out = String::new();
+    let (mut quoted, mut escaped) = (false, false);
+
+    for c in value.chars() {
+        match (quoted, escaped, c) {
+            (true, true, _) => {
+                out.push(c);
+                escaped = false;
+            }
+            (true, false, '\\') => escaped = true,
+            (_, _, '"') => quoted = !quoted,
+            _ => out.push(c),
+        }
+    }
+
+    out
 }
 
 /// Whether an address is a dot-atom `local@domain` (RFC 5322 §3.4.1,
@@ -342,30 +471,6 @@ fn ids(value: &HeaderValue) -> Vec<String> {
         HeaderValue::Text(text) => id(text).into_iter().collect(),
         HeaderValue::TextList(list) => list.iter().filter_map(|text| id(text)).collect(),
         _ => Vec::new(),
-    }
-}
-
-/// A top-level header read as unstructured text, RFC 2047 decoded and
-/// unfolded, whatever mail-parser parses it as.
-fn unstructured(message: &Message, name: &str) -> Option<String> {
-    let header = message
-        .root_part()
-        .headers
-        .iter()
-        .find(|header| header.name.as_str().eq_ignore_ascii_case(name))?;
-    let value = message
-        .raw_message
-        .get(header.offset_start as usize..header.offset_end as usize)?;
-    let mut value = value.to_vec();
-    if value.last() != Some(&b'\n') {
-        value.push(b'\n');
-    }
-    match MessageStream::new(&value).parse_unstructured() {
-        HeaderValue::Text(text) => {
-            let text = text.trim();
-            (!text.is_empty()).then(|| text.to_owned())
-        }
-        _ => None,
     }
 }
 
@@ -1062,5 +1167,108 @@ mod tests {
         assert_eq!(json["parts"][0]["method"], serde_json::Value::Null);
         assert_eq!(json["html"], "<img src=\"cid:logo@example.com\">");
         assert_eq!(json["text"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn utf8_bytes_labelled_us_ascii_read_as_utf8() {
+        let raw = b"From: a@exemple.test\r\nSubject: ASCII\r\nContent-Type: text/plain; charset=us-ascii\r\n\r\nD\xc3\xa9clar\xc3\xa9 ASCII mais en UTF-8";
+
+        let json = view(raw);
+
+        assert_eq!(json["text"], "D\u{e9}clar\u{e9} ASCII mais en UTF-8");
+        assert_eq!(json["parts"][0]["charset"], "us-ascii");
+    }
+
+    #[test]
+    fn non_utf8_bytes_labelled_us_ascii_keep_their_decoding() {
+        let raw = b"Content-Type: text/html; charset=us-ascii\r\n\r\n<p>caf\xe9</p>";
+
+        let json = view(raw);
+
+        assert_eq!(json["html"], "<p>caf\u{e9}</p>");
+    }
+
+    #[test]
+    fn a_raw_8bit_subject_reads_as_windows_1252_or_utf8() {
+        let raw = b"From: a@exemple.test\r\nSubject: Caf\xe9 \x80\r\nContent-Type: text/plain; charset=windows-1252\r\n\r\nPrix : 12 \x80 \x96 \x9c fin";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["subject"], "Caf\u{e9} \u{20ac}");
+        assert_eq!(json["text"], "Prix : 12 \u{20ac} \u{2013} \u{153} fin");
+
+        let raw = "Subject: Caf\u{e9} \u{20ac}\r\n\r\nx".as_bytes();
+        assert_eq!(view(raw)["headers"]["subject"], "Caf\u{e9} \u{20ac}");
+    }
+
+    #[test]
+    fn raw_8bit_names_and_filenames_read_as_windows_1252() {
+        let raw = b"From: Andr\xe9 <andre@example.com>\r\n\
+            To: \"Z\xc3\xa9lie\" <zelie@example.com>\r\n\
+            Content-Type: multipart/mixed; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: application/pdf\r\n\
+            Content-Disposition: attachment; filename=\"r\xe9sum\xe9.pdf\"\r\n\
+            \r\n\
+            x\r\n\
+            --b--\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["from"][0]["name"], "Andr\u{e9}");
+        assert_eq!(json["headers"]["to"][0]["name"], "Z\u{e9}lie");
+        assert_eq!(json["parts"][0]["filename"], "r\u{e9}sum\u{e9}.pdf");
+    }
+
+    #[test]
+    fn a_character_split_across_encoded_words_is_rebuilt() {
+        let raw = b"From: a@exemple.test\r\nSubject: =?utf-8?B?Q2Fmw6kg?= =?utf-8?B?ww==?= =?utf-8?B?qXTDqQ==?= fin =?iso-8859-1?Q?=E9t=E9?=\r\n\r\nx";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["subject"],
+            "Caf\u{e9} \u{e9}t\u{e9} fin \u{e9}t\u{e9}"
+        );
+    }
+
+    #[test]
+    fn split_encoded_words_rebuild_names_and_filenames() {
+        let raw =
+            b"From: =?utf-8?B?w4lsb2Rp?= =?utf-8?B?ZSBD?= =?utf-8?B?w6k=?= <e@example.com>\r\n\
+            Content-Type: multipart/mixed; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: application/pdf; name=\"=?utf-8?B?w6k=?= =?utf-8?B?dMOp?=.pdf\"\r\n\
+            \r\n\
+            x\r\n\
+            --b--\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["from"][0]["name"], "\u{c9}lodie C\u{e9}");
+        assert_eq!(json["parts"][0]["filename"], "\u{e9}t\u{e9}.pdf");
+    }
+
+    #[test]
+    fn an_invalid_content_type_is_plain_us_ascii_text() {
+        let raw = b"From: a@exemple.test\nSubject: LF seulement\nContent-Type: text/\nDate: pas une date\n\nCorps en LF";
+
+        let json = view(raw);
+
+        assert_eq!(json["text"], "Corps en LF");
+        assert_eq!(json["headers"]["subject"], "LF seulement");
+        assert_eq!(json["headers"]["date"], serde_json::Value::Null);
+        assert_eq!(json["parts"][0]["role"], "body");
+        assert_eq!(json["parts"][0]["mime"], "text/plain");
+        assert_eq!(json["parts"][0]["charset"], "us-ascii");
+
+        for ctype in ["textplain", "/plain", "text/pl ain", "text/plain/x"] {
+            let raw = format!("Content-Type: {ctype}\r\n\r\nD\u{e9}j\u{e0}");
+            let json = view(raw.as_bytes());
+            assert_eq!(json["parts"][0]["mime"], "text/plain", "{ctype}");
+            assert_eq!(json["text"], "D\u{e9}j\u{e0}", "{ctype}");
+        }
     }
 }

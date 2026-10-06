@@ -18,7 +18,10 @@ use mail_parser::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::error::{CodedError, ErrorCode};
+use crate::{
+    error::{CodedError, ErrorCode},
+    shared::message::header,
+};
 
 /// The deepest a part may sit, the top-level part being at depth 1.
 pub const MAX_DEPTH: usize = 8;
@@ -173,7 +176,7 @@ pub enum PartRole {
 /// attachment` is an attachment; a `text/plain` or `text/html` part
 /// naming no file is a body; an `image/*` part marked inline or carrying
 /// a `Content-ID` is inline; anything else is an attachment.
-pub fn role(part: &MessagePart) -> PartRole {
+pub fn role(message: &Message, part: &MessagePart) -> PartRole {
     let mime = mime(part);
     let disposition = disposition(part);
 
@@ -182,7 +185,7 @@ pub fn role(part: &MessagePart) -> PartRole {
         return PartRole::Attachment;
     }
 
-    if (mime == "text/plain" || mime == "text/html") && filename(part).is_none() {
+    if (mime == "text/plain" || mime == "text/html") && filename(message, part).is_none() {
         return PartRole::Body;
     }
 
@@ -196,14 +199,16 @@ pub fn role(part: &MessagePart) -> PartRole {
 }
 
 /// The part's MIME type, lowercased, defaulting as RFC 2045 does when
-/// the part carries no `Content-Type`.
+/// the part carries no `Content-Type`, and taken as `text/plain` when it
+/// carries an invalid one (RFC 2045 §5.2).
 pub fn mime(part: &MessagePart) -> String {
+    if invalid_content_type(part) {
+        return "text/plain".to_string();
+    }
+
     if let Some(ctype) = part.content_type() {
-        let mime = match ctype.c_subtype.as_deref() {
-            Some(subtype) => format!("{}/{subtype}", ctype.c_type),
-            None => ctype.c_type.to_string(),
-        };
-        return mime.to_ascii_lowercase();
+        let subtype = ctype.c_subtype.as_deref().unwrap_or_default();
+        return format!("{}/{subtype}", ctype.c_type).to_ascii_lowercase();
     }
 
     match part.body {
@@ -215,6 +220,26 @@ pub fn mime(part: &MessagePart) -> String {
     .to_string()
 }
 
+/// Whether the part's `Content-Type` is present but invalid: a type or
+/// subtype missing, empty or not an RFC 2045 token. RFC 2045 §5.2 reads
+/// it as `text/plain; charset=us-ascii`.
+fn invalid_content_type(part: &MessagePart) -> bool {
+    part.content_type()
+        .is_some_and(|ctype| match ctype.c_subtype.as_deref() {
+            Some(subtype) => !is_token(&ctype.c_type) || !is_token(subtype),
+            None => true,
+        })
+}
+
+/// Whether a value is an RFC 2045 token.
+fn is_token(value: &str) -> bool {
+    const TSPECIALS: &[u8] = b"()<>@,;:\\\"/[]?=";
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_graphic() && !TSPECIALS.contains(&b))
+}
+
 /// The `Content-Disposition` type, lowercased.
 fn disposition(part: &MessagePart) -> Option<String> {
     part.content_disposition()
@@ -223,13 +248,31 @@ fn disposition(part: &MessagePart) -> Option<String> {
 
 /// The file name the part carries, from `Content-Disposition` then
 /// `Content-Type`, RFC 2231 and RFC 2047 decoded, `None` when empty.
-pub fn filename(part: &MessagePart) -> Option<String> {
-    let name = part.attachment_name()?;
-    let name = if name.contains("=?") {
-        decode_words(name).unwrap_or_else(|| name.to_owned())
-    } else {
-        name.to_owned()
+///
+/// NOTE: the header is parsed again from its raw bytes, read as
+/// [`header::eight_bit`] does, so a raw 8-bit name reads right and
+/// adjacent encoded words rebuild a character split between them.
+pub fn filename(message: &Message, part: &MessagePart) -> Option<String> {
+    let param = |header: &str, param: &str| {
+        let value = header::raw_text(message, &part.headers, header)?;
+
+        // NOTE: mail-parser decodes the encoded words of a quoted
+        // parameter one by one, so a plain one is read here; the RFC 2231
+        // forms are left to mail-parser.
+        if let Some(plain) = header::plain_param(&value, param) {
+            return Some(header::decode_words(&plain));
+        }
+
+        let line = format!("{value}\n");
+        match MessageStream::new(line.as_bytes()).parse_content_type() {
+            HeaderValue::ContentType(ctype) => ctype.attribute(param).map(str::to_owned),
+            _ => None,
+        }
     };
+
+    let name = param("Content-Disposition", "filename")
+        .or_else(|| param("Content-Type", "name"))
+        .or_else(|| part.attachment_name().map(str::to_owned))?;
     let name = name.trim();
     (!name.is_empty()).then(|| name.to_owned())
 }
@@ -240,8 +283,12 @@ pub fn content_id(part: &MessagePart) -> Option<String> {
     (!id.is_empty()).then(|| id.to_owned())
 }
 
-/// The `charset` parameter of the `Content-Type`, as found.
+/// The `charset` parameter of the `Content-Type`, as found; `us-ascii`
+/// for an invalid `Content-Type`.
 pub fn charset(part: &MessagePart) -> Option<String> {
+    if invalid_content_type(part) {
+        return Some("us-ascii".to_string());
+    }
     let charset = part.content_type()?.attribute("charset")?.trim();
     (!charset.is_empty()).then(|| charset.to_owned())
 }
@@ -295,19 +342,22 @@ pub fn bytes<'a>(message: &'a Message, part: &'a MessagePart) -> Cow<'a, [u8]> {
 }
 
 /// The part decoded to UTF-8 by its charset, lossily.
-pub fn text(part: &MessagePart) -> String {
+///
+/// A part labelled US-ASCII, or naming no charset, whose bytes are valid
+/// UTF-8 is read as UTF-8, which is what such mail holds in practice.
+pub fn text(message: &Message, part: &MessagePart) -> String {
+    let ascii = charset(part).is_none_or(|charset| {
+        let charset = charset.trim_matches('"').to_ascii_lowercase();
+        charset == "us-ascii" || charset == "ascii"
+    });
+
+    if ascii && let Ok(text) = String::from_utf8(bytes(message, part).into_owned()) {
+        return text;
+    }
+
     match part.text_contents() {
         Some(text) => text.to_owned(),
         None => String::from_utf8_lossy(part.contents()).into_owned(),
-    }
-}
-
-/// Decodes the RFC 2047 encoded words of an unstructured value.
-pub fn decode_words(value: &str) -> Option<String> {
-    let line = format!("{value}\n");
-    match MessageStream::new(line.as_bytes()).parse_unstructured() {
-        HeaderValue::Text(text) => Some(text.into_owned()),
-        _ => None,
     }
 }
 

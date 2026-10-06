@@ -204,7 +204,7 @@ impl PartBytes {
         Some(Self {
             id: leaf.id,
             mime: part::mime(leaf.part),
-            filename: part::filename(leaf.part),
+            filename: part::filename(message, leaf.part),
             size: bytes.len() as u64,
             data: BASE64_STANDARD.encode(&bytes),
             bytes,
