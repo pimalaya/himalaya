@@ -29,6 +29,8 @@ pub mod header;
 #[cfg(backend)]
 pub mod mv;
 #[cfg(backend)]
+pub mod parse;
+#[cfg(backend)]
 pub mod part;
 #[cfg(backend)]
 pub mod read;

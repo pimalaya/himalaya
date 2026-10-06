@@ -88,9 +88,7 @@ impl MessageReadCommand {
             return Ok(());
         }
 
-        let message = part::parse(&raw)?;
-
-        printer.out(MessageReadOutput::new(message))
+        printer.out(MessageReadOutput::from_raw(&raw)?)
     }
 }
 
@@ -115,6 +113,12 @@ pub struct MessageReadOutput {
 }
 
 impl MessageReadOutput {
+    /// Parses a raw message within the bounds of [`part::parse`] and
+    /// builds its view: what `message read` and `message parse` print.
+    pub fn from_raw(raw: &[u8]) -> Result<Self> {
+        Ok(Self::new(part::parse(raw)?))
+    }
+
     /// Builds the view of a parsed message.
     pub fn new(message: Message<'_>) -> Self {
         let mut texts = Vec::new();

@@ -9,8 +9,8 @@ use pimalaya_cli::printer::Printer;
 #[cfg(backend)]
 use crate::shared::message::{
     add::MessageAddCommand, copy::MessageCopyCommand, delete::MessageDeleteCommand,
-    forward::MessageForwardCommand, mv::MessageMoveCommand, read::MessageReadCommand,
-    reply::MessageReplyCommand,
+    forward::MessageForwardCommand, mv::MessageMoveCommand, parse::MessageParseCommand,
+    read::MessageReadCommand, reply::MessageReplyCommand,
 };
 use crate::{
     account::context::Account,
@@ -47,6 +47,8 @@ pub enum MessageCommand {
     #[command(visible_alias = "mv")]
     Move(MessageMoveCommand),
     #[cfg(backend)]
+    Parse(MessageParseCommand),
+    #[cfg(backend)]
     Read(MessageReadCommand),
     #[cfg(backend)]
     Reply(MessageReplyCommand),
@@ -73,6 +75,8 @@ impl MessageCommand {
             Self::Forward(cmd) => cmd.execute(printer, account, client),
             #[cfg(backend)]
             Self::Move(cmd) => cmd.execute(printer, account, client),
+            #[cfg(backend)]
+            Self::Parse(cmd) => cmd.execute(printer),
             #[cfg(backend)]
             Self::Read(cmd) => cmd.execute(printer, account, client),
             #[cfg(backend)]

@@ -104,3 +104,9 @@ A message nested deeper than 8 levels, or holding more than 200 parts or 500 hea
 
 ### Requirement: A part can be read without touching the disk
 `attachment download <MESSAGE-ID> <PART-ID> --stdout` SHALL take exactly one part id, any leaf part `message read` lists, and write that part's decoded bytes to stdout with nothing else, touching no file; `--dir` SHALL be refused beside it. Under `--json` it SHALL print `{id, mime, filename, size, data}`, `data` in base64. Without `--stdout`, the attachment parts SHALL be written to the download directory as the same decoded bytes.
+
+### Requirement: A message can be read without an account
+`message parse [EML]` SHALL read a raw message from a path, or from stdin with `-` or when omitted, and SHALL print what `message read` prints for the same bytes. It SHALL resolve no account and read no configuration. A source holding nothing but whitespace SHALL be refused, naming where it was read from; the bounds and the `message-too-complex` code SHALL apply as on `message read`.
+
+### Requirement: A parsed message hands one part over
+`message parse --part <PART-ID>` SHALL write that part's bytes, transfer encoding undone, to stdout, or under `--json` `{id, mime, filename, size, data}` with `data` in base64; the ids SHALL be those of the view. An unknown id or a container's SHALL be refused.

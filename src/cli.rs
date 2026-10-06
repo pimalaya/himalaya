@@ -306,6 +306,10 @@ impl Command {
                     EmailClient::new(config, &name, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
+            // NOTE: `message parse` reads a raw message it is given, so it
+            // resolves no account and reads no configuration at all.
+            #[cfg(backend)]
+            Self::Message(MessageCommand::Parse(cmd)) => cmd.execute(printer),
             #[cfg(any(backend, feature = "smtp"))]
             Self::Message(cmd) => {
                 let (config, name, account_config) =

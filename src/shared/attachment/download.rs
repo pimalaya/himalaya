@@ -89,14 +89,7 @@ impl AttachmentDownloadCommand {
                 bail!("No part with id {id} on message `{}`", self.message_id);
             };
 
-            if printer.is_json() {
-                return printer.out(AttachmentDownloadOutput::Part(part));
-            }
-
-            let mut out = stdout().lock();
-            out.write_all(&part.bytes)?;
-            out.flush()?;
-            return Ok(());
+            return part.print(printer);
         }
 
         let dir = self.dir.clone().unwrap_or_else(|| account.downloads_dir());
@@ -197,8 +190,9 @@ pub struct PartBytes {
 }
 
 impl PartBytes {
-    /// The part of a message carrying the given id, with its bytes.
-    fn new(message: &Message, id: &str) -> Option<Self> {
+    /// The leaf part of a message carrying the given id, with its bytes;
+    /// `None` for an unknown id or a container's.
+    pub fn new(message: &Message, id: &str) -> Option<Self> {
         let leaf = part::find(message, id)?;
         let bytes = part::bytes(message, leaf.part).into_owned();
         Some(Self {
@@ -209,6 +203,25 @@ impl PartBytes {
             data: BASE64_STANDARD.encode(&bytes),
             bytes,
         })
+    }
+
+    /// Writes the bytes to stdout and nothing else, or under `--json`
+    /// the part as `{id, mime, filename, size, data}`: what `attachment
+    /// download --stdout` and `message parse --part` print.
+    pub fn print(self, printer: &mut impl Printer) -> Result<()> {
+        if printer.is_json() {
+            return printer.out(AttachmentDownloadOutput::Part(self));
+        }
+
+        self.write_stdout()
+    }
+
+    /// Writes the decoded bytes to stdout, and nothing else.
+    pub fn write_stdout(&self) -> Result<()> {
+        let mut out = stdout().lock();
+        out.write_all(&self.bytes)?;
+        out.flush()?;
+        Ok(())
     }
 }
 

@@ -66,6 +66,12 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-message-read",
             crate::shared::message::read::MessageReadOutput
         );
+        // NOTE: `message parse` prints the `message read` view, or under
+        // `--part` the part `attachment download --stdout` prints.
+        insert!(
+            "himalaya-message-parse",
+            crate::shared::message::parse::MessageParseOutput
+        );
         insert!(
             "himalaya-message-delete",
             crate::shared::message::delete::DeleteReport
