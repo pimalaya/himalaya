@@ -196,7 +196,7 @@ default = true
 # IMAP server: a bare authority, which takes `imaps://` and its implicit TLS,
 # or a full URL, `imap://` being cleartext with an optional STARTTLS upgrade.
 imap.server = "example.com"
-#imap.server = "imap.example.com:143"
+#imap.server = "imap.example.com:993"
 #imap.server = "imap://example.com:143"
 #imap.server = "imaps://example.com:993"
 
@@ -478,7 +478,7 @@ imap.sasl.plain.password.raw = "***"
 # SMTP server: a bare authority, which takes `smtps://` and its implicit TLS, or
 # a full URL, `smtp://` being cleartext with an optional STARTTLS upgrade.
 smtp.server = "example.com"
-#smtp.server = "smtp.example.com:587"
+#smtp.server = "smtp.example.com:465"
 #smtp.server = "smtp://example.com:587"
 #smtp.server = "smtps://example.com:465"
 
