@@ -64,7 +64,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-message-read",
-            crate::shared::message::read::MessageView
+            crate::shared::message::read::MessageReadOutput
         );
         insert!(
             "himalaya-message-delete",
@@ -89,10 +89,10 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::shared::attachment::list::Attachments
         );
         // NOTE: `attachment download` reports the `Attachments` table of
-        // `list`.
+        // `list`, or the one part `--stdout --json` reads.
         insert!(
             "himalaya-attachment-download",
-            crate::shared::attachment::list::Attachments
+            crate::shared::attachment::download::AttachmentDownloadOutput
         );
     }
 

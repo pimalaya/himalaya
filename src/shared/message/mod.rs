@@ -27,6 +27,8 @@ pub mod handler;
 #[cfg(backend)]
 pub mod mv;
 #[cfg(backend)]
+pub mod part;
+#[cfg(backend)]
 pub mod read;
 #[cfg(backend)]
 pub mod reply;

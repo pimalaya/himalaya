@@ -21,6 +21,10 @@ pub enum ErrorCode {
     /// The message is listed but its body is not local yet: a sync will
     /// bring it, so the caller waits rather than reports a loss.
     BodyPending,
+    /// The message is nested too deep or holds too many parts or header
+    /// lines to be read whole, so it is refused rather than read in
+    /// part.
+    MessageTooComplex,
 }
 
 /// A failure carrying an [`ErrorCode`], anywhere in an error chain.

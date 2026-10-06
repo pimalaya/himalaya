@@ -35,6 +35,7 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | Code | Raised when |
 |---|---|
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
+| `message-too-complex` | a message is nested deeper than 8 levels, or holds more than 200 parts or 500 header lines; it is refused whole |
 
 #### Scenario: A body not downloaded yet
 - GIVEN a pimdir item whose body is not local
@@ -88,3 +89,15 @@ A command taking a raw RFC 5322 message SHALL resolve it through the shared `Mes
 
 ### Requirement: Saving a sent message follows the send
 A command both saving and sending (`--save` with `--send`, `message send --save`, `message add --send`) SHALL send first and save afterwards, so a failed send leaves no copy. A save failing after a successful send SHALL fail the command with an error stating that the message was sent.
+
+### Requirement: A read message is a designed view
+`message read --json` SHALL print `{headers, text, html, parts}`, built from the raw message so it is the same on every backend, rather than the parser's own model. `headers` SHALL carry `from`, `to`, `cc`, `bcc`, `replyTo` and `sender` as lists of `{name, email}` (groups flattened, an entry without a valid email dropped, `name` decoded or `null`), `subject` decoded, `date` as RFC 3339 with its offset or `null`, `messageId`, `inReplyTo` and `references` (a list) without angle brackets, and `listId`, `listUnsubscribe`, `precedence` and `autoSubmitted` as found, decoded. `text` SHALL be every `text/plain` body part decoded to UTF-8 by its charset, lossily, joined by a blank line, and `html` the first `text/html` body part, each `null` when absent. The text output and `--raw` SHALL stay unchanged.
+
+### Requirement: Every part has an id and a role
+`parts` SHALL list every leaf part, depth first, as `{id, role, mime, filename, size, contentId, charset, method}`, the `id` being the one `attachment list` and `attachment download` take: the 1-based position of the part in the whole part list. A `multipart/*` SHALL be no part; `message/rfc822` or `Content-Disposition: attachment` SHALL be an `attachment`; a `text/plain` or `text/html` without a filename SHALL be a `body`; an `image/*` marked inline or carrying a `Content-ID` SHALL be `inline`; anything else SHALL be an `attachment`. `filename` SHALL be RFC 2231 and RFC 2047 decoded, `null` when the part names none; `size` SHALL count the part's bytes once its transfer encoding is undone, in its own charset; `contentId` SHALL carry no angle brackets; `method` SHALL be a `text/calendar` part's `method` parameter, uppercased. `attachment list --json` SHALL report the same ids, sizes and `contentId`.
+
+### Requirement: A message too complex is refused whole
+A message nested deeper than 8 levels, or holding more than 200 parts or 500 header lines (folded lines and the headers of every part and attached message included), SHALL be refused with the JSON error code `message-too-complex` rather than read in part, by `message read` (except `--raw`) and the `attachment` commands.
+
+### Requirement: A part can be read without touching the disk
+`attachment download <MESSAGE-ID> <PART-ID> --stdout` SHALL take exactly one part id, any leaf part `message read` lists, and write that part's decoded bytes to stdout with nothing else, touching no file; `--dir` SHALL be refused beside it. Under `--json` it SHALL print `{id, mime, filename, size, data}`, `data` in base64. Without `--stdout`, the attachment parts SHALL be written to the download directory as the same decoded bytes.

@@ -5,10 +5,10 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use mail_parser::{MessageParser, MessagePart, MimeHeaders};
+use mail_parser::{Message, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
@@ -16,7 +16,9 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
+    shared::{
+        client::EmailClient, mailbox::arg::MailboxArg, message::part, table::style_from_preset,
+    },
 };
 
 /// List the attachments of one message.
@@ -49,31 +51,11 @@ impl AttachmentListCommand {
         let mailbox = self.mailbox.resolve(account);
         let raw = client.get_message(&mailbox, &self.message_id, false)?;
 
-        let Some(message) = MessageParser::new().parse(&raw) else {
-            bail!("Failed to parse RFC 5322 message");
-        };
+        let message = part::parse(&raw)?;
 
-        let mut attachments = Vec::new();
-        for &part_id in &message.attachments {
-            let part = &message.parts[part_id as usize];
-            let inline = part
-                .content_disposition()
-                .map(|cd| cd.c_type.eq_ignore_ascii_case("inline"))
-                .unwrap_or(false);
-
-            if inline && !self.inline {
-                continue;
-            }
-
-            attachments.push(Attachment {
-                id: (part_id + 1).to_string(),
-                filename: part.attachment_name().map(str::to_owned),
-                mime: mime_string(part),
-                size: part.contents().len() as u64,
-                inline,
-                path: None,
-            });
-        }
+        let attachments = attachments(&message)
+            .filter(|attachment| self.inline || !attachment.inline)
+            .collect();
 
         let attachments = Attachments {
             preset: account.table_preset().to_string(),
@@ -106,6 +88,15 @@ pub(crate) struct AttachmentColors {
     pub path: Color,
 }
 
+/// The attachment parts of a message, in part order, inline ones
+/// included: mail-parser's attachments, under the ids of the shared part
+/// walk.
+pub(crate) fn attachments<'a>(message: &'a Message) -> impl Iterator<Item = Attachment> + 'a {
+    part::leaves(message)
+        .filter(|leaf| message.attachments.contains(&(leaf.index as u32)))
+        .map(|leaf| Attachment::new(message, leaf, None))
+}
+
 /// One row of the `attachment list` and `attachment download` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachment {
@@ -120,10 +111,32 @@ pub struct Attachment {
     pub size: u64,
     /// Whether the part carries `Content-Disposition: inline`.
     pub inline: bool,
+    /// The `Content-ID`, without angle brackets, by which an HTML body
+    /// shows the part.
+    #[serde(rename = "contentId")]
+    pub content_id: Option<String>,
     /// Where the bytes were written, which `attachment download` alone
     /// fills in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+}
+
+impl Attachment {
+    /// The row of one leaf part, `path` being where it was written.
+    pub(crate) fn new(message: &Message, leaf: part::Leaf, path: Option<String>) -> Self {
+        let part = leaf.part;
+        Self {
+            id: leaf.id,
+            filename: part::filename(part),
+            mime: mime_string(part),
+            size: part::bytes(message, part).len() as u64,
+            inline: part
+                .content_disposition()
+                .is_some_and(|cd| cd.c_type.eq_ignore_ascii_case("inline")),
+            content_id: part::content_id(part),
+            path,
+        }
+    }
 }
 
 /// The `attachment list` output, a table of attachments.
@@ -212,7 +225,64 @@ pub(super) fn mime_string(part: &MessagePart<'_>) -> Option<String> {
 mod tests {
     use pimalaya_cli::table::{Color, ContentArrangement};
 
-    use super::{Attachment, AttachmentColors, Attachments};
+    use super::{Attachment, AttachmentColors, Attachments, attachments};
+    use crate::shared::message::{part, read::MessageReadOutput};
+
+    #[test]
+    fn ids_are_those_of_the_read_view() {
+        let raw = b"Content-Type: multipart/mixed; boundary=\"m\"\r\n\
+            \r\n\
+            --m\r\n\
+            Content-Type: multipart/related; boundary=\"r\"\r\n\
+            \r\n\
+            --r\r\n\
+            Content-Type: text/html\r\n\
+            \r\n\
+            <img src=\"cid:logo@example.com\">\r\n\
+            --r\r\n\
+            Content-Type: image/png\r\n\
+            Content-ID: <logo@example.com>\r\n\
+            Content-Disposition: inline\r\n\
+            \r\n\
+            PNG\r\n\
+            --r--\r\n\
+            --m\r\n\
+            Content-Type: application/pdf; name=\"doc.pdf\"\r\n\
+            Content-Transfer-Encoding: base64\r\n\
+            \r\n\
+            JVBERi0=\r\n\
+            --m\r\n\
+            Content-Type: message/rfc822\r\n\
+            \r\n\
+            Subject: inner\r\n\
+            \r\n\
+            inner\r\n\
+            --m--\r\n";
+        let message = part::parse(raw).unwrap();
+        let listed: Vec<Attachment> = attachments(&message).collect();
+        let view = serde_json::to_value(MessageReadOutput::new(part::parse(raw).unwrap())).unwrap();
+        let parts = view["parts"].as_array().unwrap();
+
+        let ids: Vec<&str> = listed.iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(ids, ["4", "5", "6"]);
+        for attachment in &listed {
+            let part = parts
+                .iter()
+                .find(|part| part["id"] == attachment.id.as_str())
+                .expect("listed id in the view");
+            assert_eq!(part["size"], attachment.size);
+            assert_eq!(part["contentId"], serde_json::json!(attachment.content_id));
+            assert_ne!(part["role"], "body");
+        }
+
+        let json = serde_json::to_value(&listed[0]).unwrap();
+        assert_eq!(json["contentId"], "logo@example.com");
+        assert_eq!(json["inline"], true);
+        assert_eq!(
+            serde_json::to_value(&listed[1]).unwrap()["contentId"],
+            serde_json::Value::Null
+        );
+    }
 
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
@@ -235,6 +305,7 @@ mod tests {
                 mime: Some(String::from("application/pdf\x1b[8m")),
                 size: 0,
                 inline: false,
+                content_id: None,
                 path: Some(String::from("/tmp/invoice\x1b[2J.pdf")),
             }],
         };

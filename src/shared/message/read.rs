@@ -1,24 +1,33 @@
 //! # Message read
 //!
 //! The `message read` command, rendering a fetched message as a header
-//! block and a walk of its MIME parts.
+//! block and a walk of its MIME parts, or under `--json` as a designed
+//! view of its headers, bodies and parts.
 
 use std::{
     fmt,
     io::{Write, stdout},
 };
 
-use anyhow::{Result, bail};
+use anyhow::Result;
+use chrono::{FixedOffset, NaiveDate, TimeZone};
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MessagePart, MimeHeaders};
+use mail_parser::{
+    Addr, Address, ContentType, HeaderValue, Message, MessagePart, MimeHeaders,
+    parsers::MessageStream,
+};
 use pimalaya_cli::printer::{Message as PrinterMessage, Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    shared::{client::EmailClient, mailbox::arg::MailboxArg},
+    shared::{
+        client::EmailClient,
+        mailbox::arg::MailboxArg,
+        message::part::{self, PartRole},
+    },
 };
 
 /// Read a message.
@@ -31,9 +40,14 @@ use crate::{
 /// The `[ID]` prefixing a summary is the part's position in the message,
 /// the same id `attachment list` reports and `attachment download` takes.
 ///
-/// `--raw` dumps the original RFC 5322 bytes instead and `--json` the
-/// whole parsed message, either of which pipes into an HTML renderer or
-/// a pretty-printer of your own.
+/// `--json` prints a view of the message, the same whatever the backend:
+/// its headers decoded, its text and HTML bodies decoded to UTF-8, and
+/// every leaf part with its id, role (body, inline or attachment), type,
+/// file name and size. `--raw` dumps the original RFC 5322 bytes instead.
+///
+/// A message nested deeper than 8 levels, or holding more than 200 parts
+/// or 500 header lines, is refused whole with the `message-too-complex`
+/// code rather than read in part.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     /// Identifier of the message.
@@ -74,19 +88,289 @@ impl MessageReadCommand {
             return Ok(());
         }
 
-        let Some(parsed) = MessageParser::new().parse(&raw) else {
-            bail!("Failed to parse RFC 5322 message");
-        };
+        let message = part::parse(&raw)?;
 
-        printer.out(MessageView(parsed.into_owned()))
+        printer.out(MessageReadOutput::new(message))
     }
 }
 
-/// The `message read` output: a header block, then one summary line per
-/// MIME part with the decoded contents of the text ones.
+/// The `message read` output: under `--json` the view of the message,
+/// built from its raw bytes so it is the same on every backend; as text
+/// a header block, then one summary line per MIME part with the decoded
+/// contents of the text ones.
 #[derive(Serialize, JsonSchema)]
-#[serde(transparent)]
-pub struct MessageView(#[schemars(with = "serde_json::Value")] Message<'static>);
+pub struct MessageReadOutput {
+    /// The headers a reader acts on, decoded.
+    pub headers: MessageHeaders,
+    /// Every `text/plain` body part decoded to UTF-8, in order, joined by
+    /// a blank line; `null` when there is none.
+    pub text: Option<String>,
+    /// The first `text/html` body part decoded to UTF-8; `null` when
+    /// there is none.
+    pub html: Option<String>,
+    /// Every leaf part, depth first.
+    pub parts: Vec<MessagePartView>,
+    #[serde(skip)]
+    view: MessageView,
+}
+
+impl MessageReadOutput {
+    /// Builds the view of a parsed message.
+    pub fn new(message: Message<'_>) -> Self {
+        let mut texts = Vec::new();
+        let mut html = None;
+        let mut parts = Vec::new();
+
+        for leaf in part::leaves(&message) {
+            let role = part::role(leaf.part);
+            let mime = part::mime(leaf.part);
+
+            if role == PartRole::Body {
+                if mime == "text/plain" {
+                    texts.push(part::text(leaf.part));
+                } else if mime == "text/html" && html.is_none() {
+                    html = Some(part::text(leaf.part));
+                }
+            }
+
+            parts.push(MessagePartView {
+                id: leaf.id,
+                role,
+                filename: part::filename(leaf.part),
+                size: part::bytes(&message, leaf.part).len() as u64,
+                content_id: part::content_id(leaf.part),
+                charset: part::charset(leaf.part),
+                method: part::method(leaf.part),
+                mime,
+            });
+        }
+
+        Self {
+            headers: MessageHeaders::new(&message),
+            text: (!texts.is_empty()).then(|| texts.join("\n\n")),
+            html,
+            parts,
+            view: MessageView(message.into_owned()),
+        }
+    }
+}
+
+impl fmt::Display for MessageReadOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.view.fmt(f)
+    }
+}
+
+/// The headers of a read message.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageHeaders {
+    pub from: Vec<MailAddress>,
+    pub to: Vec<MailAddress>,
+    pub cc: Vec<MailAddress>,
+    pub bcc: Vec<MailAddress>,
+    pub reply_to: Vec<MailAddress>,
+    pub sender: Vec<MailAddress>,
+    /// The subject, RFC 2047 decoded.
+    pub subject: Option<String>,
+    /// The date as RFC 3339, with the offset the header carries; `null`
+    /// when absent or unreadable.
+    pub date: Option<String>,
+    /// The `Message-ID`, without angle brackets.
+    pub message_id: Option<String>,
+    /// The first id of `In-Reply-To`, without angle brackets.
+    pub in_reply_to: Option<String>,
+    /// The ids of `References`, in order, without angle brackets.
+    pub references: Vec<String>,
+    /// The `List-ID` header as found, decoded.
+    pub list_id: Option<String>,
+    /// The `List-Unsubscribe` header as found, decoded.
+    pub list_unsubscribe: Option<String>,
+    /// The `Precedence` header as found, decoded.
+    pub precedence: Option<String>,
+    /// The `Auto-Submitted` header as found, decoded.
+    pub auto_submitted: Option<String>,
+}
+
+impl MessageHeaders {
+    fn new(message: &Message) -> Self {
+        Self {
+            from: addresses(message.from()),
+            to: addresses(message.to()),
+            cc: addresses(message.cc()),
+            bcc: addresses(message.bcc()),
+            reply_to: addresses(message.reply_to()),
+            sender: addresses(message.sender()),
+            subject: message
+                .subject()
+                .map(str::trim)
+                .filter(|subject| !subject.is_empty())
+                .map(str::to_owned),
+            date: message.date().and_then(rfc3339),
+            message_id: message.message_id().and_then(id),
+            in_reply_to: ids(message.in_reply_to()).into_iter().next(),
+            references: ids(message.references()),
+            list_id: unstructured(message, "List-ID"),
+            list_unsubscribe: unstructured(message, "List-Unsubscribe"),
+            precedence: unstructured(message, "Precedence"),
+            auto_submitted: unstructured(message, "Auto-Submitted"),
+        }
+    }
+}
+
+/// One address of an address header.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, JsonSchema)]
+pub struct MailAddress {
+    /// The display name, RFC 2047 decoded; `null` when absent.
+    pub name: Option<String>,
+    pub email: String,
+}
+
+/// One leaf part of a read message.
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MessagePartView {
+    /// The id `attachment list` reports and `attachment download` takes.
+    pub id: String,
+    pub role: PartRole,
+    /// The MIME type, lowercased.
+    pub mime: String,
+    /// The file name, RFC 2231 and RFC 2047 decoded; `null` when the part
+    /// names none.
+    pub filename: Option<String>,
+    /// The size of the part once its transfer encoding is undone, in
+    /// bytes.
+    pub size: u64,
+    /// The `Content-ID`, without angle brackets.
+    pub content_id: Option<String>,
+    /// The `charset` parameter, as found.
+    pub charset: Option<String>,
+    /// The `method` parameter of a `text/calendar` part, uppercased.
+    pub method: Option<String>,
+}
+
+/// An address header as a list, groups flattened and entries without a
+/// valid email dropped.
+fn addresses(address: Option<&Address>) -> Vec<MailAddress> {
+    let Some(address) = address else {
+        return Vec::new();
+    };
+
+    address
+        .iter()
+        .filter_map(|addr| {
+            let email = addr.address.as_deref()?.trim();
+            if !is_email(email) {
+                return None;
+            }
+            let name = addr
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned);
+            Some(MailAddress {
+                name,
+                email: email.to_owned(),
+            })
+        })
+        .collect()
+}
+
+/// Whether an address is a dot-atom `local@domain` (RFC 5322 §3.4.1,
+/// UTF-8 allowed as RFC 6532 does) with a domain of two labels or more.
+///
+/// NOTE: a quoted local part and a domain literal are refused, as no
+/// reader relies on them and they hide what an address says.
+fn is_email(email: &str) -> bool {
+    let Some((local, domain)) = email.rsplit_once('@') else {
+        return false;
+    };
+
+    let atext =
+        |c: char| c.is_ascii_alphanumeric() || "!#$%&'*+/=?^_`{|}~-".contains(c) || is_utf8_text(c);
+    let local_ok = !local.is_empty()
+        && local.len() <= 64
+        && local
+            .split('.')
+            .all(|atom| !atom.is_empty() && atom.chars().all(atext));
+
+    let label_ok = |label: &str| {
+        !label.is_empty()
+            && label.len() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || is_utf8_text(c))
+    };
+    let domain_ok =
+        domain.len() <= 255 && domain.split('.').count() >= 2 && domain.split('.').all(label_ok);
+
+    local_ok && domain_ok
+}
+
+/// A non-ASCII character that is neither a control nor a space.
+fn is_utf8_text(c: char) -> bool {
+    !c.is_ascii() && !c.is_control() && !c.is_whitespace()
+}
+
+/// A parsed date as RFC 3339 with its own offset, `None` when it names
+/// no real instant.
+fn rfc3339(date: &mail_parser::DateTime) -> Option<String> {
+    let seconds = i32::from(date.tz_hour) * 3600 + i32::from(date.tz_minute) * 60;
+    let offset = if date.tz_before_gmt {
+        FixedOffset::west_opt(seconds)?
+    } else {
+        FixedOffset::east_opt(seconds)?
+    };
+    let naive = NaiveDate::from_ymd_opt(date.year.into(), date.month.into(), date.day.into())?
+        .and_hms_opt(date.hour.into(), date.minute.into(), date.second.into())?;
+    let date = offset.from_local_datetime(&naive).single()?;
+    Some(date.to_rfc3339())
+}
+
+/// A message id without angle brackets, `None` when empty.
+fn id(value: &str) -> Option<String> {
+    let id = part::bare_id(value);
+    (!id.is_empty()).then(|| id.to_owned())
+}
+
+/// The ids an `In-Reply-To` or `References` header holds.
+fn ids(value: &HeaderValue) -> Vec<String> {
+    match value {
+        HeaderValue::Text(text) => id(text).into_iter().collect(),
+        HeaderValue::TextList(list) => list.iter().filter_map(|text| id(text)).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// A top-level header read as unstructured text, RFC 2047 decoded and
+/// unfolded, whatever mail-parser parses it as.
+fn unstructured(message: &Message, name: &str) -> Option<String> {
+    let header = message
+        .root_part()
+        .headers
+        .iter()
+        .find(|header| header.name.as_str().eq_ignore_ascii_case(name))?;
+    let value = message
+        .raw_message
+        .get(header.offset_start as usize..header.offset_end as usize)?;
+    let mut value = value.to_vec();
+    if value.last() != Some(&b'\n') {
+        value.push(b'\n');
+    }
+    match MessageStream::new(&value).parse_unstructured() {
+        HeaderValue::Text(text) => {
+            let text = text.trim();
+            (!text.is_empty()).then(|| text.to_owned())
+        }
+        _ => None,
+    }
+}
+
+/// The text rendering of a read message.
+struct MessageView(Message<'static>);
 
 impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -112,15 +396,9 @@ impl fmt::Display for MessageView {
         // stays a summary unless printing it is the only readable option.
         let html_only = is_html_only(message);
 
-        // NOTE: a leaf's id is its 1-based position in the whole part
-        // list, so the numbering gaps where a skipped container sits.
-        // That is what makes it the id the `attachment` commands take.
-        for (position, part) in message.parts.iter().enumerate() {
-            if part.is_multipart() {
-                continue;
-            }
-            let id = position + 1;
-
+        // NOTE: the ids are the leaves' own, the ones the `attachment`
+        // commands and the JSON view take.
+        for part::Leaf { id, part, .. } in part::leaves(message) {
             let mime = part_mime(part);
             let size = format_size(part.len() as u64, BINARY);
             writeln!(f)?;
@@ -251,11 +529,12 @@ fn format_addr(addr: &Addr) -> String {
 
 #[cfg(test)]
 mod tests {
+    use base64::{Engine, prelude::BASE64_STANDARD};
+
     use super::*;
 
     fn render(raw: &[u8]) -> String {
-        let parsed = MessageParser::new().parse(raw).expect("parse");
-        MessageView(parsed.into_owned()).to_string()
+        MessageReadOutput::new(part::parse(raw).expect("parse")).to_string()
     }
 
     #[test]
@@ -356,5 +635,432 @@ mod tests {
 
         assert!(out.contains("plain body"));
         assert!(!out.contains("<p>html body</p>"));
+    }
+
+    fn view(raw: &[u8]) -> serde_json::Value {
+        serde_json::to_value(MessageReadOutput::new(part::parse(raw).expect("parse"))).unwrap()
+    }
+
+    #[test]
+    fn json_view_has_the_designed_shape() {
+        let raw = b"Date: Thu, 24 Jul 2025 10:00:00 +0000\r\n\
+            From: Alice <alice@example.com>\r\n\
+            Subject: Hello\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            Hi Bob\r\n";
+
+        let json = view(raw);
+
+        // NOTE: serde_json sorts the keys of a parsed object.
+        let keys: Vec<&str> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(keys, ["headers", "html", "parts", "text"]);
+        let headers: Vec<&str> = json["headers"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            headers,
+            [
+                "autoSubmitted",
+                "bcc",
+                "cc",
+                "date",
+                "from",
+                "inReplyTo",
+                "listId",
+                "listUnsubscribe",
+                "messageId",
+                "precedence",
+                "references",
+                "replyTo",
+                "sender",
+                "subject",
+                "to",
+            ]
+        );
+        assert_eq!(json["headers"]["to"], serde_json::json!([]));
+        assert_eq!(json["text"], "Hi Bob\r\n");
+        assert_eq!(json["html"], serde_json::Value::Null);
+        assert_eq!(
+            json["parts"],
+            serde_json::json!([{
+                "id": "1",
+                "role": "body",
+                "mime": "text/plain",
+                "filename": null,
+                "size": 8,
+                "contentId": null,
+                "charset": null,
+                "method": null,
+            }])
+        );
+    }
+
+    #[test]
+    fn encoded_words_are_decoded_adjacent_ones_joined() {
+        let raw = b"From: =?ISO-8859-1?Q?Andr=E9?= Dupont <andre@example.com>\r\n\
+            To: =?UTF-8?B?w4lsb2RpZQ==?= <elodie@example.com>\r\n\
+            Subject: =?UTF-8?B?w4l0w6k=?= =?UTF-8?Q?_=C3=A0_Paris?=\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["subject"], "\u{c9}t\u{e9} \u{e0} Paris");
+        assert_eq!(
+            json["headers"]["from"],
+            serde_json::json!([{ "name": "Andr\u{e9} Dupont", "email": "andre@example.com" }])
+        );
+        assert_eq!(
+            json["headers"]["to"],
+            serde_json::json!([{ "name": "\u{c9}lodie", "email": "elodie@example.com" }])
+        );
+    }
+
+    #[test]
+    fn address_groups_are_flattened_and_invalid_entries_dropped() {
+        let raw = b"From: alice@example.com\r\n\
+            To: Friends: Bob <bob@example.com>, carol@example.com;, dave@example.org\r\n\
+            Cc: Undisclosed recipients:;\r\n\
+            Bcc: nobody, Eve <eve@>, \"x\" <@example.com>, Frank <frank@localhost>, <grace@example.net>\r\n\
+            Reply-To: \"Support, Team\" <support@example.com>\r\n\
+            Sender: Mallory <mallory@example.com>\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["from"],
+            serde_json::json!([{ "name": null, "email": "alice@example.com" }])
+        );
+        assert_eq!(
+            json["headers"]["to"],
+            serde_json::json!([
+                { "name": "Bob", "email": "bob@example.com" },
+                { "name": null, "email": "carol@example.com" },
+                { "name": null, "email": "dave@example.org" },
+            ])
+        );
+        assert_eq!(json["headers"]["cc"], serde_json::json!([]));
+        assert_eq!(
+            json["headers"]["bcc"],
+            serde_json::json!([{ "name": null, "email": "grace@example.net" }])
+        );
+        assert_eq!(
+            json["headers"]["replyTo"],
+            serde_json::json!([{ "name": "Support, Team", "email": "support@example.com" }])
+        );
+        assert_eq!(
+            json["headers"]["sender"],
+            serde_json::json!([{ "name": "Mallory", "email": "mallory@example.com" }])
+        );
+    }
+
+    #[test]
+    fn date_keeps_its_offset_and_an_unreadable_one_is_null() {
+        let at = |date: &str| {
+            let raw = format!("Date: {date}\r\nContent-Type: text/plain\r\n\r\nbody\r\n");
+            view(raw.as_bytes())["headers"]["date"].clone()
+        };
+
+        assert_eq!(
+            at("Thu, 24 Jul 2025 10:00:00 -0500"),
+            "2025-07-24T10:00:00-05:00"
+        );
+        assert_eq!(
+            at("Thu, 24 Jul 2025 10:00:00 +0530"),
+            "2025-07-24T10:00:00+05:30"
+        );
+        assert_eq!(
+            at("Thu, 24 Jul 2025 10:00:00 +0000"),
+            "2025-07-24T10:00:00+00:00"
+        );
+        assert_eq!(at("not a date"), serde_json::Value::Null);
+        assert_eq!(
+            at("Mon, 31 Feb 2025 10:00:00 +0000"),
+            serde_json::Value::Null
+        );
+    }
+
+    #[test]
+    fn ids_lose_their_angle_brackets() {
+        let raw = b"Message-ID: <3@example.com>\r\n\
+            In-Reply-To: <2@example.com> <1@example.com>\r\n\
+            References: <1@example.com>\r\n <2@example.com>\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["messageId"], "3@example.com");
+        assert_eq!(json["headers"]["inReplyTo"], "2@example.com");
+        assert_eq!(
+            json["headers"]["references"],
+            serde_json::json!(["1@example.com", "2@example.com"])
+        );
+    }
+
+    #[test]
+    fn list_headers_are_kept_as_found() {
+        let raw = b"List-ID: =?UTF-8?Q?Caf=C3=A9?= news <news.example.com>\r\n\
+            List-Unsubscribe: <mailto:leave@example.com>,\r\n <https://example.com/leave>\r\n\
+            Precedence: bulk\r\n\
+            Auto-Submitted: auto-generated\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["listId"],
+            "Caf\u{e9} news <news.example.com>"
+        );
+        assert_eq!(
+            json["headers"]["listUnsubscribe"],
+            "<mailto:leave@example.com>, <https://example.com/leave>"
+        );
+        assert_eq!(json["headers"]["precedence"], "bulk");
+        assert_eq!(json["headers"]["autoSubmitted"], "auto-generated");
+        assert_eq!(json["headers"]["subject"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn bodies_are_decoded_by_their_charset_and_transfer_encoding() {
+        let cp1252 = BASE64_STANDARD.encode(b"5 \x80 l\x92heure");
+        let raw = format!(
+            "Content-Type: multipart/mixed; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: text/plain; charset=ISO-8859-1\r\n\
+            Content-Transfer-Encoding: quoted-printable\r\n\
+            \r\n\
+            caf=E9 cr=E8me=\r\n br=FBl=E9e\r\n\
+            --b\r\n\
+            Content-Type: text/plain; charset=windows-1252\r\n\
+            Content-Transfer-Encoding: base64\r\n\
+            \r\n\
+            {cp1252}\r\n\
+            --b--\r\n"
+        );
+
+        let json = view(raw.as_bytes());
+
+        assert_eq!(
+            json["text"],
+            "caf\u{e9} cr\u{e8}me br\u{fb}l\u{e9}e\n\n5 \u{20ac} l\u{2019}heure"
+        );
+        assert_eq!(json["parts"][0]["charset"], "ISO-8859-1");
+        assert_eq!(json["parts"][1]["charset"], "windows-1252");
+        // NOTE: the size counts the bytes in the part's own charset.
+        assert_eq!(json["parts"][0]["size"], 17);
+        assert_eq!(json["parts"][1]["size"], 11);
+    }
+
+    #[test]
+    fn an_unknown_charset_reads_lossily() {
+        let raw = b"Content-Type: text/plain; charset=x-unknown\r\n\
+            \r\n\
+            ok \xff\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["text"], "ok \u{fffd}\r\n");
+    }
+
+    #[test]
+    fn nested_alternative_in_mixed_gives_bodies_and_an_attachment() {
+        let raw = b"Content-Type: multipart/mixed; boundary=\"outer\"\r\n\
+            \r\n\
+            --outer\r\n\
+            Content-Type: multipart/alternative; boundary=\"inner\"\r\n\
+            \r\n\
+            --inner\r\n\
+            Content-Type: text/plain; charset=utf-8\r\n\
+            \r\n\
+            plain body\r\n\
+            --inner\r\n\
+            Content-Type: text/html; charset=utf-8\r\n\
+            \r\n\
+            <p>html body</p>\r\n\
+            --inner--\r\n\
+            \r\n\
+            --outer\r\n\
+            Content-Type: application/pdf; name=\"doc.pdf\"\r\n\
+            Content-Disposition: attachment; filename=\"doc.pdf\"\r\n\
+            Content-Transfer-Encoding: base64\r\n\
+            \r\n\
+            JVBERi0=\r\n\
+            --outer--\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["text"], "plain body");
+        assert_eq!(json["html"], "<p>html body</p>");
+        let parts: Vec<(&str, &str, &str)> = json["parts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|part| {
+                (
+                    part["id"].as_str().unwrap(),
+                    part["role"].as_str().unwrap(),
+                    part["mime"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            parts,
+            [
+                ("3", "body", "text/plain"),
+                ("4", "body", "text/html"),
+                ("5", "attachment", "application/pdf"),
+            ]
+        );
+        assert_eq!(json["parts"][2]["filename"], "doc.pdf");
+        assert_eq!(json["parts"][2]["size"], 5);
+    }
+
+    #[test]
+    fn an_attached_message_is_one_attachment_part() {
+        let raw = b"Subject: Outer\r\n\
+            Content-Type: multipart/mixed; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            see attached\r\n\
+            --b\r\n\
+            Content-Type: message/rfc822\r\n\
+            \r\n\
+            Subject: Inner\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            inner body\r\n\
+            --b--\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["headers"]["subject"], "Outer");
+        assert_eq!(json["text"], "see attached");
+        let parts = json["parts"].as_array().unwrap();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[1]["id"], "3");
+        assert_eq!(parts[1]["role"], "attachment");
+        assert_eq!(parts[1]["mime"], "message/rfc822");
+        assert_eq!(parts[1]["filename"], serde_json::Value::Null);
+        let inner = b"Subject: Inner\r\nContent-Type: text/plain\r\n\r\ninner body";
+        assert_eq!(parts[1]["size"], inner.len());
+    }
+
+    #[test]
+    fn rfc2231_filenames_are_decoded() {
+        let raw = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: application/pdf\r\n\
+            Content-Disposition: attachment;\r\n filename*0*=utf-8''r%C3%A9sum;\r\n filename*1*=%C3%A9.pdf\r\n\
+            \r\n\
+            x\r\n\
+            --b\r\n\
+            Content-Type: text/plain\r\n\
+            Content-Disposition: attachment; filename*=iso-8859-1'fr'caf%E9.txt\r\n\
+            \r\n\
+            y\r\n\
+            --b\r\n\
+            Content-Type: application/octet-stream; name=\"=?UTF-8?B?w6l0w6kucG5n?=\"\r\n\
+            \r\n\
+            z\r\n\
+            --b--\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(json["parts"][0]["filename"], "r\u{e9}sum\u{e9}.pdf");
+        assert_eq!(json["parts"][1]["filename"], "caf\u{e9}.txt");
+        assert_eq!(json["parts"][1]["role"], "attachment");
+        assert_eq!(json["parts"][2]["filename"], "\u{e9}t\u{e9}.png");
+        assert_eq!(json["text"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn roles_follow_the_rule() {
+        let raw = b"Content-Type: multipart/related; boundary=\"b\"\r\n\
+            \r\n\
+            --b\r\n\
+            Content-Type: text/html\r\n\
+            \r\n\
+            <img src=\"cid:logo@example.com\">\r\n\
+            --b\r\n\
+            Content-Type: image/png\r\n\
+            Content-ID: <logo@example.com>\r\n\
+            Content-Transfer-Encoding: base64\r\n\
+            \r\n\
+            iVBORw==\r\n\
+            --b\r\n\
+            Content-Type: image/gif\r\n\
+            Content-Disposition: inline\r\n\
+            \r\n\
+            GIF\r\n\
+            --b\r\n\
+            Content-Type: image/jpeg\r\n\
+            \r\n\
+            JPG\r\n\
+            --b\r\n\
+            Content-Type: text/plain; name=\"notes.txt\"\r\n\
+            \r\n\
+            notes\r\n\
+            --b\r\n\
+            Content-Type: text/calendar; charset=UTF-8; method=request\r\n\
+            \r\n\
+            BEGIN:VCALENDAR\r\n\
+            END:VCALENDAR\r\n\
+            --b\r\n\
+            Content-Type: image/png\r\n\
+            Content-ID: <photo@example.com>\r\n\
+            Content-Disposition: attachment; filename=\"photo.png\"\r\n\
+            \r\n\
+            PNG\r\n\
+            --b--\r\n";
+
+        let json = view(raw);
+
+        let roles: Vec<&str> = json["parts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|part| part["role"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            roles,
+            [
+                "body",
+                "inline",
+                "inline",
+                "attachment",
+                "attachment",
+                "attachment",
+                "attachment"
+            ]
+        );
+        assert_eq!(json["parts"][1]["contentId"], "logo@example.com");
+        assert_eq!(json["parts"][1]["size"], 4);
+        assert_eq!(json["parts"][5]["mime"], "text/calendar");
+        assert_eq!(json["parts"][5]["method"], "REQUEST");
+        assert_eq!(json["parts"][5]["charset"], "UTF-8");
+        assert_eq!(json["parts"][0]["method"], serde_json::Value::Null);
+        assert_eq!(json["html"], "<img src=\"cid:logo@example.com\">");
+        assert_eq!(json["text"], serde_json::Value::Null);
     }
 }
