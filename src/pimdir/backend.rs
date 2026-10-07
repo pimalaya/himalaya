@@ -17,16 +17,18 @@
 //! would guess at the sync's convention rather than look it up, and
 //! `mailbox.alias` is how a user avoids typing it.
 
-use std::io::Write;
+use std::{io::Write, ops::ControlFlow};
 
 use anyhow::{Result, anyhow, bail};
-use chrono::DateTime;
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
 use io_pimdir::{
     capability,
     client::{
         blobs::PimdirBlobWriter,
         producer::{PimdirActionStatus, PimdirPendingAction},
-        reader::{PimdirCollection, PimdirItem, PimdirRoundState},
+        reader::{
+            PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
+        },
     },
     codec::PimdirAction,
     collection::{PimdirCollectionId, PimdirCoverage},
@@ -46,7 +48,12 @@ use crate::{
         envelope::Envelope,
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
-        search::{eval, query::SearchEmailsQuery},
+        search::{
+            eval,
+            filter::query::SearchEmailsFilterQuery,
+            query::SearchEmailsQuery,
+            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+        },
         submission::SubmissionEnvelope,
     },
     error::{CodedError, ErrorCode},
@@ -61,6 +68,13 @@ const SUBMIT: &str = "submit";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
+
+/// The smallest keyset page a filtered search reads, so a sparse match
+/// does not cost a query per row.
+const WALK_MIN: usize = 64;
+
+/// The sort key of a dated mail: its summary date (pimdir STORAGE Annex A.1).
+const KEY_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 
 /// Whether a collection's declared kind makes it a mailbox, matched on
 /// the bare media type the way the store reads it.
@@ -178,6 +192,9 @@ impl PimdirClient {
 
     /// Lists envelopes from `mailbox`, built from the stored summaries (no
     /// body reads), in the store's newest-first order then paginated.
+    ///
+    /// With a page size, the store is read by keyset pages up to the end of
+    /// the page asked for, never past it: page N of size S reads N × S items.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -186,11 +203,26 @@ impl PimdirClient {
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         let collection = self.hub_id(mailbox)?;
-        let envelopes: Vec<Envelope> = self
-            .scan_items(&collection)?
-            .iter()
-            .map(envelope_from_item)
-            .collect();
+        let Some(wanted) = page_end(page, page_size) else {
+            let envelopes = self
+                .scan_items(&collection)?
+                .iter()
+                .map(envelope_from_item)
+                .collect();
+            return Ok(envelopes);
+        };
+        if wanted == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut envelopes: Vec<Envelope> = Vec::new();
+        self.walk(&collection, None, false, wanted.min(SCAN_BATCH), |item| {
+            envelopes.push(envelope_from_item(&item));
+            match wanted - envelopes.len() {
+                0 => ControlFlow::Break(()),
+                left => ControlFlow::Continue(left.min(SCAN_BATCH)),
+            }
+        })?;
         Ok(paginate(envelopes, page, page_size))
     }
 
@@ -198,6 +230,11 @@ impl PimdirClient {
     /// applies the shared filter/sort/paginate. Body clauses cannot match on
     /// an item whose body is not local (no bytes to scan); header/flag
     /// clauses always do.
+    ///
+    /// The store is read newest first, within the date bounds the query
+    /// states and through the unread chip where it applies, and the read
+    /// stops at the end of the page when the order is the store's own
+    /// ([`PimdirPushdown`]). Every clause is still matched in memory.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -208,8 +245,85 @@ impl PimdirClient {
     ) -> Result<Vec<Envelope>> {
         let collection = self.hub_id(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
+        let sort = query.and_then(|q| q.sort.as_deref());
+
+        match self.search_pushed(&collection, filter, sort, page, page_size)? {
+            Some(hits) => Ok(hits),
+            None => self.search_scanned(&collection, filter, sort, page, page_size),
+        }
+    }
+
+    /// [`Self::search_envelopes`] reading only the rows the query can
+    /// reach, `None` when a row read breaks the store's ordering contract
+    /// (its sort key is not its summary date), which the bounds and the
+    /// early stop rest on.
+    fn search_pushed(
+        &self,
+        collection: &str,
+        filter: Option<&SearchEmailsFilterQuery>,
+        sort: Option<&[SearchEmailsSorter]>,
+        page: Option<u32>,
+        page_size: Option<u32>,
+    ) -> Result<Option<Vec<Envelope>>> {
+        if page_size == Some(0) {
+            return Ok(Some(Vec::new()));
+        }
+
+        let pushdown = filter.map(PimdirPushdown::of).unwrap_or_default();
+        let unread = pushdown.unread && self.overlay_quiet(collection);
+        // NOTE: a page of a search in another order sits anywhere in the
+        // range, so the whole range is read then sorted.
+        let wanted = match is_store_order(sort) {
+            true => page_end(page, page_size),
+            false => None,
+        };
+        let batch =
+            |left: Option<usize>| left.map_or(SCAN_BATCH, |left| left.clamp(WALK_MIN, SCAN_BATCH));
+
+        let start = pushdown.before.as_deref().map(|key| (key, 0));
+        let mut hits: Vec<Envelope> = Vec::new();
+        let mut ordered = true;
+        self.walk(collection, start, unread, batch(wanted), |item| {
+            if !in_store_order(&item) {
+                ordered = false;
+                return ControlFlow::Break(());
+            }
+            if let Some(from) = &pushdown.from
+                && item.sort_key.as_str() < from.as_str()
+            {
+                return ControlFlow::Break(());
+            }
+            let envelope = envelope_from_item(&item);
+            if filter.is_none_or(|filter| eval::matches_filter(&envelope, &[], filter)) {
+                hits.push(envelope);
+            }
+            let left = wanted.map(|wanted| wanted.saturating_sub(hits.len()));
+            match left {
+                Some(0) => ControlFlow::Break(()),
+                left => ControlFlow::Continue(batch(left)),
+            }
+        })?;
+
+        if !ordered {
+            warn!("a row of `{collection}` is not filed under its date, searching it whole");
+            return Ok(None);
+        }
+        eval::sort_envelopes(&mut hits, sort);
+        Ok(Some(paginate(hits, page, page_size)))
+    }
+
+    /// [`Self::search_envelopes`] over every item of the mailbox, matched,
+    /// sorted then paginated in memory.
+    fn search_scanned(
+        &self,
+        collection: &str,
+        filter: Option<&SearchEmailsFilterQuery>,
+        sort: Option<&[SearchEmailsSorter]>,
+        page: Option<u32>,
+        page_size: Option<u32>,
+    ) -> Result<Vec<Envelope>> {
         let mut hits: Vec<Envelope> = self
-            .scan_items(&collection)?
+            .scan_items(collection)?
             .iter()
             .map(envelope_from_item)
             .filter(|envelope| match filter {
@@ -217,7 +331,7 @@ impl PimdirClient {
                 None => true,
             })
             .collect();
-        eval::sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
+        eval::sort_envelopes(&mut hits, sort);
         Ok(paginate(hits, page, page_size))
     }
 
@@ -576,6 +690,96 @@ impl PimdirClient {
         }
     }
 
+    /// Walks a mailbox newest first by keyset pages, from below `start`
+    /// (a sort key and a public id) or from the newest, handing each item
+    /// to `visit`, which stops the walk or names the size of the next page;
+    /// the walk ends with the mailbox.
+    ///
+    /// `unread` reads through the store's unread chip, which reads the
+    /// committed rows only: the caller checks no queued action changes what
+    /// the mailbox shows ([`Self::overlay_quiet`]).
+    fn walk(
+        &self,
+        collection: &str,
+        start: Option<(&str, i64)>,
+        unread: bool,
+        first: usize,
+        mut visit: impl FnMut(PimdirItem) -> ControlFlow<(), usize>,
+    ) -> Result<()> {
+        let mut after = start.map(|(key, seq)| (key.to_owned(), seq));
+        let mut limit = first.max(1);
+        loop {
+            let asked = limit;
+            let cursor = after.as_ref().map(|(key, seq)| (key.as_str(), *seq));
+            let page = self.page(collection, cursor, unread, asked)?;
+            let read = page.len();
+            for item in page {
+                after = Some((item.sort_key.clone(), item.seq));
+                match visit(item) {
+                    ControlFlow::Break(()) => return Ok(()),
+                    ControlFlow::Continue(next) => limit = next.max(1),
+                }
+            }
+            if read < asked {
+                return Ok(());
+            }
+        }
+    }
+
+    /// One keyset page of [`Self::walk`], newest first below `after`.
+    fn page(
+        &self,
+        collection: &str,
+        after: Option<(&str, i64)>,
+        unread: bool,
+        limit: usize,
+    ) -> Result<Vec<PimdirItem>> {
+        if !unread {
+            return self
+                .store
+                .list_summaries(collection, after, limit)
+                .map_err(|err| anyhow!("List items in `{collection}`: {err}"));
+        }
+
+        let filter = PimdirMailFilter {
+            seen: Some(false),
+            attachment: None,
+        };
+        let cursor = after.map(|(key, seq)| PimdirMailCursor {
+            sort_key: key.to_owned(),
+            seq,
+            collection: collection.to_owned(),
+        });
+        let entries = self
+            .store
+            .list_mail_page_filtered(&[collection], filter, cursor.as_ref(), limit)
+            .map_err(|err| anyhow!("List unread items in `{collection}`: {err}"))?;
+        Ok(entries.into_iter().map(|entry| entry.item).collect())
+    }
+
+    /// Whether no queued action changes what a read of `collection` shows,
+    /// so its committed rows are what the overlaying reader returns: no
+    /// `set-flags`, `update` or `remove` on it, no `move` out of it, no
+    /// `move` or `copy` into it. A queue that does not read counts as
+    /// changing it.
+    fn overlay_quiet(&self, collection: &str) -> bool {
+        let Ok(queued) = self.store.list_pending_actions() else {
+            return false;
+        };
+        !queued.iter().any(|queued| {
+            let here = queued.collection == collection;
+            match &queued.action {
+                PimdirAction::SetFlags { .. }
+                | PimdirAction::Update { .. }
+                | PimdirAction::Remove { .. } => here,
+                PimdirAction::Move { to, .. } | PimdirAction::Copy { to, .. } => {
+                    here || to.0 == collection
+                }
+                _ => false,
+            }
+        })
+    }
+
     /// Pulls every live item of a collection with its summary by keyset
     /// paging, newest first (the read API is paginated; the shared
     /// list/search commands paginate in memory, as the file backends do).
@@ -818,6 +1022,131 @@ fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> PimdirFla
 fn parse_id(id: &str) -> Result<i64> {
     id.parse::<i64>()
         .map_err(|_| anyhow!("Invalid message id `{id}` (expected a number)"))
+}
+
+/// What a search query states that the store's reads express, every
+/// clause still being matched in memory, so a bound only skips rows the
+/// query cannot match.
+///
+/// Only clauses joined by `and` at the top of the query count. The bounds
+/// are days (`YYYY-MM-DD`) compared with the sort key, which for mail is
+/// the summary date as `YYYY-MM-DDTHH:MM:SSZ` (pimdir STORAGE §9.3, Annex
+/// A.1), empty for an undated row: the key of an instant on a day sorts at
+/// or above that day's own key and below the next one's. A date clause
+/// reads the day in UTC, the offset the store keeps.
+#[derive(Debug, Default, PartialEq)]
+struct PimdirPushdown {
+    /// The lowest sort key a match can have, inclusive: an undated row
+    /// sorts below any.
+    from: Option<String>,
+    /// The sort key every match sorts below.
+    before: Option<String>,
+    /// Whether only unread mail matches: `not flag seen`.
+    unread: bool,
+}
+
+impl PimdirPushdown {
+    fn of(filter: &SearchEmailsFilterQuery) -> Self {
+        let mut pushdown = Self::default();
+        pushdown.add(filter);
+        pushdown
+    }
+
+    fn add(&mut self, clause: &SearchEmailsFilterQuery) {
+        use SearchEmailsFilterQuery as Q;
+
+        match clause {
+            Q::And(left, right) => {
+                self.add(left);
+                self.add(right);
+            }
+            Q::Date(day) => {
+                self.raise(day_key(*day));
+                self.lower(next_day_key(*day));
+            }
+            Q::AfterDate(day) => self.raise(next_day_key(*day)),
+            Q::Not(inner) => match inner.as_ref() {
+                // NOTE: an undated row is not after any day, so it matches
+                // and the bound is an upper one only.
+                Q::AfterDate(day) => self.lower(next_day_key(*day)),
+                // NOTE: the chip reads `\Seen` in that one spelling, so it reads
+                // every row unread here and some read in another spelling,
+                // which the match drops.
+                Q::Flag(flag) if flag.iana() == Some(IanaFlag::Seen) => self.unread = true,
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    fn raise(&mut self, key: Option<String>) {
+        if let Some(key) = key
+            && self.from.as_ref().is_none_or(|from| key > *from)
+        {
+            self.from = Some(key);
+        }
+    }
+
+    fn lower(&mut self, key: Option<String>) {
+        if let Some(key) = key
+            && self.before.as_ref().is_none_or(|before| key < *before)
+        {
+            self.before = Some(key);
+        }
+    }
+}
+
+/// A day as the sort key it bounds, `None` for a year the key's four
+/// digits cannot spell.
+fn day_key(day: NaiveDate) -> Option<String> {
+    (0..=9999)
+        .contains(&day.year())
+        .then(|| day.format("%Y-%m-%d").to_string())
+}
+
+/// The day after `day` as a sort key.
+fn next_day_key(day: NaiveDate) -> Option<String> {
+    day.succ_opt().and_then(day_key)
+}
+
+/// Whether a search order is the store's own, date descending: none, or
+/// `date desc` alone, both sorting the undated last and keeping ties in
+/// the order read.
+fn is_store_order(sort: Option<&[SearchEmailsSorter]>) -> bool {
+    sort.is_none_or(|chain| {
+        chain.is_empty()
+            || chain
+                == [SearchEmailsSorter(
+                    SearchEmailsSorterKind::Date,
+                    SearchEmailsSorterOrder::Descending,
+                )]
+    })
+}
+
+/// Whether a row sits where its date files it, which the search bounds and
+/// early stop rest on: its sort key is its summary date written as
+/// `YYYY-MM-DDTHH:MM:SSZ`, or empty for a row whose date does not read and
+/// so sorts last.
+fn in_store_order(item: &PimdirItem) -> bool {
+    let date = mail_summary(item.summary.as_ref())
+        .and_then(|mail| mail.date.as_deref())
+        .filter(|date| DateTime::parse_from_rfc3339(date).is_ok());
+    match date {
+        None => item.sort_key.is_empty(),
+        Some(date) => {
+            date == item.sort_key
+                && NaiveDateTime::parse_from_str(date, KEY_FORMAT)
+                    .is_ok_and(|at| at.format(KEY_FORMAT).to_string() == date)
+        }
+    }
+}
+
+/// Where a 1-indexed page ends in the full listing, `None` with no page
+/// size, which asks for everything.
+fn page_end(page: Option<u32>, page_size: Option<u32>) -> Option<usize> {
+    let size = page_size? as usize;
+    let page = page.unwrap_or(1).max(1) as usize;
+    Some((page - 1).saturating_mul(size).saturating_add(size))
 }
 
 /// 1-indexed in-memory pagination; `page_size = None` returns the full slice.
@@ -1491,5 +1820,504 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    /// One mail a seeded mailbox holds: its handle, its flags, and its
+    /// summary, `None` for a row whose summary was never read.
+    struct Seeded {
+        handle: String,
+        flags: PimdirFlags,
+        summary: Option<PimdirMailSummary>,
+    }
+
+    /// `n` mails spread over six days of May 2026, with ties on the minute,
+    /// undated ones, rows with no summary, read and unread (`\Seen` in two
+    /// spellings), flagged, unknown flag sets, two senders on some, and an
+    /// attachment mark set, cleared or absent.
+    fn mails(prefix: &str, n: usize) -> Vec<Seeded> {
+        let words = ["release", "Invoice", "météo", "hello"];
+        (0..n)
+            .map(|i| {
+                let date = (i % 17 != 0).then(|| {
+                    format!(
+                        "2026-05-{:02}T{:02}:{:02}:00Z",
+                        10 + (i * 7) % 6,
+                        (i * 13) % 24,
+                        i % 2,
+                    )
+                });
+                let mut flags = Vec::new();
+                if i % 3 == 0 {
+                    flags.push("\\Seen");
+                }
+                if i % 5 == 0 {
+                    flags.push("\\seen");
+                }
+                if i % 7 == 0 {
+                    flags.push("\\Flagged");
+                }
+                let flags = match i % 11 {
+                    0 => PimdirFlags::Unknown,
+                    _ => known(&flags),
+                };
+                let mut from = vec![person(
+                    &format!("user{}@example.org", i % 5),
+                    (i % 2 == 0).then_some("Alice Martin"),
+                )];
+                if i % 4 == 0 {
+                    from.push(person("second@example.org", Some("Second")));
+                }
+                let summary = (i % 23 != 0).then(|| PimdirMailSummary {
+                    message_id: Some(format!("{prefix}{i}@x.test")),
+                    subject: format!("{} {i}", words[i % words.len()]),
+                    sender: from.first().map(|from| from.address.clone()),
+                    sender_name: from.first().and_then(|from| from.name.clone()),
+                    date,
+                    size: Some(100 + i as u64),
+                    attachment: match i % 9 {
+                        0 => None,
+                        _ => Some(i % 2 == 0),
+                    },
+                    from,
+                    to: vec![person("team@example.org", None)],
+                    ..Default::default()
+                });
+                Seeded {
+                    handle: format!("{prefix}{i}"),
+                    flags,
+                    summary,
+                }
+            })
+            .collect()
+    }
+
+    /// Files `mails` in `collection` as the `imap` source lists them, at the
+    /// `Meta` tier, in batches.
+    fn seed(dir: &std::path::Path, collection: &str, mails: &[Seeded]) {
+        use io_pimdir::{
+            change::PimdirWriteOp,
+            placement::{PimdirBase, PimdirHandle, PimdirPlacement, PimdirStatus},
+        };
+
+        let mut store = io_pimdir::client::PimdirStore::open(dir)
+            .unwrap()
+            .for_source("imap");
+        store.ensure_collection(collection, MAIL_KIND).unwrap();
+        for batch in mails.chunks(1000) {
+            let ops = batch
+                .iter()
+                .map(|mail| {
+                    let (link_id, sort_key) = match &mail.summary {
+                        Some(summary) => (summary.link_id(), summary.sort_key()),
+                        None => (
+                            PimdirLinkId(format!("{}@x.test", mail.handle)),
+                            Default::default(),
+                        ),
+                    };
+                    PimdirWriteOp::UpsertPlacement(PimdirPlacement {
+                        collection: PimdirCollectionId(collection.into()),
+                        handle: PimdirHandle(mail.handle.clone()),
+                        link_id: Some(link_id),
+                        object: None,
+                        level: PimdirLevel::Meta,
+                        summary: mail.summary.clone().map(PimdirSummary::Mail),
+                        sort_key,
+                        flags: mail.flags.clone(),
+                        status: PimdirStatus::Clean,
+                        conflict_revision: None,
+                        conflict_object: None,
+                        base: Some(PimdirBase {
+                            flags: mail.flags.clone(),
+                            revision: None,
+                            object: None,
+                        }),
+                        origin: None,
+                    })
+                })
+                .collect();
+            store.write(ops).unwrap();
+        }
+    }
+
+    /// A store holding `imap/INBOX` (300 mails) and `imap/Archive` (20), and
+    /// the client reading it.
+    fn seeded_store() -> (tempfile::TempDir, PimdirClient) {
+        let dir = tempfile::tempdir().unwrap();
+        seed(dir.path(), "imap/INBOX", &mails("in", 300));
+        seed(dir.path(), "imap/Archive", &mails("ar", 20));
+        let client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+        (dir, client)
+    }
+
+    const QUERIES: &[&str] = &[
+        "",
+        "flag seen",
+        "not flag seen",
+        "not flag \\\\Seen",
+        "flag flagged",
+        "not flag flagged",
+        "after 2026-05-12",
+        "date 2026-05-13",
+        "not after 2026-05-12",
+        "after 2026-05-11 and not after 2026-05-13",
+        "date 2026-05-13 and not flag seen",
+        "not flag seen and after 2026-05-14",
+        "date 2026-05-10 and date 2026-05-11",
+        "after 2026-05-30",
+        "after 1999-01-01",
+        "not after 1999-01-01",
+        "not date 2026-05-13",
+        "not (after 2026-05-12 and flag seen)",
+        "from user1",
+        "from SECOND",
+        "from alice and not flag seen",
+        "subject release",
+        "subject MÉTÉO",
+        "to team",
+        "body hello",
+        "from user1 or flag seen",
+        "order by date desc",
+        "order by date",
+        "order by from",
+        "date 2026-05-13 order by date asc",
+        "not flag seen order by subject desc",
+        "after 2026-05-12 order by date desc",
+    ];
+
+    const PAGES: &[(Option<u32>, Option<u32>)] = &[
+        (None, None),
+        (Some(1), None),
+        (Some(1), Some(10)),
+        (Some(2), Some(10)),
+        (Some(3), Some(7)),
+        (Some(1), Some(1)),
+        (None, Some(64)),
+        (Some(2), Some(65)),
+        (Some(5), Some(60)),
+        (Some(50), Some(10)),
+        (Some(1), Some(0)),
+        (Some(1), Some(1000)),
+        (Some(u32::MAX), Some(u32::MAX)),
+    ];
+
+    /// Every page of every query the paged reads answer as the whole-mailbox
+    /// read did, byte for byte, through the pushed-down path.
+    fn assert_paged_reads_agree(client: &mut PimdirClient, mailbox: &str) {
+        for (page, size) in PAGES {
+            let scanned: Vec<Envelope> = client
+                .scan_items(mailbox)
+                .unwrap()
+                .iter()
+                .map(envelope_from_item)
+                .collect();
+            let listed = client.list_envelopes(mailbox, *page, *size, false).unwrap();
+            assert_eq!(
+                serde_json::to_string(&listed).unwrap(),
+                serde_json::to_string(&paginate(scanned, *page, *size)).unwrap(),
+                "list page {page:?} size {size:?}",
+            );
+
+            for query in QUERIES {
+                let parsed =
+                    (!query.is_empty()).then(|| query.parse::<SearchEmailsQuery>().unwrap());
+                let filter = parsed.as_ref().and_then(|q| q.filter.as_ref());
+                let sort = parsed.as_ref().and_then(|q| q.sort.as_deref());
+                let scanned = client
+                    .search_scanned(mailbox, filter, sort, *page, *size)
+                    .unwrap();
+                let pushed = client
+                    .search_pushed(mailbox, filter, sort, *page, *size)
+                    .unwrap()
+                    .expect("the seeded rows are filed under their dates");
+                let searched = client
+                    .search_envelopes(mailbox, parsed.as_ref(), *page, *size, false)
+                    .unwrap();
+                let scanned = serde_json::to_string(&scanned).unwrap();
+                assert_eq!(
+                    serde_json::to_string(&pushed).unwrap(),
+                    scanned,
+                    "search `{query}` page {page:?} size {size:?}",
+                );
+                assert_eq!(serde_json::to_string(&searched).unwrap(), scanned);
+            }
+        }
+    }
+
+    #[test]
+    fn paged_reads_agree_with_the_whole_mailbox_read() {
+        let (_dir, mut client) = seeded_store();
+        assert!(client.overlay_quiet("imap/INBOX"));
+        assert_paged_reads_agree(&mut client, "imap/INBOX");
+
+        // NOTE: a sanity check that the seed holds what the queries reach.
+        let unread = "not flag seen".parse::<SearchEmailsQuery>().unwrap();
+        let hits = client
+            .search_envelopes("imap/INBOX", Some(&unread), None, None, false)
+            .unwrap();
+        assert!(hits.len() > 50 && hits.len() < 250, "{}", hits.len());
+        let undated = client
+            .list_envelopes("imap/INBOX", None, None, false)
+            .unwrap()
+            .into_iter()
+            .filter(|envelope| envelope.date.is_none())
+            .count();
+        assert!(undated > 10, "{undated}");
+    }
+
+    #[test]
+    fn paged_reads_agree_with_the_whole_mailbox_read_over_a_busy_queue() {
+        let (_dir, mut client) = seeded_store();
+        let inbox: Vec<String> = client
+            .list_envelopes("imap/INBOX", None, None, false)
+            .unwrap()
+            .into_iter()
+            .map(|envelope| envelope.id)
+            .collect();
+        let archive: Vec<String> = client
+            .list_envelopes("imap/Archive", None, None, false)
+            .unwrap()
+            .into_iter()
+            .map(|envelope| envelope.id)
+            .collect();
+        let ids = |ids: &[String], step: usize, skip: usize| -> Vec<String> {
+            ids.iter().skip(skip).step_by(step).cloned().collect()
+        };
+        fn refs(ids: &[String]) -> Vec<&str> {
+            ids.iter().map(String::as_str).collect()
+        }
+
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+        let read = ids(&inbox, 4, 1);
+        client
+            .store_flags("imap/INBOX", &refs(&read), &seen, FlagOp::Add)
+            .unwrap();
+        let unread = ids(&inbox, 6, 0);
+        client
+            .store_flags("imap/INBOX", &refs(&unread), &seen, FlagOp::Remove)
+            .unwrap();
+        let gone = ids(&inbox, 10, 3);
+        client.delete_messages("imap/INBOX", &refs(&gone)).unwrap();
+        let moved = ids(&inbox, 15, 2);
+        client
+            .move_messages("imap/INBOX", "imap/Archive", &refs(&moved))
+            .unwrap();
+        let arrived = ids(&archive, 2, 0);
+        client
+            .move_messages("imap/Archive", "imap/INBOX", &refs(&arrived))
+            .unwrap();
+        client.add_message("imap/INBOX", &[], RAW.to_vec()).unwrap();
+
+        assert!(!client.overlay_quiet("imap/INBOX"));
+        assert!(!client.overlay_quiet("imap/Archive"));
+        assert_paged_reads_agree(&mut client, "imap/INBOX");
+        assert_paged_reads_agree(&mut client, "imap/Archive");
+    }
+
+    #[test]
+    fn a_queue_touching_another_mailbox_leaves_one_quiet() {
+        let (dir, mut client) = seeded_store();
+        seed(dir.path(), "imap/Work", &mails("wo", 5));
+        let id = client
+            .list_envelopes("imap/Archive", Some(1), Some(1), false)
+            .unwrap()[0]
+            .id
+            .clone();
+        client
+            .store_flags(
+                "imap/Archive",
+                &[id.as_str()],
+                &[Flag::from_iana(IanaFlag::Seen)],
+                FlagOp::Add,
+            )
+            .unwrap();
+        client.add_message("imap/INBOX", &[], RAW.to_vec()).unwrap();
+        assert!(client.overlay_quiet("imap/INBOX"));
+        assert!(!client.overlay_quiet("imap/Archive"));
+
+        client
+            .copy_messages("imap/Archive", "imap/Work", &[id.as_str()])
+            .unwrap();
+        assert!(!client.overlay_quiet("imap/Work"));
+        assert!(client.overlay_quiet("imap/INBOX"));
+    }
+
+    /// A row filed under another key than its date sends the search back
+    /// to the whole-mailbox read, which answers as before.
+    #[test]
+    fn a_row_out_of_date_order_searches_the_whole_mailbox() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut seeded = mails("in", 40);
+        let summary = seeded[1].summary.as_mut().unwrap();
+        summary.date = Some("2026-05-12T10:00:00+02:00".into());
+        seed(dir.path(), "imap/INBOX", &seeded);
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+
+        for query in ["", "after 2026-05-11", "not flag seen order by from"] {
+            let parsed = (!query.is_empty()).then(|| query.parse::<SearchEmailsQuery>().unwrap());
+            let filter = parsed.as_ref().and_then(|q| q.filter.as_ref());
+            let sort = parsed.as_ref().and_then(|q| q.sort.as_deref());
+            assert_eq!(
+                client
+                    .search_pushed("imap/INBOX", filter, sort, None, None)
+                    .unwrap(),
+                None,
+                "`{query}`",
+            );
+            let scanned = client
+                .search_scanned("imap/INBOX", filter, sort, Some(1), Some(10))
+                .unwrap();
+            let searched = client
+                .search_envelopes("imap/INBOX", parsed.as_ref(), Some(1), Some(10), false)
+                .unwrap();
+            assert_eq!(
+                serde_json::to_string(&searched).unwrap(),
+                serde_json::to_string(&scanned).unwrap(),
+            );
+        }
+    }
+
+    #[test]
+    fn date_clauses_bound_the_walk_on_the_sort_key() {
+        let pushdown = |query: &str| {
+            let query = query.parse::<SearchEmailsQuery>().unwrap();
+            PimdirPushdown::of(query.filter.as_ref().unwrap())
+        };
+        let day = |day: &str| Some(day.to_string());
+
+        assert_eq!(
+            pushdown("date 2026-05-13 and not flag seen"),
+            PimdirPushdown {
+                from: day("2026-05-13"),
+                before: day("2026-05-14"),
+                unread: true,
+            }
+        );
+        assert_eq!(
+            pushdown("after 2026-05-11 and not after 2026-05-13 and after 2026-05-10"),
+            PimdirPushdown {
+                from: day("2026-05-12"),
+                before: day("2026-05-14"),
+                unread: false,
+            }
+        );
+        assert_eq!(pushdown("after 2026-12-31").from, day("2027-01-01"));
+        // NOTE: only clauses joined by `and` at the top bound the walk.
+        assert_eq!(
+            pushdown("after 2026-05-11 or flag seen"),
+            PimdirPushdown::default()
+        );
+        assert_eq!(
+            pushdown("not (after 2026-05-11 and not flag seen)"),
+            PimdirPushdown::default()
+        );
+        assert_eq!(pushdown("flag seen and from x"), PimdirPushdown::default());
+        assert_eq!(pushdown("after 9999-12-31"), PimdirPushdown::default());
+    }
+
+    #[test]
+    fn a_page_ends_where_its_last_row_sits() {
+        assert_eq!(page_end(None, None), None);
+        assert_eq!(page_end(Some(3), None), None);
+        assert_eq!(page_end(None, Some(50)), Some(50));
+        assert_eq!(page_end(Some(0), Some(50)), Some(50));
+        assert_eq!(page_end(Some(3), Some(50)), Some(150));
+        assert_eq!(
+            page_end(Some(u32::MAX), Some(u32::MAX)),
+            Some(u32::MAX as usize * u32::MAX as usize)
+        );
+    }
+
+    /// `envelope list -s 50` and a few searches on a mailbox of 50,000
+    /// mails, read whole then paged; prints the timings.
+    ///
+    /// `cargo test --release --no-default-features --features pimdir,rustls-ring
+    /// -- --ignored --nocapture fifty_thousand`
+    #[test]
+    #[ignore = "seeds 50,000 mails"]
+    fn fifty_thousand_mails_list_one_page() {
+        use std::time::{Duration, Instant};
+
+        let dir = tempfile::tempdir().unwrap();
+        let seeded = Instant::now();
+        let mut many = mails("in", 50_000);
+        for (i, mail) in many.iter_mut().enumerate() {
+            if let Some(summary) = mail.summary.as_mut()
+                && summary.date.is_some()
+            {
+                let at = 1_767_225_600 + (i as i64) * 600;
+                let at = DateTime::from_timestamp(at, 0).unwrap();
+                summary.date = Some(at.format(KEY_FORMAT).to_string());
+            }
+        }
+        seed(dir.path(), "imap/INBOX", &many);
+        eprintln!("seeded 50,000 mails in {:?}", seeded.elapsed());
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+
+        fn median(mut run: impl FnMut() -> usize) -> Duration {
+            let mut times: Vec<Duration> = (0..5)
+                .map(|_| {
+                    let at = Instant::now();
+                    std::hint::black_box(run());
+                    at.elapsed()
+                })
+                .collect();
+            times.sort();
+            times[2]
+        }
+
+        let whole = median(|| {
+            let all: Vec<Envelope> = client
+                .scan_items("imap/INBOX")
+                .unwrap()
+                .iter()
+                .map(envelope_from_item)
+                .collect();
+            paginate(all, Some(1), Some(50)).len()
+        });
+        eprintln!("envelope list -s 50, whole mailbox read: {whole:?}");
+        for page in [1, 10, 100] {
+            let paged = median(|| {
+                client
+                    .list_envelopes("imap/INBOX", Some(page), Some(50), false)
+                    .unwrap()
+                    .len()
+            });
+            eprintln!("envelope list -s 50 -p {page}, paged read: {paged:?}");
+        }
+        for query in [
+            "not flag seen",
+            "after 2026-08-01",
+            "from user1",
+            "subject release order by from",
+        ] {
+            let parsed = query.parse::<SearchEmailsQuery>().unwrap();
+            let filter = parsed.filter.as_ref();
+            let sort = parsed.sort.as_deref();
+            let scanned = median(|| {
+                client
+                    .search_scanned("imap/INBOX", filter, sort, Some(1), Some(50))
+                    .unwrap()
+                    .len()
+            });
+            let pushed = median(|| {
+                client
+                    .search_envelopes("imap/INBOX", Some(&parsed), Some(1), Some(50), false)
+                    .unwrap()
+                    .len()
+            });
+            eprintln!("envelope search -s 50 `{query}`: whole {scanned:?}, paged {pushed:?}");
+        }
     }
 }

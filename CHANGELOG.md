@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed `envelope list` and `envelope search` on a pimdir account to read only what the page needs: newest first by keyset pages up to the end of the page, a search bounded by its date clauses and reading unread mail through the store's unread index, rather than every message of the mailbox. Output is unchanged; on 50,000 mails `envelope list -s 50` goes from 3.65 s to 28 ms.
 - **Breaking:** changed the `--json` output of `message read`, which no longer prints mail-parser's own model of the message but the view above.
 - Changed the size `attachment list` reports, and the bytes `attachment download` writes, to be the part's bytes once its transfer encoding is undone, in its own charset: a text attachment is no longer converted to UTF-8, and an attached message is written alone rather than with the whole message holding it.
 - Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen. A write a source supports only in part logs a warning.
