@@ -61,7 +61,7 @@ io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.4", default-features = false, optional = true }
 io-pim-discovery = { version = "0.8", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "35a1c3f1c8102be7664f5e89db562d68f2333687", default-features = false, features = ["client"], optional = true }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "f9b13f8836e1161af80b1b1457032ea49b747461", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.5", default-features = false, optional = true }
 log = "0.4"
