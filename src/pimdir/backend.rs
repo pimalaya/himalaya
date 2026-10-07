@@ -1239,6 +1239,7 @@ mod tests {
                     PimdirWriteOp::OpenRound {
                         collection: inbox.clone(),
                         scope: PimdirScope::since("2026-09-07T00:00:00Z"),
+                        band: false,
                     },
                     PimdirWriteOp::CloseRound {
                         collection: inbox.clone(),
@@ -1251,12 +1252,14 @@ mod tests {
                 .write(vec![PimdirWriteOp::OpenRound {
                     collection: inbox,
                     scope: PimdirScope::unbounded(),
+                    band: false,
                 }])
                 .unwrap();
             store
                 .write(vec![PimdirWriteOp::OpenRound {
                     collection: work,
                     scope: PimdirScope::since("2026-09-07T00:00:00Z"),
+                    band: false,
                 }])
                 .unwrap();
         }
