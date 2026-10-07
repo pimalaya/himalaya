@@ -8,16 +8,21 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    pimdir::{client::PimdirClient, mailbox::create::PimdirMailboxCreateCommand},
+    pimdir::{
+        client::PimdirClient,
+        mailbox::{create::PimdirMailboxCreateCommand, list::PimdirMailboxListCommand},
+    },
 };
 
-/// Ask the sync engine to create a mailbox.
+/// List the store's mailboxes with their coverage, or ask the sync engine
+/// to create one.
 ///
 /// A pimdir store mirrors its server, so a new mailbox is created there by
 /// the sync engine and arrives in the store with the sync that performs it.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum PimdirMailboxCommand {
+    List(PimdirMailboxListCommand),
     Create(PimdirMailboxCreateCommand),
 }
 
@@ -30,6 +35,7 @@ impl PimdirMailboxCommand {
         client: &mut PimdirClient,
     ) -> Result<()> {
         match self {
+            Self::List(cmd) => cmd.execute(printer, account, client),
             Self::Create(cmd) => cmd.execute(printer, account, client),
         }
     }

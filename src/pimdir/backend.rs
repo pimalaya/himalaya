@@ -26,10 +26,10 @@ use io_pimdir::{
     client::{
         blobs::PimdirBlobWriter,
         producer::{PimdirActionStatus, PimdirPendingAction},
-        reader::{PimdirCollection, PimdirItem},
+        reader::{PimdirCollection, PimdirItem, PimdirRoundState},
     },
     codec::PimdirAction,
-    collection::PimdirCollectionId,
+    collection::{PimdirCollectionId, PimdirCoverage},
     object::{PimdirHash, PimdirObject},
     placement::PimdirFlags,
     summary::{
@@ -129,6 +129,50 @@ impl PimdirClient {
             });
         }
         mailboxes.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(mailboxes)
+    }
+
+    /// Lists the account's mailboxes as [`Self::list_mailboxes`] does with
+    /// counts, each with the coverage the store lists it with and the round
+    /// a source has under way.
+    ///
+    /// The coverage is the narrowest of the collection's sources' (pimdir
+    /// STORAGE §14.1), `None` while one never closed a round, so a reader
+    /// says "mail since" from it and knows a search below it is not
+    /// exhaustive. A store its owner has not reconciled yet has none.
+    pub fn list_covered_mailboxes(&mut self) -> Result<Vec<PimdirCoveredMailbox>> {
+        let collections = self.mail_collections()?;
+        let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
+        let unread = self
+            .store
+            .count_unread(&ids, None)
+            .map_err(|err| anyhow!("Count unread pimdir mail: {err}"))?;
+
+        let mut mailboxes = Vec::new();
+        for collection in collections {
+            let total = self
+                .store
+                .count_items(&collection.id)
+                .map_err(|err| anyhow!("Count items in `{}`: {err}", collection.id))?;
+            let round = self
+                .store
+                .list_coverage(&collection.id)
+                .map_err(|err| anyhow!("Read the coverage of `{}`: {err}", collection.id))?
+                .into_iter()
+                .find_map(|source| source.round);
+            mailboxes.push(PimdirCoveredMailbox {
+                mailbox: Mailbox {
+                    unread: Some(unread.get(&collection.id).copied().unwrap_or(0)),
+                    id: collection.id,
+                    name: collection.name,
+                    role: collection.role.as_deref().map(MailboxRole::parse),
+                    total: Some(total),
+                },
+                coverage: collection.coverage,
+                round,
+            });
+        }
+        mailboxes.sort_by(|a, b| a.mailbox.id.cmp(&b.mailbox.id));
         Ok(mailboxes)
     }
 
@@ -652,6 +696,18 @@ fn address(address: PimdirAddress) -> Address {
     }
 }
 
+/// A mailbox with what the store says it holds of its server.
+#[derive(Clone, Debug)]
+pub struct PimdirCoveredMailbox {
+    /// The mailbox, with both counts.
+    pub mailbox: Mailbox,
+    /// The scope its sources' last closed rounds covered and when, `None`
+    /// before every source closed one.
+    pub coverage: Option<PimdirCoverage>,
+    /// The round a source has under way, if any.
+    pub round: Option<PimdirRoundState>,
+}
+
 /// A message staged for the owner: the queue row it waits in, and the link
 /// id it is filed under once applied.
 #[derive(Clone, Debug)]
@@ -830,6 +886,112 @@ mod tests {
         );
     }
 
+    /// A mailbox carries the coverage its sources' closed rounds left and
+    /// the round one has under way; one no round closed on carries none.
+    #[test]
+    fn a_mailbox_lists_its_coverage_and_round() {
+        use io_pimdir::{
+            change::PimdirWriteOp,
+            collection::{PimdirCollectionId, PimdirScope},
+        };
+
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let mut store = io_pimdir::client::PimdirStore::open(dir.path())
+                .unwrap()
+                .for_source("imap");
+            for id in ["imap/INBOX", "imap/Work"] {
+                store.ensure_collection(id, MAIL_KIND).unwrap();
+            }
+            let inbox = PimdirCollectionId("imap/INBOX".into());
+            let work = PimdirCollectionId("imap/Work".into());
+            store
+                .write(vec![
+                    PimdirWriteOp::OpenRound {
+                        collection: inbox.clone(),
+                        scope: PimdirScope::since("2026-09-07T00:00:00Z"),
+                    },
+                    PimdirWriteOp::CloseRound {
+                        collection: inbox.clone(),
+                        coverage: PimdirScope::since("2026-09-07T00:00:00Z"),
+                        checkpoint: None,
+                    },
+                ])
+                .unwrap();
+            store
+                .write(vec![PimdirWriteOp::OpenRound {
+                    collection: inbox,
+                    scope: PimdirScope::unbounded(),
+                }])
+                .unwrap();
+            store
+                .write(vec![PimdirWriteOp::OpenRound {
+                    collection: work,
+                    scope: PimdirScope::since("2026-09-07T00:00:00Z"),
+                }])
+                .unwrap();
+        }
+
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+        let mailboxes = client.list_covered_mailboxes().unwrap();
+        assert_eq!(mailboxes.len(), 2);
+
+        let inbox = &mailboxes[0];
+        assert_eq!(inbox.mailbox.id, "imap/INBOX");
+        assert_eq!(
+            (inbox.mailbox.total, inbox.mailbox.unread),
+            (Some(0), Some(0))
+        );
+        let coverage = inbox.coverage.as_ref().expect("a closed round covers");
+        assert_eq!(
+            coverage.scope.since.as_deref(),
+            Some("2026-09-07T00:00:00Z")
+        );
+        assert_eq!(coverage.scope.until, None);
+        assert!(!coverage.at.is_empty());
+        let round = inbox.round.as_ref().expect("a round is under way");
+        assert_eq!(round.scope, PimdirScope::unbounded());
+
+        let work = &mailboxes[1];
+        assert_eq!(work.mailbox.id, "imap/Work");
+        assert_eq!(work.coverage, None);
+        assert_eq!(
+            work.round
+                .as_ref()
+                .map(|round| round.scope.since.as_deref()),
+            Some(Some("2026-09-07T00:00:00Z"))
+        );
+    }
+
+    /// The attachment mark reads as stored: set, cleared, or not known.
+    #[test]
+    fn the_attachment_mark_reads_as_stored() {
+        for (mark, json) in [
+            (Some(true), serde_json::json!(true)),
+            (Some(false), serde_json::json!(false)),
+            (None, serde_json::Value::Null),
+        ] {
+            let envelope = envelope_from_item(&item(
+                1,
+                "x@y",
+                known(&[]),
+                PimdirMailSummary {
+                    attachment: mark,
+                    ..Default::default()
+                },
+            ));
+            assert_eq!(envelope.has_attachment, mark);
+            assert_eq!(
+                serde_json::to_value(&envelope).unwrap()["has-attachment"],
+                json
+            );
+        }
+    }
+
     /// A stored item at the `Meta` tier: a mail summary and no body.
     fn item(seq: i64, link_id: &str, flags: PimdirFlags, mail: PimdirMailSummary) -> PimdirItem {
         PimdirItem {
@@ -926,7 +1088,7 @@ mod tests {
             flags: PimdirFlags::Unknown,
             sort_key: String::new(),
             object: None,
-            level: PimdirLevel::Probed,
+            level: PimdirLevel::Meta,
             summary: None,
             retention: None,
         };
