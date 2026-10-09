@@ -12,6 +12,9 @@ use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
 /// Send a Gmail message (users.messages.send).
 #[derive(Debug, Parser)]
 pub struct GmailMessageSendCommand {
+    /// Thread id to attach the sent message to.
+    #[arg(long = "thread-id", value_name = "ID")]
+    pub thread_id: Option<String>,
     #[command(flatten)]
     pub message: MessageArg,
 }
@@ -22,6 +25,7 @@ impl GmailMessageSendCommand {
         let raw = self.message.parse()?;
         let message = GmailMessage {
             raw: Some(encode_raw(&raw)),
+            thread_id: self.thread_id.clone(),
             ..Default::default()
         };
         let id = client.message_send(&message)?.response;
