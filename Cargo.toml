@@ -63,7 +63,7 @@ io-msgraph = { version = "0.4", default-features = false, optional = true }
 io-pim-discovery = { version = "0.8", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "be03184246e1ad7e45bd657de5076d99a1b34922", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
-io-smtp = { version = "0.5", default-features = false, optional = true }
+io-smtp = { version = "0.6", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "1"
 mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }

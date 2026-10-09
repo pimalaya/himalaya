@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `pimdir message add` and `pimdir message send`, staging as the shared commands do and printing the queue row with the `Message-ID`, and `pimdir queue show <ROW>`, saying whether a row is pending, parked (with why), applied (with the id of the message an add created; a message sent or a mailbox created once the sync engine acknowledges it) or unknown.
 - Added `pimdir mailbox create <NAME>`, queueing a `collection-create` intent for the sync engine to create the mailbox on its server.
 - Added the `pimdir performer` command, showing which sources can perform a capability such as `mail.submit` for the account and recording the user's choice among them (pimdir draft-03, STORAGE §15.6).
+- Added `--notify`, `--ret` and `--envid` to `smtp send`, requesting delivery status notifications (RFC 3461). The command fails when the server does not announce `DSN` ([#775]).
 
 ### Changed
 
@@ -1420,6 +1421,7 @@ Few major concepts changed:
 [#764]: https://github.com/pimalaya/himalaya/issues/764
 [#769]: https://github.com/pimalaya/himalaya/issues/769
 [#772]: https://github.com/pimalaya/himalaya/issues/772
+[#775]: https://github.com/pimalaya/himalaya/issues/775
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

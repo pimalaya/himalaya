@@ -8,6 +8,7 @@
 //! back for dispatch uniformity and is not threaded into them.
 
 use std::{
+    borrow::Cow,
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
 };
@@ -30,6 +31,8 @@ use crate::{
 /// SMTP client wrapping the inner stream for sending messages.
 pub struct SmtpClient {
     inner: Inner,
+    /// The capability lines of the last EHLO, keyword first.
+    pub capabilities: Vec<Cow<'static, str>>,
 }
 
 impl SmtpClient {
@@ -65,8 +68,11 @@ impl SmtpClient {
                 starttls: config.starttls,
             },
         };
-        let (inner, _capabilities) = Inner::connect(&server, domain, opts)?;
-        Ok(Self { inner })
+        let (inner, capabilities) = Inner::connect(&server, domain, opts)?;
+        Ok(Self {
+            inner,
+            capabilities,
+        })
     }
 }
 
