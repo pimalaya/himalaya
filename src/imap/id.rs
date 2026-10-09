@@ -46,7 +46,7 @@ impl ImapIdCommand {
         client: &mut ImapClient,
     ) -> Result<()> {
         let mut params: HashMap<IString<'static>, NString<'static>> = HashMap::new();
-        for key in ["name", "version", "vendor", "support-url"] {
+        for key in CANNED_KEYS {
             let (k, v) = build_canned_pair(key)?;
             params.insert(k, v);
         }
@@ -117,8 +117,9 @@ impl fmt::Display for ServerIdTable {
 /// Resolves the configured `imap.id.fields` into the parameter list the
 /// io-imap auth coroutines send.
 ///
-/// `None` when `auto` is off. A key set to `true` takes himalaya's canned
-/// value, or `NIL` with a warning when there is none.
+/// `None` when `auto` is off. Unset fields take every canned pair. A key
+/// set to `true` takes himalaya's canned value, or `NIL` with a warning
+/// when there is none.
 pub fn resolve_auto_id_params(
     config: &ImapIdConfig,
 ) -> Result<Option<Vec<(IString<'static>, NString<'static>)>>> {
@@ -126,8 +127,13 @@ pub fn resolve_auto_id_params(
         return Ok(None);
     }
 
-    let mut params = Vec::with_capacity(config.fields.len());
-    for (key, &use_canned) in &config.fields {
+    let Some(fields) = &config.fields else {
+        let params = CANNED_KEYS.into_iter().map(build_canned_pair);
+        return Ok(Some(params.collect::<Result<_>>()?));
+    };
+
+    let mut params = Vec::with_capacity(fields.len());
+    for (key, &use_canned) in fields {
         let ikey = IString::try_from(key.clone())
             .map_err(|err| anyhow!("Invalid IMAP ID parameter key `{key}`: {err}"))?
             .into_static();
@@ -175,6 +181,9 @@ fn parameter_parser(param: &str) -> Result<(IString<'static>, NString<'static>),
 
     Ok((ikey.into_static(), nval.into_static()))
 }
+
+/// The well-known `ID` keys himalaya has a canned value for.
+const CANNED_KEYS: [&str; 4] = ["name", "version", "vendor", "support-url"];
 
 /// himalaya's own value for a well-known `ID` key.
 fn canned_value(key: &str) -> Option<&'static str> {

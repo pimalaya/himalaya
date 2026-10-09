@@ -233,8 +233,8 @@ imap.sasl.plain.username = "user@example.com"
 imap.sasl.plain.password.raw = "***"
 #imap.sasl.plain.password.command = "pass show example"
 
-# SASL LOGIN
-# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+# IMAP LOGIN command (not SASL), for servers advertising no usable mechanism
+# https://www.rfc-editor.org/rfc/rfc9051.html#name-login-command
 #imap.sasl.login.username = "user@example.com"
 #imap.sasl.login.password.raw = "***"
 
@@ -257,19 +257,19 @@ imap.sasl.plain.password.raw = "***"
 # SASL-IR, unset following the advertised capability. `false` waits for the
 # server's continuation request rather than inline the credentials, which
 # Coremail (126.com, 163.com) needs: it advertises SASL-IR falsely. 163.com
-# also refuses `AUTHENTICATE PLAIN`, take `imap.sasl.login` there.
+# also refuses `AUTHENTICATE PLAIN`: take `imap.sasl.login` there.
 # https://www.rfc-editor.org/rfc/rfc4959.html
 #imap.sasl-ir = false
 
 # Exchange an `ID` straight after authentication, which mail.qq.com, fastmail,
-# 126.com and 163.com want. 163.com answers `ID NIL` with OK and then refuses
-# the next command with `Unsafe Login`, so give it some `imap.id.fields`.
+# 126.com and 163.com want.
 # https://www.rfc-editor.org/rfc/rfc2971.html
 #imap.id.auto = false
 
 # What the auto-`ID` sends. A key absent from the map is not transmitted at all.
 # `true` substitutes himalaya's canned value for a well-known key and NIL, with
-# a warning, otherwise; `false` always sends NIL. An empty map sends `ID NIL`.
+# a warning, otherwise; `false` always sends NIL. Unset sends every canned
+# value, an empty map sends `ID NIL`, which 163.com refuses as `Unsafe Login`.
 #imap.id.fields = { name = true, version = true, vendor = true, support-url = true }
 
 # Sort client-side with SEARCH and FETCH rather than issue a server SORT. Unset,

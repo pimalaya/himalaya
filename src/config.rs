@@ -769,13 +769,15 @@ pub struct ImapIdConfig {
     /// tagged auth response, default `false` skipping it.
     #[serde(default, skip_serializing_if = "is_default")]
     pub auto: bool,
-    /// Parameters sent with the auto-`ID` command, empty sending `ID NIL`.
+    /// Parameters sent with the auto-`ID` command.
     ///
-    /// `true` substitutes himalaya's canned value for a well-known key
-    /// (`name`, `version`, `vendor`, `support-url`) and `NIL` otherwise,
-    /// `false` always sends `NIL`, and an absent key is not transmitted.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub fields: HashMap<String, bool>,
+    /// Unset sends himalaya's canned value for every well-known key
+    /// (`name`, `version`, `vendor`, `support-url`), and an empty map
+    /// sends `ID NIL`. `true` substitutes the canned value for a
+    /// well-known key and `NIL` otherwise, `false` always sends `NIL`,
+    /// and an absent key is not transmitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<HashMap<String, bool>>,
 }
 
 /// Header carrying custom keywords inline with a message body.
