@@ -14,7 +14,10 @@ use chrono::{FixedOffset, NaiveDate, TimeZone};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mail_parser::{Addr, Address, ContentType, HeaderValue, Message, MessagePart, MimeHeaders};
-use pimalaya_cli::printer::{Message as PrinterMessage, Printer};
+use pimalaya_cli::{
+    printer::{Message as PrinterMessage, Printer},
+    table::sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -44,6 +47,8 @@ use crate::{
 /// its headers decoded, its text and HTML bodies decoded to UTF-8, and
 /// every leaf part with its id, role (body, inline or attachment), type,
 /// file name and size. `--raw` dumps the original RFC 5322 bytes instead.
+/// Plain output replaces terminal control and bidi characters, retaining
+/// body tabs and newlines. JSON and raw output keep their contents.
 ///
 /// A message nested deeper than 8 levels, or holding more than 200 parts
 /// or 500 header lines, is refused whole with the `message-too-complex`
@@ -534,16 +539,16 @@ impl fmt::Display for MessageView {
             writeln!(f, "Date: {}", date.to_rfc822())?;
         }
         if let Some(from) = message.from() {
-            writeln!(f, "From: {}", format_address(from))?;
+            writeln!(f, "From: {}", sanitize(&format_address(from)))?;
         }
         if let Some(to) = message.to() {
-            writeln!(f, "To: {}", format_address(to))?;
+            writeln!(f, "To: {}", sanitize(&format_address(to)))?;
         }
         if let Some(cc) = message.cc() {
-            writeln!(f, "Cc: {}", format_address(cc))?;
+            writeln!(f, "Cc: {}", sanitize(&format_address(cc)))?;
         }
         if let Some(subject) = message.subject() {
-            writeln!(f, "Subject: {subject}")?;
+            writeln!(f, "Subject: {}", sanitize(subject))?;
         }
 
         // NOTE: HTML markup is verbose and `--raw` covers it, so a part
@@ -554,10 +559,11 @@ impl fmt::Display for MessageView {
         // commands and the JSON view take.
         for part::Leaf { id, part, .. } in part::leaves(message) {
             let mime = part_mime(part);
+            let mime = sanitize(&mime);
             let size = format_size(part.len() as u64, BINARY);
             writeln!(f)?;
             match part.attachment_name() {
-                Some(name) => writeln!(f, "[{id}] {mime} — {name} ({size})")?,
+                Some(name) => writeln!(f, "[{id}] {mime} — {} ({size})", sanitize(name))?,
                 None => writeln!(f, "[{id}] {mime} ({size})")?,
             }
             render_part_headers(f, part)?;
@@ -574,12 +580,28 @@ impl fmt::Display for MessageView {
                     .filter(|t| !t.is_empty())
             {
                 writeln!(f)?;
-                writeln!(f, "{text}")?;
+                writeln!(f, "{}", sanitize_body(text))?;
             }
         }
 
         Ok(())
     }
+}
+
+/// Replaces unsafe body characters while retaining its text layout.
+fn sanitize_body(text: &str) -> String {
+    text.replace("\r\n", "\n")
+        .chars()
+        .map(|c| {
+            if (c.is_control() && !matches!(c, '\t' | '\n'))
+                || matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+            {
+                char::REPLACEMENT_CHARACTER
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// Whether the sole text part of the message is a single HTML one, which
@@ -601,23 +623,27 @@ fn is_html_only(message: &Message) -> bool {
 /// line, each shown only when it is present.
 fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MessagePart) -> fmt::Result {
     if let Some(ctype) = part.content_type() {
-        writeln!(f, "    Content-Type: {}", format_content_type(ctype))?;
+        writeln!(
+            f,
+            "    Content-Type: {}",
+            sanitize(&format_content_type(ctype))
+        )?;
     }
     if let Some(encoding) = part.content_transfer_encoding() {
-        writeln!(f, "    Content-Transfer-Encoding: {encoding}")?;
+        writeln!(f, "    Content-Transfer-Encoding: {}", sanitize(encoding))?;
     }
     if let Some(disposition) = part.content_disposition() {
         writeln!(
             f,
             "    Content-Disposition: {}",
-            format_content_type(disposition)
+            sanitize(&format_content_type(disposition))
         )?;
     }
     if let Some(id) = part.content_id() {
-        writeln!(f, "    Content-ID: {id}")?;
+        writeln!(f, "    Content-ID: {}", sanitize(id))?;
     }
     if let Some(description) = part.content_description() {
-        writeln!(f, "    Content-Description: {description}")?;
+        writeln!(f, "    Content-Description: {}", sanitize(description))?;
     }
     Ok(())
 }
@@ -689,6 +715,52 @@ mod tests {
 
     fn render(raw: &[u8]) -> String {
         MessageReadOutput::new(part::parse(raw).expect("parse")).to_string()
+    }
+
+    #[test]
+    fn bodies_do_not_emit_terminal_commands_or_bidi_controls() {
+        let text =
+            "first\tline\r\n日本語\n\x1b[2J\x1b]52;c;YXVkaXQ=\x07\u{9b}\x7f\u{202e}end\rtail";
+        let raw = format!(
+            "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n",
+            BASE64_STANDARD.encode(text)
+        );
+        let view = MessageReadOutput::from_raw(raw.as_bytes()).unwrap();
+        let rendered = view.to_string();
+        assert!(
+            !rendered
+                .chars()
+                .any(|c| (c.is_control() && !matches!(c, '\t' | '\n'))
+                    || matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'))
+        );
+        assert!(rendered.contains("first\tline\n日本語\n"));
+        assert!(rendered.contains("�[2J�]52;c;YXVkaXQ=�"));
+        assert_eq!(view.text.as_deref(), Some(text));
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(json["text"], text);
+    }
+
+    #[test]
+    fn message_headers_and_part_metadata_are_sanitized() {
+        let encoded = format!(
+            "=?utf-8?B?{}?=",
+            BASE64_STANDARD.encode("audit\x1b]52;c;YQ==\x07\u{202e}")
+        );
+        let raw = format!(
+            "From: {encoded} <audit@example.test>\r\nTo: {encoded} <to@example.test>\r\nCc: {encoded} <cc@example.test>\r\nSubject: {encoded}\r\nContent-Type: text/plain; name=\"{encoded}\"\r\nContent-Disposition: attachment; filename=\"{encoded}\"\r\nContent-Description: {encoded}\r\nContent-ID: <audit\x1b[2J@example.test>\r\n\r\nbody"
+        );
+        let rendered = render(raw.as_bytes());
+        assert!(!rendered.contains('\x1b'));
+        assert!(!rendered.contains('\x07'));
+        assert!(!rendered.contains('\u{202e}'));
+        assert!(rendered.contains("Subject: audit�]52;c;YQ==��"));
+    }
+
+    #[test]
+    fn html_only_body_is_sanitized_too() {
+        let raw = b"Content-Type: text/html\r\n\r\n<p>hello\x1b[2J</p>";
+        let rendered = render(raw);
+        assert!(rendered.contains("<p>hello�[2J</p>"));
     }
 
     #[test]
