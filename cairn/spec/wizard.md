@@ -55,3 +55,6 @@ The wizard SHALL write a configuration file that does not exist and append a pla
 
 ### Requirement: A generated account reads in a deliberate order
 The serializer SHALL decide what a generated account holds, so a defaulted field is omitted and no field is enumerated twice, but the rendering SHALL order what it emits: the groups run most-defining first (`default`, the identity, the storage backend, the transport, the mailboxes, the rendering options), an unrecognised group renders after them rather than being dropped, a group's `server` key reads before the credentials qualifying it, and a blank line separates groups.
+
+### Requirement: Generated configuration files are private
+On Unix, the wizard SHALL create new configuration directories with mode 0700 and new configuration files with mode 0600, subject to a more restrictive umask. Before appending an account, it SHALL restrict the opened file to mode 0600. Creating a new configuration SHALL fail rather than truncate an existing entry. Existing parent directory permissions SHALL remain unchanged.
