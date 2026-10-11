@@ -93,6 +93,9 @@ A command taking a raw RFC 5322 message SHALL resolve it through the shared `Mes
 ### Requirement: Saving a sent message follows the send
 A command both saving and sending (`--save` with `--send`, `message send --save`, `message add --send`) SHALL send first and save afterwards, so a failed send leaves no copy. A save failing after a successful send SHALL fail the command with an error stating that the message was sent.
 
+### Requirement: A sent reply or forward flags its source
+`message reply --send` SHALL add the `answered` flag (RFC 3501 §2.3.2) to the source message once the send has succeeded. A flag failing after a successful send SHALL fail the command with an error stating that the message was sent. `message forward --send` SHALL add the `forwarded` flag (RFC 5788) to the source the same way, best-effort: a backend refusing the keyword SHALL be logged as a warning and SHALL NOT fail the command. A reply or forward only printed or saved SHALL leave the source untouched.
+
 ### Requirement: A read message is a designed view
 `message read --json` SHALL print `{headers, text, html, parts}`, built from the raw message so it is the same on every backend, rather than the parser's own model. `headers` SHALL carry `from`, `to`, `cc`, `bcc`, `replyTo` and `sender` as lists of `{name, email}` (groups flattened, an entry without a valid email dropped, `name` decoded or `null`), `subject` decoded, `date` as RFC 3339 with its offset or `null`, `messageId`, `inReplyTo` and `references` (a list) without angle brackets, and `listId`, `listUnsubscribe`, `precedence` and `autoSubmitted` as found, decoded. `text` SHALL be every `text/plain` body part decoded to UTF-8 by its charset, lossily, joined by a blank line, and `html` the first `text/html` body part, each `null` when absent. The text output and `--raw` SHALL stay unchanged.
 
