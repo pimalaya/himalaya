@@ -20,13 +20,13 @@
 
 use std::{
     fmt,
-    fs::{self, DirBuilder, OpenOptions},
-    io::{IsTerminal, Write, stdin, stdout},
+    fs::{self, DirBuilder, File, OpenOptions},
+    io::{ErrorKind, IsTerminal, Read, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
 
 #[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -91,7 +91,7 @@ impl ConfigureCommand {
         }
 
         match existing {
-            Some(_) => append_or_print(printer, &path, config),
+            Some(existing) => append_or_print(printer, &path, config, &existing.snapshot),
             None => save_or_print(printer, &path, config),
         }
     }
@@ -103,6 +103,7 @@ impl ConfigureCommand {
 struct ExistingConfig {
     names: Vec<String>,
     has_default: bool,
+    snapshot: ConfigSnapshot,
 }
 
 impl ExistingConfig {
@@ -113,16 +114,16 @@ impl ExistingConfig {
     /// appending to a broken document would bury the real problem under a
     /// second one.
     fn read(path: &Path) -> Result<Option<Self>> {
-        if !path.exists() {
+        let Some(snapshot) = ConfigSnapshot::read(path)? else {
             return Ok(None);
-        }
-
-        let config = Config::from_paths(&[path.to_path_buf()])
-            .with_context(|| format!("Read the configuration at {}", path.display()))?;
+        };
+        let config: Config = toml::from_str(&snapshot.contents)
+            .with_context(|| format!("Parse the configuration at {}", path.display()))?;
 
         Ok(Some(Self {
             names: config.accounts.keys().cloned().collect(),
             has_default: config.accounts.values().any(|account| account.default),
+            snapshot,
         }))
     }
 }
@@ -211,7 +212,7 @@ fn save_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutpu
         return printer.out(config);
     }
 
-    write_configuration(path, &config.to_string(), false)?;
+    write_configuration(path, &config.to_string(), None)?;
 
     print_saved(path, &config);
 
@@ -220,7 +221,12 @@ fn save_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutpu
 
 /// Offers to append the generated account to the configuration file
 /// already there, printing it instead when the offer is declined.
-fn append_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutput) -> Result<()> {
+fn append_or_print(
+    printer: &mut impl Printer,
+    path: &Path,
+    config: ConfigureOutput,
+    snapshot: &ConfigSnapshot,
+) -> Result<()> {
     let prompt = format!("Append account `{}` to {}?", config.name, path.display());
 
     if !prompt::bool(prompt, true)? {
@@ -231,7 +237,7 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOut
     // they are, which re-serializing the document would not. The leading
     // newline separates the two tables, and terminates the last line of a
     // file that ends without one.
-    write_configuration(path, &format!("\n{config}"), true)?;
+    write_configuration(path, &format!("\n{config}"), Some(snapshot))?;
 
     print_saved(path, &config);
 
@@ -239,29 +245,48 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOut
 }
 
 /// Writes or appends a generated account with private Unix permissions.
-fn write_configuration(path: &Path, document: &str, append: bool) -> Result<()> {
+fn write_configuration(
+    path: &Path,
+    document: &str,
+    snapshot: Option<&ConfigSnapshot>,
+) -> Result<()> {
+    let append = snapshot.is_some();
     if !append && let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        let mut directory = DirBuilder::new();
-        directory.recursive(true);
-        #[cfg(unix)]
-        directory.mode(0o700);
-        directory
-            .create(parent)
-            .with_context(|| format!("Create the config directory {}", parent.display()))?;
+        create_private_directories(parent)?;
     }
 
     let mut options = OpenOptions::new();
     options.write(true);
     if append {
-        options.append(true);
+        require_regular_path(path)?;
+        options.read(true).append(true);
     } else {
         options.create_new(true);
     }
     #[cfg(unix)]
-    options.mode(0o600);
+    options.mode(0o600).custom_flags(libc::O_NONBLOCK);
     let mut file = options
         .open(path)
         .with_context(|| format!("Open the config file {}", path.display()))?;
+    require_regular_file(&file)?;
+    if let Some(snapshot) = snapshot {
+        let metadata = file.metadata()?;
+        let original = snapshot.file.metadata()?;
+        #[cfg(unix)]
+        if metadata.dev() != original.dev() || metadata.ino() != original.ino() {
+            bail!("Configuration was replaced while prompting");
+        }
+        #[cfg(not(unix))]
+        if metadata.modified()? != original.modified()? {
+            bail!("Configuration changed while prompting");
+        }
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        if contents != snapshot.contents {
+            bail!("Configuration changed while prompting");
+        }
+    }
+    require_no_macos_acl(&file)?;
     #[cfg(unix)]
     if append {
         file.set_permissions(fs::Permissions::from_mode(0o600))
@@ -270,6 +295,113 @@ fn write_configuration(path: &Path, document: &str, append: bool) -> Result<()> 
     file.write_all(document.as_bytes())
         .with_context(|| format!("Write the config file {}", path.display()))?;
     Ok(())
+}
+
+/// The identity and bytes validated before the wizard prompts.
+struct ConfigSnapshot {
+    // NOTE: keeping the original inode open prevents its number being
+    // reused by a replacement while the wizard is prompting.
+    file: File,
+    contents: String,
+}
+
+impl ConfigSnapshot {
+    fn read(path: &Path) -> Result<Option<Self>> {
+        match fs::metadata(path) {
+            Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(err) => return Err(err.into()),
+            Ok(metadata) if !metadata.is_file() => bail!("Configuration is not a regular file"),
+            Ok(_) => {}
+        }
+        let mut options = OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        options.custom_flags(libc::O_NONBLOCK);
+        let mut file = options.open(path)?;
+        require_regular_file(&file)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(Some(Self { file, contents }))
+    }
+}
+
+fn require_regular_path(path: &Path) -> Result<()> {
+    if !fs::metadata(path)?.is_file() {
+        bail!("Configuration is not a regular file");
+    }
+    Ok(())
+}
+
+fn require_regular_file(file: &File) -> Result<()> {
+    if !file.metadata()?.is_file() {
+        bail!("Configuration is not a regular file");
+    }
+    Ok(())
+}
+
+/// Creates only missing directories and refuses inherited macOS ACLs.
+fn create_private_directories(path: &Path) -> Result<()> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        create_private_directories(parent)?;
+    }
+    let mut directory = DirBuilder::new();
+    #[cfg(unix)]
+    directory.mode(0o700);
+    match directory.create(path) {
+        Ok(()) => {
+            #[cfg(target_os = "macos")]
+            require_no_macos_acl(&File::open(path)?)?;
+            Ok(())
+        }
+        Err(err) if err.kind() == ErrorKind::AlreadyExists && path.is_dir() => Ok(()),
+        Err(err) => {
+            Err(err).with_context(|| format!("Create the config directory {}", path.display()))
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn require_no_macos_acl(_file: &File) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn require_no_macos_acl(file: &File) -> Result<()> {
+    use std::{ffi::c_void, io, os::fd::AsRawFd, ptr};
+
+    unsafe extern "C" {
+        fn acl_get_fd_np(fd: libc::c_int, kind: libc::c_int) -> *mut c_void;
+        fn acl_get_entry(acl: *mut c_void, id: libc::c_int, entry: *mut *mut c_void)
+        -> libc::c_int;
+        fn acl_free(acl: *mut c_void) -> libc::c_int;
+    }
+    // SAFETY: the descriptor stays live; ACL_TYPE_EXTENDED is 0x100 in
+    // macOS sys/acl.h. The returned allocation is freed below.
+    let acl = unsafe { acl_get_fd_np(file.as_raw_fd(), 0x100) };
+    if acl.is_null() {
+        let error = io::Error::last_os_error();
+        // NOTE: macOS reports ENOENT when this live descriptor has no ACL.
+        if error.raw_os_error() == Some(libc::ENOENT) {
+            return Ok(());
+        }
+        return Err(error).context("Read configuration ACL");
+    }
+    let mut entry = ptr::null_mut();
+    // SAFETY: acl is a valid allocation and entry is an out pointer.
+    // ACL_FIRST_ENTRY is zero in macOS sys/acl.h.
+    let result = unsafe { acl_get_entry(acl, 0, &mut entry) };
+    let error = io::Error::last_os_error();
+    // SAFETY: acl was allocated by acl_get_fd_np and is freed once.
+    unsafe { acl_free(acl) };
+    match result {
+        0 => bail!("Configuration target has an ACL; choose an owner-only location"),
+        // NOTE: Darwin returns EINVAL past the last entry of a valid ACL.
+        -1 if error.raw_os_error() == Some(libc::EINVAL) => Ok(()),
+        _ => Err(error).context("Inspect configuration ACL"),
+    }
 }
 
 /// Tells where the account landed, under which name, and what to run
@@ -327,7 +459,7 @@ mod tests {
     fn generated_configuration_and_new_directories_are_private() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("first/second/config.toml");
-        write_configuration(&path, "password.raw = \"dummy\"\n", false).unwrap();
+        write_configuration(&path, "password.raw = \"dummy\"\n", None).unwrap();
         assert_eq!(
             fs::metadata(&path).unwrap().permissions().mode() & 0o777,
             0o600
@@ -347,7 +479,8 @@ mod tests {
         let path = dir.path().join("config.toml");
         fs::write(&path, "# keep this comment\n").unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        write_configuration(&path, "new account\n", true).unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        write_configuration(&path, "new account\n", Some(&snapshot)).unwrap();
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
             "# keep this comment\nnew account\n"
@@ -363,7 +496,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
         fs::write(&path, "original").unwrap();
-        assert!(write_configuration(&path, "replacement", false).is_err());
+        assert!(write_configuration(&path, "replacement", None).is_err());
         assert_eq!(fs::read(&path).unwrap(), b"original");
     }
 
@@ -375,8 +508,137 @@ mod tests {
         let target = dir.path().join("target.toml");
         let path = dir.path().join("config.toml");
         symlink(&target, &path).unwrap();
-        assert!(write_configuration(&path, "secret", false).is_err());
+        assert!(write_configuration(&path, "secret", None).is_err());
         assert!(!target.exists());
+    }
+
+    #[test]
+    fn appending_refuses_changed_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        fs::write(&path, "changed").unwrap();
+        assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"changed");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn appending_refuses_a_replaced_inode_with_the_same_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        fs::rename(&path, dir.path().join("old.toml")).unwrap();
+        fs::write(&path, "original").unwrap();
+        assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"original");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn original_handle_survives_unlink_and_prevents_inode_reuse() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        let original = snapshot.file.metadata().unwrap();
+        for _ in 0..32 {
+            fs::remove_file(&path).unwrap();
+            fs::write(&path, "original").unwrap();
+            let replacement = fs::metadata(&path).unwrap();
+            assert_ne!(replacement.ino(), original.ino());
+            assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"original");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unchanged_symlink_configuration_can_be_appended() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.toml");
+        let path = dir.path().join("config.toml");
+        fs::write(&target, "original").unwrap();
+        symlink(&target, &path).unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        write_configuration(&path, "\nnew", Some(&snapshot)).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"original\nnew");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fifo_targets_are_rejected_without_waiting_for_a_reader() {
+        use std::{ffi::CString, os::unix::ffi::OsStrExt};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        fs::remove_file(&path).unwrap();
+        let name = CString::new(path.as_os_str().as_bytes()).unwrap();
+        // SAFETY: name is a live, NUL-terminated temporary path.
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        assert!(ExistingConfig::read(&path).is_err());
+        assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+        let mut options = OpenOptions::new();
+        options.read(true).custom_flags(libc::O_NONBLOCK);
+        let mut reader = options.open(&path).unwrap();
+        assert!(require_regular_file(&reader).is_err());
+        assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).unwrap();
+        assert!(bytes.is_empty());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn explicit_acl_is_rejected_before_appending_or_chmod() {
+        use std::process::Command;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(
+            Command::new("/bin/chmod")
+                .args(["+a", "everyone allow read"])
+                .arg(&path)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let snapshot = ConfigSnapshot::read(&path).unwrap().unwrap();
+        assert!(write_configuration(&path, "secret", Some(&snapshot)).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"original");
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn inherited_acls_are_rejected_before_writing_secrets() {
+        use std::process::Command;
+        let dir = tempfile::tempdir().unwrap();
+        assert!(
+            Command::new("/bin/chmod")
+                .args([
+                    "+a",
+                    "everyone allow read,search,file_inherit,directory_inherit"
+                ])
+                .arg(dir.path())
+                .status()
+                .unwrap()
+                .success()
+        );
+        let direct = dir.path().join("config.toml");
+        assert!(write_configuration(&direct, "secret", None).is_err());
+        assert_eq!(fs::read(&direct).unwrap(), b"");
+        let nested = dir.path().join("first/second/config.toml");
+        assert!(write_configuration(&nested, "secret", None).is_err());
+        assert!(!nested.exists());
     }
 
     #[test]
@@ -460,9 +722,13 @@ mod tests {
 
     #[test]
     fn a_taken_name_gets_a_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "").unwrap();
         let existing = ExistingConfig {
             names: vec!["perso".to_string(), "perso-2".to_string()],
             has_default: true,
+            snapshot: ConfigSnapshot::read(&path).unwrap().unwrap(),
         };
 
         assert_eq!(account_name("perso", None), "perso");

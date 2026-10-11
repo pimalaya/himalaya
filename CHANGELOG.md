@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the named configuration wizard accepting special files or a replaced configuration during prompts. On macOS, ACL-bearing save targets are refused before writing generated credentials.
 - Fixed generated configuration files being readable by other users under a permissive umask on Unix. New files use mode 0600, new configuration directories use mode 0700, and appending restricts the file permissions.
 - Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
 - Fixed pimdir queue details leaking into the shared outputs: `envelope list` no longer reports a `queued` count, and `message send`, `message add --send` and the composers no longer print a `queueId`. `himalaya pimdir queue list` shows what is queued, and a queued send logs its row id at info level.

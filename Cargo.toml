@@ -85,3 +85,6 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
