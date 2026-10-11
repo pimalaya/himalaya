@@ -8,4 +8,4 @@ change: wizard-save-target-validation
 - [x] Add ACL, FIFO, replacement and compatibility regression tests.
 - [x] Run checks and independent Astra review.
 - [x] Fold specification and append history.
-- [ ] Update PR #784.
+- [x] Update PR #784.
