@@ -958,6 +958,7 @@ dependencies = [
  "io-pimdir",
  "io-sasl",
  "io-smtp",
+ "libc",
  "log",
  "mail-builder",
  "mail-parser",
