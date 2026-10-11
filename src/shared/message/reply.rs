@@ -4,13 +4,14 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
     config::PostingStyle,
+    email::flag::{Flag, FlagOp, IanaFlag},
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -28,7 +29,8 @@ use crate::{
 /// quote the text body. With `--all`, the other recipients of the
 /// source go in `Cc`. The result goes to stdout, `--save` or `--send`.
 /// With `--json` and neither, the decoded fields come out instead,
-/// without the signature that sending appends.
+/// without the signature that sending appends. Once sent, the source is
+/// flagged as answered.
 ///
 /// Richer composition is `message read <id>` piped into a standalone
 /// composer, whose output feeds `message send` or `message add`.
@@ -114,7 +116,8 @@ pub struct MessageReplyCommand {
 }
 
 impl MessageReplyCommand {
-    /// Fetches the source, builds the reply and hands it to the handler.
+    /// Fetches the source, builds the reply and hands it to the handler,
+    /// then flags the source as answered when the reply was sent.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -164,6 +167,22 @@ impl MessageReplyCommand {
             raw,
             account.resolve_save(self.save.as_deref(), self.no_save, self.send),
             self.send,
-        )
+        )?;
+
+        // NOTE: a draft that is only printed or saved answers nothing
+        // yet, so the flag follows the send alone (RFC 3501 section
+        // 2.3.2).
+        if self.send {
+            client
+                .store_flags(
+                    &mailbox,
+                    &[self.id.as_str()],
+                    &[Flag::from_iana(IanaFlag::Answered)],
+                    FlagOp::Add,
+                )
+                .context("Message sent, but flagging the source as answered failed")?;
+        }
+
+        Ok(())
     }
 }

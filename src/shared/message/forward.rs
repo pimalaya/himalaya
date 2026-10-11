@@ -12,6 +12,7 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     config::PostingStyle,
+    email::flag::{Flag, FlagOp, IanaFlag},
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -27,7 +28,9 @@ use crate::{
 /// The source is fetched to pre-fill the `Fwd:` subject and the
 /// `References` header, and to quote the body. The result goes to stdout,
 /// `--save` or `--send`. With `--json` and neither, the decoded fields
-/// come out instead, without the signature that sending appends.
+/// come out instead, without the signature that sending appends. Once
+/// sent, the source is flagged as forwarded where the backend takes the
+/// keyword.
 ///
 /// Richer composition is `message read <id>` piped into a standalone
 /// composer, whose output feeds `message send` or `message add`.
@@ -107,7 +110,8 @@ pub struct MessageForwardCommand {
 
 impl MessageForwardCommand {
     /// Fetches the source, builds the forward and hands it to the
-    /// handler.
+    /// handler, then flags the source as forwarded when the forward was
+    /// sent.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -157,6 +161,21 @@ impl MessageForwardCommand {
             raw,
             account.resolve_save(self.save.as_deref(), self.no_save, self.send),
             self.send,
-        )
+        )?;
+
+        // NOTE: `$Forwarded` (RFC 5788) is a keyword, which a server may
+        // refuse where `\Answered` is a system flag it has to take, so
+        // the flag is best-effort and never fails a forward already
+        // sent.
+        if self.send {
+            let forwarded = Flag::from_iana(IanaFlag::Forwarded);
+            let stored =
+                client.store_flags(&mailbox, &[self.id.as_str()], &[forwarded], FlagOp::Add);
+            if let Err(err) = stored {
+                log::warn!("message sent, but flagging the source as forwarded failed: {err:#}");
+            }
+        }
+
+        Ok(())
     }
 }
