@@ -5,12 +5,13 @@
 
 use std::{
     collections::BTreeSet,
-    fmt, fs,
-    io::{Write, stdout},
+    fmt,
+    fs::{self, File, OpenOptions},
+    io::{ErrorKind, Write, stdout},
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
 use mail_parser::Message;
@@ -112,12 +113,12 @@ impl AttachmentDownloadCommand {
                 .clone()
                 .unwrap_or_else(|| format!("attachment-{}", attachment.id));
             let safe = sanitize(&on_disk_name);
-            let path = unique_path(&dir, &safe);
-
             let Some(leaf) = part::find(&message, &attachment.id) else {
                 continue;
             };
-            fs::write(&path, part::bytes(&message, leaf.part))?;
+            let (path, mut file) = create_unique_file(&dir, &safe)?;
+            file.write_all(&part::bytes(&message, leaf.part))
+                .with_context(|| format!("Write attachment to {}", path.display()))?;
 
             attachment.path = Some(path.display().to_string());
             written.push(attachment);
@@ -244,34 +245,54 @@ fn sanitize(name: &str) -> String {
     }
 }
 
-/// Returns a path in the directory that does not exist yet, suffixing the
-/// stem with `(1)`, `(2)` and so on as needed.
-fn unique_path(dir: &Path, name: &str) -> PathBuf {
-    let candidate = dir.join(name);
-    if !candidate.exists() {
-        return candidate;
-    }
-
+/// Creates an unoccupied file, suffixing its name and refusing symlinks.
+fn create_unique_file(dir: &Path, name: &str) -> Result<(PathBuf, File)> {
     let (stem, ext) = match name.rsplit_once('.') {
         Some((s, e)) if !s.is_empty() => (s.to_string(), format!(".{e}")),
         _ => (name.to_string(), String::new()),
     };
 
-    for n in 1..1024 {
-        let candidate = dir.join(format!("{stem} ({n}){ext}"));
-        if !candidate.exists() {
-            return candidate;
+    for n in 0..1024 {
+        let candidate = if n == 0 {
+            dir.join(name)
+        } else {
+            dir.join(format!("{stem} ({n}){ext}"))
+        };
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => return Ok((candidate, file)),
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => continue,
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Create attachment at {}", candidate.display()));
+            }
         }
     }
-    dir.join(name)
+    bail!(
+        "No unused attachment name for `{name}` in {}",
+        dir.display()
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        io::Write,
+        sync::{Arc, Barrier},
+        thread,
+    };
+
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
     use base64::{Engine, prelude::BASE64_STANDARD};
     use clap::Parser;
 
-    use super::{AttachmentDownloadCommand, PartBytes, sanitize};
+    use super::{AttachmentDownloadCommand, PartBytes, create_unique_file, sanitize};
     use crate::shared::message::part;
 
     const MIXED: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\
@@ -291,6 +312,72 @@ mod tests {
         \r\n\
         SUMMARY:Caf=E9 =80 5\r\n\
         --b--\r\n";
+
+    #[test]
+    fn a_collision_does_not_replace_existing_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let original = dir.path().join("report.txt");
+        fs::write(&original, b"original").unwrap();
+        let (path, mut file) = create_unique_file(dir.path(), "report.txt").unwrap();
+        file.write_all(b"attachment").unwrap();
+        assert_eq!(path, dir.path().join("report (1).txt"));
+        assert_eq!(fs::read(original).unwrap(), b"original");
+        assert_eq!(fs::read(path).unwrap(), b"attachment");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_dangling_symlink_is_occupied_not_followed() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join("unexpected.txt");
+        symlink(&target, dir.path().join("report.txt")).unwrap();
+        let (path, mut file) = create_unique_file(dir.path(), "report.txt").unwrap();
+        file.write_all(b"attachment").unwrap();
+        assert!(!target.exists());
+        assert_eq!(path, dir.path().join("report (1).txt"));
+        assert_eq!(fs::read(path).unwrap(), b"attachment");
+    }
+
+    #[test]
+    fn exhausted_names_fail_without_overwriting() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("report.txt"), b"original").unwrap();
+        for n in 1..1024 {
+            fs::write(dir.path().join(format!("report ({n}).txt")), b"original").unwrap();
+        }
+        assert!(create_unique_file(dir.path(), "report.txt").is_err());
+        for entry in fs::read_dir(dir.path()).unwrap() {
+            assert_eq!(fs::read(entry.unwrap().path()).unwrap(), b"original");
+        }
+    }
+
+    #[test]
+    fn concurrent_downloads_get_distinct_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let barrier = Arc::new(Barrier::new(8));
+        let writers: Vec<_> = (0..8)
+            .map(|n| {
+                let dir = dir.path().to_path_buf();
+                let barrier = barrier.clone();
+                thread::spawn(move || {
+                    barrier.wait();
+                    let (path, mut file) = create_unique_file(&dir, "report.txt").unwrap();
+                    let bytes = format!("attachment {n}");
+                    file.write_all(bytes.as_bytes()).unwrap();
+                    (path, bytes)
+                })
+            })
+            .collect();
+        let results: Vec<_> = writers
+            .into_iter()
+            .map(|writer| writer.join().unwrap())
+            .collect();
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 8);
+        for (path, bytes) in results {
+            assert_eq!(fs::read(path).unwrap(), bytes.as_bytes());
+        }
+    }
 
     #[test]
     fn stdout_bytes_are_the_decoded_part() {
