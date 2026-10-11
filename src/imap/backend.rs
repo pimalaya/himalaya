@@ -317,7 +317,7 @@ impl ImapClient {
         self.select(source, ImapMailboxSelectOptions::default())?;
         let copy_uid = self.copy(sequence_set, target, ImapMessageCopyOptions { uid: true })?;
 
-        Ok(self.copied_count(copy_uid, ids.len()))
+        Ok(Self::copied_count(copy_uid, ids.len()))
     }
 
     /// Moves a UID set between two mailboxes.
@@ -325,7 +325,8 @@ impl ImapClient {
     /// With RFC 6851 MOVE this is a single `UID MOVE`. Without it, it is
     /// the sequence RFC 6851 §1 describes for such servers: `UID COPY`,
     /// then `\Deleted` and, when RFC 4315 UIDPLUS is advertised, a
-    /// `UID EXPUNGE` of the source UIDs `COPYUID` reported. Without
+    /// `UID EXPUNGE` of the source UIDs `COPYUID` reported, or of the
+    /// requested ones when it is missing or unreadable. Without
     /// UIDPLUS the messages stay flagged in the source, as
     /// `delete_messages` already does in the trash. A plain `EXPUNGE`
     /// would also remove every other `\Deleted` message.
@@ -340,7 +341,7 @@ impl ImapClient {
             (true, _) => {
                 let copy_uid =
                     self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
-                Ok(self.copied_count(copy_uid, ids.len()))
+                Ok(Self::copied_count(copy_uid, ids.len()))
             }
             (false, uidplus) => {
                 let copy_uid = self.copy(
@@ -348,7 +349,7 @@ impl ImapClient {
                     target,
                     ImapMessageCopyOptions { uid: true },
                 )?;
-                let moved = self.copied_count(copy_uid.clone(), ids.len());
+                let moved = Self::copied_count(copy_uid.clone(), ids.len());
                 if moved == 0 {
                     return Ok(0);
                 }
@@ -407,13 +408,15 @@ impl ImapClient {
     /// How many messages a UID `COPY` or `MOVE` really affected.
     ///
     /// A UIDPLUS `COPYUID` lists exactly those UIDs, so it is
-    /// authoritative, its absence meaning nothing matched. Without
-    /// UIDPLUS there is no such feedback, so the requested count answers
-    /// rather than under-report a real copy as zero.
-    fn copied_count(&self, copy_uid: ImapCopyUid, requested: usize) -> usize {
+    /// authoritative. Without one, the tagged `OK` is the only feedback,
+    /// so the requested count answers rather than under-report a real
+    /// copy as zero: some UIDPLUS servers send an unreadable `COPYUID`,
+    /// such as Mailo's UIDVALIDITY 0 ([#781]).
+    ///
+    /// [#781]: https://github.com/pimalaya/himalaya/issues/781
+    fn copied_count(copy_uid: ImapCopyUid, requested: usize) -> usize {
         match copy_uid {
             Some((_, source_uids, _)) => source_uids.len(),
-            None if self.supports_uidplus() => 0,
             None => requested,
         }
     }
