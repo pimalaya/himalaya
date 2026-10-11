@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Result, anyhow, bail};
 use mail_builder::{
     MessageBuilder,
-    headers::{address::Address, raw::Raw},
+    headers::{address::Address, message_id::generate_message_id_header, raw::Raw},
 };
 use mail_parser::{HeaderValue, MessageParser, parsers::MessageStream};
 
@@ -84,6 +84,9 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     if let Some(from) = args.from {
         let (parsed_name, address) = parse_mailboxes(from)?.remove(0);
         let name = args.from_name.map(str::to_owned).or(parsed_name);
+        if let Some(id) = message_id(&address) {
+            builder = builder.message_id(id);
+        }
         builder = builder.from(Address::new_address(name, address));
     }
     if !args.to.is_empty() {
@@ -174,6 +177,33 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     builder
         .write_to_vec()
         .map_err(|err| anyhow!("serialize composed message: {err}"))
+}
+
+/// Generates a `Message-ID` on the domain of the sender's address.
+///
+/// Left alone, mail-builder puts the machine's hostname on the right
+/// of the `@`, which tells every recipient the name of the machine and
+/// is rarely a domain at all. `None` when the address carries no
+/// plain domain, mail-builder then falling back to the hostname.
+fn message_id(address: &str) -> Option<String> {
+    let (_, domain) = address.rsplit_once('@')?;
+
+    // NOTE: RFC 5322 section 3.6.4 wants a dot-atom on the right, so a
+    // domain literal or an internationalized domain is left out.
+    let is_atext = |c: char| c.is_ascii_alphanumeric() || c == '-';
+    if domain.is_empty()
+        || !domain
+            .split('.')
+            .all(|l| !l.is_empty() && l.chars().all(is_atext))
+    {
+        return None;
+    }
+
+    let mut id = Vec::new();
+    generate_message_id_header(&mut id, domain);
+    let id = String::from_utf8(id).ok()?;
+
+    Some(id.trim_matches(['<', '>']).to_owned())
 }
 
 /// Splits an address list into its mailboxes, each with its display
@@ -525,6 +555,40 @@ Original body line.\r\n";
         let text = String::from_utf8(raw).unwrap();
 
         assert!(text.contains("From: \"Doe, Alice\" <alice@example.com>"));
+    }
+
+    #[test]
+    fn message_id_sits_on_the_sender_domain() {
+        let to = vec!["bob@example.com".to_string()];
+        let a = args("Alice <alice@example.com>", &to, Some("Hello"), "Hi Bob");
+
+        let raw = build(a, None).unwrap();
+        let msg = parse(&raw);
+        let id = msg.message_id().expect("a message id");
+
+        assert!(id.ends_with("@example.com"), "{id}");
+        assert!(id.len() > "@example.com".len());
+        assert_eq!(
+            String::from_utf8(raw)
+                .unwrap()
+                .matches("Message-ID:")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn message_id_needs_a_plain_domain() {
+        assert!(message_id("alice@example.com").is_some());
+        assert_ne!(
+            message_id("alice@example.com"),
+            message_id("alice@example.com")
+        );
+        assert_eq!(message_id("alice"), None);
+        assert_eq!(message_id("alice@"), None);
+        assert_eq!(message_id("alice@[192.0.2.1]"), None);
+        assert_eq!(message_id("alice@exa mple.com"), None);
+        assert_eq!(message_id("alice@b\u{fc}cher.example"), None);
     }
 
     #[test]
