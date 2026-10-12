@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed pimdir queue details leaking into the shared outputs: `envelope list` no longer reports a `queued` count, and `message send`, `message add --send` and the composers no longer print a `queueId`. `himalaya pimdir queue list` shows what is queued, and a queued send logs its row id at info level.
 - Fixed `message compose`, `reply` and `forward` writing a `Message-ID` on the hostname of the machine (`<…@myhost>`), which disclosed it to every recipient. The id now sits on the domain of the `From` address; without one, or with a domain that is not a plain dot-atom, the hostname is still used.
 - Fixed `message move` on an IMAP server without MOVE whose `COPYUID` cannot be read, such as Mailo's UIDVALIDITY 0: the message was copied, left in the source and reported as not found. A tagged `OK` without a readable `COPYUID` now counts as the requested messages copied, for `message copy` too ([#781]).
+- Fixed a raw message piped on stdin (`message send`, `message add`, `smtp send`, every `save`, `import` and `insert`) being cut at its first line that is not valid UTF-8 and still reported as sent or saved, or refused as empty when that line was the first. Stdin and message files are now read whole as bytes, so a message in another 8-bit charset goes through intact. `imap raw` and `smtp raw` read stdin whole too and refuse invalid UTF-8 rather than truncating ([#786]).
 
 ## [2.2.1] - 2026-10-02
 
@@ -1430,6 +1431,7 @@ Few major concepts changed:
 [#774]: https://github.com/pimalaya/himalaya/pull/774
 [#775]: https://github.com/pimalaya/himalaya/issues/775
 [#781]: https://github.com/pimalaya/himalaya/issues/781
+[#786]: https://github.com/pimalaya/himalaya/issues/786
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

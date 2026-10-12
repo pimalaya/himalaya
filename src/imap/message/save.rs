@@ -54,7 +54,7 @@ impl ImapMessageSaveCommand {
 
         client.append(
             mailbox,
-            message.as_bytes(),
+            &message,
             ImapMessageAppendOptions {
                 flags,
                 date: None,

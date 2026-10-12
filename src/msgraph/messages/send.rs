@@ -20,7 +20,7 @@ pub struct MsgraphMessageSendCommand {
 impl MsgraphMessageSendCommand {
     /// Sends the given MIME bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         client.mail_send_mime(&raw)?;
         printer.out(Message::new("Microsoft Graph message successfully sent"))
     }

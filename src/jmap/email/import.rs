@@ -48,7 +48,7 @@ pub struct JmapEmailImportCommand {
 impl JmapEmailImportCommand {
     /// Uploads the message as a blob, then imports it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let data = self.message.parse()?.into_bytes();
+        let data = self.message.parse()?;
 
         let session = client
             .session()

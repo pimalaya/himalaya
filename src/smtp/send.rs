@@ -113,7 +113,7 @@ impl SmtpSendCommand {
             rcpt_parameters,
         };
 
-        client.send(self.mail_from, self.rcpt_to, message.into_bytes(), options)?;
+        client.send(self.mail_from, self.rcpt_to, message, options)?;
         printer.out(Message::new("Message successfully sent"))
     }
 }

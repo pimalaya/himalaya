@@ -33,7 +33,7 @@ pub struct GmailDraftUpdateCommand {
 impl GmailDraftUpdateCommand {
     /// Replaces the draft with the given message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
 
         let draft = GmailDraft {
             id: self.id.clone(),

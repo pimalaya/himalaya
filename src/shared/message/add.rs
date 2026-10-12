@@ -52,7 +52,7 @@ impl MessageAddCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let outcome = handler::apply(account, client, raw, &flags, Some(&self.mailbox), self.send)?;
         let Outcome::Saved { id, sent } = outcome else {

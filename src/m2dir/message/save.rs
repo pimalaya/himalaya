@@ -41,7 +41,7 @@ impl M2dirMessageSaveCommand {
         let m2dir = client.open_m2dir(path)?;
 
         let msg = self.message.parse()?;
-        let entry = client.store(m2dir.clone(), msg.into_bytes())?;
+        let entry = client.store(m2dir.clone(), msg)?;
 
         if !self.flags.is_empty() {
             let flags = M2dirFlags::from_iter(self.flags.iter().map(String::as_str));

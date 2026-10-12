@@ -23,7 +23,7 @@ pub struct MsgraphMessageCreateCommand {
 impl MsgraphMessageCreateCommand {
     /// Creates the draft from the given MIME bytes.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let message = client
             .message_create_mime(self.folder.as_deref(), &raw)?
             .response;

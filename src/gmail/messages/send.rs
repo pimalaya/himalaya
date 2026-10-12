@@ -19,7 +19,7 @@ pub struct GmailMessageSendCommand {
 impl GmailMessageSendCommand {
     /// Sends the message and reports the id it landed under.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let message = GmailMessage {
             raw: Some(encode_raw(&raw)),
             ..Default::default()

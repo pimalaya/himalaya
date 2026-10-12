@@ -30,7 +30,7 @@ pub struct GmailDraftCreateCommand {
 impl GmailDraftCreateCommand {
     /// Creates the draft and reports its new id.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
 
         let draft = GmailDraft {
             id: String::new(),

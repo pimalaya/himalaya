@@ -43,7 +43,7 @@ impl PimdirMessageAddCommand {
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let mailbox = account.resolve_mailbox(&self.mailbox);
         let staged = client.add_message(mailbox, &flags, raw)?;

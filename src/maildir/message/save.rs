@@ -47,7 +47,7 @@ impl MaildirMessageSaveCommand {
         let msg = self.message.parse()?;
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;
+        let (id, path) = client.store(maildir, self.subdir.into(), flags, msg)?;
         let path = PathBuf::from(path.into_string());
 
         printer.out(StoredMessage { id, path })

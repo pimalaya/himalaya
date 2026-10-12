@@ -9,7 +9,7 @@
 
 use std::{
     fs,
-    io::{IsTerminal, stdin},
+    io::{IsTerminal, Read, stdin},
 };
 
 use anyhow::{Context, bail};
@@ -34,12 +34,15 @@ pub struct MessageArg {
 impl MessageArg {
     /// Resolves the message, rejecting an empty result whatever its
     /// source.
-    pub fn parse(&self) -> anyhow::Result<String> {
+    ///
+    /// The message is kept as bytes: RFC 5322 allows 8-bit content in
+    /// any charset, which UTF-8 decoding would reject.
+    pub fn parse(&self) -> anyhow::Result<Vec<u8>> {
         let message = self.resolve()?;
 
         // NOTE: an empty message would otherwise reach the backend and
         // fail there with an opaque server error.
-        if message.trim().is_empty() {
+        if message.trim_ascii().is_empty() {
             bail!("Message is empty");
         }
 
@@ -48,24 +51,27 @@ impl MessageArg {
 
     /// Reads the message off the positional, a file it names, or piped
     /// stdin, normalising its line endings to CRLF.
-    fn resolve(&self) -> anyhow::Result<String> {
+    fn resolve(&self) -> anyhow::Result<Vec<u8>> {
         if !self.raw.is_empty() {
             let mime = self.raw.join(" ").replace("\\r", "").replace("\\n", "\r\n");
 
             // NOTE: a real file that fails to read is a hard error, never
             // silently reinterpreted as the message body.
             if let Some(path) = path_parser(&mime).ok().filter(|path| path.is_file()) {
-                let contents = fs::read_to_string(&path)
+                let contents = fs::read(&path)
                     .with_context(|| format!("Failed to read message file `{}`", path.display()))?;
                 return Ok(crlf::normalize(&contents));
             }
 
-            return Ok(crlf::normalize(&mime));
+            return Ok(crlf::normalize(mime.as_bytes()));
         }
 
         if !stdin().is_terminal() {
-            let lines: Vec<_> = stdin().lines().map_while(Result::ok).collect();
-            return Ok(lines.join("\r\n"));
+            let mut contents = Vec::new();
+            stdin()
+                .read_to_end(&mut contents)
+                .context("Failed to read message from stdin")?;
+            return Ok(crlf::normalize(&contents));
         }
 
         bail!("No message provided: pass it as an argument, a file path, or via stdin");

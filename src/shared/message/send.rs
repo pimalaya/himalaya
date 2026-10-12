@@ -44,7 +44,7 @@ impl MessageSendCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let save = account.resolve_save(self.save.as_deref(), self.no_save, true);
         handler::route(printer, account, client, raw, save, true)
     }

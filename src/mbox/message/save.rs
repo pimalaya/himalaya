@@ -39,7 +39,7 @@ impl MboxMessageSaveCommand {
         let msg = self.message.parse()?;
         let flags = MboxFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        let id = client.append(&path, flags, msg.into_bytes())?;
+        let id = client.append(&path, flags, msg)?;
 
         printer.out(StoredMessage { id })
     }

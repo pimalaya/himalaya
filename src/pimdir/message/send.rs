@@ -48,7 +48,7 @@ impl PimdirMessageSendCommand {
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
-        let raw = self.message.parse()?.into_bytes();
+        let raw = self.message.parse()?;
         let save = account
             .resolve_save(self.save.as_deref(), self.no_save, true)
             .map(|name| account.resolve_mailbox(name));
