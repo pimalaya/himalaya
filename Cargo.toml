@@ -92,4 +92,4 @@ io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec6
 io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "b1ab38ea9f24578b46dda56aa009600571b6b9ef" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "189db408bdbeee33c1c535709c5f40f3464c7ecb" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "07bd3169ae5af2f7c8806675dc4cc58eddf4b044" }
