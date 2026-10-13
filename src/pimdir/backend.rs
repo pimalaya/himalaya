@@ -159,7 +159,7 @@ impl PimdirClient {
         let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
         let unread = self
             .store
-            .count_unread(&ids, None)
+            .count_unread(&ids, None, None)
             .map_err(|err| anyhow!("Count unread pimdir mail: {err}"))?;
 
         let mut mailboxes = Vec::new();
@@ -752,7 +752,7 @@ impl PimdirClient {
         });
         let entries = self
             .store
-            .list_mail_page_filtered(&[collection], filter, cursor.as_ref(), limit)
+            .list_mail_page_filtered(&[collection], filter, None, cursor.as_ref(), limit)
             .map_err(|err| anyhow!("List unread items in `{collection}`: {err}"))?;
         Ok(entries.into_iter().map(|entry| entry.item).collect())
     }

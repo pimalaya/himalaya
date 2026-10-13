@@ -1195,9 +1195,9 @@ dependencies = [
 
 [[package]]
 name = "io-gmail"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76991fe82eed84da4d85fb04c392fe0d93cad5ca1419c25faedb9d9a42a8a20b"
+checksum = "9395ae6abe2e10289147290316e62226bedbd20a6b29fd6d9ae903d1483344c0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1214,8 +1214,7 @@ dependencies = [
 [[package]]
 name = "io-http"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fe2064378f85c13e3f3aca141308fa541c4478ff5cf5ebadd7dcbcce1a44281"
+source = "git+https://github.com/pimalaya/io-http?rev=e1815307771c1ec65a86b77256d46c33241d3038#e1815307771c1ec65a86b77256d46c33241d3038"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1231,8 +1230,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df059b417ac8888b21787a4464a146260aba38d59f0d1945cd3b727777eb8297"
+source = "git+https://github.com/pimalaya/io-imap?rev=b1ab38ea9f24578b46dda56aa009600571b6b9ef#b1ab38ea9f24578b46dda56aa009600571b6b9ef"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1248,9 +1246,8 @@ dependencies = [
 
 [[package]]
 name = "io-jmap"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cac88102ac3621a7da2dc6a306c5251c293f2c5b0c16fbc08ccea1fad849188b"
+version = "0.6.0"
+source = "git+https://github.com/pimalaya/io-jmap?rev=919eab465ab620b323f9191ab8de2f640bc4a1d2#919eab465ab620b323f9191ab8de2f640bc4a1d2"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1323,9 +1320,8 @@ dependencies = [
 
 [[package]]
 name = "io-msgraph"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf5b9c7de32943e38be0e1f99c03c9280aca59d9041f90073404b17e2c861fb9"
+version = "0.6.0"
+source = "git+https://github.com/pimalaya/io-msgraph?rev=2ae26370aefa671c16316dbad98107634436bce6#2ae26370aefa671c16316dbad98107634436bce6"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1363,8 +1359,8 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.6.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=be03184246e1ad7e45bd657de5076d99a1b34922#be03184246e1ad7e45bd657de5076d99a1b34922"
+version = "0.8.0"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=189db408bdbeee33c1c535709c5f40f3464c7ecb#189db408bdbeee33c1c535709c5f40f3464c7ecb"
 dependencies = [
  "blake3",
  "fs4",

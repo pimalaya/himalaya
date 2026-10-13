@@ -52,16 +52,16 @@ convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "7"
 humansize = "2"
-io-gmail = { version = "0.4", default-features = false, optional = true }
+io-gmail = { version = "0.5", default-features = false, optional = true }
 io-imap = { version = "0.7.1", default-features = false, optional = true }
-io-jmap = { version = "0.4.1", default-features = false, optional = true }
+io-jmap = { version = "0.6", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
-io-msgraph = { version = "0.4", default-features = false, optional = true }
+io-msgraph = { version = "0.6", default-features = false, optional = true }
 io-pim-discovery = { version = "0.8", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "be03184246e1ad7e45bd657de5076d99a1b34922", default-features = false, features = ["client"], optional = true }
+io-pimdir = { version = "0.8", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
 log = "0.4"
@@ -85,3 +85,11 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
+
+# NOTE: unreleased fixes, to be replaced by released versions.
+[patch.crates-io]
+io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
+io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "b1ab38ea9f24578b46dda56aa009600571b6b9ef" }
+io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
+io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "189db408bdbeee33c1c535709c5f40f3464c7ecb" }

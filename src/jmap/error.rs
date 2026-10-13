@@ -208,6 +208,10 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
             | Self::ForbiddenToSend { description }
             | Self::CannotUnsendMessage { description }
             | Self::InvalidEmail { description }
+            | Self::TooLarge { description, .. }
+            | Self::Forbidden { description }
+            | Self::OverQuota { description }
+            | Self::RateLimit { description }
             | Self::NotFound { description }
             | Self::InvalidProperties { description, .. } => description.as_deref(),
             Self::Unknown => None,
@@ -231,6 +235,10 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
             Self::ForbiddenToSend { .. } => "forbiddenToSend",
             Self::CannotUnsendMessage { .. } => "cannotUnsendMessage",
             Self::InvalidEmail { .. } => "invalidEmail",
+            Self::TooLarge { .. } => "tooLarge",
+            Self::Forbidden { .. } => "forbidden",
+            Self::OverQuota { .. } => "overQuota",
+            Self::RateLimit { .. } => "rateLimit",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Unknown => "unknown",

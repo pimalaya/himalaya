@@ -87,6 +87,7 @@ impl MsgraphMessageListCommand {
             search,
             orderby,
             count,
+            ..Default::default()
         };
         let response = client
             .messages_list(self.folder.as_deref(), &params)?

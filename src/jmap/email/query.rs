@@ -147,6 +147,7 @@ impl JmapEmailQueryCommand {
             position: Some(self.page.saturating_sub(1) * self.page_size),
             limit: Some(self.page_size),
             properties: None,
+            ..Default::default()
         })?;
 
         let table = EmailsTable {

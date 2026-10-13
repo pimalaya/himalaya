@@ -121,6 +121,7 @@ impl JmapClient {
             position,
             limit,
             properties: Some(envelope_properties()),
+            ..Default::default()
         })?;
 
         let mut envelopes: Vec<Envelope> = output.emails.into_iter().map(envelope_from).collect();
