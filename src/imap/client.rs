@@ -87,9 +87,9 @@ impl ImapClient {
 
     /// Whether the server advertised RFC 4315 UIDPLUS.
     ///
-    /// With it, `COPY` and `MOVE` return an authoritative `COPYUID` whose
-    /// absence means nothing was affected, so a count can be trusted.
-    /// Without it there is no such feedback.
+    /// With it, `UID EXPUNGE` removes only the given messages. Its
+    /// `COPYUID` is not relied on alone: a server sends none when nothing
+    /// matched, and some send one that cannot be read.
     pub fn supports_uidplus(&self) -> bool {
         has_imap_capability!(self.capabilities, UidPlus)
     }
