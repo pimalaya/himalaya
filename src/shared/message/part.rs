@@ -156,6 +156,63 @@ pub fn find<'a, 'x>(message: &'a Message<'x>, id: &str) -> Option<Leaf<'a, 'x>> 
     leaves(message).find(|leaf| leaf.id == id)
 }
 
+/// The leaf part at the given IMAP section (RFC 3501 §6.4.5): `1` for
+/// the body of a message that is not multipart, else the 1-based
+/// position of each part among its siblings, joined with dots down the
+/// multipart parts (`2`, `1.2`).
+///
+/// A part of an attached message has no section here, as it is no leaf
+/// of the message.
+pub fn find_section<'a, 'x>(message: &'a Message<'x>, section: &str) -> Option<Leaf<'a, 'x>> {
+    let sections = sections(message);
+    leaves(message)
+        .find(|leaf| sections.get(leaf.index).and_then(Option::as_deref) == Some(section))
+}
+
+/// The IMAP section of each part, by its index in [`Message::parts`];
+/// `None` for the message's own multipart and for a part no multipart
+/// lists.
+fn sections(message: &Message) -> Vec<Option<String>> {
+    let mut sections = vec![None; message.parts.len()];
+    match message.parts.first().map(|root| &root.body) {
+        Some(PartType::Multipart(children)) => number(message, children, "", 1, &mut sections),
+        Some(_) => sections[0] = Some(String::from("1")),
+        None => (),
+    }
+    sections
+}
+
+/// Numbers the `children` of a multipart under `prefix`, then their own
+/// children, `depth` deep at most [`MAX_DEPTH`].
+fn number(
+    message: &Message,
+    children: &[u32],
+    prefix: &str,
+    depth: usize,
+    sections: &mut [Option<String>],
+) {
+    if depth > MAX_DEPTH {
+        return;
+    }
+    for (position, &child) in children.iter().enumerate() {
+        let child = child as usize;
+        let Some(part) = message.parts.get(child) else {
+            continue;
+        };
+        let section = format!("{prefix}{}", position + 1);
+        if let PartType::Multipart(grandchildren) = &part.body {
+            number(
+                message,
+                grandchildren,
+                &format!("{section}."),
+                depth + 1,
+                sections,
+            );
+        }
+        sections[child] = Some(section);
+    }
+}
+
 /// What a part is to a reader.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]

@@ -17,6 +17,7 @@
 //!
 //! [`PimdirReader`]: io_pimdir::client::reader::PimdirReader
 
+pub mod attachment;
 pub mod backend;
 pub mod cli;
 pub mod client;

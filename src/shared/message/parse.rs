@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -31,7 +31,7 @@ use crate::shared::{
 ///
 /// `--part` writes the decoded bytes of one part to stdout instead, as
 /// `attachment download --stdout` does, the ids being those of the
-/// view's `parts`.
+/// view's `parts`; `--section` names the part by its IMAP section.
 ///
 /// A message nested deeper than 8 levels, or holding more than 200 parts
 /// or 500 header lines, is refused whole with the `message-too-complex`
@@ -49,6 +49,15 @@ pub struct MessageParseCommand {
     /// base64.
     #[arg(long, value_name = "PART-ID")]
     pub part: Option<String>,
+    /// As `--part`, the part named by its IMAP section instead.
+    ///
+    /// The section is RFC 3501's (§6.4.5): `1` for the body of a message
+    /// that is not multipart, else each part's position among its
+    /// siblings, joined with dots (`2`, `1.2`). It is what a pimdir store
+    /// records of an attachment, and what `pimdir attachment list`
+    /// prints. The JSON `id` is still the view's.
+    #[arg(long, value_name = "SECTION", conflicts_with = "part")]
+    pub section: Option<String>,
 }
 
 impl MessageParseCommand {
@@ -56,14 +65,21 @@ impl MessageParseCommand {
     pub fn execute(self, printer: &mut impl Printer) -> Result<()> {
         let (raw, source) = self.read()?;
 
-        let Some(id) = self.part else {
+        if self.part.is_none() && self.section.is_none() {
             let view = MessageReadOutput::from_raw(&raw)?;
             return printer.out(MessageParseOutput::View(Box::new(view)));
-        };
+        }
 
         let message = part::parse(&raw)?;
-        let Some(part) = PartBytes::new(&message, &id) else {
-            bail!("No part with id {id} in the message read from {source}");
+        let part = match (&self.part, &self.section) {
+            (Some(id), _) => PartBytes::new(&message, id)
+                .ok_or_else(|| anyhow!("No part with id {id} in the message read from {source}"))?,
+            (None, Some(section)) => part::find_section(&message, section)
+                .and_then(|leaf| PartBytes::new(&message, &leaf.id))
+                .ok_or_else(|| {
+                    anyhow!("No part at section {section} in the message read from {source}")
+                })?,
+            (None, None) => bail!("Name the part to write with `--part` or `--section`"),
         };
 
         if printer.is_json() {

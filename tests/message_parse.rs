@@ -212,6 +212,58 @@ fn a_blank_source_is_refused_naming_it() {
 }
 
 #[test]
+fn a_part_is_named_by_its_imap_section_too() {
+    let himalaya = Himalaya::new();
+    let path = himalaya.eml("m.eml", MIXED);
+    let path = path.to_str().unwrap();
+
+    // NOTE: mixed holds related (1: alternative 1.1, holding 1.1.1 and
+    // 1.1.2, then the image 1.2), the file (2) and the message (3).
+    for (section, id) in [
+        ("1.1.1", "4"),
+        ("1.1.2", "5"),
+        ("1.2", "6"),
+        ("2", "7"),
+        ("3", "8"),
+    ] {
+        let by_section =
+            json(himalaya.run(&["--json", "message", "parse", "--section", section, path]));
+        let by_id = json(himalaya.run(&["--json", "message", "parse", "--part", id, path]));
+        assert_eq!(by_section, by_id, "section {section}");
+    }
+    assert_eq!(
+        ok(himalaya.run_stdin(&["message", "parse", "--section", "2", "-"], MIXED)),
+        b"\x00\x01\xff\xfe\x00\x0a\x0d"
+    );
+
+    // NOTE: containers, a part of the attached message and nothing.
+    for section in ["1", "1.1", "3.1", "4", "0", ""] {
+        let output = himalaya.run(&["--json", "message", "parse", "--section", section, path]);
+        assert!(!output.status.success(), "section {section:?}");
+        let err: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let err = err["error"].as_str().unwrap();
+        assert!(
+            err.contains(&format!("No part at section {section}")),
+            "{err}"
+        );
+    }
+
+    let output = himalaya.run(&["message", "parse", "--part", "7", "--section", "2", path]);
+    assert!(!output.status.success());
+
+    // NOTE: the body of a message that is not multipart is section 1.
+    let single = b"Content-Type: application/pdf\r\n\
+        Content-Disposition: attachment; filename=\"a.pdf\"\r\n\
+        Content-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n";
+    let part = json(himalaya.run_stdin(
+        &["--json", "message", "parse", "--section", "1", "-"],
+        single,
+    ));
+    assert_eq!(part["filename"], "a.pdf");
+    assert_eq!(part["data"], "JVBERi0xLjQK");
+}
+
+#[test]
 fn a_message_too_complex_is_refused_with_its_code() {
     let himalaya = Himalaya::new();
     let mut raw = String::new();

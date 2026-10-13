@@ -408,6 +408,15 @@ pub fn schemas() -> BTreeMap<String, Value> {
             "himalaya-pimdir-mailbox-list",
             crate::pimdir::mailbox::list::PimdirMailboxes
         );
+        insert!(
+            "himalaya-pimdir-attachment-list",
+            crate::pimdir::attachment::list::PimdirAttachments
+        );
+        // NOTE: `pimdir attachment search` prints the page `list` prints.
+        insert!(
+            "himalaya-pimdir-attachment-search",
+            crate::pimdir::attachment::list::PimdirAttachments
+        );
     }
 
     schemas

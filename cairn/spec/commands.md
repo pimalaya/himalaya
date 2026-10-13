@@ -114,5 +114,7 @@ A message nested deeper than 8 levels, or holding more than 200 parts or 500 hea
 ### Requirement: A parsed message hands one part over
 `message parse --part <PART-ID>` SHALL write that part's bytes, transfer encoding undone, to stdout, or under `--json` `{id, mime, filename, size, data}` with `data` in base64; the ids SHALL be those of the view. An unknown id or a container's SHALL be refused.
 
+`message parse --section <SECTION>` SHALL do the same for the leaf part at that IMAP section (RFC 3501 §6.4.5): `1` for the body of a message that is not multipart, else each part's 1-based position among its siblings, joined with dots down the message's own multiparts. The JSON `id` SHALL stay the view's. A container's section, a part of an attached message, or a section naming nothing SHALL be refused; `--part` and `--section` SHALL NOT be given together.
+
 ### Requirement: Downloaded attachments never replace an existing entry
 Attachment downloads SHALL atomically create a new file, refusing to follow an existing leaf symlink. An occupied name SHALL be suffixed with a number before its extension. If the original name and suffixes 1 through 1023 are occupied, the command SHALL fail rather than overwrite a file. Concurrent downloads SHALL reserve distinct names.
