@@ -190,20 +190,21 @@ impl MsgraphClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let patch = flag_patch(flags, op);
 
         // NOTE: `\Answered` and `$Forwarded` have no Graph field, so
         // adding or removing only those leaves an empty PATCH, a wasted
-        // request that could still fail.
+        // request that could still fail. The ids are then
+        // not checked and all count as found.
         if patch == MsgraphMessage::default() {
-            return Ok(());
+            return Ok(ids.len());
         }
 
         for id in ids {
             self.message_update(id, &patch)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Fetches one message's raw RFC 5322 bytes via

@@ -255,7 +255,8 @@ impl EmailClient {
         }
     }
 
-    /// Adds, sets or removes flags on a set of messages.
+    /// Adds, sets or removes flags on a set of messages, returning how
+    /// many of them were found.
     #[cfg(backend)]
     pub fn store_flags(
         &mut self,
@@ -263,7 +264,7 @@ impl EmailClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {

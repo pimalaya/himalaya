@@ -3,7 +3,7 @@
 //! The `message move` command, moving messages between two mailboxes of
 //! one account.
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -46,7 +46,7 @@ impl MessageMoveCommand {
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         let count = client.move_messages(&from, &to, &ids)?;
         let message = match count {
-            0 => "No message moved: no id matched in the source mailbox".to_string(),
+            0 => bail!("No message moved: no id matched in the source mailbox"),
             1 => "1 message successfully moved".to_string(),
             n => format!("{n} messages successfully moved"),
         };

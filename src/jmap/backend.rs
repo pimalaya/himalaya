@@ -141,7 +141,7 @@ impl JmapClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let mut args = JmapEmailSetArgs::default();
 
         for id in ids {
@@ -167,7 +167,9 @@ impl JmapClient {
         }
 
         let output = self.email_set(args)?;
-        bail_on_not_updated(output.not_updated)
+        let count = output.updated.len();
+        bail_on_not_updated(output.not_updated)?;
+        Ok(count)
     }
 
     /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the

@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -44,10 +44,13 @@ impl FlagRemoveCommand {
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        client.store_flags(&mailbox, &ids, &flags, FlagOp::Remove)?;
+        let count = client.store_flags(&mailbox, &ids, &flags, FlagOp::Remove)?;
+        if count == 0 {
+            bail!("No flag removed: no id matched in the mailbox");
+        }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(RemovedFlags { flags })
+        printer.out(RemovedFlags { flags, count })
     }
 }
 
@@ -55,10 +58,38 @@ impl FlagRemoveCommand {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct RemovedFlags {
     flags: Vec<String>,
+    /// How many of the given messages were found.
+    count: usize,
 }
 
 impl fmt::Display for RemovedFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Successfully removed flags: {}", self.flags.join(", "))
+        let (count, flags) = (self.count, self.flags.join(", "));
+        writeln!(
+            f,
+            "Successfully removed flags from {count} message(s): {flags}"
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RemovedFlags;
+
+    #[test]
+    fn output_counts_the_messages_and_ends_the_line() {
+        let output = RemovedFlags {
+            flags: vec!["seen".into(), "flagged".into()],
+            count: 2,
+        };
+
+        assert_eq!(
+            output.to_string(),
+            "Successfully removed flags from 2 message(s): seen, flagged\n"
+        );
+        assert_eq!(
+            serde_json::to_string(&output).unwrap(),
+            r#"{"flags":["seen","flagged"],"count":2}"#
+        );
     }
 }

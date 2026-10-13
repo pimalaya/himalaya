@@ -189,14 +189,21 @@ impl ImapClient {
         Ok(reorder_envelopes(data, &page_uids))
     }
 
-    /// Adds, sets or removes flags on a UID set.
+    /// Adds, sets or removes flags on a UID set, returning how many of
+    /// the UIDs exist in the mailbox.
+    ///
+    /// `UID STORE` answers `OK` for UIDs that match nothing (RFC 3501
+    /// section 6.4.8), so the untagged `FETCH` echoes are the first
+    /// count. A server is free to skip the echo of a message whose flags
+    /// did not change, so fewer echoes than UIDs is settled by a
+    /// `UID SEARCH` on the same set.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(ids)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
@@ -207,14 +214,18 @@ impl ImapClient {
         };
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
-        self.store(
-            sequence_set,
+        let echoes = self.store(
+            sequence_set.clone(),
             kind,
             imap_flags,
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        Ok(())
+        if echoes.len() >= ids.len() {
+            return Ok(ids.len());
+        }
+
+        Ok(self.present_uids(sequence_set)?.len())
     }
 
     /// Fetches one message's raw RFC 5322 bytes, marking it seen only
