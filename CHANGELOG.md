@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `msgraph messages send-draft <ID>`, sending an existing Microsoft Graph draft (`POST /me/messages/{id}/send`), which Graph moves to Sent Items ([#787]).
 - Added `--all` (`-A`) to `message reply`, replying to everyone: `To` stays the source's `Reply-To` or `From`, and `Cc` takes the `To` and `Cc` of the source without the account's `email` nor anyone already in `To`, each address once. An explicit `--to` or `--cc` takes precedence over the list it would derive ([#779]).
 - Added `pimdir attachment list`, one page of the files a pimdir account's messages attach, newest message first, read from the stand-ins the store records as each body enters it (io-pimdir `14a8fca`, pimdir STORAGE §14.3): each with its `id`, `name`, `mediaType`, `size` and IMAP `section`, and the `messageId`, `mailbox`, `sender`, `senderName` and `date` of its message, the ids being those `envelope list` and `message read` take, plus a `nextPage` token that `--page-token` takes. `pimdir attachment search <WORDS>` keeps the files every word of which is in the file name, the sender's address or the sender's name, ignoring case.
 - Added `--section <SECTION>` to `message parse`, writing the part at that IMAP section (`2`, `1.2`) as `--part` writes a part by its id: what a pimdir store records of an attachment.
@@ -1434,6 +1435,7 @@ Few major concepts changed:
 [#774]: https://github.com/pimalaya/himalaya/pull/774
 [#775]: https://github.com/pimalaya/himalaya/issues/775
 [#779]: https://github.com/pimalaya/himalaya/issues/779
+[#787]: https://github.com/pimalaya/himalaya/issues/787
 [#781]: https://github.com/pimalaya/himalaya/issues/781
 [#786]: https://github.com/pimalaya/himalaya/issues/786
 

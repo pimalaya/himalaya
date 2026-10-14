@@ -14,7 +14,8 @@ use crate::{
             copy::MsgraphMessageCopyCommand, create::MsgraphMessageCreateCommand,
             delete::MsgraphMessageDeleteCommand, get::MsgraphMessageGetCommand,
             list::MsgraphMessageListCommand, r#move::MsgraphMessageMoveCommand,
-            send::MsgraphMessageSendCommand, update::MsgraphMessageUpdateCommand,
+            send::MsgraphMessageSendCommand, send_draft::MsgraphMessageSendDraftCommand,
+            update::MsgraphMessageUpdateCommand,
         },
     },
 };
@@ -28,6 +29,7 @@ pub enum MsgraphMessagesCommand {
     Create(MsgraphMessageCreateCommand),
     Update(MsgraphMessageUpdateCommand),
     Send(MsgraphMessageSendCommand),
+    SendDraft(MsgraphMessageSendDraftCommand),
     Copy(MsgraphMessageCopyCommand),
     #[command(name = "move")]
     Move(MsgraphMessageMoveCommand),
@@ -49,6 +51,7 @@ impl MsgraphMessagesCommand {
             Self::Create(cmd) => cmd.execute(printer, client),
             Self::Update(cmd) => cmd.execute(printer, client),
             Self::Send(cmd) => cmd.execute(printer, client),
+            Self::SendDraft(cmd) => cmd.execute(printer, client),
             Self::Copy(cmd) => cmd.execute(printer, client),
             Self::Move(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),

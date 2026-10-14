@@ -10,4 +10,5 @@ pub mod get;
 pub mod list;
 pub mod r#move;
 pub mod send;
+pub mod send_draft;
 pub mod update;
