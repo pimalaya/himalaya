@@ -145,6 +145,8 @@ impl MessageForwardCommand {
                 mode: SourceMode::Forward,
                 posting_style: account.resolve_forward_posting_style(self.posting_style),
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
+                reply_all: false,
+                own_email: None,
             }),
         )?;
 

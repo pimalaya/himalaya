@@ -25,7 +25,8 @@ use crate::{
 ///
 /// The source is fetched to pre-fill `In-Reply-To`, `References` and the
 /// `Re:` subject, derive the recipients from `Reply-To` or `From`, and
-/// quote the text body. The result goes to stdout, `--save` or `--send`.
+/// quote the text body. With `--all`, the other recipients of the
+/// source go in `Cc`. The result goes to stdout, `--save` or `--send`.
 /// With `--json` and neither, the decoded fields come out instead,
 /// without the signature that sending appends.
 ///
@@ -49,6 +50,13 @@ pub struct MessageReplyCommand {
     /// Carbon-copy recipients.
     #[arg(long, value_name = "ADDR")]
     pub cc: Vec<String>,
+    /// Reply to everyone: the source's `To` and `Cc` go in `Cc`, without
+    /// the account's `email` nor anyone already in `To`.
+    ///
+    /// An explicit `--to` or `--cc` takes precedence over the list it
+    /// would derive.
+    #[arg(long, short = 'A')]
+    pub all: bool,
     /// Blind carbon-copy recipients.
     #[arg(long, value_name = "ADDR")]
     pub bcc: Vec<String>,
@@ -144,6 +152,8 @@ impl MessageReplyCommand {
                 mode: SourceMode::Reply,
                 posting_style: account.resolve_reply_posting_style(self.posting_style),
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
+                reply_all: self.all,
+                own_email: account.email.as_deref(),
             }),
         )?;
 
