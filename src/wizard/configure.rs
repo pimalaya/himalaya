@@ -20,10 +20,13 @@
 
 use std::{
     fmt,
-    fs::{self, OpenOptions},
+    fs::{DirBuilder, OpenOptions},
     io::{IsTerminal, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
+
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -208,16 +211,7 @@ fn save_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOutpu
         return printer.out(config);
     }
 
-    if let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Create the config directory {}", parent.display()))?;
-    }
-
-    fs::write(path, config.to_string())
-        .with_context(|| format!("Write the config file {}", path.display()))?;
+    write_configuration(path, &config.to_string(), false)?;
 
     print_saved(path, &config);
 
@@ -233,19 +227,45 @@ fn append_or_print(printer: &mut impl Printer, path: &Path, config: ConfigureOut
         return printer.out(config);
     }
 
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(path)
-        .with_context(|| format!("Open the config file {}", path.display()))?;
-
     // NOTE: appending text keeps every comment and hand-written line as
     // they are, which re-serializing the document would not. The leading
     // newline separates the two tables, and terminates the last line of a
     // file that ends without one.
-    write!(file, "\n{config}")
-        .with_context(|| format!("Append to the config file {}", path.display()))?;
+    write_configuration(path, &format!("\n{config}"), true)?;
 
     print_saved(path, &config);
+
+    Ok(())
+}
+
+/// Creates a private configuration or appends without changing permissions.
+fn write_configuration(path: &Path, document: &str, append: bool) -> Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true);
+
+    if append {
+        options.append(true);
+    } else {
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            let mut directory = DirBuilder::new();
+            directory.recursive(true);
+            #[cfg(unix)]
+            directory.mode(0o700);
+            directory
+                .create(parent)
+                .with_context(|| format!("Create the config directory {}", parent.display()))?;
+        }
+
+        options.create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+    }
+
+    let mut file = options
+        .open(path)
+        .with_context(|| format!("Open the config file {}", path.display()))?;
+    file.write_all(document.as_bytes())
+        .with_context(|| format!("Write the config file {}", path.display()))?;
 
     Ok(())
 }
@@ -278,6 +298,9 @@ mod tests {
 
     use super::*;
     use crate::config::{AccountConfig, MaildirConfig};
+
+    #[cfg(unix)]
+    use std::os::unix::fs::{PermissionsExt, symlink};
 
     static NEXT_CONFIG: AtomicUsize = AtomicUsize::new(0);
 
@@ -358,9 +381,8 @@ mod tests {
         let document = account(!existing.has_default)
             .render("perso")
             .expect("render the account");
-        let mut file = OpenOptions::new().append(true).open(&path).expect("open");
-        write!(file, "\n{document}").expect("append the generated account");
-        drop(file);
+        write_configuration(&path, &format!("\n{document}"), true)
+            .expect("append the generated account");
 
         let content = fs::read_to_string(&path).expect("read back");
         let config: Config = toml::from_str(&content).expect("parse the appended config");
@@ -396,5 +418,92 @@ mod tests {
         let existing = ExistingConfig::read(&config_path()).expect("read a missing config");
 
         assert!(existing.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn generated_configuration_and_new_directories_are_private() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("first/second/config.toml");
+        let document = "password.raw = \"dummy\"\n";
+
+        write_configuration(&path, document, false).unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), document);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        for parent in [dir.path().join("first"), dir.path().join("first/second")] {
+            assert_eq!(
+                fs::metadata(parent).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn appending_keeps_existing_content_and_permissions() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "# keep this comment\n").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        write_configuration(&path, "new account\n", true).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "# keep this comment\nnew account\n"
+        );
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_keeps_existing_directory_permissions() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+
+        write_configuration(&dir.path().join("config.toml"), "secret", false).unwrap();
+
+        assert_eq!(
+            fs::metadata(dir.path()).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+    }
+
+    #[test]
+    fn saving_does_not_truncate_an_existing_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "original").unwrap();
+
+        assert!(write_configuration(&path, "replacement", false).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"original");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_refuses_a_dangling_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.toml");
+        let path = dir.path().join("config.toml");
+        symlink(&target, &path).unwrap();
+
+        assert!(write_configuration(&path, "secret", false).is_err());
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn appending_does_not_create_a_missing_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+
+        assert!(write_configuration(&path, "secret", true).is_err());
+        assert!(!path.exists());
     }
 }
