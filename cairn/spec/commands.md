@@ -75,6 +75,9 @@ The same composers SHALL end the body with the account's `signature`, introduced
 
 With `--json` and neither `--save` nor `--send`, the same composers SHALL print the decoded `from`, `to`, `cc`, `bcc`, `subject` and `body` instead of the raw bytes, the body without any signature, so an editor can lay the message out and hand it back through the flags, sending appending the signature once. `--posting-style none` SHALL send the written body alone, the source left unquoted, for a writer who already laid the quote out.
 
+### Requirement: Reply to all recipients
+`message reply --all` (`-A`) SHALL keep the `To` of a plain reply and fill `Cc` with the `To` and `Cc` of the source, without the account's `email` and without any address already in `To`, each address once, compared ignoring case, display names kept. An explicit `--to` SHALL replace the derived `To`, the `Cc` then being deduplicated against it, and an explicit `--cc` SHALL replace the derived `Cc` whole. Without `--all`, `Cc` SHALL stay empty unless `--cc` fills it.
+
 ### Requirement: Raw message input is shared
 A command taking a raw RFC 5322 message SHALL resolve it through the shared `MessageArg`: a file path, an inline value after `--`, or piped stdin read whole. The message SHALL be kept as bytes, never decoded, so 8-bit content in any charset reaches the backend intact. The resolved message is normalised to CRLF and rejected when empty, so no backend receives a zero-length message.
 

@@ -65,7 +65,14 @@ pub struct SourceArgs<'a> {
     pub posting_style: PostingStyle,
     /// The headline placed before its quoted body.
     pub quote_headline: &'a str,
+    /// Whether a reply also goes to the other recipients of the source.
+    pub reply_all: bool,
+    /// The account's own address, left out of a reply to all.
+    pub own_email: Option<&'a str>,
 }
+
+/// A mailbox: its display name, when it carries one, and its address.
+type Mailbox = (Option<String>, String);
 
 /// Whether the source message is being replied to or forwarded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,11 +127,26 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
             });
         }
 
-        if source.mode == SourceMode::Reply
-            && args.to.is_empty()
-            && let Some(addrs) = reply_recipients(parsed)
-        {
-            builder = builder.to(addrs);
+        if source.mode == SourceMode::Reply {
+            let derived = match args.to.is_empty() {
+                true => reply_recipients(parsed),
+                false => Vec::new(),
+            };
+            if !derived.is_empty() {
+                builder = builder.to(address_list(&derived));
+            }
+
+            if source.reply_all && args.cc.is_empty() {
+                let mut to: Vec<String> = derived.into_iter().map(|(_, email)| email).collect();
+                for value in args.to {
+                    to.extend(parse_mailboxes(value)?.into_iter().map(|(_, email)| email));
+                }
+
+                let cc = reply_all_cc(parsed, &to, source.own_email);
+                if !cc.is_empty() {
+                    builder = builder.cc(address_list(&cc));
+                }
+            }
         }
 
         if let Some(message_id) = parsed.message_id() {
@@ -376,43 +398,73 @@ fn has_prefix(subject: &str, prefix: &str) -> bool {
 
 /// Derives the recipients of a reply from the source's `Reply-To`, or
 /// from its `From` when it names none.
-fn reply_recipients(msg: &mail_parser::Message<'_>) -> Option<Address<'static>> {
+fn reply_recipients(msg: &mail_parser::Message<'_>) -> Vec<Mailbox> {
+    msg.header("Reply-To")
+        .or_else(|| msg.header("From"))
+        .map(header_mailboxes)
+        .unwrap_or_default()
+}
+
+/// Derives the carbon-copy recipients of a reply to all: the `To` and
+/// `Cc` of the source, without the account's own address nor anyone
+/// already in `to`, and without duplicates, compared ignoring case.
+fn reply_all_cc(msg: &mail_parser::Message<'_>, to: &[String], own: Option<&str>) -> Vec<Mailbox> {
+    let mut seen: Vec<String> = to
+        .iter()
+        .map(String::as_str)
+        .chain(own)
+        .map(|email| email.trim().to_ascii_lowercase())
+        .collect();
+    let mut cc = Vec::new();
+
+    for name in ["To", "Cc"] {
+        for (display, email) in msg.header(name).map(header_mailboxes).unwrap_or_default() {
+            let key = email.trim().to_ascii_lowercase();
+            if !seen.contains(&key) {
+                seen.push(key);
+                cc.push((display, email));
+            }
+        }
+    }
+
+    cc
+}
+
+/// Collects the mailboxes of an address header, groups flattened and
+/// entries without an address dropped.
+fn header_mailboxes(value: &HeaderValue<'_>) -> Vec<Mailbox> {
     use mail_parser::Address as ParserAddress;
 
-    let header = msg
-        .header("Reply-To")
-        .or_else(|| msg.header("From"))
-        .cloned();
-
-    let HeaderValue::Address(addr) = header? else {
-        return None;
+    let HeaderValue::Address(addr) = value else {
+        return Vec::new();
     };
 
-    let collected: Vec<Address<'static>> = match addr {
-        ParserAddress::List(list) => list
-            .into_iter()
-            .filter_map(|a| {
-                let email = a.address?.into_owned();
-                let name = a.name.map(|s| s.into_owned());
-                Some(Address::new_address(name, email))
-            })
-            .collect(),
+    let entries: Vec<_> = match addr {
+        ParserAddress::List(list) => list.iter().collect(),
         ParserAddress::Group(groups) => groups
-            .into_iter()
-            .flat_map(|g| g.addresses.into_iter())
-            .filter_map(|a| {
-                let email = a.address?.into_owned();
-                let name = a.name.map(|s| s.into_owned());
-                Some(Address::new_address(name, email))
-            })
+            .iter()
+            .flat_map(|group| group.addresses.iter())
             .collect(),
     };
 
-    if collected.is_empty() {
-        None
-    } else {
-        Some(Address::new_list(collected))
-    }
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let email = entry.address.as_ref()?.to_string();
+            let name = entry.name.as_ref().map(|name| name.to_string());
+            Some((name, email))
+        })
+        .collect()
+}
+
+/// Turns mailboxes into the address list a header carries.
+fn address_list(mailboxes: &[Mailbox]) -> Address<'static> {
+    Address::new_list(
+        mailboxes
+            .iter()
+            .map(|(name, email)| Address::new_address(name.clone(), email.clone()))
+            .collect(),
+    )
 }
 
 /// Builds the `References` header of a reply: the source's own chain,
@@ -499,6 +551,8 @@ Original body line.\r\n";
             mode,
             posting_style: PostingStyle::Top,
             quote_headline: "On a day, Alice wrote:",
+            reply_all: false,
+            own_email: None,
         }
     }
 
@@ -618,6 +672,8 @@ Original body line.\r\n";
             mode: SourceMode::Reply,
             posting_style: PostingStyle::Top,
             quote_headline: "",
+            reply_all: false,
+            own_email: None,
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
@@ -632,6 +688,8 @@ Original body line.\r\n";
             mode: SourceMode::Reply,
             posting_style: PostingStyle::Top,
             quote_headline: "",
+            reply_all: false,
+            own_email: None,
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
@@ -649,6 +707,117 @@ Original body line.\r\n";
         let text = String::from_utf8(raw).unwrap();
         assert!(text.contains("dave@example.com"));
         assert!(!text.contains("alice@example.com"));
+    }
+
+    /// A source with several `To` and `Cc` recipients, the account's own
+    /// address and a repeat among them, and a `Reply-To` of its own.
+    const GROUP_SOURCE: &[u8] = b"From: Alice <alice@example.com>\r\n\
+Reply-To: Lists <lists@example.com>\r\n\
+To: Bob <bob@example.com>, \"Carol, C\" <CAROL@example.com>, me@example.com\r\n\
+Cc: bob@example.com, Dave <dave@example.com>, Me <ME@Example.com>\r\n\
+Subject: Plan\r\n\
+Message-ID: <plan@example.com>\r\n\
+\r\n\
+Body.\r\n";
+
+    /// Builds a reply to [`GROUP_SOURCE`] and returns its `To` and `Cc`
+    /// addresses.
+    fn reply_lists(reply_all: bool, to: &[String], cc: &[String]) -> (Vec<String>, Vec<String>) {
+        let mut a = args("me@example.com", to, None, "r");
+        a.cc = cc;
+        let source = SourceArgs {
+            raw: GROUP_SOURCE,
+            mode: SourceMode::Reply,
+            posting_style: PostingStyle::Top,
+            quote_headline: "",
+            reply_all,
+            own_email: Some("me@example.com"),
+        };
+
+        let raw = build(a, Some(source)).unwrap();
+        let msg = parse(&raw);
+        let emails = |name: &str| {
+            msg.header(name)
+                .map(header_mailboxes)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(_, email)| email)
+                .collect()
+        };
+
+        (emails("To"), emails("Cc"))
+    }
+
+    #[test]
+    fn reply_without_all_leaves_cc_empty() {
+        let (to, cc) = reply_lists(false, &[], &[]);
+        assert_eq!(to, ["lists@example.com"]);
+        assert!(cc.is_empty());
+    }
+
+    #[test]
+    fn reply_all_copies_the_other_recipients_once() {
+        let (to, cc) = reply_lists(true, &[], &[]);
+        assert_eq!(to, ["lists@example.com"]);
+        assert_eq!(
+            cc,
+            ["bob@example.com", "CAROL@example.com", "dave@example.com"]
+        );
+    }
+
+    #[test]
+    fn reply_all_keeps_the_display_names() {
+        let raw = build(
+            args("me@example.com", &[], None, "r"),
+            Some(SourceArgs {
+                raw: GROUP_SOURCE,
+                mode: SourceMode::Reply,
+                posting_style: PostingStyle::Top,
+                quote_headline: "",
+                reply_all: true,
+                own_email: Some("me@example.com"),
+            }),
+        )
+        .unwrap();
+        let text = String::from_utf8(raw).unwrap();
+
+        assert!(text.contains("\"Carol, C\" <CAROL@example.com>"), "{text}");
+    }
+
+    #[test]
+    fn reply_all_leaves_out_who_is_already_in_to() {
+        let msg = MessageParser::new().parse(GROUP_SOURCE).unwrap();
+        let to = vec!["bob@example.com".to_string()];
+
+        let cc: Vec<_> = reply_all_cc(&msg, &to, Some("me@example.com"))
+            .into_iter()
+            .map(|(_, email)| email)
+            .collect();
+
+        assert_eq!(cc, ["CAROL@example.com", "dave@example.com"]);
+    }
+
+    #[test]
+    fn reply_all_with_explicit_to_dedupes_against_it() {
+        let to = vec!["Dave <dave@example.com>".to_string()];
+        let (to, cc) = reply_lists(true, &to, &[]);
+        assert_eq!(to, ["dave@example.com"]);
+        assert_eq!(cc, ["bob@example.com", "CAROL@example.com"]);
+    }
+
+    #[test]
+    fn reply_all_explicit_cc_wins() {
+        let cc = vec!["erin@example.com".to_string()];
+        let (to, cc) = reply_lists(true, &[], &cc);
+        assert_eq!(to, ["lists@example.com"]);
+        assert_eq!(cc, ["erin@example.com"]);
+    }
+
+    #[test]
+    fn reply_all_without_own_email_keeps_every_recipient() {
+        let msg = MessageParser::new().parse(GROUP_SOURCE).unwrap();
+        let cc = reply_all_cc(&msg, &[], None);
+        assert_eq!(cc.len(), 4);
     }
 
     #[test]
