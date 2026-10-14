@@ -395,6 +395,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 - [jns/himalaya](https://www.raycast.com/jns/himalaya): Raycast extension
 - [openclaw/openclaw](https://github.com/openclaw/openclaw/blob/main/skills/himalaya/SKILL.md): OpenClaw SKILL
 - [parisni/dfzf](https://github.com/parisni/dfzf): dfzf integration
+- [kezhenxu94/himalaya-fzf](https://github.com/kezhenxu94/himalaya-fzf): interactive fzf front-end
 
 ## FAQ
 
