@@ -10,6 +10,8 @@ Requested in [#778]. `message reply --send` left the source as it was, so `envel
 
 `message forward --send` adds `forwarded` the same way. `$Forwarded` (RFC 5788) is a keyword, which a server may refuse where `\Answered` is a system flag it has to take, so a failure there is logged as a warning and the forward still succeeds. A reply or forward only printed or saved flags nothing.
 
+Gmail has no label for `answered` or `forwarded`, and Graph no field, so the flag leaves nothing to patch there. Their `store_flags` now skips the call in that case rather than sending an empty `messages.modify` or `PATCH`, a wasted request that on Gmail could fail a reply already sent.
+
 Verified against Gmail over IMAP: the source kept its flags after a `reply` and a `forward` without `--send`, carried `\Answered` after `reply --send`, and `\Answered` and `$Forwarded` after `forward --send`. A server refusing the keyword was not exercised.
 
 Capabilities moved: **commands** (A sent reply or forward flags its source).

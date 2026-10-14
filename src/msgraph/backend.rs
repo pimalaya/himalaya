@@ -192,6 +192,14 @@ impl MsgraphClient {
         op: FlagOp,
     ) -> Result<()> {
         let patch = flag_patch(flags, op);
+
+        // NOTE: `\Answered` and `$Forwarded` have no Graph field, so
+        // adding or removing only those leaves an empty PATCH, a wasted
+        // request that could still fail.
+        if patch == MsgraphMessage::default() {
+            return Ok(());
+        }
+
         for id in ids {
             self.message_update(id, &patch)?;
         }

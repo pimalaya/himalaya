@@ -189,6 +189,14 @@ impl GmailClient {
         op: FlagOp,
     ) -> Result<()> {
         let (add, remove) = label_patch(flags, op);
+
+        // NOTE: an IANA flag without a label (`\Answered`, `$Forwarded`)
+        // leaves nothing to patch, and an empty `messages.modify` is a
+        // wasted request that could still fail.
+        if add.is_empty() && remove.is_empty() {
+            return Ok(());
+        }
+
         for id in ids {
             self.message_modify(id, &add, &remove)?;
         }
