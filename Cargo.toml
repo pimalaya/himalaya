@@ -89,7 +89,7 @@ uds_windows = "1"
 # NOTE: unreleased fixes, to be replaced by released versions.
 [patch.crates-io]
 io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
-io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "b1ab38ea9f24578b46dda56aa009600571b6b9ef" }
+io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "5d83c49a832310cf83b2432ed57fc8093647fbe3" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "ca4c5894fbaab5838e129ca3777fe7ea941b1d36" }

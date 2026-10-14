@@ -420,13 +420,15 @@ impl ImapClient {
     /// The source UIDs a `UID COPY` of `requested` really copied, the
     /// source still selected.
     ///
-    /// A RFC 4315 `COPYUID` lists exactly those, so it answers. Without
-    /// a readable one the tagged `OK` says nothing of what matched: a
-    /// server without UIDPLUS never sends one, a UIDPLUS server sends
-    /// none when nothing matched (an `OK` all the same, RFC 9051 §6.4.9),
-    /// and some send one io-imap cannot parse and reports as missing too,
-    /// such as Mailo's UIDVALIDITY 0 ([#781]). `COPY` leaves the source
-    /// untouched, so the requested UIDs still there are the ones copied.
+    /// A RFC 4315 `COPYUID` lists exactly those, so it answers alone,
+    /// including Mailo's, whose forbidden UIDVALIDITY 0 io-imap still
+    /// reads ([#781]). Without one the tagged `OK` says nothing of what
+    /// matched: a server without UIDPLUS never sends one, a UIDPLUS
+    /// server sends none when nothing matched (an `OK` all the same,
+    /// RFC 9051 §6.4.9), and one malformed beyond that deviation is
+    /// reported as missing. `COPY` leaves the source untouched, so a
+    /// `UID SEARCH` of the requested UIDs still there finds the ones
+    /// copied.
     ///
     /// [#781]: https://github.com/pimalaya/himalaya/issues/781
     fn copied_uids(&mut self, copy_uid: ImapCopyUid, requested: SequenceSet) -> Result<Vec<u32>> {
@@ -958,6 +960,12 @@ mod tests {
             (!matched.is_empty()).then(|| copyuid(0, matched))
         }
 
+        /// A `COPYUID` malformed beyond that deviation (a UID 0), which
+        /// io-imap leaves unreadable.
+        fn garbage(matched: &[u32]) -> Option<String> {
+            (!matched.is_empty()).then(|| String::from("COPYUID 0 0 100"))
+        }
+
         /// No `COPYUID` at all, as a server without UIDPLUS answers.
         fn none(_: &[u32]) -> Option<String> {
             None
@@ -1103,8 +1111,17 @@ mod tests {
         }
 
         #[test]
-        fn an_unreadable_copyuid_still_completes_the_move() {
+        fn a_uidvalidity_zero_copyuid_answers_the_copy_fallback_move() {
             let (count, commands) = run(UIDPLUS, &[1], uidvalidity_zero, mv(&["1", "999"]));
+            assert_eq!(count, 1);
+            assert!(!has(&commands, "UID SEARCH"), "{commands:?}");
+            assert!(has(&commands, "UID STORE 1 +FLAGS"), "{commands:?}");
+            assert!(has(&commands, "UID EXPUNGE 1"), "{commands:?}");
+        }
+
+        #[test]
+        fn an_unreadable_copyuid_still_completes_the_move() {
+            let (count, commands) = run(UIDPLUS, &[1], garbage, mv(&["1", "999"]));
             assert_eq!(count, 1);
             assert!(has(&commands, "UID SEARCH UID 1,999"), "{commands:?}");
             assert!(has(&commands, "UID STORE 1 +FLAGS"), "{commands:?}");
@@ -1148,7 +1165,12 @@ mod tests {
                 move |client: &mut ImapClient| client.copy_messages("INBOX", "Archive", ids)
             };
             assert_eq!(run(UIDPLUS, &[1, 2], valid, copy(&["1", "2"])).0, 2);
-            assert_eq!(run(UIDPLUS, &[1], uidvalidity_zero, copy(&["1"])).0, 1);
+            let (count, commands) = run(UIDPLUS, &[1], uidvalidity_zero, copy(&["1"]));
+            assert_eq!(count, 1);
+            assert!(!has(&commands, "UID SEARCH"), "{commands:?}");
+            let (count, commands) = run(UIDPLUS, &[1], garbage, copy(&["1", "999"]));
+            assert_eq!(count, 1);
+            assert!(has(&commands, "UID SEARCH UID 1,999"), "{commands:?}");
             assert_eq!(run(UIDPLUS, &[1], valid, copy(&["999"])).0, 0);
             assert_eq!(run(PLAIN, &[1], none, copy(&["1", "999"])).0, 1);
         }
