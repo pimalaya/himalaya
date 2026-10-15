@@ -1,0 +1,39 @@
+---
+cairn: change
+change: pimdir-flag-commands
+---
+
+# Delta
+
+## ADDED Requirements
+
+### Requirement: pimdir stages flags by their raw spelling
+`himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused, as SHALL a value that is empty or holds whitespace or a control character. Any other value is a keyword.
+
+`add`, `set` and `remove` SHALL stage one `SetFlags` per message through `store_flags`, after checking every message against the sources' declarations (pimdir STORAGE §15.6), so a refusal queues nothing: a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the warning naming the limit. `list` SHALL print the flags a message carries as the overlaying reader shows them.
+
+#### Scenario: A keyword is staged and read back
+- GIVEN a pimdir account whose `imap` source declares `mail.flags.keywords`
+- WHEN `himalaya --json pimdir flag add -m imap/INBOX -f act 42` runs
+- THEN it prints `{"queued":[{"id":"42","queueId":7}]}`, and `pimdir flag list -m imap/INBOX 42` lists `act` before the next sync
+
+#### Scenario: A source without keywords refuses one
+- GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`
+- WHEN `himalaya pimdir flag add -m msgraph/Inbox -f act 42` runs
+- THEN the command fails naming `mail.flags.keywords`, the `msgraph` source and its detail, and nothing is queued
+
+#### Scenario: A bare IANA name is refused
+- WHEN `himalaya pimdir flag add -m imap/INBOX -f seen 42` runs
+- THEN the command fails naming `\Seen`, and nothing is queued
+
+## MODIFIED Requirements
+
+### Requirement: pimdir writes name their queue row
+`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, for an owner declaring no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they stage: `{"queued": [{"id": string, "queueId": i64}]}`. The shared commands SHALL keep printing no queue detail.
+
+`pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"queueId", "state": "pending" | "parked" | "applied" | "unknown", "collection"?, "kind"?, "attempts"?, "error"?, "appliedAt"?, "seq"?}`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5).
+
+#### Scenario: A staged draft is followed by its row
+- GIVEN a pimdir account
+- WHEN `himalaya --json pimdir message add -m imap/Drafts` stages a message
+- THEN it prints `{"queueId":12,"messageId":"d1@x.org"}`, and `pimdir queue show 12` prints `"state":"pending"` until the sync engine applies the row, then `"state":"applied"` with the `seq` the message is read by
