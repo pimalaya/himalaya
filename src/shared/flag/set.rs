@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -44,10 +44,13 @@ impl FlagSetCommand {
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        client.store_flags(&mailbox, &ids, &flags, FlagOp::Set)?;
+        let count = client.store_flags(&mailbox, &ids, &flags, FlagOp::Set)?;
+        if count == 0 {
+            bail!("No flag set: no id matched in the mailbox");
+        }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(SetFlags { flags })
+        printer.out(SetFlags { flags, count })
     }
 }
 
@@ -55,10 +58,35 @@ impl FlagSetCommand {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SetFlags {
     flags: Vec<String>,
+    /// How many of the given messages were found.
+    count: usize,
 }
 
 impl fmt::Display for SetFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Successfully set flags: {}", self.flags.join(", "))
+        let (count, flags) = (self.count, self.flags.join(", "));
+        writeln!(f, "Successfully set flags on {count} message(s): {flags}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SetFlags;
+
+    #[test]
+    fn output_counts_the_messages_and_ends_the_line() {
+        let output = SetFlags {
+            flags: vec!["seen".into(), "flagged".into()],
+            count: 2,
+        };
+
+        assert_eq!(
+            output.to_string(),
+            "Successfully set flags on 2 message(s): seen, flagged\n"
+        );
+        assert_eq!(
+            serde_json::to_string(&output).unwrap(),
+            r#"{"flags":["seen","flagged"],"count":2}"#
+        );
     }
 }

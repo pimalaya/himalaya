@@ -187,20 +187,21 @@ impl GmailClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let (add, remove) = label_patch(flags, op);
 
         // NOTE: an IANA flag without a label (`\Answered`, `$Forwarded`)
         // leaves nothing to patch, and an empty `messages.modify` is a
-        // wasted request that could still fail.
+        // wasted request that could still fail. The ids are then
+        // not checked and all count as found.
         if add.is_empty() && remove.is_empty() {
-            return Ok(());
+            return Ok(ids.len());
         }
 
         for id in ids {
             self.message_modify(id, &add, &remove)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`

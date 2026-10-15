@@ -401,7 +401,7 @@ impl PimdirClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
 
@@ -418,7 +418,7 @@ impl PimdirClient {
             self.enqueue(&mut producer, &collection, &action, None)
                 .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Stages a locally-authored message for the next sync to upload,

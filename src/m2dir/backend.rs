@@ -127,7 +127,7 @@ impl M2dirClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let m2dir = self.resolve_m2dir(mailbox)?;
         let m2dir_flags = flags_to_m2dir(flags);
 
@@ -139,7 +139,7 @@ impl M2dirClient {
             }
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.

@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -67,6 +67,9 @@ impl MessageDeleteCommand {
             }
         } else {
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
+            if moved == 0 {
+                bail!("No message deleted: no id matched in the mailbox");
+            }
             DeleteReport::new(DeleteAction::MovedToTrash, moved)
         };
 
@@ -107,12 +110,12 @@ impl fmt::Display for DeleteReport {
         let count = self.count;
         match self.action {
             DeleteAction::MovedToTrash => {
-                write!(f, "Successfully moved {count} message(s) to the trash")
+                writeln!(f, "Successfully moved {count} message(s) to the trash")
             }
             DeleteAction::Deleted => {
-                write!(f, "Successfully deleted {count} message(s) from the trash")
+                writeln!(f, "Successfully deleted {count} message(s) from the trash")
             }
-            DeleteAction::Flagged => write!(
+            DeleteAction::Flagged => writeln!(
                 f,
                 "Flagged {count} message(s) as deleted; run an expunge on the trash to remove them",
             ),

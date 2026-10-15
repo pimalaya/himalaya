@@ -32,6 +32,9 @@ The IMAP adapter's `move_messages` SHALL use `UID MOVE` (RFC 6851) when the serv
 ### Requirement: IMAP copy and move counts
 `copy_messages` and `move_messages` SHALL count the source UIDs a `COPYUID` reports, a `COPYUID` whose UIDVALIDITY is `0` (forbidden by RFC 4315, sent by Mailo) included. Without a readable `COPYUID` (none sent, as by a server without `UIDPLUS` or a `UIDPLUS` server when nothing matched, or one malformed beyond that UIDVALIDITY) they SHALL count the requested UIDs a `UID SEARCH UID` finds in the source: after the `UID COPY`, which leaves the source untouched, or before a `UID MOVE`, which then moves only those and is not sent when none is present. A tagged `OK` alone SHALL NOT count as a message copied or moved.
 
+### Requirement: IMAP flag counts
+The IMAP adapter's `store_flags` SHALL return how many of the given UIDs exist in the mailbox. A `UID STORE` echoing as many messages as UIDs given counts them all; one echoing fewer, which a server may do for a message whose flags did not change, SHALL be followed by a `UID SEARCH UID <set>` whose matches are the count.
+
 ### Requirement: Network transport resilience
 The network backends SHALL run over a transport that retries a stream reporting it is not ready (`EAGAIN` on Unix, `EINTR`, and the Windows spelling of an expired deadline) rather than ending the exchange on it. Each read and each write carries its own budget of one minute, so a slow but progressing transfer never runs out of it, and exhausting the budget SHALL fail with a message naming it rather than a raw errno.
 

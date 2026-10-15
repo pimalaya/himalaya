@@ -101,7 +101,7 @@ impl MaildirClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let maildir_flags = flags_to_maildir(flags);
 
@@ -113,7 +113,7 @@ impl MaildirClient {
             }
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.

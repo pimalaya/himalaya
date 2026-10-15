@@ -139,7 +139,7 @@ impl MboxClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let path = self.resolve_mbox(mailbox);
         let flags = flags_to_mbox(flags);
 
@@ -161,7 +161,9 @@ impl MboxClient {
             }
             read_is_old(&mut next);
             next
-        })
+        })?;
+
+        Ok(ids.len())
     }
 
     /// Rewrites the flags of messages of the mbox at `path` to what `edit`
