@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the wizard reading a `secret-tool` keyring entry only by its `account` attribute: it now prompts for the attribute (default `account`), so a KeePassXC entry keyed by `Title` is found. A secret command failing silently now names its program and exit status instead of an empty `Secret command error` ([#745]).
 - Fixed the wizard creating new configuration files with permissions that could expose raw credentials. New files use exclusive creation and Unix mode 0600, and new directories use mode 0700. Existing file and directory permissions are preserved.
 - Fixed attachment downloads following dangling symlinks or overwriting existing files after filename suffixes are exhausted. Concurrent downloads now reserve filenames exclusively.
 - Fixed decoded message bodies, headers and MIME metadata emitting terminal control or bidi characters in the human-readable view. JSON and explicitly requested raw output remain unchanged.
@@ -1431,6 +1432,7 @@ Few major concepts changed:
 [#740]: https://github.com/pimalaya/himalaya/issues/740
 [#742]: https://github.com/pimalaya/himalaya/issues/742
 [#743]: https://github.com/pimalaya/himalaya/issues/743
+[#745]: https://github.com/pimalaya/himalaya/issues/745
 [#759]: https://github.com/pimalaya/himalaya/issues/759
 [#762]: https://github.com/pimalaya/himalaya/issues/762
 [#764]: https://github.com/pimalaya/himalaya/issues/764

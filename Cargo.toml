@@ -93,3 +93,5 @@ io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "5d83c49a832310cf
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "3b4bed845a291d848499b3288952bd6a663fd513" }
+pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "e4ea7f4067501d2159889a926c6f5449778c38df" }
+pimalaya-config = { git = "https://github.com/pimalaya/config", rev = "48c8c63a6fb917175f4c684e709ce659055c5338" }
