@@ -8,17 +8,11 @@ change: pimdir-flag-commands
 ## ADDED Requirements
 
 ### Requirement: pimdir stages flags by their raw spelling
-`himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused, as SHALL a value that is empty or holds whitespace or a control character. Any other value is a keyword.
+`himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, compared without case and staged in the canonical case, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused. A backslash names a system flag, so one in front of any other word SHALL be refused, as SHALL a value that is empty or holds whitespace, a control character, a character outside ASCII or one IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`). Any other value is a keyword.
 
-`add`, `set` and `remove` SHALL stage one `SetFlags` per message through `store_flags`, checked against the sources' declarations (pimdir STORAGE §15.6): a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the declaration's warning as it is. `list` SHALL print the flags a message carries as the overlaying reader shows them.
+`add`, `set` and `remove` SHALL fail when no message is named or none of the named ones exists, and SHALL stage one `SetFlags` per message through the backend's `stage_flags`, checked against the sources' declarations (pimdir STORAGE §15.6): a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the declaration's warning as it is. `list` SHALL print the flags a message carries as the overlaying reader shows them, and `null` under `--json` for a message whose flags the sync engine never read.
 
-### Requirement: pimdir stages a flag change on every message or none
-`store_flags` SHALL check every message of a call against the sources' declarations before it queues the first row, so a call refused on any message queues nothing. This holds for the shared `flag add|set|remove` on a pimdir account as for `pimdir flag`.
-
-#### Scenario: A refusal part-way stages nothing
-- GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`, and message 41 of `msgraph/Inbox` carries the keyword `act`
-- WHEN `himalaya flag set -m msgraph/Inbox -f seen 40 41 42` runs, the set dropping `act` from 41 only
-- THEN the command fails naming `mail.flags.keywords` for message 41, and no row is queued for 40, 41 or 42
+An add or a remove SHALL match the flags a message carries as flags, not as spellings: a marker the store holds as `\seen`, or as Thunderbird's `Junk`, is the one `\Seen` or `$Junk` keeps on an add and drops on a remove. This holds for the shared flag commands on a pimdir account, which stage through the same path.
 
 #### Scenario: A keyword is staged and read back
 - GIVEN a pimdir account whose `imap` source declares `mail.flags.keywords`
@@ -30,9 +24,22 @@ change: pimdir-flag-commands
 - WHEN `himalaya pimdir flag add -m msgraph/Inbox -f act 42` runs
 - THEN the command fails naming `mail.flags.keywords`, the `msgraph` source and its detail, and nothing is queued
 
+#### Scenario: A flag held in another spelling is removed
+- GIVEN a pimdir message carrying `\seen` and `Junk`
+- WHEN `himalaya pimdir flag remove -m imap/INBOX -f '\Seen' -f '$Junk' 42` runs
+- THEN the staged set holds neither
+
 #### Scenario: A bare IANA name is refused
 - WHEN `himalaya pimdir flag add -m imap/INBOX -f seen 42` runs
 - THEN the command fails naming `\Seen`, and nothing is queued
+
+### Requirement: pimdir stages a flag change on every message or none
+`stage_flags`, which the shared `store_flags` goes through, SHALL check every message of a call the mailbox holds against the sources' declarations before it queues the first row, so a call the check refuses on any message queues nothing. An id the mailbox does not hold SHALL be skipped, the call staging the others and reporting how many it found (commands, "A command given message ids says how many it found"); a malformed id SHALL fail the call, as it does on IMAP. Each row is still its own transaction: an enqueue failing after the check leaves the rows queued before it. This holds for the shared `flag add|set|remove` on a pimdir account as for `pimdir flag`.
+
+#### Scenario: A refusal part-way stages nothing
+- GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`, and message 41 of `msgraph/Inbox` carries the keyword `act`
+- WHEN `himalaya flag set -m msgraph/Inbox -f seen 40 41 42` runs, the set dropping `act` from 41 only
+- THEN the command fails naming `mail.flags.keywords` for message 41, and no row is queued for 40, 41 or 42
 
 ## MODIFIED Requirements
 
