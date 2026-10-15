@@ -7,7 +7,6 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, Row, Table};
 use schemars::JsonSchema;
@@ -37,7 +36,13 @@ impl MaildirMailboxListCommand {
         let table = MaildirsTable {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
-            rows: maildirs.into_iter().map(From::from).collect(),
+            rows: maildirs
+                .into_iter()
+                .map(|maildir| MaildirRow {
+                    name: client.mailbox_name(&maildir),
+                    path: PathBuf::from(maildir.path().as_str()),
+                })
+                .collect(),
         };
 
         printer.out(table)
@@ -89,13 +94,4 @@ pub struct MaildirRow {
     pub name: String,
     /// Its filesystem path.
     pub path: PathBuf,
-}
-
-impl From<Maildir> for MaildirRow {
-    fn from(maildir: Maildir) -> Self {
-        Self {
-            name: maildir.name().unwrap_or("Unknown").to_owned(),
-            path: PathBuf::from(maildir.path().as_str()),
-        }
-    }
 }

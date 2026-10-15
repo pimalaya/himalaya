@@ -36,7 +36,7 @@ impl MaildirClient {
         let mut mailboxes: Vec<Mailbox> = self
             .list_maildirs()?
             .into_iter()
-            .map(mailbox_from)
+            .map(|maildir| mailbox_from(self, maildir))
             .collect();
         mailboxes.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(mailboxes)
@@ -178,11 +178,11 @@ impl MaildirClient {
 }
 
 /// Converts one [`Maildir`] into the shared [`Mailbox`] shape: `id` is
-/// the on-disk path, `name` is the last path segment.
-fn mailbox_from(maildir: Maildir) -> Mailbox {
+/// the on-disk path, `name` the [`MaildirClient::mailbox_name`].
+fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
     Mailbox {
+        name: client.mailbox_name(&maildir),
         id: maildir.path().to_string(),
-        name: maildir.name().unwrap_or("").to_string(),
         role: None,
         total: None,
         unread: None,

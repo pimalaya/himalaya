@@ -55,6 +55,9 @@ Every mbox write SHALL go through io-mbox under the dotlock and the fcntl lock, 
 ### Requirement: mbox reads go through a cache
 The mbox backend SHALL keep, per file, the io-mbox scan index and the envelope of every message already parsed, under `<XDG cache>/himalaya/mbox/`. Every operation SHALL sync the index first, so an unchanged file is not scanned and a delivery is scanned alone, and a listing SHALL parse only the messages the cache lacks. The cache SHALL be disposable: a missing, stale or unreadable one is rebuilt, failing to write one is not an error, and a read finding its entry stale SHALL rebuild the index and retry once.
 
+### Requirement: A Maildir is named relative to the root
+A Maildir mailbox SHALL be named, in `mailbox list` and `maildir list`, by its path relative to `maildir.root` (`[Gmail]/Archive`), the name `-m` takes, so nested Maildirs sharing a last segment stay apart. The root itself keeps its folder name.
+
 ### Requirement: Maildir surfaces custom keywords on demand
 The Maildir backend SHALL surface custom (non-IANA) keywords on read when told which convention the mailbox uses, so a keyword written by dovecot, mbsync, OfflineIMAP, mutt or notmuch matches a `flag <name>` search as it does on the network backends. `maildir.keywords.dovecot` SHALL resolve the lowercase info-section slot letters through the resolved mailbox's own `dovecot-keywords` file, and `maildir.keywords.header` SHALL read keywords from `X-Keywords` (comma-separated) or `X-Label` (space-separated). Both default to off, and with both off the flag set SHALL be exactly the six standard info-section letters as before.
 

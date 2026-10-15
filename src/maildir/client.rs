@@ -56,6 +56,17 @@ impl MaildirClient {
         let name = path.strip_prefix(&self.root).unwrap_or(path);
         Ok(self.load_maildir(name.to_string_lossy().into_owned())?)
     }
+
+    /// The name a Maildir is shown and selected by: its path relative
+    /// to the store root (`[Gmail]/Archive`), whatever the layout, so
+    /// nested Maildirs sharing a last segment stay apart. The root
+    /// itself keeps its folder name.
+    pub fn mailbox_name(&self, maildir: &Maildir) -> String {
+        match self.store.relative(maildir.path()) {
+            Some(name) if !name.is_empty() => name.to_string(),
+            _ => maildir.name().unwrap_or_default().to_owned(),
+        }
+    }
 }
 
 impl Deref for MaildirClient {
@@ -109,9 +120,12 @@ pub fn validate_maildir_name(name: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
-    use super::validate_maildir_name;
+    use io_maildir::maildir::Maildir;
+
+    use super::{MaildirClient, validate_maildir_name};
+    use crate::config::MaildirConfig;
 
     #[test]
     fn accepts_plain_and_nested_names() {
@@ -125,5 +139,18 @@ mod tests {
         assert!(validate_maildir_name(Path::new("/etc")).is_err());
         assert!(validate_maildir_name(Path::new("../foo")).is_err());
         assert!(validate_maildir_name(Path::new("a/../../b")).is_err());
+    }
+
+    #[test]
+    fn mailbox_name_is_relative_to_the_root() {
+        let client = MaildirClient::new(MaildirConfig {
+            root: PathBuf::from("/mail"),
+            keywords: Default::default(),
+        });
+
+        let name = |path: &str| client.mailbox_name(&Maildir::from(path));
+        assert_eq!(name("/mail/Archive"), "Archive");
+        assert_eq!(name("/mail/[Gmail]/Archive"), "[Gmail]/Archive");
+        assert_eq!(name("/mail"), "mail");
     }
 }
