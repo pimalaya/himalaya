@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen. A write a source supports only in part logs a warning.
 - Changed a pimdir send asking for a copy to carry it in the queued send, so the copy is filed only once the message is sent; a store whose owner declares no capabilities still gets the copy queued beside the send.
 - Bumped io-pimdir to 0.8 (`189db40`), io-msgraph to 0.6 (`2ae2637`), io-jmap to 0.6 (`919eab4`) and io-gmail to 0.5, and pinned io-http at `e181530` and io-imap at `b1ab38e`, whose unreleased fixes bound what a server can make the client hold: an HTTP response head is capped at 64 KiB and a body at 256 MiB, failing with a typed error rather than buffering without end, an IMAP greeting carrying a literal fails rather than panicking, a `STARTTLS` response line is capped, and `LOGIN` and `AUTHENTICATE` no longer log credentials at trace level. A JMAP submission refused as `tooLarge`, `forbidden`, `overQuota` or `rateLimit` now names that type rather than `unknown`. The pimdir reads take no date floor; outputs are unchanged.
+- Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
 
 ### Fixed
 
