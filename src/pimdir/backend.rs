@@ -402,23 +402,70 @@ impl PimdirClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<usize> {
+        Ok(self.stage_flags(mailbox, ids, flags, op)?.len())
+    }
+
+    /// Stages a flag op on the messages of `ids` the mailbox holds,
+    /// returning the queue row each message's `SetFlags` waits in.
+    ///
+    /// An id the mailbox does not hold is skipped, so the caller reports
+    /// how many messages it found. Every found message is checked against
+    /// the sources' declarations (pimdir STORAGE §15.6) before the first
+    /// row is queued, so a change the check refuses on any of them leaves
+    /// nothing staged. A partial support passes, its warning logged once
+    /// the row is queued. Each row is still its own transaction: an
+    /// enqueue that fails after the check, a declaration changing in
+    /// between or the store failing, leaves the rows queued before it.
+    pub fn stage_flags(
+        &mut self,
+        mailbox: &str,
+        ids: &[&str],
+        flags: &[Flag],
+        op: FlagOp,
+    ) -> Result<Vec<PimdirFlagged>> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
 
+        let mut checked = Vec::with_capacity(ids.len());
         for id in ids {
-            let seq = self.seq(&collection, id)?;
-            let current = self
-                .get(&collection, id)?
-                .map(|item| item.flags)
-                .unwrap_or(PimdirFlags::Unknown);
-            let action = PimdirAction::SetFlags {
-                seq,
-                flags: apply_flag_op(&current, flags, op),
+            let Some(item) = self.get(&collection, id)? else {
+                warn!("Message `{id}` not found in `{collection}`, skipped");
+                continue;
             };
-            self.enqueue(&mut producer, &collection, &action, None)
+            let action = PimdirAction::SetFlags {
+                seq: item.seq,
+                flags: apply_flag_op(&item.flags, flags, op),
+            };
+            let partials = producer
+                .check(&collection, &action)
                 .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
+            checked.push((*id, action, partials));
         }
-        Ok(ids.len())
+
+        let mut staged = Vec::with_capacity(checked.len());
+        for (id, action, partials) in checked {
+            let queue_id = producer
+                .enqueue(&collection, &action, None)
+                .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
+            for partial in &partials {
+                warn!("{partial}");
+            }
+            staged.push(PimdirFlagged {
+                id: id.to_owned(),
+                queue_id,
+            });
+        }
+        Ok(staged)
+    }
+
+    /// The flags a message carries as the store shows it, staged changes
+    /// folded in, or `None` when the store never read them.
+    pub fn read_flags(&self, mailbox: &str, id: &str) -> Result<Option<Vec<String>>> {
+        let collection = self.hub_id(mailbox)?;
+        let Some(item) = self.get(&collection, id)? else {
+            bail!("Message `{id}` not found in `{collection}`");
+        };
+        Ok(item.flags.known().map(|set| set.iter().cloned().collect()))
     }
 
     /// Stages a locally-authored message for the next sync to upload,
@@ -940,6 +987,15 @@ pub struct PimdirCreated {
     pub source: String,
 }
 
+/// A flag change staged on one message for the owner.
+#[derive(Clone, Debug)]
+pub struct PimdirFlagged {
+    /// The message's public id.
+    pub id: String,
+    /// The `set-flags` row it waits in.
+    pub queue_id: i64,
+}
+
 /// One queued creation or send, as `pimdir queue list` shows it: the row an
 /// operator acts on, plus the mail the action carries.
 #[derive(Clone, Debug)]
@@ -998,20 +1054,26 @@ fn write_blob(mut writer: PimdirBlobWriter, raw: &[u8], hash: &PimdirHash) -> Re
 
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
 /// stores. An unknown base holds no markers to build on, so it reads as empty.
+///
+/// Flags are matched as [`Flag`]s rather than as strings, so a marker the
+/// store holds in another spelling than the one given, `\seen` for
+/// `\Seen` or Thunderbird's `Junk` for `$Junk`, is the one an add keeps
+/// and a remove drops.
 fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> PimdirFlags {
-    let incoming = flags.iter().map(|flag| flag.raw().to_string());
     match op {
-        FlagOp::Set => incoming.collect(),
+        FlagOp::Set => apply_flag_op(&PimdirFlags::Known(Default::default()), flags, FlagOp::Add),
         FlagOp::Add => {
             let mut set = current.known().cloned().unwrap_or_default();
-            set.extend(incoming);
+            for flag in flags {
+                if !set.iter().any(|raw| Flag::from_raw(raw.as_str()) == *flag) {
+                    set.insert(flag.raw().to_string());
+                }
+            }
             PimdirFlags::Known(set)
         }
         FlagOp::Remove => {
             let mut set = current.known().cloned().unwrap_or_default();
-            for flag in incoming {
-                set.remove(&flag);
-            }
+            set.retain(|raw| !flags.contains(&Flag::from_raw(raw.as_str())));
             PimdirFlags::Known(set)
         }
     }
@@ -2322,5 +2384,294 @@ mod tests {
             });
             eprintln!("envelope search -s 50 `{query}`: whole {scanned:?}, paged {pushed:?}");
         }
+    }
+
+    /// A store holding `imap/INBOX` with five mails: `k0` carrying no flag,
+    /// `k1` the keyword `act`, `k2` `\Seen`, `k3` flags never read, and `k4`
+    /// `\seen` and Thunderbird's `Junk`, spellings other than the canonical
+    /// ones. `declared` is what the `imap` source declares, `None` leaving it
+    /// undeclared, which nothing gates.
+    fn flag_store(
+        declared: Option<&[(&str, io_pimdir::capability::PimdirSupport)]>,
+    ) -> (tempfile::TempDir, PimdirClient) {
+        let dir = tempfile::tempdir().unwrap();
+        let sets = [
+            Some(&[][..]),
+            Some(&["act"][..]),
+            Some(&["\\Seen"][..]),
+            None,
+            Some(&["\\seen", "Junk"][..]),
+        ];
+        let mails: Vec<Seeded> = sets
+            .iter()
+            .enumerate()
+            .map(|(i, flags)| Seeded {
+                handle: format!("k{i}"),
+                flags: flags.map_or(PimdirFlags::Unknown, known),
+                summary: Some(PimdirMailSummary {
+                    message_id: Some(format!("k{i}@x.test")),
+                    subject: format!("keyword {i}"),
+                    date: Some(format!("2026-05-1{i}T10:00:00Z")),
+                    ..Default::default()
+                }),
+            })
+            .collect();
+        seed(dir.path(), "imap/INBOX", &mails);
+
+        if let Some(declared) = declared {
+            let mut store = io_pimdir::client::PimdirStore::open(dir.path())
+                .unwrap()
+                .for_source("imap");
+            let declaration: Vec<_> = declared
+                .iter()
+                .map(|(name, support)| io_pimdir::capability::PimdirCapability {
+                    collection: None,
+                    name: name.to_string(),
+                    support: *support,
+                    detail: Some(format!("{name} as declared")),
+                })
+                .collect();
+            store.declare("imap", &declaration).unwrap();
+        }
+
+        let client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+        (dir, client)
+    }
+
+    /// The public id of the mail `k<n>` in `imap/INBOX`.
+    fn id_of(client: &mut PimdirClient, n: usize) -> String {
+        let message_id = format!("k{n}@x.test");
+        client
+            .list_envelopes("imap/INBOX", None, None, false)
+            .unwrap()
+            .into_iter()
+            .find(|envelope| envelope.message_id.as_deref() == Some(message_id.as_str()))
+            .unwrap()
+            .id
+    }
+
+    fn keyword(raw: &str) -> Flag {
+        Flag::from_raw(raw)
+    }
+
+    #[test]
+    fn a_keyword_is_staged_and_read_back() {
+        use io_pimdir::capability::{MAIL_FLAGS_KEYWORDS, PimdirSupport};
+
+        let (_dir, mut client) = flag_store(Some(&[(MAIL_FLAGS_KEYWORDS, PimdirSupport::Full)]));
+        let id = id_of(&mut client, 0);
+
+        let staged = client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[keyword("todo")],
+                FlagOp::Add,
+            )
+            .unwrap();
+
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0].id, id);
+        let pending = client.store.pending_actions("imap/INBOX").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, staged[0].queue_id);
+        assert_eq!(
+            client.read_flags("imap/INBOX", &id).unwrap(),
+            Some(vec!["todo".to_string()])
+        );
+    }
+
+    #[test]
+    fn a_keyword_is_removed_alone_and_dropped_by_a_set() {
+        let (_dir, mut client) = flag_store(None);
+        let act = id_of(&mut client, 1);
+
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[act.as_str()],
+                &[keyword("todo")],
+                FlagOp::Add,
+            )
+            .unwrap();
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[act.as_str()],
+                &[keyword("act")],
+                FlagOp::Remove,
+            )
+            .unwrap();
+        assert_eq!(
+            client.read_flags("imap/INBOX", &act).unwrap(),
+            Some(vec!["todo".to_string()])
+        );
+
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[act.as_str()],
+                &[Flag::from_iana(IanaFlag::Seen)],
+                FlagOp::Set,
+            )
+            .unwrap();
+        assert_eq!(
+            client.read_flags("imap/INBOX", &act).unwrap(),
+            Some(vec!["\\Seen".to_string()])
+        );
+    }
+
+    #[test]
+    fn a_source_without_keywords_refuses_one_and_stages_nothing() {
+        use io_pimdir::capability::{MAIL_FLAGS_KEYWORDS, MAIL_FLAGS_SEEN, PimdirSupport};
+
+        let (_dir, mut client) = flag_store(Some(&[
+            (MAIL_FLAGS_SEEN, PimdirSupport::Full),
+            (MAIL_FLAGS_KEYWORDS, PimdirSupport::None),
+        ]));
+        let id = id_of(&mut client, 0);
+
+        let err = client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[keyword("todo")],
+                FlagOp::Add,
+            )
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            err.contains(
+                "Source imap does not support mail.flags.keywords: mail.flags.keywords as declared"
+            ),
+            "{err}"
+        );
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_flag_held_in_another_spelling_is_matched_as_that_flag() {
+        let (_dir, mut client) = flag_store(None);
+        let id = id_of(&mut client, 4);
+
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[Flag::from_iana(IanaFlag::Seen)],
+                FlagOp::Add,
+            )
+            .unwrap();
+        assert_eq!(
+            client.read_flags("imap/INBOX", &id).unwrap(),
+            Some(vec!["Junk".to_string(), "\\seen".to_string()])
+        );
+
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[
+                    Flag::from_iana(IanaFlag::Seen),
+                    Flag::from_iana(IanaFlag::Junk),
+                ],
+                FlagOp::Remove,
+            )
+            .unwrap();
+        assert_eq!(client.read_flags("imap/INBOX", &id).unwrap(), Some(vec![]));
+    }
+
+    #[test]
+    fn flags_never_read_list_as_none() {
+        let (_dir, mut client) = flag_store(None);
+        let id = id_of(&mut client, 3);
+
+        assert_eq!(client.read_flags("imap/INBOX", &id).unwrap(), None);
+    }
+
+    #[test]
+    fn a_source_with_keywords_in_part_stages_one() {
+        use io_pimdir::capability::{MAIL_FLAGS_KEYWORDS, PimdirSupport};
+
+        let (_dir, mut client) = flag_store(Some(&[(MAIL_FLAGS_KEYWORDS, PimdirSupport::Partial)]));
+        let id = id_of(&mut client, 0);
+
+        let staged = client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[keyword("todo")],
+                FlagOp::Add,
+            )
+            .unwrap();
+
+        assert_eq!(staged.len(), 1);
+        assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
+    }
+
+    /// The shared `flag set -f seen` on three mails, which drops `act` from
+    /// `k1` only: the one refusal stages nothing for the other two either.
+    #[test]
+    fn a_refusal_part_way_stages_nothing() {
+        use io_pimdir::capability::{MAIL_FLAGS_KEYWORDS, MAIL_FLAGS_SEEN, PimdirSupport};
+
+        let (_dir, mut client) = flag_store(Some(&[
+            (MAIL_FLAGS_SEEN, PimdirSupport::Full),
+            (MAIL_FLAGS_KEYWORDS, PimdirSupport::None),
+        ]));
+        let ids: Vec<String> = (0..3).map(|n| id_of(&mut client, n)).collect();
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+
+        let err = client
+            .store_flags(
+                "imap/INBOX",
+                &ids,
+                &[Flag::from_iana(IanaFlag::Seen)],
+                FlagOp::Set,
+            )
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains(MAIL_FLAGS_KEYWORDS), "{err}");
+        assert!(err.contains(&format!("`{}`", ids[1])), "{err}");
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// An id the mailbox does not hold is skipped and counted out, as the
+    /// shared commands report how many of the given ids they found.
+    #[test]
+    fn an_unknown_id_is_skipped_and_counted_out() {
+        let (_dir, mut client) = flag_store(None);
+        let id = id_of(&mut client, 0);
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+
+        let count = client
+            .store_flags("imap/INBOX", &[id.as_str(), "999"], &seen, FlagOp::Add)
+            .unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
+
+        let staged = client
+            .stage_flags("imap/INBOX", &["998", "999"], &seen, FlagOp::Add)
+            .unwrap();
+        assert!(staged.is_empty());
+        assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
     }
 }

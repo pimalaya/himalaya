@@ -10,16 +10,17 @@ use crate::{
     account::context::Account,
     pimdir::{
         attachment::cli::PimdirAttachmentCommand, client::PimdirClient,
-        mailbox::cli::PimdirMailboxCommand, message::cli::PimdirMessageCommand,
-        performer::PimdirPerformerCommand, queue::cli::PimdirQueueCommand,
+        flag::cli::PimdirFlagCommand, mailbox::cli::PimdirMailboxCommand,
+        message::cli::PimdirMessageCommand, performer::PimdirPerformerCommand,
+        queue::cli::PimdirQueueCommand,
     },
 };
 
 /// pimdir-specific API.
 ///
 /// Reaches what the store holds beside the mail a mailbox lists: the queue
-/// of writes the sync engine has not applied yet, and the files the
-/// account's messages attach.
+/// of writes the sync engine has not applied yet, any flag a message
+/// carries, and the files the account's messages attach.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum PimdirCommand {
@@ -27,6 +28,8 @@ pub enum PimdirCommand {
     Queue(PimdirQueueCommand),
     #[command(subcommand)]
     Message(PimdirMessageCommand),
+    #[command(subcommand)]
+    Flag(PimdirFlagCommand),
     #[command(subcommand)]
     Mailbox(PimdirMailboxCommand),
     Performer(PimdirPerformerCommand),
@@ -45,6 +48,7 @@ impl PimdirCommand {
         match self {
             Self::Queue(cmd) => cmd.execute(printer, account, client),
             Self::Message(cmd) => cmd.execute(printer, account, client),
+            Self::Flag(cmd) => cmd.execute(printer, account, client),
             Self::Mailbox(cmd) => cmd.execute(printer, account, client),
             Self::Performer(cmd) => cmd.execute(printer, client),
             Self::Attachment(cmd) => cmd.execute(printer, account, client),
