@@ -1,5 +1,5 @@
 ---
-cairn: change
+cairn: delta
 change: pimdir-flag-commands
 ---
 
@@ -10,7 +10,15 @@ change: pimdir-flag-commands
 ### Requirement: pimdir stages flags by their raw spelling
 `himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused, as SHALL a value that is empty or holds whitespace or a control character. Any other value is a keyword.
 
-`add`, `set` and `remove` SHALL stage one `SetFlags` per message through `store_flags`, after checking every message against the sources' declarations (pimdir STORAGE §15.6), so a refusal queues nothing: a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the warning naming the limit. `list` SHALL print the flags a message carries as the overlaying reader shows them.
+`add`, `set` and `remove` SHALL stage one `SetFlags` per message through `store_flags`, checked against the sources' declarations (pimdir STORAGE §15.6): a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the declaration's warning as it is. `list` SHALL print the flags a message carries as the overlaying reader shows them.
+
+### Requirement: pimdir stages a flag change on every message or none
+`store_flags` SHALL check every message of a call against the sources' declarations before it queues the first row, so a call refused on any message queues nothing. This holds for the shared `flag add|set|remove` on a pimdir account as for `pimdir flag`.
+
+#### Scenario: A refusal part-way stages nothing
+- GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`, and message 41 of `msgraph/Inbox` carries the keyword `act`
+- WHEN `himalaya flag set -m msgraph/Inbox -f seen 40 41 42` runs, the set dropping `act` from 41 only
+- THEN the command fails naming `mail.flags.keywords` for message 41, and no row is queued for 40, 41 or 42
 
 #### Scenario: A keyword is staged and read back
 - GIVEN a pimdir account whose `imap` source declares `mail.flags.keywords`

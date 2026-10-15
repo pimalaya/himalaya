@@ -21,9 +21,9 @@ The backend is mostly there. `store_flags` stages each `Flag` by its raw spellin
 - `add`, `set` and `remove` take `-m <MAILBOX>`, repeatable `-f <FLAG>` and message ids, and print the queue row of each message, `{"queued": [{"id", "queueId"}]}`, as the other pimdir writes do. `store_flags` returns the row ids it already gets from `enqueue`.
 - A flag is taken verbatim, as in `imap store`. A value naming an IANA flag is accepted only in its canonical spelling: `-f '\Seen'` stages `\Seen`, and `-f seen` or `-f '$seen'` is refused naming it, since `pimdir message add -f seen` means `\Seen` and the reader would classify the keyword `seen` as read. `\Deleted` (a sync verb) and `\Recent` (not storable) are refused, as is a value that is empty or holds whitespace or a control character.
 - `-m` resolves aliases and roles as `pimdir message add` does.
-- Every message is checked before the first row is queued, so a refusal leaves nothing half staged. A source declaring `mail.flags.keywords` as `none` (Graph: "Graph categories are not mapped") refuses with that detail; one declaring it in part queues with the warning naming the limit (IMAP: PERMANENTFLAGS; Gmail: `$Important` only).
+- A source declaring `mail.flags.keywords` as `none` (Graph: "Graph categories are not mapped") refuses with that detail; one declaring it in part queues with the declaration's warning as it is (IMAP: PERMANENTFLAGS; Gmail: `$Important` only). What the sync engine then does with a keyword it cannot map is its own.
 
-What neverest does with a keyword other than `$Important` on a Gmail source is the sync engine's to define. A manual run against Gmail, recorded under `cairn/spec/testing/`, will say whether the row parks or is dropped, and the warning will name the outcome.
+`store_flags` also changes for the shared commands: today it checks and queues one message at a time, so a multi-id call refused part-way leaves the earlier messages staged. It will check every message before the first enqueue, so a refusal queues nothing.
 
 m2dir needs nothing: `m2dir flag` already takes free-form flags.
 
