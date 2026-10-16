@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `flag add` and `flag remove` on a pimdir account replacing every flag a message carries on the server when the sync engine never read them: they now fail saying the flags were never synced. `flag set`, which replaces the whole set by design, is unchanged.
 - Fixed `flag remove` on a pimdir account leaving a flag the store holds in another spelling than the canonical one, `\seen` or Thunderbird's `Junk`, and `flag add` adding the canonical spelling beside it: flags are now matched as flags, not as strings.
 - Fixed `flag add`, `flag set` and `flag remove` on a pimdir account staging the change on the first messages of a call and then failing on a later one: every message is now checked against the sources before the first row is queued, so a call the check refuses stages nothing, and an id the mailbox does not hold is skipped and counted out, as on the other backends.
 - Fixed Maildir mailboxes being named by their last path segment, so `Archive` and `[Gmail]/Archive` both listed as `Archive`: `mailbox list` and `maildir list` now name them by their path relative to `maildir.root`, the name `-m` takes, in both layouts ([himalaya-tui#22](https://github.com/pimalaya/himalaya-tui/issues/22)).

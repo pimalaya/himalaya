@@ -14,11 +14,12 @@ Adds and removes now match flags as flags rather than as strings, on the shared 
 
 Settled while landing, beyond the proposal as reviewed: the staging function is `stage_flags` rather than a changed `store_flags`, the validation refuses backslash words, IMAP specials and non-ASCII, a write naming no message is refused, flags are matched by flag (a `set` deduplicating as an `add` does), `list` prints `null` for an unread set, and an unknown id is skipped rather than failing the call, matching the requirement [#777] landed the same day. The delta and the proposal were edited to say so, and the delta's two requirements reordered so each keeps its own scenarios.
 
-Not changed: on a message whose flags were never read, an add stages the given flags as the whole set and a remove stages an empty set, replacing whatever the server holds, as `stage_flags` inherited from `store_flags` and as its existing test states. `pimdir flag remove` makes that reachable directly, so it is raised on the PR rather than changed here.
+Asked on [#793]: on a message whose flags were never read, an add or a remove is now refused, saying the flags were never synced, on the shared commands too. Before, an add staged the given flags as the whole set and a remove an empty one, replacing whatever the server held; `pimdir flag remove` would have reached that directly. A `set` still replaces the set, which is what it means. The upstream test that asserted the old staging now asserts the refusal, and two tests that staged flags on seeded mails pick ones whose flags were read.
 
 Verified by the test suite, which covers a keyword round trip, removal, replacement, flags held in another spelling, an unread set, a `none` and a partial declaration, a call refused part-way, and an unknown id skipped; the part-way and spelling tests fail on the previous staging. Run by hand against a store a neverest 0.3.0 sync filled from IMAP: `list` showed the stored and the staged flags, a keyword was staged as one row and cancelled, and `seen`, `\Deleted`, a value with a space and an unknown mailbox were refused. That neverest declares no capabilities, so no declaration gated the keyword there; the gate was exercised by the tests only.
 
-Capabilities moved: **backends** (pimdir stages flags by their raw spelling, pimdir stages a flag change on every message or none, pimdir writes name their queue row).
+Capabilities moved: **backends** (pimdir stages flags by their raw spelling, pimdir stages a flag change on every message or none, pimdir writes name their queue row, pimdir is a reader and a producer, never the owner).
 
 [#777]: https://github.com/pimalaya/himalaya/issues/777
 [#790]: https://github.com/pimalaya/himalaya/issues/790
+[#793]: https://github.com/pimalaya/himalaya/pull/793

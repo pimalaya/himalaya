@@ -29,4 +29,4 @@ m2dir needs nothing: `m2dir flag` already takes free-form flags.
 
 ## Non-goals
 
-The shared `flag` commands still take only the four flags every backend handles, and the shared search grammar does not change; on pimdir they only gain the all-or-nothing staging above and flag matching.
+The shared `flag` commands still take only the four flags every backend handles, and the shared search grammar does not change; on pimdir they only gain the all-or-nothing staging above, flag matching, and the refusal of an add or a remove on flags never synced (asked in review).

@@ -105,9 +105,14 @@ The reader SHALL overlay the queue (pimdir SPEC §15.4), so an action this clien
 
 A write SHALL be staged as a queued `PimdirAction` through a producer handle (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`), addressed by the public `seq`, for the store's owner to apply and push. The backend SHALL NOT write the index, load a collection, or run the owner's object sweep: a sweep run beside a sync destroys the bodies it has streamed but not yet attached, which SPEC §14 explicitly invites it to leave pending. A body an action references SHALL be written to the blob store durably before the action is enqueued, the queue row being what pins it.
 
-`SetFlags` carries the whole replacement set, so applying it twice lands the same state; a set the store reports as unknown contributes no markers rather than staging an unknown one, which would erase what a sync knows. pimdir has no native trash.
+`SetFlags` carries the whole replacement set, so applying it twice lands the same state. An add or a remove on a set the store reports as unknown SHALL be refused, saying the message's flags were never synced: it has no markers to build on, and the replacement would erase whatever the server holds. A `set` replaces the whole set, so it SHALL stage one regardless. pimdir has no native trash.
 
 An added message SHALL derive its link id through io-pimdir's mail derivation (`summary::mail::derive`), the one implementation of SPEC Annex A.1, which is the bare `Message-ID` with nothing prepended, and SHALL name it on the queued `Add`. The action carries no summary: the owner derives the summary and the sort key from the body when it applies the action, through the same call, so the two never disagree. A staged `Add` whose link id the collection already holds SHALL park (pimdir SPEC §15.3): it neither deduplicates against the stored copy nor mints a second key. Minting is the store's answer to what a source hands over; parking is its answer to a producer authoring a message the collection already has.
+
+#### Scenario: An add on flags never synced is refused
+- GIVEN a pimdir message whose flags the sync engine never read
+- WHEN `himalaya flag add -m imap/INBOX -f flagged 42` runs
+- THEN the command fails saying the flags of `42` were never synced, and nothing is queued
 
 ### Requirement: A queued creation is reported, not listed
 A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window. `himalaya pimdir queue list` is where queued creations show.
