@@ -155,6 +155,7 @@ impl MessageReplyCommand {
                 mode: SourceMode::Reply,
                 posting_style: account.resolve_reply_posting_style(self.posting_style),
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
+                no_attachments: true,
                 reply_all: self.all,
                 own_email: account.email.as_deref(),
             }),

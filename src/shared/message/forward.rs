@@ -69,6 +69,10 @@ pub struct MessageForwardCommand {
     /// Files to attach.
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
+    /// Leave the attachments of the source out of the forward, keeping
+    /// the quoted body alone.
+    #[arg(long = "no-attachments")]
+    pub no_attachments: bool,
     /// Signature appended after the body, defaulting to the account's
     /// `signature`.
     ///
@@ -149,6 +153,7 @@ impl MessageForwardCommand {
                 mode: SourceMode::Forward,
                 posting_style: account.resolve_forward_posting_style(self.posting_style),
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
+                no_attachments: self.no_attachments,
                 reply_all: false,
                 own_email: None,
             }),
