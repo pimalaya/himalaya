@@ -401,6 +401,22 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::pimdir::message::send::PimdirMessageSent
         );
         insert!(
+            "himalaya-pimdir-flag-list",
+            crate::pimdir::flag::list::PimdirFlagList
+        );
+        insert!(
+            "himalaya-pimdir-flag-add",
+            crate::pimdir::flag::PimdirFlagsStaged
+        );
+        insert!(
+            "himalaya-pimdir-flag-set",
+            crate::pimdir::flag::PimdirFlagsStaged
+        );
+        insert!(
+            "himalaya-pimdir-flag-remove",
+            crate::pimdir::flag::PimdirFlagsStaged
+        );
+        insert!(
             "himalaya-pimdir-mailbox-create",
             crate::pimdir::mailbox::create::PimdirMailboxCreated
         );

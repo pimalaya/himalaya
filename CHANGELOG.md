@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `pimdir flag list|add|set|remove`, reading and staging any flag of a pimdir message by its raw spelling, keywords included, as `imap store` does on IMAP ([#790]). A registered flag is taken in its canonical spelling only (`\Seen`, not `seen`); `\Deleted`, `\Recent`, a backslash before any other word, non-ASCII characters and the characters IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`) are refused; and a source declaring no keyword support refuses a keyword change, one supporting them in part staging it with its warning. The writes print the queue row of each message and fail when no given id exists; `list` prints `null` for flags the sync engine never read.
 - Added `msgraph messages send-draft <ID>`, sending an existing Microsoft Graph draft (`POST /me/messages/{id}/send`), which Graph moves to Sent Items ([#787]).
 - Added `--all` (`-A`) to `message reply`, replying to everyone: `To` stays the source's `Reply-To` or `From`, and `Cc` takes the `To` and `Cc` of the source without the account's `email` nor anyone already in `To`, each address once. An explicit `--to` or `--cc` takes precedence over the list it would derive ([#779]).
 - Added `pimdir attachment list`, one page of the files a pimdir account's messages attach, newest message first, read from the stand-ins the store records as each body enters it (io-pimdir `14a8fca`, pimdir STORAGE §14.3): each with its `id`, `name`, `mediaType`, `size` and IMAP `section`, and the `messageId`, `mailbox`, `sender`, `senderName` and `date` of its message, the ids being those `envelope list` and `message read` take, plus a `nextPage` token that `--page-token` takes. `pimdir attachment search <WORDS>` keeps the files every word of which is in the file name, the sender's address or the sender's name, ignoring case.
@@ -47,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `flag add` and `flag remove` on a pimdir account replacing every flag a message carries on the server when the sync engine never read them: they now fail saying the flags were never synced. `flag set`, which replaces the whole set by design, is unchanged.
+- Fixed `flag remove` on a pimdir account leaving a flag the store holds in another spelling than the canonical one, `\seen` or Thunderbird's `Junk`, and `flag add` adding the canonical spelling beside it: flags are now matched as flags, not as strings.
+- Fixed `flag add`, `flag set` and `flag remove` on a pimdir account staging the change on the first messages of a call and then failing on a later one: every message is now checked against the sources before the first row is queued, so a call the check refuses stages nothing, and an id the mailbox does not hold is skipped and counted out, as on the other backends.
 - Fixed Maildir mailboxes being named by their last path segment, so `Archive` and `[Gmail]/Archive` both listed as `Archive`: `mailbox list` and `maildir list` now name them by their path relative to `maildir.root`, the name `-m` takes, in both layouts ([himalaya-tui#22](https://github.com/pimalaya/himalaya-tui/issues/22)).
 - Fixed the wizard reading a `secret-tool` keyring entry only by its `account` attribute: it now prompts for the attribute (default `account`), so a KeePassXC entry keyed by `Title` is found. A secret command failing silently now names its program and exit status instead of an empty `Secret command error` ([#745]).
 - Fixed the wizard creating new configuration files with permissions that could expose raw credentials. New files use exclusive creation and Unix mode 0600, and new directories use mode 0700. Existing file and directory permissions are preserved.
@@ -1451,6 +1455,7 @@ Few major concepts changed:
 [#787]: https://github.com/pimalaya/himalaya/issues/787
 [#781]: https://github.com/pimalaya/himalaya/issues/781
 [#786]: https://github.com/pimalaya/himalaya/issues/786
+[#790]: https://github.com/pimalaya/himalaya/issues/790
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
