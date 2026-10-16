@@ -434,7 +434,8 @@ impl PimdirClient {
             };
             let action = PimdirAction::SetFlags {
                 seq: item.seq,
-                flags: apply_flag_op(&item.flags, flags, op),
+                flags: apply_flag_op(&item.flags, flags, op)
+                    .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?,
             };
             let partials = producer
                 .check(&collection, &action)
@@ -1053,28 +1054,36 @@ fn write_blob(mut writer: PimdirBlobWriter, raw: &[u8], hash: &PimdirHash) -> Re
 }
 
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
-/// stores. An unknown base holds no markers to build on, so it reads as empty.
+/// stores. An add or a remove on an unknown base is refused: the base holds
+/// no markers to build on, and the replacement would erase whatever the
+/// server holds. A set replaces the whole set, so it needs no base.
 ///
 /// Flags are matched as [`Flag`]s rather than as strings, so a marker the
 /// store holds in another spelling than the one given, `\seen` for
 /// `\Seen` or Thunderbird's `Junk` for `$Junk`, is the one an add keeps
 /// and a remove drops.
-fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> PimdirFlags {
+fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> Result<PimdirFlags> {
+    if matches!(op, FlagOp::Set) {
+        return apply_flag_op(&PimdirFlags::Known(Default::default()), flags, FlagOp::Add);
+    }
+    let Some(current) = current.known() else {
+        bail!("its flags were never synced: sync first, or replace them with `flag set`");
+    };
     match op {
-        FlagOp::Set => apply_flag_op(&PimdirFlags::Known(Default::default()), flags, FlagOp::Add),
+        FlagOp::Set => unreachable!("handled above"),
         FlagOp::Add => {
-            let mut set = current.known().cloned().unwrap_or_default();
+            let mut set = current.clone();
             for flag in flags {
                 if !set.iter().any(|raw| Flag::from_raw(raw.as_str()) == *flag) {
                     set.insert(flag.raw().to_string());
                 }
             }
-            PimdirFlags::Known(set)
+            Ok(PimdirFlags::Known(set))
         }
         FlagOp::Remove => {
-            let mut set = current.known().cloned().unwrap_or_default();
+            let mut set = current.clone();
             set.retain(|raw| !flags.contains(&Flag::from_raw(raw.as_str())));
-            PimdirFlags::Known(set)
+            Ok(PimdirFlags::Known(set))
         }
     }
 }
@@ -1496,24 +1505,29 @@ mod tests {
     fn flag_ops_add_set_and_remove() {
         let base = known(&["\\Seen"]);
         let flagged = [Flag::from_raw("\\Flagged")];
-        let added = apply_flag_op(&base, &flagged, FlagOp::Add);
+        let added = apply_flag_op(&base, &flagged, FlagOp::Add).unwrap();
         assert!(added.contains("\\Seen") && added.contains("\\Flagged"));
-        let set = apply_flag_op(&base, &flagged, FlagOp::Set);
+        let set = apply_flag_op(&base, &flagged, FlagOp::Set).unwrap();
         assert!(!set.contains("\\Seen") && set.contains("\\Flagged"));
         let seen = [Flag::from_raw("\\Seen")];
-        let removed = apply_flag_op(&base, &seen, FlagOp::Remove);
+        let removed = apply_flag_op(&base, &seen, FlagOp::Remove).unwrap();
         assert!(!removed.contains("\\Seen"));
     }
 
-    /// An add onto an unknown set must not carry the unknown forward: the
-    /// action replaces the set, and an unknown one erases what a sync knows.
+    /// An add or a remove onto an unknown set is refused: the action
+    /// replaces the set, so it would erase whatever the server holds. A set
+    /// replaces it anyway, so it stages a known one.
     #[test]
-    fn a_flag_op_on_an_unknown_set_stages_a_known_one() {
-        let staged = apply_flag_op(
-            &PimdirFlags::Unknown,
-            &[Flag::from_raw("\\Seen")],
-            FlagOp::Add,
-        );
+    fn a_flag_op_on_an_unknown_set_is_refused_but_a_set() {
+        let seen = [Flag::from_raw("\\Seen")];
+        for op in [FlagOp::Add, FlagOp::Remove] {
+            let err = apply_flag_op(&PimdirFlags::Unknown, &seen, op)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("never synced"), "{err}");
+        }
+
+        let staged = apply_flag_op(&PimdirFlags::Unknown, &seen, FlagOp::Set).unwrap();
         assert_eq!(staged.known().map(BTreeSet::len), Some(1));
         assert!(staged.contains("\\Seen"));
     }
@@ -2155,12 +2169,20 @@ mod tests {
             ids.iter().map(String::as_str).collect()
         }
 
+        // An add or a remove is refused on a set the store never read, and
+        // the seeded mails carry some, so the flag ops pick synced ones.
+        let synced = |client: &PimdirClient, ids: Vec<String>| -> Vec<String> {
+            ids.into_iter()
+                .filter(|id| client.read_flags("imap/INBOX", id).unwrap().is_some())
+                .collect()
+        };
+
         let seen = [Flag::from_iana(IanaFlag::Seen)];
-        let read = ids(&inbox, 4, 1);
+        let read = synced(&client, ids(&inbox, 4, 1));
         client
             .store_flags("imap/INBOX", &refs(&read), &seen, FlagOp::Add)
             .unwrap();
-        let unread = ids(&inbox, 6, 0);
+        let unread = synced(&client, ids(&inbox, 6, 0));
         client
             .store_flags("imap/INBOX", &refs(&unread), &seen, FlagOp::Remove)
             .unwrap();
@@ -2186,11 +2208,14 @@ mod tests {
     fn a_queue_touching_another_mailbox_leaves_one_quiet() {
         let (dir, mut client) = seeded_store();
         seed(dir.path(), "imap/Work", &mails("wo", 5));
+        // The first synced mail: an add is refused on flags never read.
         let id = client
-            .list_envelopes("imap/Archive", Some(1), Some(1), false)
-            .unwrap()[0]
-            .id
-            .clone();
+            .list_envelopes("imap/Archive", None, None, false)
+            .unwrap()
+            .into_iter()
+            .map(|envelope| envelope.id)
+            .find(|id| client.read_flags("imap/Archive", id).unwrap().is_some())
+            .unwrap();
         client
             .store_flags(
                 "imap/Archive",
@@ -2590,6 +2615,47 @@ mod tests {
             )
             .unwrap();
         assert_eq!(client.read_flags("imap/INBOX", &id).unwrap(), Some(vec![]));
+    }
+
+    #[test]
+    fn an_add_or_remove_on_flags_never_synced_is_refused_and_a_set_staged() {
+        let (_dir, mut client) = flag_store(None);
+        let unread = id_of(&mut client, 3);
+        let other = id_of(&mut client, 0);
+
+        for op in [FlagOp::Add, FlagOp::Remove] {
+            let err = client
+                .store_flags(
+                    "imap/INBOX",
+                    &[other.as_str(), unread.as_str()],
+                    &[Flag::from_iana(IanaFlag::Flagged)],
+                    op,
+                )
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("never synced"), "{err}");
+            assert!(err.contains(&format!("`{unread}`")), "{err}");
+        }
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
+
+        client
+            .stage_flags(
+                "imap/INBOX",
+                &[unread.as_str()],
+                &[Flag::from_iana(IanaFlag::Flagged)],
+                FlagOp::Set,
+            )
+            .unwrap();
+        assert_eq!(
+            client.read_flags("imap/INBOX", &unread).unwrap(),
+            Some(vec!["\\Flagged".to_string()])
+        );
     }
 
     #[test]
