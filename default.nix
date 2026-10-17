@@ -60,6 +60,9 @@ pimalaya.mkDefault (
       # HACK: needed until the v2.1.0 derivation lands on nixpkgs's master
       .overrideAttrs
         (drv: {
+          nativeBuildInputs =
+            (drv.nativeBuildInputs or [ ]) ++ lib.optional systemSqlite buildPackages.pkg-config;
+
           buildInputs = (drv.buildInputs or [ ]) ++ lib.optional systemSqlite sqlite';
 
           postInstall =
