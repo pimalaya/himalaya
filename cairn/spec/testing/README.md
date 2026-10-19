@@ -25,6 +25,9 @@ single combined report sufficed.
 | --- | --- | --- | --- |
 | IMAP + SMTP | Fastmail | [imap-smtp-fastmail.md](imap-smtp-fastmail.md) | [imap-smtp-specific-fastmail.md](imap-smtp-specific-fastmail.md) |
 | IMAP + SMTP | Posteo | [imap-smtp-posteo.md](imap-smtp-posteo.md) | *(combined)* |
+| IMAP + SMTP | QQ邮箱 | [imap-smtp-qq.md](imap-smtp-qq.md) | *(combined)* |
+| IMAP + SMTP | 163邮箱 | [imap-smtp-163.md](imap-smtp-163.md) | *(combined)* |
+| IMAP + SMTP | 139邮箱 | [imap-smtp-139.md](imap-smtp-139.md) | *(combined)* |
 | IMAP | Gmail (Google) | [imap-google.md](imap-google.md) | *(combined)* |
 | IMAP | iCloud | [imap-icloud.md](imap-icloud.md) | *(combined; IMAP-only account)* |
 | JMAP | Fastmail | [jmap-fastmail.md](jmap-fastmail.md) | [jmap-specific-fastmail.md](jmap-specific-fastmail.md) |
