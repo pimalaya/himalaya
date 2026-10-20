@@ -63,20 +63,26 @@ smtp.sasl.login.password.raw = "***"
   imap: FAIL (received fatal alert: HandshakeFailure)
   ```
 
-  Debug logs show rustls sends a valid ClientHello offering TLS 1.2/1.3 with
-  modern AEAD cipher suites (`TLS13_AES_256_GCM_SHA384`,
-  `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384`, etc.), but the server rejects the
-  handshake. The server likely only supports legacy cipher suites (e.g. AES-CBC
-  or 3DES) that rustls does not implement. SMTP (`smtp.139.com:465`) succeeds
-  with `rustls-ring` using TLS 1.3 (`TLS13_AES_256_GCM_SHA384`). Building
-  himalaya with `native-tls` resolves the IMAP issue. Verified:
-  - `rustls-ring`: IMAP FAIL (`received fatal alert: HandshakeFailure`), SMTP OK
-  - `native-tls`: IMAP OK, SMTP OK
+  **Root cause:** rustls ClientHello offers only modern AEAD cipher suites
+  (TLS 1.3: `TLS13_AES_256_GCM_SHA384`, `TLS13_AES_128_GCM_SHA256`,
+  `TLS13_CHACHA20_POLY1305_SHA256`; TLS 1.2: `TLS_ECDHE_RSA/ECDSA_WITH_AES_GCM`
+  and `CHACHA20_POLY1305`). The server rejects with `HandshakeFailure`, indicating
+  it requires legacy cipher suites (e.g., AES-CBC) that rustls intentionally does
+  not implement for security reasons.
 
-  Note: the reverse is true for China Mobile enterprise mail
-  (`imap.js.chinamobile.com`), which works with `rustls-ring` but fails with
-  `native-tls`. Users who need both must choose the TLS provider or build two
-  binaries.
+  **Evidence from trace logs:**
+  - rustls offers TLS 1.2/1.3 with ECDHE key exchange only
+  - No legacy ciphers (AES-CBC, 3DES, RC4) or non-ECDHE key transport
+  - Server responds with fatal HandshakeFailure alert
+  - native-tls succeeds (OpenSSL/Secure Transport support legacy ciphers)
+
+  **SMTP works:** `smtp.139.com:465` succeeds with `rustls-ring` using TLS 1.3
+  (`TLS13_AES_256_GCM_SHA384`), indicating the SMTP server supports modern ciphers
+  while the IMAP server does not.
+
+  **Verified:**
+  - `rustls-ring`: IMAP FAIL (`HandshakeFailure`), SMTP OK
+  - `native-tls`: IMAP OK, SMTP OK
 
 - **P2 — Mailbox counts not supported.** `mailbox list --counts` shows empty
   TOTAL and UNREAD columns for all folders. The 139 server likely does not
