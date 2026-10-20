@@ -12,7 +12,7 @@ Shared cross-protocol commands on the IMAP/SMTP backend against **163 Mail**
 
 > ⚠️ **Coremail quirks confirmed.** 163 Mail runs on Coremail, which has
 > several known issues documented in
-> [provider-quirks.md](../spec/provider-quirks.md). The configuration
+> [provider-quirks.md](../provider-quirks.md). The configuration
 > requires `imap.sasl-ir = false` and `imap.id.auto = true` (with non-empty
 > `id.fields`, the default). Without these, the connection fails.
 
@@ -76,7 +76,8 @@ smtp.sasl.login.password.raw = "***"
   initial response.
 
 - **P3 — ID command is required.** Confirmed that `imap.id.auto = true` is
-  required. The server sends an RFC 2971 ID command after authentication.
+  required. The client (himalaya) sends an RFC 2971 ID command after authentication,
+  and the server requires it.
 
 - **P4 — Chinese mailbox names.** 163 Mail uses Chinese names for default
   folders: 草稿箱 (Drafts), 已发送 (Sent), 已删除 (Trash), 垃圾邮件 (Junk),

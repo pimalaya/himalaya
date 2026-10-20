@@ -80,11 +80,6 @@ smtp.sasl.login.password.raw = "***"
   interface: Settings → Account → POP3/IMAP/SMTP service → Generate
   authorization code.
 
-- **P5 — FROM column truncation.** `envelope list` displays only the display
-  name part of the From address (e.g. `alice` instead of
-  `alice@example.com`). This may be a rendering choice rather than a provider
-  issue.
-
 ### Observations
 
 - `mailbox list --counts` shows TOTAL and UNREAD columns correctly.
