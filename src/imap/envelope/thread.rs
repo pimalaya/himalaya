@@ -77,7 +77,7 @@ impl ImapEnvelopeThreadCommand {
             HashMap::new()
         };
 
-        let table = ThreadResultsTable::new(threads, subjects);
+        let table = ImapThreadOutput::new(threads, subjects);
 
         printer.out(table)
     }
@@ -191,6 +191,7 @@ fn fetch_subjects(
 
 /// One flattened thread node.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ThreadEntry {
     /// The UID, or the message number under `--seq`.
     pub id: u32,
@@ -201,12 +202,12 @@ pub struct ThreadEntry {
 }
 
 /// The `imap thread` output, a tree of conversations.
-pub struct ThreadResultsTable {
+pub struct ImapThreadOutput {
     threads: Vec<Thread>,
     subjects: HashMap<u32, String>,
 }
 
-impl ThreadResultsTable {
+impl ImapThreadOutput {
     /// Pairs the threads the server returned with the fetched subjects.
     pub fn new(threads: Vec<Thread>, subjects: HashMap<u32, String>) -> Self {
         Self { threads, subjects }
@@ -253,7 +254,7 @@ impl ThreadResultsTable {
     }
 }
 
-impl fmt::Display for ThreadResultsTable {
+impl fmt::Display for ImapThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.threads.is_empty() {
             writeln!(f)?;
@@ -277,7 +278,7 @@ impl fmt::Display for ThreadResultsTable {
     }
 }
 
-impl ThreadResultsTable {
+impl ImapThreadOutput {
     fn display_thread(
         &self,
         f: &mut fmt::Formatter<'_>,
@@ -315,28 +316,29 @@ impl ThreadResultsTable {
     }
 }
 
-impl Serialize for ThreadResultsTable {
+impl Serialize for ImapThreadOutput {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut s = serializer.serialize_struct("ThreadResultsTable", 1)?;
+        let mut s = serializer.serialize_struct("ImapThreadOutput", 1)?;
         s.serialize_field("threads", &self.build_entries())?;
         s.end()
     }
 }
 
-/// Mirrors the JSON shape [`ThreadResultsTable`]'s hand-written
+/// Mirrors the JSON shape [`ImapThreadOutput`]'s hand-written
 /// [`Serialize`] produces, only so the schema can be derived from it.
 #[derive(JsonSchema)]
+#[schemars(rename = "ImapThreadOutput")]
 #[allow(dead_code)]
-struct ThreadResultsTableSchema {
+struct ImapThreadOutputSchema {
     threads: Vec<ThreadEntry>,
 }
 
-impl JsonSchema for ThreadResultsTable {
+impl JsonSchema for ImapThreadOutput {
     fn schema_name() -> Cow<'static, str> {
-        <ThreadResultsTableSchema as JsonSchema>::schema_name()
+        <ImapThreadOutputSchema as JsonSchema>::schema_name()
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        <ThreadResultsTableSchema as JsonSchema>::json_schema(generator)
+        <ImapThreadOutputSchema as JsonSchema>::json_schema(generator)
     }
 }

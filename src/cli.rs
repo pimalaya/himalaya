@@ -403,7 +403,7 @@ impl Command {
             Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
             Self::Completion(cmd) => cmd.execute(printer, Cli::command()),
             Self::Manual(cmd) => cmd.execute(printer, Cli::command()),
-            Self::JsonSchema(cmd) => cmd.execute(printer, json_schema::schemas()),
+            Self::JsonSchema(cmd) => cmd.execute(printer, json_schema::registry()),
         }
     }
 }

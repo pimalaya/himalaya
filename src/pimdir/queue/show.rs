@@ -32,7 +32,7 @@ impl PimdirQueueShowCommand {
     /// Looks the row up in the account's queue and receipts.
     pub fn execute(self, printer: &mut impl Printer, client: &mut PimdirClient) -> Result<()> {
         let status = client.queue_row(self.id)?;
-        printer.out(PimdirQueueRow::new(self.id, status))
+        printer.out(PimdirQueueShowOutput::new(self.id, status))
     }
 }
 
@@ -54,7 +54,7 @@ pub enum PimdirQueueState {
 /// The `pimdir queue show` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirQueueRow {
+pub struct PimdirQueueShowOutput {
     /// The queue row id.
     pub queue_id: i64,
     /// Where it stands.
@@ -79,7 +79,7 @@ pub struct PimdirQueueRow {
     pub seq: Option<i64>,
 }
 
-impl PimdirQueueRow {
+impl PimdirQueueShowOutput {
     /// Projects io-pimdir's status of row `queue_id`.
     pub fn new(queue_id: i64, status: PimdirActionStatus) -> Self {
         let row = Self {
@@ -134,7 +134,7 @@ impl PimdirQueueRow {
     }
 }
 
-impl fmt::Display for PimdirQueueRow {
+impl fmt::Display for PimdirQueueShowOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = self.queue_id;
         let collection = sanitize(self.collection.as_deref().unwrap_or_default());
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn an_applied_add_prints_its_seq() {
-        let row = PimdirQueueRow::new(
+        let row = PimdirQueueShowOutput::new(
             12,
             PimdirActionStatus::Applied {
                 applied_at: "2026-10-04T20:00:00Z".into(),
@@ -190,8 +190,8 @@ mod tests {
 
     #[test]
     fn an_unknown_row_prints_its_id_and_state_only() {
-        let json =
-            serde_json::to_value(PimdirQueueRow::new(7, PimdirActionStatus::Unknown)).unwrap();
+        let json = serde_json::to_value(PimdirQueueShowOutput::new(7, PimdirActionStatus::Unknown))
+            .unwrap();
         assert_eq!(
             json,
             serde_json::json!({ "queueId": 7, "state": "unknown" })

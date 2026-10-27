@@ -102,6 +102,7 @@ impl MessageReadCommand {
 /// a header block, then one summary line per MIME part with the decoded
 /// contents of the text ones.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageReadOutput {
     /// The headers a reader acts on, decoded.
     pub headers: MessageHeaders,
@@ -260,6 +261,7 @@ impl MessageHeaders {
 
 /// One address of an address header.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MailAddress {
     /// The display name, RFC 2047 decoded; `null` when absent.
     pub name: Option<String>,

@@ -63,7 +63,7 @@ impl GmailDraftsCommand {
 
 /// Identity of a created or replaced Gmail draft.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailDraftWriteOutput {
     /// The immutable draft id.
     pub(crate) id: String,

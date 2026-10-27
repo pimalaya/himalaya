@@ -18,10 +18,9 @@ use mail_parser::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    error::{CodedError, ErrorCode},
-    shared::message::header,
-};
+use pimalaya_cli::error::CodedError;
+
+use crate::{error::ErrorCode, shared::message::header};
 
 /// The deepest a part may sit, the top-level part being at depth 1.
 pub const MAX_DEPTH: usize = 8;
@@ -427,7 +426,7 @@ pub fn bare_id(id: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::code_of;
+    use pimalaya_cli::error::code_of;
 
     use super::*;
 

@@ -26,8 +26,7 @@ use crate::gmail::{
 /// JSON includes each message's MIME payload when Gmail supplies one,
 /// including bodies and attachment metadata under `--format full`.
 /// `--header` filters the summary headers, not the retained MIME payload.
-/// Keys inside `payload` keep Gmail's camelCase, unlike their kebab-case
-/// siblings, until v3 aligns them.
+/// Keys inside `payload` keep Gmail's spelling, camelCase like the rest.
 #[derive(Debug, Parser)]
 pub struct GmailThreadGetCommand {
     /// The id of the thread to get.
@@ -74,7 +73,7 @@ impl GmailThreadGetCommand {
 /// under `--json`, as a structured object instead of a wrapped human
 /// string.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailThreadGetOutput {
     id: String,
     messages: Vec<GmailThreadMessageOutput>,
@@ -107,7 +106,7 @@ impl fmt::Display for GmailThreadGetOutput {
 /// The thread id is left out, since it is the id of the enclosing
 /// [`GmailThreadGetOutput`].
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailThreadMessageOutput {
     id: String,
     label_ids: Vec<String>,

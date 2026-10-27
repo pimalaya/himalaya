@@ -11,7 +11,7 @@ use crate::{
     account::context::Account,
     jmap::{
         client::JmapClient,
-        email::query::{EmailsChars, EmailsColors, EmailsTable},
+        email::query::{EmailsChars, EmailsColors, JmapEmailQueryOutput},
     },
 };
 
@@ -39,7 +39,7 @@ impl JmapEmailGetCommand {
             warn!("email `{id}` not found, ignoring it");
         }
 
-        let table = EmailsTable {
+        let table = JmapEmailQueryOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             colors: EmailsColors {

@@ -18,9 +18,9 @@ use crate::{gmail::client::GmailClient, shared::output::Paginated};
 
 /// List the changes applied to the mailbox since a given history id.
 ///
-/// JSON includes `history-id`, `history`, and an optional `next_page` cursor.
-/// Each record retains its message-id arrays and adds `messages-added-details`
-/// with each arrival's `id`, nullable `thread-id`, and `label-ids` supplied by
+/// JSON includes `historyId`, `history`, and an optional `nextPage` cursor.
+/// Each record retains its message-id arrays and adds `messagesAddedDetails`
+/// with each arrival's `id`, nullable `threadId`, and `labelIds` supplied by
 /// Gmail. Missing labels become an empty array; text output shows counts.
 #[derive(Debug, Parser)]
 pub struct GmailHistoryListCommand {
@@ -106,7 +106,7 @@ impl From<HistoryTypeArg> for GmailHistoryType {
 /// JSON carries affected message ids and added-message details; text shows
 /// counts for incremental sync summaries.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryListOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     history_id: Option<String>,
@@ -140,7 +140,7 @@ impl fmt::Display for GmailHistoryListOutput {
 
 /// A single change to the mailbox since the requested history id.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryRecordOutput {
     id: String,
     messages_added: Vec<String>,
@@ -173,7 +173,7 @@ impl From<GmailHistory> for GmailHistoryRecordOutput {
 
 /// Identity and labels supplied by Gmail for an added message.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryMessageOutput {
     id: String,
     thread_id: Option<String>,
@@ -182,7 +182,7 @@ pub(crate) struct GmailHistoryMessageOutput {
 
 /// Labels added to or removed from one message in a history record.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryLabelOutput {
     message_id: String,
     label_ids: Vec<String>,

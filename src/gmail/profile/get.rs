@@ -32,10 +32,10 @@ impl GmailProfileGetCommand {
 }
 
 /// Gmail profile, rendered as aligned text or, under `--json`, as a
-/// structured object (`{email, messages-total, threads-total,
-/// history-id}`) instead of a wrapped human string.
+/// structured object (`{email, messagesTotal, threadsTotal, historyId}`)
+/// instead of a wrapped human string.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailProfileOutput {
     email: String,
     #[serde(skip_serializing_if = "Option::is_none")]

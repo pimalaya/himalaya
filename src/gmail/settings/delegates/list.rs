@@ -39,7 +39,7 @@ impl GmailSettingsDelegatesListCommand {
         };
         let resp = out.response;
 
-        let table = DelegatesTable {
+        let table = GmailSettingsDelegateListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             response: resp,
@@ -51,7 +51,8 @@ impl GmailSettingsDelegatesListCommand {
 
 /// Renderable table of Gmail delegates.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct DelegatesTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailSettingsDelegateListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     preset: String,
@@ -61,7 +62,7 @@ pub struct DelegatesTable {
     response: GmailDelegatesListResponse,
 }
 
-impl fmt::Display for DelegatesTable {
+impl fmt::Display for GmailSettingsDelegateListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

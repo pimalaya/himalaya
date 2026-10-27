@@ -52,7 +52,7 @@ impl AccountCheckCommand {
             .take_account(account_name)?
             .ok_or_else(|| anyhow::anyhow!("Cannot find account"))?;
 
-        let mut report = CheckReport {
+        let mut report = AccountCheckOutput {
             account: name,
             backends: Vec::new(),
         };
@@ -479,7 +479,8 @@ pub(crate) fn connect_sieve(
 
 /// The `account check` output, one outcome per backend.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct CheckReport {
+#[serde(rename_all = "camelCase")]
+pub struct AccountCheckOutput {
     /// The account that was checked.
     pub account: String,
     /// One entry per backend the account declares and `--backend` allows.
@@ -488,6 +489,7 @@ pub struct CheckReport {
 
 /// Outcome of checking one backend's connection.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct BackendCheck {
     /// The backend that was checked.
     pub backend: &'static str,
@@ -515,7 +517,7 @@ impl BackendCheck {
     }
 }
 
-impl fmt::Display for CheckReport {
+impl fmt::Display for AccountCheckOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Account: {}", self.account)?;
         for check in &self.backends {

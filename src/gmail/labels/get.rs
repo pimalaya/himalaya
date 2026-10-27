@@ -8,7 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    gmail::{client::GmailClient, labels::list::LabelsTable},
+    gmail::{client::GmailClient, labels::list::GmailLabelListOutput},
 };
 
 /// Get one or more Gmail labels by identifier (users.labels.get).
@@ -33,6 +33,6 @@ impl GmailLabelGetCommand {
             labels.push(client.label_get(&id)?.response);
         }
 
-        printer.out(LabelsTable::new(account, labels))
+        printer.out(GmailLabelListOutput::new(account, labels))
     }
 }

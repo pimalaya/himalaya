@@ -66,7 +66,7 @@ impl GmailDraftGetCommand {
 /// Gmail draft, rendered as aligned text or, under `--json`, as a
 /// structured object instead of a wrapped human string.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailDraftGetOutput {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,7 +93,7 @@ impl fmt::Display for GmailDraftGetOutput {
 
 /// The message a Gmail draft carries.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailDraftMessageOutput {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]

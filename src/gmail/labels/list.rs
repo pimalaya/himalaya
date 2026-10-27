@@ -30,7 +30,7 @@ impl GmailLabelsListCommand {
     ) -> Result<()> {
         let labels = client.labels_list()?.response.labels;
 
-        printer.out(LabelsTable::new(account, labels))
+        printer.out(GmailLabelListOutput::new(account, labels))
     }
 }
 
@@ -60,7 +60,8 @@ impl Default for LabelColors {
 
 /// Renderable table of Gmail labels.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct LabelsTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailLabelListOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -70,7 +71,7 @@ pub struct LabelsTable {
     labels: Vec<GmailLabel>,
 }
 
-impl LabelsTable {
+impl GmailLabelListOutput {
     /// Builds the table with the account's presentation settings, shared
     /// by the `list` and `get` commands.
     pub fn new(account: &Account, labels: Vec<GmailLabel>) -> Self {
@@ -88,7 +89,7 @@ impl LabelsTable {
     }
 }
 
-impl fmt::Display for LabelsTable {
+impl fmt::Display for GmailLabelListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

@@ -45,7 +45,7 @@ impl GmailSettingsVacationGetCommand {
 /// A boolean stays a boolean in JSON, where the text spells it enabled or
 /// disabled, yes or no.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsVacationGetOutput {
     enable_auto_reply: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

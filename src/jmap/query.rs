@@ -115,7 +115,7 @@ impl JmapQueryCommand {
 
         let response = client.send_raw(request)?;
 
-        printer.out(RawResponse {
+        printer.out(JmapQueryOutput {
             method_responses: response.method_responses,
         })
     }
@@ -123,11 +123,12 @@ impl JmapQueryCommand {
 
 /// Wraps the raw method_responses for display.
 #[derive(Serialize, JsonSchema)]
-pub(crate) struct RawResponse {
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JmapQueryOutput {
     method_responses: Vec<(String, Value, String)>,
 }
 
-impl fmt::Display for RawResponse {
+impl fmt::Display for JmapQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match serde_json::to_string_pretty(&self.method_responses) {
             Ok(s) => write!(f, "{s}"),

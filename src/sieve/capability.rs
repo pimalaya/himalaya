@@ -38,7 +38,7 @@ impl SieveCapabilityListCommand {
             })
             .collect();
 
-        printer.out(SieveCapabilities {
+        printer.out(SieveCapabilityOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             capabilities,
@@ -48,7 +48,7 @@ impl SieveCapabilityListCommand {
 
 /// One capability the server advertises.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct SieveCapability {
     /// The capability name, as the server spelled it.
     pub name: String,
@@ -58,7 +58,8 @@ pub struct SieveCapability {
 
 /// The `sieve capability` output, a table of capabilities.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SieveCapabilities {
+#[serde(rename_all = "camelCase")]
+pub struct SieveCapabilityOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -69,7 +70,7 @@ pub struct SieveCapabilities {
     pub capabilities: Vec<SieveCapability>,
 }
 
-impl fmt::Display for SieveCapabilities {
+impl fmt::Display for SieveCapabilityOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
         table

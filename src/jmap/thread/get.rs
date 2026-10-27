@@ -41,7 +41,7 @@ impl JmapThreadGetCommand {
             warn!("thread `{id}` not found, ignoring it");
         }
 
-        printer.out(ThreadsTable {
+        printer.out(JmapThreadGetOutput {
             preset: account.table_preset().to_string(),
             threads: output.threads,
         })
@@ -50,7 +50,8 @@ impl JmapThreadGetCommand {
 
 /// The threads rendered as a table, each with the emails it holds.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct ThreadsTable {
+#[serde(rename_all = "camelCase")]
+pub struct JmapThreadGetOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -58,7 +59,7 @@ pub struct ThreadsTable {
     pub threads: Vec<JmapThread>,
 }
 
-impl fmt::Display for ThreadsTable {
+impl fmt::Display for JmapThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

@@ -36,7 +36,7 @@ impl GmailSettingsSendAsListCommand {
             client.run(c)?
         };
 
-        let table = SendAsTable {
+        let table = GmailSettingsSendAsListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             send_as: out.response.send_as,
@@ -48,7 +48,8 @@ impl GmailSettingsSendAsListCommand {
 
 /// Renderable table of Gmail send-as aliases.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SendAsTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailSettingsSendAsListOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -56,7 +57,7 @@ pub struct SendAsTable {
     send_as: Vec<GmailSendAs>,
 }
 
-impl fmt::Display for SendAsTable {
+impl fmt::Display for GmailSettingsSendAsListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

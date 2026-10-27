@@ -60,7 +60,7 @@ impl GmailMessagesListCommand {
         let response = client.messages_list(&params)?.response;
 
         let next_page = response.next_page_token;
-        let table = MessageIdsTable {
+        let table = GmailMessageListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             id_color: account.envelopes_list_table_id_color(),
@@ -73,7 +73,8 @@ impl GmailMessagesListCommand {
 
 /// Renders a list of Gmail message ids as a two-column table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MessageIdsTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailMessageListOutput {
     #[serde(skip)]
     /// The `comfy_table` preset string the table renders with.
     pub preset: String,
@@ -87,7 +88,7 @@ pub struct MessageIdsTable {
     pub ids: Vec<GmailMessageId>,
 }
 
-impl fmt::Display for MessageIdsTable {
+impl fmt::Display for GmailMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

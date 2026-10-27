@@ -48,7 +48,7 @@ impl M2dirMessageSaveCommand {
             client.set_flags(&m2dir, entry.id(), flags)?;
         }
 
-        printer.out(StoredMessage {
+        printer.out(M2dirMessageSaveOutput {
             id: entry.id().to_owned(),
             path: entry.path().as_str().to_owned(),
         })
@@ -57,12 +57,13 @@ impl M2dirMessageSaveCommand {
 
 /// Output of a saved m2dir message: its id and path.
 #[derive(Serialize, JsonSchema)]
-pub struct StoredMessage {
+#[serde(rename_all = "camelCase")]
+pub struct M2dirMessageSaveOutput {
     id: String,
     path: String,
 }
 
-impl fmt::Display for StoredMessage {
+impl fmt::Display for M2dirMessageSaveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = &self.id;
         let path = &self.path;

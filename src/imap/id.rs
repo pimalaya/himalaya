@@ -59,7 +59,7 @@ impl ImapIdCommand {
             parameters: Some(params.into_iter().collect()),
         })?;
 
-        let table = ServerIdTable {
+        let table = ImapIdOutput {
             preset: account.table_preset().to_string(),
             server_id: params
                 .unwrap_or_default()
@@ -82,8 +82,8 @@ impl ImapIdCommand {
 
 /// The `imap id` output, a table of the parameters the server sent back.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub struct ServerIdTable {
+#[serde(rename_all = "camelCase")]
+pub struct ImapIdOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -91,7 +91,7 @@ pub struct ServerIdTable {
     pub server_id: HashMap<String, Option<String>>,
 }
 
-impl fmt::Display for ServerIdTable {
+impl fmt::Display for ImapIdOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

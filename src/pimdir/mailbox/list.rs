@@ -52,7 +52,7 @@ impl PimdirMailboxListCommand {
             .unzip();
         account.apply_role_aliases(&mut mailboxes);
 
-        printer.out(PimdirMailboxes {
+        printer.out(PimdirMailboxListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             max_width: self.max_width,
@@ -152,7 +152,8 @@ impl From<PimdirCoveredMailbox> for PimdirMailbox {
 
 /// The `pimdir mailbox list` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct PimdirMailboxes {
+#[serde(rename_all = "camelCase")]
+pub struct PimdirMailboxListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -166,7 +167,7 @@ pub struct PimdirMailboxes {
     pub mailboxes: Vec<PimdirMailbox>,
 }
 
-impl fmt::Display for PimdirMailboxes {
+impl fmt::Display for PimdirMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
         table

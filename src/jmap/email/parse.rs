@@ -53,17 +53,18 @@ impl JmapEmailParseCommand {
             }
         }
 
-        printer.out(ParsedBodies { bodies })
+        printer.out(JmapEmailParseOutput { bodies })
     }
 }
 
 /// The `jmap email parse` output, the text bodies the blobs held.
 #[derive(Serialize, JsonSchema)]
-pub(crate) struct ParsedBodies {
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JmapEmailParseOutput {
     bodies: Vec<String>,
 }
 
-impl fmt::Display for ParsedBodies {
+impl fmt::Display for JmapEmailParseOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for body in &self.bodies {
             write!(f, "{body}")?;

@@ -10,7 +10,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    jmap::{client::JmapClient, submission::query::SubmissionsTable},
+    jmap::{client::JmapClient, submission::query::JmapSubmissionQueryOutput},
 };
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
@@ -37,7 +37,7 @@ impl JmapSubmissionGetCommand {
             warn!("submission `{id}` not found, ignoring it");
         }
 
-        let table = SubmissionsTable {
+        let table = JmapSubmissionQueryOutput {
             preset: account.table_preset().to_string(),
             submissions: output.submissions,
         };

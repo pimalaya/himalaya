@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// protocol-specific subcommands instead. The role is optional, so a
 /// backend without one still fits.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct Mailbox {
     /// The identifier a follow-up command names the mailbox by.
     ///

@@ -150,7 +150,7 @@ impl JmapEmailQueryCommand {
             ..Default::default()
         })?;
 
-        let table = EmailsTable {
+        let table = JmapEmailQueryOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             colors: EmailsColors {
@@ -200,7 +200,8 @@ pub struct EmailsChars {
 
 /// The emails rendered as a table of envelopes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct EmailsTable {
+#[serde(rename_all = "camelCase")]
+pub struct JmapEmailQueryOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -217,7 +218,7 @@ pub struct EmailsTable {
     pub emails: Vec<JmapEmail>,
 }
 
-impl fmt::Display for EmailsTable {
+impl fmt::Display for JmapEmailQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

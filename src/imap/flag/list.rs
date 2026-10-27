@@ -46,7 +46,7 @@ impl ImapFlagListCommand {
         let flags = data.flags.unwrap_or_default();
         let permanent_flags = data.permanent_flags.unwrap_or_default();
 
-        let table = FlagsTable {
+        let table = ImapFlagListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags,
@@ -60,7 +60,8 @@ impl ImapFlagListCommand {
 /// The `imap flag` output, a table of the flags a mailbox allows and of
 /// the ones it keeps across sessions.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct FlagsTable<'a> {
+#[serde(rename_all = "camelCase")]
+pub struct ImapFlagListOutput<'a> {
     #[serde(skip_serializing)]
     #[schemars(skip)]
     preset: String,
@@ -75,7 +76,7 @@ pub struct FlagsTable<'a> {
     permanent_flags: Vec<FlagPerm<'a>>,
 }
 
-impl FlagsTable<'_> {
+impl ImapFlagListOutput<'_> {
     /// Pairs each flag with whether it is permanent.
     fn build_entries(&self) -> Vec<(String, bool)> {
         let mut entries: BTreeMap<String, bool> = BTreeMap::new();
@@ -96,7 +97,7 @@ impl FlagsTable<'_> {
     }
 }
 
-impl fmt::Display for FlagsTable<'_> {
+impl fmt::Display for ImapFlagListOutput<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

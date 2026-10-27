@@ -129,6 +129,7 @@ impl ExistingConfig {
 
 /// The generated account, as the printer takes it.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigureOutput {
     /// The account name, which is the `[accounts.<name>]` table key.
     name: String,

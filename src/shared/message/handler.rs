@@ -9,7 +9,8 @@
 //! [`Outcome`] itself.
 //!
 //! Under `--json`, a message neither saved nor sent comes out as a
-//! [`MessageTemplate`] rather than raw bytes, so an editor can lay it out.
+//! [`MessageTemplateOutput`] rather than raw bytes, so an editor can lay it
+//! out.
 
 use std::{
     fmt,
@@ -102,7 +103,7 @@ pub fn route(
     send: bool,
 ) -> Result<()> {
     if printer.is_json() && !send && save.is_none() {
-        return printer.out(MessageTemplate::parse(&raw)?);
+        return printer.out(MessageTemplateOutput::parse(&raw)?);
     }
 
     let outcome = apply(
@@ -144,7 +145,8 @@ impl fmt::Display for MessageRouteOutput {
 /// The body carries no signature: sending or saving appends the one the
 /// account configures.
 #[derive(Serialize, JsonSchema)]
-pub struct MessageTemplate {
+#[serde(rename_all = "camelCase")]
+pub struct MessageTemplateOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
     pub to: Vec<String>,
@@ -155,7 +157,7 @@ pub struct MessageTemplate {
     pub body: String,
 }
 
-impl MessageTemplate {
+impl MessageTemplateOutput {
     /// Decodes the headers and the text body of raw RFC 5322 bytes.
     fn parse(raw: &[u8]) -> Result<Self> {
         let Some(message) = MessageParser::new().parse(raw) else {
@@ -195,7 +197,7 @@ fn mailbox(addr: &Addr) -> String {
     }
 }
 
-impl fmt::Display for MessageTemplate {
+impl fmt::Display for MessageTemplateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(from) = &self.from {
             writeln!(f, "From: {from}")?;
@@ -215,7 +217,7 @@ impl fmt::Display for MessageTemplate {
 
 #[cfg(test)]
 mod tests {
-    use super::MessageTemplate;
+    use super::MessageTemplateOutput;
 
     #[test]
     fn template_decodes_headers_and_body_and_quotes_names() {
@@ -229,7 +231,7 @@ mod tests {
             "=C3=A0 demain\r\n",
         );
 
-        let template = MessageTemplate::parse(raw.as_bytes()).unwrap();
+        let template = MessageTemplateOutput::parse(raw.as_bytes()).unwrap();
 
         assert_eq!(template.from.as_deref(), Some("Clément <c@example.org>"));
         assert_eq!(

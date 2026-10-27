@@ -12,22 +12,25 @@ use serde::{Deserialize, Serialize};
 use crate::email::{address::Address, flag::Flag};
 
 /// A message summary, enough to list without fetching a body.
+///
+/// The mbox cache stores it too, so the kebab-case keys it was written with
+/// before 3.0 stay readable through `alias`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct Envelope {
     /// The identifier the backend knows the message by: an IMAP UID, a
     /// JMAP email id, a Maildir filename id.
     pub id: String,
     /// The RFC 5322 section 3.6.4 `Message-ID:`, normalised so it is
     /// stable across every backend storing the message.
-    #[serde(default)]
+    #[serde(default, alias = "message-id")]
     pub message_id: Option<String>,
     /// The messages this one replies to, from its `In-Reply-To:` header.
     ///
     /// A list, the grammar being `1*msg-id`. Each id is normalised like
     /// [`Envelope::message_id`], so a client pairs a reply with its parent
     /// from a listing alone.
-    #[serde(default)]
+    #[serde(default, alias = "in-reply-to")]
     pub in_reply_to: Vec<String>,
     /// The flags set on the message, a sorted set since wire order means
     /// nothing and a duplicate is nonsense.
@@ -51,7 +54,7 @@ pub struct Envelope {
     pub size: u64,
     /// Whether the message carries an attachment, `None` when the caller
     /// did not ask or the backend cannot tell.
-    #[serde(default)]
+    #[serde(default, alias = "has-attachment")]
     pub has_attachment: Option<bool>,
 }
 

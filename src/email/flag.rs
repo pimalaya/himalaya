@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 /// A flag attached to an envelope, keeping its wire spelling and IANA tag.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Flag {
     raw: String,
     iana: Option<IanaFlag>,

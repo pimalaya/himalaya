@@ -12,7 +12,7 @@ use crate::{
     account::context::Account,
     jmap::{
         client::JmapClient,
-        mailbox::query::{MailboxColors, MailboxesTable},
+        mailbox::query::{JmapMailboxQueryOutput, MailboxColors},
     },
 };
 
@@ -41,7 +41,7 @@ impl JmapMailboxGetCommand {
             warn!("mailbox `{id}` not found, ignoring it");
         }
 
-        let table = MailboxesTable {
+        let table = JmapMailboxQueryOutput {
             preset: account.table_preset().to_string(),
             colors: MailboxColors {
                 id: account.mailboxes_list_table_id_color(),

@@ -45,7 +45,7 @@ impl M2dirFlagListCommand {
         let m2dir = client.open_m2dir(path)?;
         let flags = client.read_flags(&m2dir, &self.id.inner)?;
 
-        let table = FlagsTable {
+        let table = M2dirFlagListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags: flags.iter().map(str::to_owned).collect(),
@@ -57,7 +57,8 @@ impl M2dirFlagListCommand {
 
 /// Renderable table of flags set on an m2dir message.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct FlagsTable {
+#[serde(rename_all = "camelCase")]
+pub struct M2dirFlagListOutput {
     #[serde(skip_serializing)]
     #[schemars(skip)]
     preset: String,
@@ -67,7 +68,7 @@ pub struct FlagsTable {
     flags: Vec<String>,
 }
 
-impl fmt::Display for FlagsTable {
+impl fmt::Display for M2dirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

@@ -57,7 +57,7 @@ impl AttachmentListCommand {
             .filter(|attachment| self.inline || !attachment.inline)
             .collect();
 
-        let attachments = Attachments {
+        let attachments = AttachmentListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             with_inline: self.inline,
@@ -99,6 +99,7 @@ pub(crate) fn attachments<'a>(message: &'a Message) -> impl Iterator<Item = Atta
 
 /// One row of the `attachment list` and `attachment download` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Attachment {
     /// The 1-based position of the MIME part in the message, the same id
     /// `message read` prints.
@@ -141,7 +142,8 @@ impl Attachment {
 
 /// The `attachment list` output, a table of attachments.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct Attachments {
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -160,7 +162,7 @@ pub struct Attachments {
     pub attachments: Vec<Attachment>,
 }
 
-impl fmt::Display for Attachments {
+impl fmt::Display for AttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -225,7 +227,7 @@ pub(super) fn mime_string(part: &MessagePart<'_>) -> Option<String> {
 mod tests {
     use pimalaya_cli::table::{Color, ContentArrangement};
 
-    use super::{Attachment, AttachmentColors, Attachments, attachments};
+    use super::{Attachment, AttachmentColors, AttachmentListOutput, attachments};
     use crate::shared::message::{part, read::MessageReadOutput};
 
     #[test]
@@ -286,7 +288,7 @@ mod tests {
 
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
-        let attachments = Attachments {
+        let attachments = AttachmentListOutput {
             preset: String::new(),
             arrangement: ContentArrangement::Disabled,
             with_inline: false,

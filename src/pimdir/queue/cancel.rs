@@ -50,18 +50,19 @@ impl PimdirQueueCancelCommand {
             );
         }
 
-        printer.out(PimdirQueueCancelled { id: self.id })
+        printer.out(PimdirQueueCancelOutput { id: self.id })
     }
 }
 
 /// The `pimdir queue cancel` output.
 #[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
-pub struct PimdirQueueCancelled {
+#[serde(rename_all = "camelCase")]
+pub struct PimdirQueueCancelOutput {
     /// The row that was cancelled.
     pub id: i64,
 }
 
-impl fmt::Display for PimdirQueueCancelled {
+impl fmt::Display for PimdirQueueCancelOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Queued message {} cancelled", self.id)
     }

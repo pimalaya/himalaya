@@ -32,10 +32,10 @@ impl MsgraphProfileGetCommand {
 }
 
 /// Microsoft Graph user profile, rendered as aligned text or, under
-/// `--json`, as a structured object (`{id, display-name, mail,
-/// user-principal-name}`) instead of a wrapped human string.
+/// `--json`, as a structured object (`{id, displayName, mail,
+/// userPrincipalName}`) instead of a wrapped human string.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct MsgraphProfileOutput {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]

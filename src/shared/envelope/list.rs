@@ -74,7 +74,7 @@ impl EnvelopeListCommand {
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
 
-        let envelopes = Envelopes {
+        let envelopes = EnvelopeListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             max_width: self.max_width,
@@ -136,7 +136,8 @@ pub(super) struct EnvelopeColors {
 
 /// The `envelope list` output, a table of envelopes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct Envelopes {
+#[serde(rename_all = "camelCase")]
+pub struct EnvelopeListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -169,7 +170,7 @@ pub struct Envelopes {
     pub envelopes: Vec<Envelope>,
 }
 
-impl fmt::Display for Envelopes {
+impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let today = Local::now().date_naive();
         let mut table = Table::new();
@@ -285,7 +286,7 @@ pub fn format_addresses(addrs: &[Address]) -> String {
         .join(", ")
 }
 
-impl Envelopes {
+impl EnvelopeListOutput {
     /// Renders a date with the configured format, in the local timezone
     /// when asked for, or relative to `today` when recent and asked for.
     fn format_date(&self, date: Option<DateTime<FixedOffset>>, today: NaiveDate) -> String {
@@ -319,10 +320,10 @@ mod tests {
     use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
     use pimalaya_cli::table::{Color, ContentArrangement};
 
-    use super::{Address, Envelope, EnvelopeColors, Envelopes, FlagChars};
+    use super::{Address, Envelope, EnvelopeColors, EnvelopeListOutput, FlagChars};
 
-    fn envelopes(relative: bool) -> Envelopes {
-        Envelopes {
+    fn envelopes(relative: bool) -> EnvelopeListOutput {
+        EnvelopeListOutput {
             preset: String::new(),
             arrangement: ContentArrangement::Disabled,
             max_width: None,

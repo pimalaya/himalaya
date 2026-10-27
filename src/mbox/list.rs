@@ -35,7 +35,7 @@ impl MboxMailboxListCommand {
     ) -> Result<()> {
         let mboxes = client.list_mboxes()?;
 
-        let table = MboxesTable {
+        let table = MboxListOutput {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
             rows: mboxes.into_iter().map(From::from).collect(),
@@ -47,7 +47,8 @@ impl MboxMailboxListCommand {
 
 /// The `mbox list` output, a table of mbox files.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MboxesTable {
+#[serde(rename_all = "camelCase")]
+pub struct MboxListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -59,7 +60,7 @@ pub struct MboxesTable {
     pub rows: Vec<MboxRow>,
 }
 
-impl fmt::Display for MboxesTable {
+impl fmt::Display for MboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -85,6 +86,7 @@ impl fmt::Display for MboxesTable {
 
 /// One row of the mbox table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MboxRow {
     /// The mbox name, relative to the account root.
     pub name: String,

@@ -12,7 +12,7 @@ use crate::{
     email::flag::FlagOp,
     pimdir::{
         client::PimdirClient,
-        flag::{PimdirFlagsStaged, RawFlagsArg, message_ids},
+        flag::{PimdirFlagStageOutput, RawFlagsArg, message_ids},
     },
     shared::{flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
@@ -44,6 +44,6 @@ impl PimdirFlagAddCommand {
         let mailbox = self.mailbox.resolve(account);
         let ids = message_ids(&self.message_ids)?;
         let staged = client.stage_flags(&mailbox, &ids, &flags, FlagOp::Add)?;
-        printer.out(PimdirFlagsStaged::found(staged)?)
+        printer.out(PimdirFlagStageOutput::found(staged)?)
     }
 }

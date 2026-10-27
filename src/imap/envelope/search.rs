@@ -64,7 +64,7 @@ impl ImapEnvelopeSearchCommand {
         let criteria = self.criteria.into_criteria()?;
         let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
 
-        let table = SearchTable {
+        let table = ImapSearchOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             id_color: account.envelopes_list_table_id_color(),
@@ -266,6 +266,7 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
 
 /// One row of the search results, a single message id.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchResult {
     /// The UID, or the message number under `--seq`.
     pub id: u32,
@@ -273,7 +274,8 @@ pub struct SearchResult {
 
 /// The `imap search` output, a table of message ids.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SearchTable {
+#[serde(rename_all = "camelCase")]
+pub struct ImapSearchOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -284,7 +286,7 @@ pub struct SearchTable {
     ids: Vec<SearchResult>,
 }
 
-impl fmt::Display for SearchTable {
+impl fmt::Display for ImapSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

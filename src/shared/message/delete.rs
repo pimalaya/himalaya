@@ -61,16 +61,16 @@ impl MessageDeleteCommand {
         let report = if current_id == trash_id {
             let count = ids.len();
             if client.delete_messages(&current_id, &ids)? {
-                DeleteReport::new(DeleteAction::Deleted, count)
+                MessageDeleteOutput::new(DeleteAction::Deleted, count)
             } else {
-                DeleteReport::new(DeleteAction::Flagged, count)
+                MessageDeleteOutput::new(DeleteAction::Flagged, count)
             }
         } else {
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
             if moved == 0 {
                 bail!("No message deleted: no id matched in the mailbox");
             }
-            DeleteReport::new(DeleteAction::MovedToTrash, moved)
+            MessageDeleteOutput::new(DeleteAction::MovedToTrash, moved)
         };
 
         printer.out(report)
@@ -79,13 +79,13 @@ impl MessageDeleteCommand {
 
 /// The `message delete` output: what was done, and to how many messages.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) struct DeleteReport {
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MessageDeleteOutput {
     action: DeleteAction,
     count: usize,
 }
 
-impl DeleteReport {
+impl MessageDeleteOutput {
     /// Reports one action over a message count.
     fn new(action: DeleteAction, count: usize) -> Self {
         Self { action, count }
@@ -105,7 +105,7 @@ pub(crate) enum DeleteAction {
     Flagged,
 }
 
-impl fmt::Display for DeleteReport {
+impl fmt::Display for MessageDeleteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let count = self.count;
         match self.action {

@@ -37,7 +37,7 @@ impl SieveScriptGetCommand {
 
 /// Structured output for `sieve get`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct SieveScriptOutput {
     /// The script name.
     pub name: String,

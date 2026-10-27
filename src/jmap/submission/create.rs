@@ -14,7 +14,9 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    jmap::{client::JmapClient, error::format_set_error, submission::query::SubmissionsTable},
+    jmap::{
+        client::JmapClient, error::format_set_error, submission::query::JmapSubmissionQueryOutput,
+    },
 };
 
 /// Submit a JMAP email for sending (EmailSubmission/set).
@@ -87,7 +89,7 @@ impl JmapSubmissionCreateCommand {
             bail!(msg);
         }
 
-        let table = SubmissionsTable {
+        let table = JmapSubmissionQueryOutput {
             preset: account.table_preset().to_string(),
             submissions: output.created.into_values().collect(),
         };

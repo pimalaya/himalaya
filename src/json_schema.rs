@@ -12,15 +12,18 @@
 
 use std::collections::BTreeMap;
 
+use pimalaya_cli::{clap::commands::JsonSchemaRegistry, error::ErrorReport};
 use schemars::schema_for;
-use serde_json::Value;
 
-/// Builds the command-to-schema map consumed by `json-schema <DIR>`.
+use crate::error::ErrorCode;
+
+/// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
-/// Each value describes the type the command hands to the printer.
+/// Each value describes the type the command hands to the printer, and
+/// `himalaya-error` the failure object every command prints instead.
 /// Paginated listings use the `Paginated<T>` wrapper, so the extra
-/// `next_page` field is described too.
-pub fn schemas() -> BTreeMap<String, Value> {
+/// `nextPage` field is described too.
+pub fn registry() -> JsonSchemaRegistry {
     let mut schemas = BTreeMap::new();
 
     macro_rules! insert {
@@ -36,22 +39,22 @@ pub fn schemas() -> BTreeMap<String, Value> {
     {
         insert!(
             "himalaya-mailbox-list",
-            crate::shared::mailbox::list::Mailboxes
+            crate::shared::mailbox::list::MailboxListOutput
         );
         insert!(
             "himalaya-envelope-list",
-            crate::shared::envelope::list::Envelopes
+            crate::shared::envelope::list::EnvelopeListOutput
         );
-        // NOTE: `envelope search` renders the `Envelopes` table of `list`.
+        // NOTE: `envelope search` renders the `EnvelopeListOutput` of `list`.
         insert!(
             "himalaya-envelope-search",
-            crate::shared::envelope::list::Envelopes
+            crate::shared::envelope::list::EnvelopeListOutput
         );
-        insert!("himalaya-flag-add", crate::shared::flag::add::AddedFlags);
-        insert!("himalaya-flag-set", crate::shared::flag::set::SetFlags);
+        insert!("himalaya-flag-add", crate::shared::flag::add::FlagAddOutput);
+        insert!("himalaya-flag-set", crate::shared::flag::set::FlagSetOutput);
         insert!(
             "himalaya-flag-remove",
-            crate::shared::flag::remove::RemovedFlags
+            crate::shared::flag::remove::FlagRemoveOutput
         );
         insert!(
             "himalaya-message-add",
@@ -74,27 +77,27 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-message-delete",
-            crate::shared::message::delete::DeleteReport
+            crate::shared::message::delete::MessageDeleteOutput
         );
-        // NOTE: the composers print a `MessageTemplate` when neither
+        // NOTE: the composers print a `MessageTemplateOutput` when neither
         // saving nor sending, and a confirmation line otherwise.
         insert!(
             "himalaya-message-compose",
-            crate::shared::message::handler::MessageTemplate
+            crate::shared::message::handler::MessageTemplateOutput
         );
         insert!(
             "himalaya-message-reply",
-            crate::shared::message::handler::MessageTemplate
+            crate::shared::message::handler::MessageTemplateOutput
         );
         insert!(
             "himalaya-message-forward",
-            crate::shared::message::handler::MessageTemplate
+            crate::shared::message::handler::MessageTemplateOutput
         );
         insert!(
             "himalaya-attachment-list",
-            crate::shared::attachment::list::Attachments
+            crate::shared::attachment::list::AttachmentListOutput
         );
-        // NOTE: `attachment download` reports the `Attachments` table of
+        // NOTE: `attachment download` reports the `AttachmentListOutput` of
         // `list`, or the one part `--stdout --json` reads.
         insert!(
             "himalaya-attachment-download",
@@ -107,95 +110,101 @@ pub fn schemas() -> BTreeMap<String, Value> {
         "himalaya-configure",
         crate::wizard::configure::ConfigureOutput
     );
-    insert!("himalaya-account-list", crate::account::list::AccountsTable);
-    insert!("himalaya-account-check", crate::account::check::CheckReport);
+    insert!(
+        "himalaya-account-list",
+        crate::account::list::AccountListOutput
+    );
+    insert!(
+        "himalaya-account-check",
+        crate::account::check::AccountCheckOutput
+    );
 
     #[cfg(feature = "imap")]
     {
-        insert!("himalaya-imap-id", crate::imap::id::ServerIdTable);
+        insert!("himalaya-imap-id", crate::imap::id::ImapIdOutput);
         insert!(
             "himalaya-imap-status",
-            crate::imap::mailbox::status::MailboxStatus
+            crate::imap::mailbox::status::ImapMailboxStatusOutput
         );
         insert!(
             "himalaya-imap-list",
-            crate::imap::mailbox::list::MailboxesTable
+            crate::imap::mailbox::list::ImapMailboxListOutput
         );
         insert!(
             "himalaya-imap-search",
-            crate::imap::envelope::search::SearchTable
+            crate::imap::envelope::search::ImapSearchOutput
         );
         insert!(
             "himalaya-imap-sort",
-            crate::imap::envelope::sort::SortResultsTable
+            crate::imap::envelope::sort::ImapSortOutput
         );
         insert!(
             "himalaya-imap-thread",
-            crate::imap::envelope::thread::ThreadResultsTable
+            crate::imap::envelope::thread::ImapThreadOutput
         );
         insert!(
             "himalaya-imap-flag",
-            crate::imap::flag::list::FlagsTable<'static>
+            crate::imap::flag::list::ImapFlagListOutput<'static>
         );
-        insert!("himalaya-imap-fetch", crate::imap::fetch::FetchedMessages);
+        insert!("himalaya-imap-fetch", crate::imap::fetch::ImapFetchOutput);
     }
 
     #[cfg(feature = "sieve")]
     {
         insert!(
             "himalaya-sieve-capability",
-            crate::sieve::capability::SieveCapabilities
+            crate::sieve::capability::SieveCapabilityOutput
         );
-        insert!("himalaya-sieve-list", crate::sieve::list::SieveScripts);
+        insert!("himalaya-sieve-list", crate::sieve::list::SieveListOutput);
         insert!("himalaya-sieve-get", crate::sieve::get::SieveScriptOutput);
     }
 
     #[cfg(feature = "jmap")]
     {
-        insert!("himalaya-jmap-query", crate::jmap::query::RawResponse);
+        insert!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
         insert!(
             "himalaya-jmap-mailbox-get",
-            crate::jmap::mailbox::query::MailboxesTable
+            crate::jmap::mailbox::query::JmapMailboxQueryOutput
         );
         insert!(
             "himalaya-jmap-mailbox-query",
-            crate::jmap::mailbox::query::MailboxesTable
+            crate::jmap::mailbox::query::JmapMailboxQueryOutput
         );
         insert!(
             "himalaya-jmap-email-get",
-            crate::jmap::email::query::EmailsTable
+            crate::jmap::email::query::JmapEmailQueryOutput
         );
         insert!(
             "himalaya-jmap-email-query",
-            crate::jmap::email::query::EmailsTable
+            crate::jmap::email::query::JmapEmailQueryOutput
         );
         insert!(
             "himalaya-jmap-email-parse",
-            crate::jmap::email::parse::ParsedBodies
+            crate::jmap::email::parse::JmapEmailParseOutput
         );
         insert!(
             "himalaya-jmap-thread-get",
-            crate::jmap::thread::get::ThreadsTable
+            crate::jmap::thread::get::JmapThreadGetOutput
         );
         insert!(
             "himalaya-jmap-identity-get",
-            crate::jmap::identity::get::IdentitiesTable
+            crate::jmap::identity::get::JmapIdentityGetOutput
         );
         insert!(
             "himalaya-jmap-submission-get",
-            crate::jmap::submission::query::SubmissionsTable
+            crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
         insert!(
             "himalaya-jmap-submission-query",
-            crate::jmap::submission::query::SubmissionsTable
+            crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
         insert!(
             "himalaya-jmap-submission-create",
-            crate::jmap::submission::query::SubmissionsTable
+            crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
         insert!(
             "himalaya-jmap-vacation-response-get",
-            crate::jmap::vacation::get::VacationTable
+            crate::jmap::vacation::get::JmapVacationResponseGetOutput
         );
     }
 
@@ -209,15 +218,15 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-labels-list",
-            crate::gmail::labels::list::LabelsTable
+            crate::gmail::labels::list::GmailLabelListOutput
         );
         insert!(
             "himalaya-gmail-labels-get",
-            crate::gmail::labels::list::LabelsTable
+            crate::gmail::labels::list::GmailLabelListOutput
         );
         insert!(
             "himalaya-gmail-messages-list",
-            Paginated<crate::gmail::messages::list::MessageIdsTable>
+            Paginated<crate::gmail::messages::list::GmailMessageListOutput>
         );
         insert!(
             "himalaya-gmail-messages-get",
@@ -225,7 +234,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-drafts-list",
-            Paginated<crate::gmail::drafts::list::DraftsTable>
+            Paginated<crate::gmail::drafts::list::GmailDraftListOutput>
         );
         insert!(
             "himalaya-gmail-drafts-get",
@@ -241,7 +250,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-threads-list",
-            Paginated<crate::gmail::threads::list::ThreadsTable>
+            Paginated<crate::gmail::threads::list::GmailThreadListOutput>
         );
         insert!(
             "himalaya-gmail-threads-get",
@@ -253,7 +262,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-settings-filters-list",
-            crate::gmail::settings::filters::list::FiltersTable
+            crate::gmail::settings::filters::list::GmailSettingsFilterListOutput
         );
         insert!(
             "himalaya-gmail-settings-filters-get",
@@ -261,7 +270,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-settings-forwarding-addresses-list",
-            crate::gmail::settings::forwarding_addresses::list::ForwardingAddressesTable
+            crate::gmail::settings::forwarding_addresses::list::GmailSettingsForwardingAddressListOutput
         );
         insert!(
             "himalaya-gmail-settings-forwarding-addresses-get",
@@ -269,7 +278,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-settings-delegates-list",
-            crate::gmail::settings::delegates::list::DelegatesTable
+            crate::gmail::settings::delegates::list::GmailSettingsDelegateListOutput
         );
         insert!(
             "himalaya-gmail-settings-delegates-get",
@@ -277,7 +286,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-gmail-settings-send-as-list",
-            crate::gmail::settings::sendas::list::SendAsTable
+            crate::gmail::settings::sendas::list::GmailSettingsSendAsListOutput
         );
         insert!(
             "himalaya-gmail-settings-send-as-get",
@@ -315,19 +324,19 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-msgraph-mail-folders-list",
-            crate::msgraph::mail_folders::list::MailFoldersTable
+            crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
         );
         insert!(
             "himalaya-msgraph-mail-folders-child-folders",
-            crate::msgraph::mail_folders::list::MailFoldersTable
+            crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
         );
         insert!(
             "himalaya-msgraph-mail-folders-get",
-            crate::msgraph::mail_folders::list::MailFoldersTable
+            crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
         );
         insert!(
             "himalaya-msgraph-messages-list",
-            Paginated<crate::msgraph::messages::list::MessagesTable>
+            Paginated<crate::msgraph::messages::list::MsgraphMessageListOutput>
         );
         insert!(
             "himalaya-msgraph-messages-get",
@@ -335,46 +344,49 @@ pub fn schemas() -> BTreeMap<String, Value> {
         );
         insert!(
             "himalaya-msgraph-attachments-list",
-            crate::msgraph::attachments::list::AttachmentsTable
+            crate::msgraph::attachments::list::MsgraphAttachmentListOutput
         );
     }
 
     #[cfg(feature = "maildir")]
     {
-        insert!("himalaya-maildir-list", crate::maildir::list::MaildirsTable);
+        insert!(
+            "himalaya-maildir-list",
+            crate::maildir::list::MaildirListOutput
+        );
         insert!(
             "himalaya-maildir-flag-list",
-            crate::maildir::flag::list::FlagsTable
+            crate::maildir::flag::list::MaildirFlagListOutput
         );
         insert!(
             "himalaya-maildir-message-save",
-            crate::maildir::message::save::StoredMessage
+            crate::maildir::message::save::MaildirMessageSaveOutput
         );
     }
 
     #[cfg(feature = "mbox")]
     {
-        insert!("himalaya-mbox-list", crate::mbox::list::MboxesTable);
+        insert!("himalaya-mbox-list", crate::mbox::list::MboxListOutput);
         insert!(
             "himalaya-mbox-flag-list",
-            crate::mbox::flag::list::FlagsTable
+            crate::mbox::flag::list::MboxFlagListOutput
         );
         insert!(
             "himalaya-mbox-message-save",
-            crate::mbox::message::save::StoredMessage
+            crate::mbox::message::save::MboxMessageSaveOutput
         );
     }
 
     #[cfg(feature = "m2dir")]
     {
-        insert!("himalaya-m2dir-list", crate::m2dir::list::M2dirsTable);
+        insert!("himalaya-m2dir-list", crate::m2dir::list::M2dirListOutput);
         insert!(
             "himalaya-m2dir-flag-list",
-            crate::m2dir::flag::list::FlagsTable
+            crate::m2dir::flag::list::M2dirFlagListOutput
         );
         insert!(
             "himalaya-m2dir-message-save",
-            crate::m2dir::message::save::StoredMessage
+            crate::m2dir::message::save::M2dirMessageSaveOutput
         );
     }
 
@@ -382,58 +394,72 @@ pub fn schemas() -> BTreeMap<String, Value> {
     {
         insert!(
             "himalaya-pimdir-queue-list",
-            crate::pimdir::queue::list::PimdirQueuedMessages
+            crate::pimdir::queue::list::PimdirQueueListOutput
         );
         insert!(
             "himalaya-pimdir-queue-cancel",
-            crate::pimdir::queue::cancel::PimdirQueueCancelled
+            crate::pimdir::queue::cancel::PimdirQueueCancelOutput
         );
         insert!(
             "himalaya-pimdir-queue-show",
-            crate::pimdir::queue::show::PimdirQueueRow
+            crate::pimdir::queue::show::PimdirQueueShowOutput
         );
         insert!(
             "himalaya-pimdir-message-add",
-            crate::pimdir::message::add::PimdirMessageAdded
+            crate::pimdir::message::add::PimdirMessageAddOutput
         );
         insert!(
             "himalaya-pimdir-message-send",
-            crate::pimdir::message::send::PimdirMessageSent
+            crate::pimdir::message::send::PimdirMessageSendOutput
         );
         insert!(
             "himalaya-pimdir-flag-list",
-            crate::pimdir::flag::list::PimdirFlagList
+            crate::pimdir::flag::list::PimdirFlagListOutput
         );
         insert!(
             "himalaya-pimdir-flag-add",
-            crate::pimdir::flag::PimdirFlagsStaged
+            crate::pimdir::flag::PimdirFlagStageOutput
         );
         insert!(
             "himalaya-pimdir-flag-set",
-            crate::pimdir::flag::PimdirFlagsStaged
+            crate::pimdir::flag::PimdirFlagStageOutput
         );
         insert!(
             "himalaya-pimdir-flag-remove",
-            crate::pimdir::flag::PimdirFlagsStaged
+            crate::pimdir::flag::PimdirFlagStageOutput
         );
         insert!(
             "himalaya-pimdir-mailbox-create",
-            crate::pimdir::mailbox::create::PimdirMailboxCreated
+            crate::pimdir::mailbox::create::PimdirMailboxCreateOutput
         );
         insert!(
             "himalaya-pimdir-mailbox-list",
-            crate::pimdir::mailbox::list::PimdirMailboxes
+            crate::pimdir::mailbox::list::PimdirMailboxListOutput
         );
         insert!(
             "himalaya-pimdir-attachment-list",
-            crate::pimdir::attachment::list::PimdirAttachments
+            crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
         // NOTE: `pimdir attachment search` prints the page `list` prints.
         insert!(
             "himalaya-pimdir-attachment-search",
-            crate::pimdir::attachment::list::PimdirAttachments
+            crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
     }
 
-    schemas
+    insert!("himalaya-error", ErrorReport<ErrorCode>);
+
+    JsonSchemaRegistry {
+        bin: "himalaya",
+        version: env!("CARGO_PKG_VERSION"),
+        schemas,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_payload_is_an_object() {
+        assert_eq!(super::registry().non_object_roots(), Vec::<&str>::new());
+    }
 }

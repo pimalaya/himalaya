@@ -15,7 +15,7 @@ use crate::{
     email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
     shared::{
         client::EmailClient,
-        envelope::list::{EnvelopeColors, Envelopes, FlagChars},
+        envelope::list::{EnvelopeColors, EnvelopeListOutput, FlagChars},
         mailbox::arg::MailboxArg,
     },
 };
@@ -85,7 +85,7 @@ impl EnvelopeSearchCommand {
             self.has_attachment,
         )?;
 
-        let envelopes = Envelopes {
+        let envelopes = EnvelopeListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             max_width: self.max_width,

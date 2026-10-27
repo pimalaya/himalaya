@@ -48,7 +48,7 @@ impl PimdirMessageAddCommand {
         let mailbox = account.resolve_mailbox(&self.mailbox);
         let staged = client.add_message(mailbox, &flags, raw)?;
 
-        printer.out(PimdirMessageAdded {
+        printer.out(PimdirMessageAddOutput {
             queue_id: staged.queue_id,
             message_id: staged.message_id,
         })
@@ -58,14 +58,14 @@ impl PimdirMessageAddCommand {
 /// The `pimdir message add` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirMessageAdded {
+pub struct PimdirMessageAddOutput {
     /// The queue row the message waits in.
     pub queue_id: i64,
     /// The bare `Message-ID` it is filed under once applied.
     pub message_id: String,
 }
 
-impl fmt::Display for PimdirMessageAdded {
+impl fmt::Display for PimdirMessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

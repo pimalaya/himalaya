@@ -47,7 +47,7 @@ impl JmapVacationGetCommand {
             return printer.out(Message::new("No vacation response configured"));
         };
 
-        let table = VacationTable {
+        let table = JmapVacationResponseGetOutput {
             preset: account.table_preset().to_string(),
             vacation,
         };
@@ -60,7 +60,7 @@ impl JmapVacationGetCommand {
 /// The vacation response rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
-pub struct VacationTable {
+pub struct JmapVacationResponseGetOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -68,7 +68,7 @@ pub struct VacationTable {
     pub vacation: JmapVacationResponse,
 }
 
-impl fmt::Display for VacationTable {
+impl fmt::Display for JmapVacationResponseGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
         let v = &self.vacation;

@@ -43,7 +43,7 @@ impl PimdirMailboxCreateCommand {
             .map(|parent| account.resolve_mailbox(parent).to_owned());
         let created = client.create_mailbox(&self.name, parent.as_deref())?;
 
-        printer.out(PimdirMailboxCreated {
+        printer.out(PimdirMailboxCreateOutput {
             queue_id: created.queue_id,
             name: self.name,
             parent,
@@ -55,7 +55,7 @@ impl PimdirMailboxCreateCommand {
 /// The `pimdir mailbox create` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirMailboxCreated {
+pub struct PimdirMailboxCreateOutput {
     /// The `collection-create` row.
     pub queue_id: i64,
     /// The new mailbox's name.
@@ -67,7 +67,7 @@ pub struct PimdirMailboxCreated {
     pub source: String,
 }
 
-impl fmt::Display for PimdirMailboxCreated {
+impl fmt::Display for PimdirMailboxCreateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

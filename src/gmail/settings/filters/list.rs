@@ -40,7 +40,7 @@ impl GmailSettingsFiltersListCommand {
         };
         let resp = out.response;
 
-        let table = FiltersTable {
+        let table = GmailSettingsFilterListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             response: resp,
@@ -52,7 +52,8 @@ impl GmailSettingsFiltersListCommand {
 
 /// Renderable table of Gmail filters.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct FiltersTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailSettingsFilterListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     preset: String,
@@ -62,7 +63,7 @@ pub struct FiltersTable {
     response: GmailFiltersListResponse,
 }
 
-impl fmt::Display for FiltersTable {
+impl fmt::Display for GmailSettingsFilterListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

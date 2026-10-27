@@ -50,7 +50,7 @@ impl PimdirQueueListCommand {
         let mailbox = self.mailbox.resolve(account);
         let queued = client.queued_envelopes(&mailbox)?;
 
-        printer.out(PimdirQueuedMessages {
+        printer.out(PimdirQueueListOutput {
             preset: account.table_preset().to_string(),
             id_color: account.envelopes_list_table_id_color(),
             subject_color: account.envelopes_list_table_subject_color(),
@@ -75,6 +75,7 @@ impl PimdirQueueListCommand {
 
 /// One message waiting in the store's queue.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PimdirQueuedMessage {
     /// The queue row id, which `pimdir queue cancel` takes. It names a
     /// pending action, not a message: the message has no id until the sync
@@ -93,7 +94,8 @@ pub struct PimdirQueuedMessage {
 
 /// The `pimdir queue list` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct PimdirQueuedMessages {
+#[serde(rename_all = "camelCase")]
+pub struct PimdirQueueListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -122,7 +124,7 @@ pub struct PimdirQueuedMessages {
     pub messages: Vec<PimdirQueuedMessage>,
 }
 
-impl fmt::Display for PimdirQueuedMessages {
+impl fmt::Display for PimdirQueueListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.messages.is_empty() {
             return writeln!(f, "No message queued in this mailbox");

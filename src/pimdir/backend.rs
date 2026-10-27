@@ -40,6 +40,7 @@ use io_pimdir::{
     },
 };
 use log::{info, warn};
+use pimalaya_cli::error::CodedError;
 use serde::Serialize;
 
 use crate::{
@@ -56,7 +57,7 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{CodedError, ErrorCode},
+    error::ErrorCode,
     pimdir::client::PimdirClient,
 };
 
@@ -1389,7 +1390,7 @@ mod tests {
             ));
             assert_eq!(envelope.has_attachment, mark);
             assert_eq!(
-                serde_json::to_value(&envelope).unwrap()["has-attachment"],
+                serde_json::to_value(&envelope).unwrap()["hasAttachment"],
                 json
             );
         }

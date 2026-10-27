@@ -22,7 +22,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     shared::{
-        attachment::list::{self, AttachmentColors, Attachments},
+        attachment::list::{self, AttachmentColors, AttachmentListOutput},
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::part,
@@ -133,7 +133,7 @@ impl AttachmentDownloadCommand {
             );
         }
 
-        let attachments = Attachments {
+        let attachments = AttachmentListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             with_inline: written.iter().any(|a| a.inline),
@@ -158,7 +158,7 @@ impl AttachmentDownloadCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum AttachmentDownloadOutput {
-    Written(Attachments),
+    Written(AttachmentListOutput),
     Part(PartBytes),
 }
 
@@ -173,6 +173,7 @@ impl fmt::Display for AttachmentDownloadOutput {
 
 /// One part read by `attachment download --stdout --json`.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PartBytes {
     /// The id of the part, as `message read` and `attachment list` give
     /// it.

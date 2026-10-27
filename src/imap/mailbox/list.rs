@@ -52,7 +52,7 @@ impl ImapMailboxListCommand {
             client.lsub(reference, pattern)?
         };
 
-        let table = MailboxesTable {
+        let table = ImapMailboxListOutput {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
             mailboxes: mailboxes.into_iter().map(From::from).collect(),
@@ -64,7 +64,8 @@ impl ImapMailboxListCommand {
 
 /// The `imap list` output, a table of mailboxes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MailboxesTable {
+#[serde(rename_all = "camelCase")]
+pub struct ImapMailboxListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -75,7 +76,7 @@ pub struct MailboxesTable {
     pub mailboxes: Vec<MailboxRow>,
 }
 
-impl fmt::Display for MailboxesTable {
+impl fmt::Display for ImapMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -117,6 +118,7 @@ impl fmt::Display for MailboxesTable {
 
 /// One row of the mailboxes table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MailboxRow {
     /// The mailbox name.
     pub name: String,

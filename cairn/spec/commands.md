@@ -32,6 +32,9 @@ Data and errors SHALL go to stdout through the printer; `--json` switches every 
 ### Requirement: A JSON error carries a stable code
 A failure a caller is expected to act on SHALL carry a stable code, printed under `--json` as a `code` string beside `error`, `sources` and `backtrace`. The code SHALL be found anywhere in the error chain, so added context does not hide it. A failure with no code SHALL print no `code` field. The plain output SHALL stay unchanged. Codes are kebab-case and never renamed; `error` stays free wording.
 
+### Requirement: The JSON contract is described and versioned
+`json-schema` SHALL describe the failure object under the key `himalaya-error`, its `code` typed by the code vocabulary. Every generated schema SHALL carry an `$id` naming the contract version, the major version of Himalaya. Every registered payload SHALL be a JSON object, checked by a test. Piped `--json` output SHALL print one value per line.
+
 | Code | Raised when |
 |---|---|
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
@@ -53,6 +56,9 @@ A command returning data SHALL hand the printer a dedicated output type implemen
 
 ### Requirement: Serialized collections are always present
 An output field holding a collection SHALL be serialized even when empty, because the schema marks it required regardless and a skipped field would contradict the published schema.
+
+### Requirement: JSON keys are camelCase
+Every output type handed to the printer SHALL serialize its keys as camelCase, matching the wire formats the backends speak (JMAP per RFC 8620, Microsoft Graph, the Google APIs) and keeping every key reachable by dot access in jq and JavaScript. Each one SHALL be named `<Domain><Target><Verb>Output`, the domain omitted for the shared commands. A field carrying a provider spelling verbatim SHALL keep its explicit `#[serde(rename)]`, since `@odata.nextLink` and `nextPageToken` are the provider's names rather than derivable ones, and a transparent newtype over an io-gmail or io-msgraph resource SHALL serialize that resource as its crate declares it. The rule covers keys only: string values keep their own spelling (error codes, flags, mailbox roles, `message delete` actions and pimdir queue states stay kebab-case or lowercase). Configuration types SHALL stay kebab-case: they are read from TOML and are not `--json` payloads.
 
 ### Requirement: Gmail header selection applies to every format
 `gmail messages get --header` and `gmail threads get --header` SHALL narrow the rendered headers whatever the requested format. Gmail honours its `metadataHeaders` parameter under the metadata format alone and returns every header otherwise, so the narrowing SHALL also be applied to the response. Matching is case-insensitive, order and repeats are preserved, and passing no `--header` renders every header. Headers are read from the top-level payload part, where Gmail puts the RFC 5322 headers.
@@ -82,10 +88,10 @@ With `--json` and neither `--save` nor `--send`, the same composers SHALL print 
 A command taking a raw RFC 5322 message SHALL resolve it through the shared `MessageArg`: a file path, an inline value after `--`, or piped stdin read whole. The message SHALL be kept as bytes, never decoded, so 8-bit content in any charset reaches the backend intact. The resolved message is normalised to CRLF and rejected when empty, so no backend receives a zero-length message.
 
 ### Requirement: Gmail draft writes return identities
-`gmail drafts create` and `gmail drafts update` SHALL serialize the returned draft `id`, and nullable `message-id` and `thread-id`, under `--json`, with schemas registered for both commands. Non-JSON output SHALL retain the existing success sentence. A response without a message SHALL still succeed, with `message-id` and `thread-id` null, since the draft was already written.
+`gmail drafts create` and `gmail drafts update` SHALL serialize the returned draft `id`, and nullable `messageId` and `threadId`, under `--json`, with schemas registered for both commands. Non-JSON output SHALL retain the existing success sentence. A response without a message SHALL still succeed, with `messageId` and `threadId` null, since the draft was already written.
 
 ### Requirement: Gmail history retains added-message details
-`gmail history list --json` SHALL retain each added message's `id`, nullable `thread-id`, and supplied `label-ids` in a `messages-added-details` array, preserving order and duplicate entries. Missing labels SHALL produce an empty array. The existing `messages-added` id array, other change arrays, pagination, and text counts SHALL remain unchanged. The registered JSON Schema SHALL describe the details array, which SHALL remain present when empty.
+`gmail history list --json` SHALL retain each added message's `id`, nullable `threadId`, and supplied `labelIds` in a `messagesAddedDetails` array, preserving order and duplicate entries. Missing labels SHALL produce an empty array. The existing `messagesAdded` id array, other change arrays, pagination, and text counts SHALL remain unchanged. The registered JSON Schema SHALL describe the details array, which SHALL remain present when empty.
 
 ### Requirement: IMAP fetch can return whole messages
 `imap fetch --body` SHALL add `BODY.PEEK[]` (RFC 3501 §6.4.5) to the requested data items, so a caller downloads every message of a sequence set over one session instead of one `message read` per message. The fetch SHALL NOT set `\Seen`. The JSON output SHALL carry the message octets byte-exact as the standard Base64 of the `body` field, which the JSON Schema SHALL declare with `contentEncoding: base64` and `contentMediaType: message/rfc822`; the plain rendering SHALL print the size only. `--body` SHALL NOT imply `--envelope`.

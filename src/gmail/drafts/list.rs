@@ -61,7 +61,7 @@ impl GmailDraftsListCommand {
         let response = out.response;
 
         let next_page = response.next_page_token;
-        let table = DraftsTable {
+        let table = GmailDraftListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             drafts: response.drafts,
@@ -73,7 +73,8 @@ impl GmailDraftsListCommand {
 
 /// Renders a list of Gmail drafts as a three-column table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct DraftsTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailDraftListOutput {
     #[serde(skip)]
     /// The `comfy_table` preset string the table renders with.
     pub preset: String,
@@ -84,7 +85,7 @@ pub struct DraftsTable {
     pub drafts: Vec<GmailDraft>,
 }
 
-impl fmt::Display for DraftsTable {
+impl fmt::Display for GmailDraftListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

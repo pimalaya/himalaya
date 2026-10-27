@@ -59,7 +59,7 @@ impl AccountListCommand {
             .collect();
         accounts.sort_by(|a, b| a.name.cmp(&b.name));
 
-        let table = AccountsTable {
+        let table = AccountListOutput {
             preset,
             arrangement,
             colors,
@@ -89,6 +89,7 @@ fn load_config(paths: &[PathBuf]) -> Result<Config> {
 
 /// One row of the accounts table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountRow {
     /// The name of the `[accounts.<name>]` block.
     pub name: String,
@@ -140,7 +141,8 @@ impl AccountRow {
 
 /// The `account list` output, a table of accounts.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct AccountsTable {
+#[serde(rename_all = "camelCase")]
+pub struct AccountListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -153,7 +155,7 @@ pub struct AccountsTable {
     pub accounts: Vec<AccountRow>,
 }
 
-impl fmt::Display for AccountsTable {
+impl fmt::Display for AccountListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

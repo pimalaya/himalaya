@@ -25,7 +25,7 @@ pub struct MaildirFlagListCommand;
 impl MaildirFlagListCommand {
     /// Tables the six standard flags and their info letters.
     pub fn execute(self, printer: &mut impl Printer, account: &mut Account) -> Result<()> {
-        let table = FlagsTable {
+        let table = MaildirFlagListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags: vec![
@@ -44,7 +44,8 @@ impl MaildirFlagListCommand {
 
 /// Renderable table of the standard Maildir flags.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct FlagsTable {
+#[serde(rename_all = "camelCase")]
+pub struct MaildirFlagListOutput {
     #[serde(skip_serializing)]
     #[schemars(skip)]
     preset: String,
@@ -56,6 +57,7 @@ pub struct FlagsTable {
 
 /// One row of the Maildir flags table: code and name.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FlagRow {
     code: String,
     name: String,
@@ -70,7 +72,7 @@ impl FlagRow {
     }
 }
 
-impl fmt::Display for FlagsTable {
+impl fmt::Display for MaildirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

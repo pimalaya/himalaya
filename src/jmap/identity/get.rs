@@ -42,7 +42,7 @@ impl JmapIdentityGetCommand {
             warn!("identity `{id}` not found");
         }
 
-        let table = IdentitiesTable {
+        let table = JmapIdentityGetOutput {
             preset: account.table_preset().to_string(),
             identities: output.identities,
         };
@@ -53,7 +53,8 @@ impl JmapIdentityGetCommand {
 
 /// The identities rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct IdentitiesTable {
+#[serde(rename_all = "camelCase")]
+pub struct JmapIdentityGetOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -61,7 +62,7 @@ pub struct IdentitiesTable {
     pub identities: Vec<JmapIdentity>,
 }
 
-impl fmt::Display for IdentitiesTable {
+impl fmt::Display for JmapIdentityGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

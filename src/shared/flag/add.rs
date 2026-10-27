@@ -50,19 +50,20 @@ impl FlagAddCommand {
         }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(AddedFlags { flags, count })
+        printer.out(FlagAddOutput { flags, count })
     }
 }
 
 /// The `flag add` output, naming the flags that were added.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct AddedFlags {
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FlagAddOutput {
     flags: Vec<String>,
     /// How many of the given messages were found.
     count: usize,
 }
 
-impl fmt::Display for AddedFlags {
+impl fmt::Display for FlagAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (count, flags) = (self.count, self.flags.join(", "));
         writeln!(f, "Successfully added flags to {count} message(s): {flags}")
@@ -71,11 +72,11 @@ impl fmt::Display for AddedFlags {
 
 #[cfg(test)]
 mod tests {
-    use super::AddedFlags;
+    use super::FlagAddOutput;
 
     #[test]
     fn output_counts_the_messages_and_ends_the_line() {
-        let output = AddedFlags {
+        let output = FlagAddOutput {
             flags: vec!["seen".into(), "flagged".into()],
             count: 2,
         };

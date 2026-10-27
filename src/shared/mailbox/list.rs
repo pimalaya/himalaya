@@ -48,7 +48,7 @@ impl MailboxListCommand {
         let mut mailboxes = client.list_mailboxes(self.counts)?;
         account.apply_role_aliases(&mut mailboxes);
 
-        let mailboxes = Mailboxes {
+        let mailboxes = MailboxListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             max_width: self.max_width,
@@ -79,7 +79,8 @@ struct MailboxColors {
 
 /// The `mailbox list` output, a table of mailboxes.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct Mailboxes {
+#[serde(rename_all = "camelCase")]
+pub struct MailboxListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -98,7 +99,7 @@ pub struct Mailboxes {
     pub mailboxes: Vec<Mailbox>,
 }
 
-impl fmt::Display for Mailboxes {
+impl fmt::Display for MailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

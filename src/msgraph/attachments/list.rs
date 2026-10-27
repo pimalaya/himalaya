@@ -35,7 +35,7 @@ impl MsgraphAttachmentListCommand {
     ) -> Result<()> {
         let attachments = client.attachments_list(&self.message_id)?.response.value;
 
-        let table = AttachmentsTable {
+        let table = MsgraphAttachmentListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             colors: AttachmentColors {
@@ -81,7 +81,8 @@ impl Default for AttachmentColors {
 
 /// Renderable table of Microsoft Graph message attachments.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct AttachmentsTable {
+#[serde(rename_all = "camelCase")]
+pub struct MsgraphAttachmentListOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -91,7 +92,7 @@ pub struct AttachmentsTable {
     attachments: Vec<MsgraphAttachment>,
 }
 
-impl fmt::Display for AttachmentsTable {
+impl fmt::Display for MsgraphAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

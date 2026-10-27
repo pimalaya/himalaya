@@ -45,7 +45,7 @@ impl GmailSettingsAutoForwardingGetCommand {
 /// The disposition keeps its Gmail wire spelling, so a value `get` reads
 /// is a value `set` accepts back.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsAutoForwardingGetOutput {
     enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

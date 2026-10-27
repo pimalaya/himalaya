@@ -118,16 +118,16 @@ use std::{
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
-use pimalaya_cli::{log::Logger, printer::Printer, printer::StdoutPrinter};
+use pimalaya_cli::{error::ErrorReport, log::Logger, printer::Printer, printer::StdoutPrinter};
 use pimalaya_config::toml::TomlConfig;
 
-use crate::{cli::Cli, config::Config};
+use crate::{cli::Cli, config::Config, error::ErrorCode};
 
 fn main() {
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(&cli.json);
     let result = execute(cli, &mut printer);
-    error::eval(&mut printer, result);
+    ErrorReport::<ErrorCode>::eval_coded(&mut printer, result);
 }
 
 fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {

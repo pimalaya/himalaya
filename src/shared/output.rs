@@ -17,9 +17,10 @@ use serde::Serialize;
 /// A listing plus the cursor of its next page.
 ///
 /// The cursor is part of the output, a footer line in text and a
-/// `next_page` field in JSON, so a script reads it. Logging it to stderr
+/// `nextPage` field in JSON, so a script reads it. Logging it to stderr
 /// would not.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Paginated<T> {
     #[serde(flatten)]
     inner: T,

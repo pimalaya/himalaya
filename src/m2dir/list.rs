@@ -41,7 +41,7 @@ impl M2dirMailboxListCommand {
             })
             .collect();
 
-        let table = M2dirsTable {
+        let table = M2dirListOutput {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
             rows,
@@ -53,7 +53,8 @@ impl M2dirMailboxListCommand {
 
 /// The `m2dir list` output, a table of folders.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct M2dirsTable {
+#[serde(rename_all = "camelCase")]
+pub struct M2dirListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -65,7 +66,7 @@ pub struct M2dirsTable {
     pub rows: Vec<M2dirRow>,
 }
 
-impl fmt::Display for M2dirsTable {
+impl fmt::Display for M2dirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -91,6 +92,7 @@ impl fmt::Display for M2dirsTable {
 
 /// One row of the folders table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct M2dirRow {
     /// The folder name, relative to the store root.
     pub name: String,

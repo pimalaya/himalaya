@@ -112,8 +112,8 @@ pub(crate) fn recipient(recipient: &MsgraphRecipient) -> String {
 
 /// Builds the renderable messages table with the account's
 /// envelope-table colors and layout.
-fn messages_table(account: &Account, messages: Vec<MsgraphMessage>) -> MessagesTable {
-    MessagesTable {
+fn messages_table(account: &Account, messages: Vec<MsgraphMessage>) -> MsgraphMessageListOutput {
+    MsgraphMessageListOutput {
         preset: account.table_preset().to_string(),
         arrangement: account.table_arrangement(),
         colors: MessageColors {
@@ -152,7 +152,8 @@ impl Default for MessageColors {
 
 /// Renderable table of Microsoft Graph messages.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MessagesTable {
+#[serde(rename_all = "camelCase")]
+pub struct MsgraphMessageListOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -162,7 +163,7 @@ pub struct MessagesTable {
     messages: Vec<MsgraphMessage>,
 }
 
-impl fmt::Display for MessagesTable {
+impl fmt::Display for MsgraphMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

@@ -62,8 +62,8 @@ impl MsgraphMailFolderListCommand {
 pub(crate) fn folders_table(
     account: &Account,
     folders: Vec<MsgraphMailFolder>,
-) -> MailFoldersTable {
-    MailFoldersTable {
+) -> MsgraphMailFolderListOutput {
+    MsgraphMailFolderListOutput {
         preset: account.table_preset().to_string(),
         arrangement: account.table_arrangement(),
         colors: MailFolderColors {
@@ -102,7 +102,8 @@ impl Default for MailFolderColors {
 
 /// Renderable table of Microsoft Graph mail folders.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MailFoldersTable {
+#[serde(rename_all = "camelCase")]
+pub struct MsgraphMailFolderListOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -112,7 +113,7 @@ pub struct MailFoldersTable {
     folders: Vec<MsgraphMailFolder>,
 }
 
-impl fmt::Display for MailFoldersTable {
+impl fmt::Display for MsgraphMailFolderListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

@@ -58,7 +58,8 @@ impl ImapMailboxStatusCommand {
 
 /// The `imap status` output, one field per data item the server returned.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MailboxStatus {
+#[serde(rename_all = "camelCase")]
+pub struct ImapMailboxStatusOutput {
     /// Total message count.
     pub messages: Option<u32>,
     /// Count of messages carrying `\Recent`.
@@ -77,9 +78,9 @@ pub struct MailboxStatus {
     pub highest_mod_seq: Option<u64>,
 }
 
-impl From<Vec<StatusDataItem>> for MailboxStatus {
+impl From<Vec<StatusDataItem>> for ImapMailboxStatusOutput {
     fn from(items: Vec<StatusDataItem>) -> Self {
-        let mut status = MailboxStatus {
+        let mut status = ImapMailboxStatusOutput {
             messages: None,
             recent: None,
             uid_next: None,
@@ -112,7 +113,7 @@ pub struct MailboxStatusTable {
     /// The `comfy_table` preset string the table renders with.
     pub preset: String,
     /// The status the server reported.
-    pub status: MailboxStatus,
+    pub status: ImapMailboxStatusOutput,
 }
 
 impl fmt::Display for MailboxStatusTable {

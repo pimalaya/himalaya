@@ -33,7 +33,7 @@ impl MaildirMailboxListCommand {
     ) -> Result<()> {
         let maildirs = client.list_maildirs()?;
 
-        let table = MaildirsTable {
+        let table = MaildirListOutput {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
             rows: maildirs
@@ -51,7 +51,8 @@ impl MaildirMailboxListCommand {
 
 /// The `maildir list` output, a table of Maildirs.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct MaildirsTable {
+#[serde(rename_all = "camelCase")]
+pub struct MaildirListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -63,7 +64,7 @@ pub struct MaildirsTable {
     pub rows: Vec<MaildirRow>,
 }
 
-impl fmt::Display for MaildirsTable {
+impl fmt::Display for MaildirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -89,6 +90,7 @@ impl fmt::Display for MaildirsTable {
 
 /// One row of the Maildirs table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MaildirRow {
     /// The Maildir name, relative to the store root.
     pub name: String,

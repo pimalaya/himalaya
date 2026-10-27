@@ -40,7 +40,7 @@ impl GmailSettingsForwardingAddressesListCommand {
         };
         let resp = out.response;
 
-        let table = ForwardingAddressesTable {
+        let table = GmailSettingsForwardingAddressListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             response: resp,
@@ -52,7 +52,8 @@ impl GmailSettingsForwardingAddressesListCommand {
 
 /// Renderable table of Gmail forwarding addresses.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct ForwardingAddressesTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailSettingsForwardingAddressListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     preset: String,
@@ -62,7 +63,7 @@ pub struct ForwardingAddressesTable {
     response: GmailForwardingAddressesListResponse,
 }
 
-impl fmt::Display for ForwardingAddressesTable {
+impl fmt::Display for GmailSettingsForwardingAddressListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

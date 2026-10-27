@@ -89,7 +89,7 @@ impl JmapSubmissionQueryCommand {
             limit: Some(self.page_size),
         })?;
 
-        let table = SubmissionsTable {
+        let table = JmapSubmissionQueryOutput {
             preset: account.table_preset().to_string(),
             submissions: output.submissions,
         };
@@ -100,7 +100,8 @@ impl JmapSubmissionQueryCommand {
 
 /// The submissions rendered as a table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SubmissionsTable {
+#[serde(rename_all = "camelCase")]
+pub struct JmapSubmissionQueryOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -108,7 +109,7 @@ pub struct SubmissionsTable {
     pub submissions: Vec<JmapEmailSubmission>,
 }
 
-impl fmt::Display for SubmissionsTable {
+impl fmt::Display for JmapSubmissionQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

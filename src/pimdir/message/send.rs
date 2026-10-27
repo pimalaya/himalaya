@@ -74,7 +74,7 @@ impl PimdirMessageSendCommand {
             _ => None,
         };
 
-        printer.out(PimdirMessageSent {
+        printer.out(PimdirMessageSendOutput {
             queue_id: sent.staged.queue_id,
             message_id: sent.staged.message_id,
             copy: sent.carried,
@@ -86,7 +86,7 @@ impl PimdirMessageSendCommand {
 /// The `pimdir message send` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirMessageSent {
+pub struct PimdirMessageSendOutput {
     /// The `submit` row the message waits in until the owner sends it.
     pub queue_id: i64,
     /// The message's bare `Message-ID`.
@@ -99,7 +99,7 @@ pub struct PimdirMessageSent {
     pub copy_queue_id: Option<i64>,
 }
 
-impl fmt::Display for PimdirMessageSent {
+impl fmt::Display for PimdirMessageSendOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

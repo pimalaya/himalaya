@@ -114,7 +114,8 @@ pub fn parse_flag(raw: &str) -> Result<Flag> {
 /// The output of `pimdir flag add`, `set` and `remove`: the row each
 /// message's change waits in.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct PimdirFlagsStaged {
+#[serde(rename_all = "camelCase")]
+pub struct PimdirFlagStageOutput {
     /// One row per message, in the order given.
     pub queued: Vec<PimdirFlagRow>,
 }
@@ -129,7 +130,7 @@ pub struct PimdirFlagRow {
     pub queue_id: i64,
 }
 
-impl PimdirFlagsStaged {
+impl PimdirFlagStageOutput {
     /// The rows a write staged, failing when none of its ids matched, as
     /// the shared flag commands do.
     pub fn found(staged: Vec<PimdirFlagged>) -> Result<Self> {
@@ -140,7 +141,7 @@ impl PimdirFlagsStaged {
     }
 }
 
-impl From<Vec<PimdirFlagged>> for PimdirFlagsStaged {
+impl From<Vec<PimdirFlagged>> for PimdirFlagStageOutput {
     fn from(staged: Vec<PimdirFlagged>) -> Self {
         let queued = staged
             .into_iter()
@@ -153,7 +154,7 @@ impl From<Vec<PimdirFlagged>> for PimdirFlagsStaged {
     }
 }
 
-impl fmt::Display for PimdirFlagsStaged {
+impl fmt::Display for PimdirFlagStageOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let rows: Vec<String> = self
             .queued
@@ -238,7 +239,7 @@ mod tests {
 
     #[test]
     fn a_write_matching_no_id_fails() {
-        let err = PimdirFlagsStaged::found(Vec::new())
+        let err = PimdirFlagStageOutput::found(Vec::new())
             .unwrap_err()
             .to_string();
         assert!(err.contains("no id matched"), "{err}");
@@ -256,7 +257,7 @@ mod tests {
 
     #[test]
     fn staged_rows_print_and_serialize() {
-        let output = PimdirFlagsStaged::from(vec![
+        let output = PimdirFlagStageOutput::from(vec![
             PimdirFlagged {
                 id: "42".into(),
                 queue_id: 7,

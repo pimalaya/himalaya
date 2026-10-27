@@ -1938,7 +1938,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.2.6"
-source = "git+https://github.com/pimalaya/cli?rev=e4ea7f4067501d2159889a926c6f5449778c38df#e4ea7f4067501d2159889a926c6f5449778c38df"
+source = "git+https://github.com/pimalaya/cli?rev=55b66933950f02541892407667e5e0b254245871#55b66933950f02541892407667e5e0b254245871"
 dependencies = [
  "anyhow",
  "clap",
@@ -1951,6 +1951,7 @@ dependencies = [
  "git2",
  "inquire",
  "log",
+ "schemars",
  "secrecy",
  "serde",
  "serde_json",

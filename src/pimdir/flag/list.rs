@@ -49,7 +49,7 @@ impl PimdirFlagListCommand {
             );
         }
 
-        printer.out(PimdirFlagList {
+        printer.out(PimdirFlagListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags,
@@ -59,7 +59,8 @@ impl PimdirFlagListCommand {
 
 /// The `pimdir flag list` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct PimdirFlagList {
+#[serde(rename_all = "camelCase")]
+pub struct PimdirFlagListOutput {
     #[serde(skip_serializing)]
     #[schemars(skip)]
     preset: String,
@@ -71,7 +72,7 @@ pub struct PimdirFlagList {
     flags: Option<Vec<String>>,
 }
 
-impl fmt::Display for PimdirFlagList {
+impl fmt::Display for PimdirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -93,8 +94,8 @@ impl fmt::Display for PimdirFlagList {
 mod tests {
     use super::*;
 
-    fn list(flags: Option<Vec<String>>) -> PimdirFlagList {
-        PimdirFlagList {
+    fn list(flags: Option<Vec<String>>) -> PimdirFlagListOutput {
+        PimdirFlagListOutput {
             preset: String::new(),
             arrangement: ContentArrangement::Disabled,
             flags,

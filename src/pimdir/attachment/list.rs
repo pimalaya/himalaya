@@ -87,7 +87,7 @@ impl PageArgs {
             .max(1) as usize;
         let page = client.list_attachments(after.as_ref(), limit, query)?;
 
-        let mut output = PimdirAttachments::from(page);
+        let mut output = PimdirAttachmentListOutput::from(page);
         output.preset = account.table_preset().to_string();
         output.arrangement = account.table_arrangement();
         output.max_width = self.max_width;
@@ -159,7 +159,7 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
 /// The `pimdir attachment list` and `pimdir attachment search` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirAttachments {
+pub struct PimdirAttachmentListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -182,7 +182,7 @@ pub struct PimdirAttachments {
     pub next_page: Option<String>,
 }
 
-impl From<PimdirAttachmentPage> for PimdirAttachments {
+impl From<PimdirAttachmentPage> for PimdirAttachmentListOutput {
     fn from(page: PimdirAttachmentPage) -> Self {
         Self {
             preset: String::new(),
@@ -196,7 +196,7 @@ impl From<PimdirAttachmentPage> for PimdirAttachments {
     }
 }
 
-impl PimdirAttachments {
+impl PimdirAttachmentListOutput {
     /// A date in the configured format, as stored when it does not read.
     fn format_date(&self, date: &str) -> String {
         match DateTime::parse_from_rfc3339(date) {
@@ -210,7 +210,7 @@ impl PimdirAttachments {
     }
 }
 
-impl fmt::Display for PimdirAttachments {
+impl fmt::Display for PimdirAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
         table

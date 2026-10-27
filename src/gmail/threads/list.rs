@@ -67,7 +67,7 @@ impl GmailThreadsListCommand {
         let response = out.response;
 
         let next_page = response.next_page_token;
-        let table = ThreadsTable {
+        let table = GmailThreadListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             threads: response.threads,
@@ -79,7 +79,8 @@ impl GmailThreadsListCommand {
 
 /// Renders a list of Gmail thread summaries as a three-column table.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct ThreadsTable {
+#[serde(rename_all = "camelCase")]
+pub struct GmailThreadListOutput {
     #[serde(skip)]
     /// The `comfy_table` preset string the table renders with.
     pub preset: String,
@@ -90,7 +91,7 @@ pub struct ThreadsTable {
     pub threads: Vec<GmailThreadSummary>,
 }
 
-impl fmt::Display for ThreadsTable {
+impl fmt::Display for GmailThreadListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

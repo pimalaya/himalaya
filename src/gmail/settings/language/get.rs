@@ -36,7 +36,7 @@ impl GmailSettingsLanguageGetCommand {
 /// Gmail display language settings, rendered as text or, under `--json`,
 /// as a structured object instead of a wrapped human string.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsLanguageGetOutput {
     display_language: String,
 }

@@ -100,7 +100,7 @@ impl JmapMailboxQueryCommand {
             properties: None,
         })?;
 
-        let table = MailboxesTable {
+        let table = JmapMailboxQueryOutput {
             preset: account.table_preset().to_string(),
             colors: MailboxColors {
                 id: account.mailboxes_list_table_id_color(),
@@ -141,7 +141,8 @@ impl Default for MailboxColors {
 
 /// The mailboxes rendered as a table.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
-pub struct MailboxesTable {
+#[serde(rename_all = "camelCase")]
+pub struct JmapMailboxQueryOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -152,7 +153,7 @@ pub struct MailboxesTable {
     pub mailboxes: Vec<JmapMailbox>,
 }
 
-impl fmt::Display for MailboxesTable {
+impl fmt::Display for JmapMailboxQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

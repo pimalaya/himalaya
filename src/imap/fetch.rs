@@ -92,7 +92,7 @@ impl ImapFetchCommand {
             .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
             .collect();
 
-        printer.out(FetchedMessages { messages })
+        printer.out(ImapFetchOutput { messages })
     }
 
     /// The data items to request: the UID always, the envelope when
@@ -138,7 +138,8 @@ impl ImapFetchCommand {
 
 /// The `imap fetch` output, one block per message.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
-pub struct FetchedMessages {
+#[serde(rename_all = "camelCase")]
+pub struct ImapFetchOutput {
     /// The messages, in the order the server returned them.
     pub messages: Vec<FetchedMessage>,
 }
@@ -146,6 +147,7 @@ pub struct FetchedMessages {
 /// The data items fetched for one message, each `None` when it was not
 /// asked for.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FetchedMessage {
     /// The message number in the selected mailbox.
     pub seq: u32,
@@ -214,6 +216,7 @@ fn serialize_base64<S: Serializer>(body: &Option<Vec<u8>>, s: S) -> Result<S::Ok
 
 /// A fetched envelope, its addresses already formatted for display.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct EnvelopeView {
     /// The `Date:` header.
     pub date: Option<String>,
@@ -256,6 +259,7 @@ impl From<&Envelope<'_>> for EnvelopeView {
 
 /// One node of a fetched MIME body structure tree.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct BodyPart {
     /// The part's `Content-Type`.
     pub content_type: String,
@@ -348,7 +352,7 @@ fn format_size(bytes: usize) -> String {
     }
 }
 
-impl fmt::Display for FetchedMessages {
+impl fmt::Display for ImapFetchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f)?;
 

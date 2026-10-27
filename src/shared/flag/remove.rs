@@ -50,19 +50,20 @@ impl FlagRemoveCommand {
         }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(RemovedFlags { flags, count })
+        printer.out(FlagRemoveOutput { flags, count })
     }
 }
 
 /// The `flag remove` output, naming the flags that were removed.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct RemovedFlags {
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FlagRemoveOutput {
     flags: Vec<String>,
     /// How many of the given messages were found.
     count: usize,
 }
 
-impl fmt::Display for RemovedFlags {
+impl fmt::Display for FlagRemoveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (count, flags) = (self.count, self.flags.join(", "));
         writeln!(
@@ -74,11 +75,11 @@ impl fmt::Display for RemovedFlags {
 
 #[cfg(test)]
 mod tests {
-    use super::RemovedFlags;
+    use super::FlagRemoveOutput;
 
     #[test]
     fn output_counts_the_messages_and_ends_the_line() {
-        let output = RemovedFlags {
+        let output = FlagRemoveOutput {
             flags: vec!["seen".into(), "flagged".into()],
             count: 2,
         };

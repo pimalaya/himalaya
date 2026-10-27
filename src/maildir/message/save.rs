@@ -50,18 +50,19 @@ impl MaildirMessageSaveCommand {
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg)?;
         let path = PathBuf::from(path.into_string());
 
-        printer.out(StoredMessage { id, path })
+        printer.out(MaildirMessageSaveOutput { id, path })
     }
 }
 
 /// Output of a saved Maildir message: its id and file path.
 #[derive(Serialize, JsonSchema)]
-pub struct StoredMessage {
+#[serde(rename_all = "camelCase")]
+pub struct MaildirMessageSaveOutput {
     id: String,
     path: PathBuf,
 }
 
-impl fmt::Display for StoredMessage {
+impl fmt::Display for MaildirMessageSaveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = &self.id;
         let path = self.path.display();

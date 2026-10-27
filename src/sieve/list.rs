@@ -37,7 +37,7 @@ impl SieveScriptListCommand {
             })
             .collect();
 
-        printer.out(SieveScripts {
+        printer.out(SieveListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             scripts,
@@ -47,7 +47,7 @@ impl SieveScriptListCommand {
 
 /// One stored script, by name and by whether it filters incoming mail.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct SieveScript {
     /// The script name.
     pub name: String,
@@ -57,7 +57,8 @@ pub struct SieveScript {
 
 /// The `sieve list` output, a table of scripts.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SieveScripts {
+#[serde(rename_all = "camelCase")]
+pub struct SieveListOutput {
     /// The `comfy_table` preset string the table renders with.
     #[serde(skip)]
     pub preset: String,
@@ -68,7 +69,7 @@ pub struct SieveScripts {
     pub scripts: Vec<SieveScript>,
 }
 
-impl fmt::Display for SieveScripts {
+impl fmt::Display for SieveListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
         table

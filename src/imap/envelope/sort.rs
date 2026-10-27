@@ -83,7 +83,7 @@ impl ImapEnvelopeSortCommand {
             },
         )?;
 
-        let table = SortResultsTable {
+        let table = ImapSortOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             id_color: account.envelopes_list_table_id_color(),
@@ -132,7 +132,8 @@ impl From<SortKeyArg> for SortKey {
 
 /// The `imap sort` output, a table of message ids in sorted order.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct SortResultsTable {
+#[serde(rename_all = "camelCase")]
+pub struct ImapSortOutput {
     #[serde(skip)]
     preset: String,
     #[serde(skip)]
@@ -143,7 +144,7 @@ pub struct SortResultsTable {
     ids: Vec<u32>,
 }
 
-impl fmt::Display for SortResultsTable {
+impl fmt::Display for ImapSortOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

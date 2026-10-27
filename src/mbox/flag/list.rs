@@ -32,7 +32,7 @@ impl MboxFlagListCommand {
             name: name.into(),
         };
 
-        let table = FlagsTable {
+        let table = MboxFlagListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags: vec![
@@ -51,7 +51,8 @@ impl MboxFlagListCommand {
 
 /// Renderable table of the mbox flags.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-pub struct FlagsTable {
+#[serde(rename_all = "camelCase")]
+pub struct MboxFlagListOutput {
     #[serde(skip_serializing)]
     #[schemars(skip)]
     preset: String,
@@ -63,13 +64,14 @@ pub struct FlagsTable {
 
 /// One row of the mbox flags table: letter, header and name.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FlagRow {
     code: String,
     header: String,
     name: String,
 }
 
-impl fmt::Display for FlagsTable {
+impl fmt::Display for MboxFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 

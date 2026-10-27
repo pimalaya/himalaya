@@ -41,17 +41,18 @@ impl MboxMessageSaveCommand {
 
         let id = client.append(&path, flags, msg)?;
 
-        printer.out(StoredMessage { id })
+        printer.out(MboxMessageSaveOutput { id })
     }
 }
 
 /// Output of a saved mbox message: its id.
 #[derive(Serialize, JsonSchema)]
-pub struct StoredMessage {
+#[serde(rename_all = "camelCase")]
+pub struct MboxMessageSaveOutput {
     id: String,
 }
 
-impl fmt::Display for StoredMessage {
+impl fmt::Display for MboxMessageSaveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Message `{}` successfully saved", self.id)
     }

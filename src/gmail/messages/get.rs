@@ -70,7 +70,7 @@ impl GmailMessageGetCommand {
 /// recursive MIME tree of base64 bodies, which belongs on the raw path.
 /// `--format raw` and `attachments get` are how a body is reached.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailMessageGetOutput {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,6 +117,7 @@ impl fmt::Display for GmailMessageGetOutput {
 /// Headers are a list rather than a map, a message being free to repeat a
 /// name and their order being meaningful.
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GmailMessageHeaderOutput {
     /// The header name.
     pub name: String,
