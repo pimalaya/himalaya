@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumped ctutils to 0.4.6, rustls-webpki to 0.103.16 and webpki-root-certs to 1.0.11, fixing RUSTSEC-2026-0382, RUSTSEC-2026-0383 and RUSTSEC-2026-0385.
 - **Breaking:** changed every `--json` key to camelCase, the spelling JMAP, Microsoft Graph and the Google APIs already use, so each key is reachable by dot access in jq and JavaScript: `messages-total` becomes `messagesTotal`, `next_page` becomes `nextPage`, `thread-id` becomes `threadId`, `uid_validity` becomes `uidValidity`. Values keep their spelling (error codes, flags, mailbox roles stay kebab-case or lowercase), provider passthrough keeps the provider's keys, and the TOML configuration stays kebab-case. The `json-schema` titles follow the output types, now all named `*Output` (`Envelopes` becomes `EnvelopeListOutput`).
 - Changed piped `--json` output to print one value per line, each schema of `json-schema` to carry an `$id` naming the contract version (`v2`), and added `himalaya-error`, the schema of the JSON failure object (pimalaya-cli `55b6693`).
 - Changed `imap.id.auto` to send himalaya's canned `name`, `version`, `vendor` and `support-url` when `imap.id.fields` is unset, rather than `ID NIL`, which 163.com acknowledges and then refuses with `Unsafe Login`. An explicit empty `imap.id.fields` still sends `ID NIL` ([#774]).
