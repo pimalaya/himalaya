@@ -97,8 +97,8 @@ smtp.sasl.login.password.raw = "***"
 
 - **P7 — TLS compatibility.** 163 Mail works with both `rustls-ring` (default)
   and `native-tls`. No TLS provider switch needed. Note: this is not true for
-  all Chinese providers — 139 Mail requires `native-tls`, and China Mobile
-  enterprise mail requires `rustls-ring`.
+  all Chinese providers — 139 Mail requires `native-tls` for IMAP (see
+  [imap-smtp-139.md](imap-smtp-139.md) P1).
 
 ### Observations
 
