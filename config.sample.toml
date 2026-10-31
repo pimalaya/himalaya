@@ -7,7 +7,8 @@
 #   - $HOME/.himalayarc
 #
 # Override with `himalaya -c <PATH>`. Multiple paths can be passed at once,
-# separated by `:`; the first one is the base and the rest are deep-merged on
+# separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or
+# by repeating `-c`; the first one is the base and the rest are deep-merged on
 # top of it.
 #
 # Bare `himalaya` launches the wizard, which discovers an account from your

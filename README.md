@@ -178,7 +178,7 @@ A persistent configuration is loaded from the first valid path among:
 
 These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
 
-Override the path with `-c <PATH>`; multiple paths can be passed at once, separated by `:`. The first one is the base and the rest are deep-merged on top.
+Override the path with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
 
 To add or reconfigure an account, run the bare `himalaya` wizard again and redirect its printed TOML into (or merge it with) your config file. There is no in-place edit subcommand; `himalaya account list` and `himalaya account check` inspect and validate the accounts already declared.
 
