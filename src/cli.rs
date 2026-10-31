@@ -161,6 +161,14 @@ pub enum Command {
     JsonSchema(JsonSchemaCommand),
 }
 
+/// The character separating several configuration paths, `$PATH`'s own: `;`
+/// on Windows, where a colon belongs to the drive letter of an absolute path,
+/// and `:` elsewhere.
+#[cfg(windows)]
+const CONFIG_PATH_DELIMITER: char = ';';
+#[cfg(not(windows))]
+const CONFIG_PATH_DELIMITER: char = ':';
+
 /// Path(s) to the TOML configuration file(s).
 ///
 /// Declared here rather than taken from pimalaya-cli, so the environment
@@ -170,11 +178,11 @@ pub struct ConfigPathsArg {
     /// Override the default configuration file path.
     ///
     /// Paths are shell-expanded then canonicalized, and several may be given
-    /// at once, delimited by `:` like `$PATH`. The first is the base and the
-    /// rest are merged on top, which is how a public configuration stays
-    /// separate from the private ones.
+    /// at once, delimited like `$PATH` (`;` on Windows, `:` elsewhere). The
+    /// first is the base and the rest are merged on top, which is how a public
+    /// configuration stays separate from the private ones.
     #[arg(long = "config", short = 'c', global = true, env = "HIMALAYA_CONFIG")]
-    #[arg(name = "config_paths", value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
+    #[arg(name = "config_paths", value_name = "PATH", value_parser = path_parser, value_delimiter = CONFIG_PATH_DELIMITER)]
     pub paths: Vec<PathBuf>,
 }
 
@@ -405,5 +413,53 @@ impl Command {
             Self::Manual(cmd) => cmd.execute(printer, Cli::command()),
             Self::JsonSchema(cmd) => cmd.execute(printer, json_schema::registry()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, path::PathBuf, process};
+
+    use clap::Parser;
+
+    use super::{CONFIG_PATH_DELIMITER, Cli};
+
+    /// A directory that is never created, so the paths below it keep the
+    /// spelling they were given instead of being canonicalized.
+    fn absent_dir() -> PathBuf {
+        env::temp_dir().join(format!("himalaya-config-paths-{}", process::id()))
+    }
+
+    fn paths(args: &[&str]) -> Vec<PathBuf> {
+        Cli::try_parse_from([&["himalaya"], args].concat())
+            .expect("parse")
+            .config
+            .paths
+    }
+
+    #[test]
+    fn a_config_path_is_never_split() {
+        // NOTE: an absolute Windows path holds a colon of its own, so splitting
+        // on it would read `C:\dir\config.toml` as two paths and find neither.
+        let path = absent_dir().join("config.toml");
+
+        assert_eq!(
+            paths(&["-c", path.to_str().unwrap(), "account", "list"]),
+            [path]
+        );
+    }
+
+    #[test]
+    fn several_config_paths_split_on_the_platform_delimiter() {
+        let dir = absent_dir();
+        let (one, two) = (dir.join("one.toml"), dir.join("two.toml"));
+        let given = format!(
+            "{}{}{}",
+            one.display(),
+            CONFIG_PATH_DELIMITER,
+            two.display()
+        );
+
+        assert_eq!(paths(&["-c", &given, "account", "list"]), [one, two]);
     }
 }
