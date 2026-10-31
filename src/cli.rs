@@ -466,4 +466,13 @@ mod tests {
 
         assert_eq!(paths(&["-c", &given, "account", "list"]), [one, two]);
     }
+
+    #[test]
+    fn the_delimiter_is_the_platform_one() {
+        // NOTE: `$PATH` separates with `;` on Windows, where a colon belongs to
+        // the drive letter of an absolute path, and with `:` elsewhere.
+        let expected = if cfg!(windows) { ';' } else { ':' };
+
+        assert_eq!(CONFIG_PATH_DELIMITER, expected);
+    }
 }
