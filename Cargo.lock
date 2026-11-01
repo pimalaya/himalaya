@@ -1371,7 +1371,7 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.8.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=09d2d1c5cf8c157cf9b558a715e42af77fc284e9#09d2d1c5cf8c157cf9b558a715e42af77fc284e9"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=fd0c06059dfb947f536bb0b72d55b2603fd2456a#fd0c06059dfb947f536bb0b72d55b2603fd2456a"
 dependencies = [
  "blake3",
  "encoding_rs",
