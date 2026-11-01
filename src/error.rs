@@ -31,10 +31,10 @@ pub enum ErrorCode {
     /// lines to be read whole, so it is refused rather than read in
     /// part.
     MessageTooComplex,
-    /// The pimdir store's schema is newer than Himalaya's: upgrade
-    /// Himalaya.
+    /// The pimdir store is of another draft of the format than Himalaya's:
+    /// upgrade Himalaya, or reinstall the store as its sync engine says.
     #[cfg(feature = "pimdir")]
-    StoreNewer,
+    StoreVersion,
     /// The pimdir store has no schema yet: its sync engine creates it.
     #[cfg(feature = "pimdir")]
     StoreUncreated,
@@ -42,21 +42,22 @@ pub enum ErrorCode {
     /// program wrote it.
     #[cfg(feature = "pimdir")]
     StoreForeign,
-    /// The pimdir store's version records disagree.
+    /// The pimdir store's version records disagree, or its schema is not
+    /// the one its draft declares.
     #[cfg(feature = "pimdir")]
     StoreCorrupt,
-    /// The pimdir store is not at Himalaya's schema: run or upgrade its
-    /// sync engine.
+    /// The pimdir store holds no schema yet, and the verb creates none:
+    /// its sync engine creates it.
     #[cfg(feature = "pimdir")]
     StoreNotCurrent,
-    /// The pimdir store was written by an earlier draft: run or upgrade
-    /// its sync engine.
-    #[cfg(feature = "pimdir")]
-    StoreStale,
     /// The pimdir store names its bodies with a hash Himalaya does not
     /// compute.
     #[cfg(feature = "pimdir")]
     StoreHashAlgo,
+    /// The pimdir store's sync state was written by another version of
+    /// its sync engine.
+    #[cfg(feature = "pimdir")]
+    SyncVersion,
     /// Another writer holds the pimdir store's write lock: retry.
     #[cfg(feature = "pimdir")]
     StoreBusy,
@@ -69,10 +70,24 @@ pub enum ErrorCode {
     /// A pimdir store verb is between two of its chunks: retry.
     #[cfg(feature = "pimdir")]
     StoreInFlight,
+    /// The pimdir store is a link, or another user can read or write it:
+    /// restrict it to its user.
+    #[cfg(feature = "pimdir")]
+    StoreExposed,
     /// The mailbox already holds the message, or has its creation
     /// queued: nothing was staged.
     #[cfg(feature = "pimdir")]
     ItemDuplicate,
+    /// The pimdir store cannot hold the flag: empty, or holding a space, a
+    /// control or a non-ASCII character. Nothing was staged.
+    #[cfg(feature = "pimdir")]
+    FlagInvalid,
+    /// The pimdir action's payload is malformed: nothing was staged.
+    #[cfg(feature = "pimdir")]
+    ActionMalformed,
+    /// The pimdir conflict holds a body nobody has read: fetch it first.
+    #[cfg(feature = "pimdir")]
+    ConflictUnread,
     /// A source of the pimdir store does not support the write: nothing
     /// was staged.
     #[cfg(feature = "pimdir")]
@@ -92,6 +107,14 @@ pub enum ErrorCode {
     /// engine rebuilds it.
     #[cfg(feature = "pimdir")]
     IndexOutdated,
+    /// The pimdir search index is of another draft or shape: its sync
+    /// engine rebuilds one of an earlier draft, and leaves any other.
+    #[cfg(feature = "pimdir")]
+    IndexVersion,
+    /// The zone the pimdir search index reads floating times in is not
+    /// an IANA zone.
+    #[cfg(feature = "pimdir")]
+    IndexZoneUnknown,
     /// The SQLite Himalaya links lacks what the pimdir search index
     /// needs (FTS5, 3.43 or later).
     #[cfg(feature = "pimdir")]
@@ -114,23 +137,29 @@ pub enum ErrorCode {
 /// serialises each.
 #[cfg(feature = "pimdir")]
 const PIMDIR_CODES: &[(&str, ErrorCode)] = &[
-    ("store-newer", ErrorCode::StoreNewer),
+    ("store-version", ErrorCode::StoreVersion),
     ("store-uncreated", ErrorCode::StoreUncreated),
     ("store-foreign", ErrorCode::StoreForeign),
     ("store-corrupt", ErrorCode::StoreCorrupt),
     ("store-not-current", ErrorCode::StoreNotCurrent),
-    ("store-stale", ErrorCode::StoreStale),
     ("store-hash-algo", ErrorCode::StoreHashAlgo),
+    ("sync-version", ErrorCode::SyncVersion),
     ("store-busy", ErrorCode::StoreBusy),
     ("store-owned", ErrorCode::StoreOwned),
     ("store-staging", ErrorCode::StoreStaging),
     ("store-in-flight", ErrorCode::StoreInFlight),
+    ("store-exposed", ErrorCode::StoreExposed),
     ("item-duplicate", ErrorCode::ItemDuplicate),
+    ("flag-invalid", ErrorCode::FlagInvalid),
+    ("action-malformed", ErrorCode::ActionMalformed),
+    ("conflict-unread", ErrorCode::ConflictUnread),
     ("unsupported", ErrorCode::Unsupported),
     ("no-performer", ErrorCode::NoPerformer),
     ("ambiguous-performer", ErrorCode::AmbiguousPerformer),
     ("index-missing", ErrorCode::IndexMissing),
     ("index-outdated", ErrorCode::IndexOutdated),
+    ("index-version", ErrorCode::IndexVersion),
+    ("index-zone-unknown", ErrorCode::IndexZoneUnknown),
     ("index-fts5-missing", ErrorCode::IndexFts5Missing),
     ("query-refused", ErrorCode::QueryRefused),
     ("query-unanswerable", ErrorCode::QueryUnanswerable),
@@ -140,7 +169,7 @@ const PIMDIR_CODES: &[(&str, ErrorCode)] = &[
 #[cfg(feature = "pimdir")]
 impl ErrorCode {
     /// The code of a pimdir failure, `None` for one the caller cannot act
-    /// on (an SQL or I/O failure, a malformed action).
+    /// on (an SQL, I/O or JSON failure).
     pub fn of_pimdir(err: &PimdirError) -> Option<Self> {
         let code = err.code();
         PIMDIR_CODES
@@ -152,10 +181,22 @@ impl ErrorCode {
 
 /// A pimdir failure as an error carrying its code, when it has one.
 ///
-/// The message stays io-pimdir's: the caller adds its own context.
+/// The message stays io-pimdir's, the caller adding its own context. A
+/// store of another draft also says what to do about it: drafts are
+/// exact, so a store opens only under the draft that wrote it, and moving
+/// one aside loses the writes still queued in it, which neverest's
+/// reinstall syncs out first.
 #[cfg(feature = "pimdir")]
 pub fn pimdir_error(err: PimdirError) -> anyhow::Error {
     match ErrorCode::of_pimdir(&err) {
+        Some(code @ ErrorCode::StoreVersion) => CodedError::new(
+            code,
+            format!(
+                "{err}; upgrade Himalaya if the store's sync engine is newer, \
+                 else reinstall the store as neverest's MIGRATION.md says"
+            ),
+        )
+        .into(),
         Some(code) => CodedError::new(code, err.to_string()).into(),
         None => err.into(),
     }

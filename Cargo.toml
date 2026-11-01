@@ -39,7 +39,7 @@ panic = "abort"
 pimalaya-cli = { version = "0.2.6", default-features = false, features = ["build"] }
 
 [dev-dependencies]
-rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
 tempfile = "3"
 
 [dependencies]
@@ -94,8 +94,6 @@ io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec6
 io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "5d83c49a832310cf83b2432ed57fc8093647fbe3" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
-# NOTE: the local io-pimdir checkout, temporary until its changes of
-# 2026-10-30 are pushed; it then returns to a git rev.
-io-pimdir = { path = "../io-pimdir" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "bff573783364a9bba3104c5e11c01fb944d67e62" }
 pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "55b66933950f02541892407667e5e0b254245871" }
 pimalaya-config = { git = "https://github.com/pimalaya/config", rev = "48c8c63a6fb917175f4c684e709ce659055c5338" }

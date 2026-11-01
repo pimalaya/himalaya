@@ -24,6 +24,7 @@ use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime};
 use io_pimdir::{
     capability,
     client::{
+        PimdirError,
         producer::{PimdirActionStatus, PimdirParkedAction, PimdirPendingAction},
         reader::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
@@ -605,8 +606,9 @@ impl PimdirClient {
     ///
     /// The body is stored as given, `Bcc:` included, and the row carries the
     /// envelope derived from its headers, the `submit` intent any owner of
-    /// the store may perform. The owner holds the credentials and sends on its next run;
-    /// nothing leaves from here.
+    /// the store may perform, naming the source that performs it. The owner
+    /// holds the credentials and sends on its next run; nothing leaves from
+    /// here.
     ///
     /// The row is filed under `mailbox`, which must exist: an enqueue
     /// creates the collection it names, and a send anchored on a made-up
@@ -614,9 +616,9 @@ impl PimdirClient {
     ///
     /// With `copy`, the intent asks the owner to file a copy in `mailbox`
     /// once the message is sent (pimdir STORAGE Annex B.2), so a failed
-    /// send leaves no copy behind. An owner that declares nothing predates
-    /// the field and would ignore it, so the copy is left to the caller
-    /// there, as before.
+    /// send leaves no copy behind. Against a source that declares nothing
+    /// the copy is left to the caller, an `add` beside the `submit`, as
+    /// Annex B.2 asks of a producer.
     ///
     /// Returns the queue row, the message's link id, and whether the intent
     /// carries the copy.
@@ -636,19 +638,26 @@ impl PimdirClient {
         let envelope = SubmissionEnvelope::parse(&raw)?;
 
         let mut producer = self.producer()?;
-        let source = self.performer(&producer, &collection, capability::MAIL_SUBMIT)?;
-        let carried = copy && source.is_some();
+        let (source, declared) =
+            match self.performer(&producer, &collection, capability::MAIL_SUBMIT)? {
+                Some(source) => (source, true),
+                None => (
+                    self.undeclared_performer(&producer, &collection, capability::MAIL_SUBMIT)?,
+                    false,
+                ),
+            };
+        let carried = copy && declared;
 
         let submit = PimdirSubmit {
             source,
-            object: producer.hash(&raw),
             from: envelope.from,
             rcpts: envelope.rcpts,
             subject: envelope.subject,
             copy: carried.then(|| PimdirCollectionId(collection.clone())),
         };
         let action = submit
-            .to_action()
+            .to_action(producer.hash(&raw))
+            .map_err(|err| pimdir_error(PimdirError::Action(err)))
             .with_context(|| format!("Queue send in `{mailbox}`"))?;
 
         let enqueued = producer
@@ -1800,7 +1809,8 @@ mod tests {
 
     #[test]
     fn a_sent_message_is_one_submit_row_with_its_envelope() {
-        let (_dir, mut client) = sent_store();
+        let (dir, mut client) = sent_store();
+        syncs(dir.path());
 
         client
             .send_message(Some("imap/Sent"), RAW.to_vec(), false)
@@ -1818,15 +1828,15 @@ mod tests {
         };
         assert_eq!(kind, intent::SUBMIT);
 
-        // NOTE: the `submit` payload a store owner decodes, `object` being
-        // the pinned body by the shared queue convention.
+        // NOTE: the `submit` payload a store owner decodes, naming the one
+        // source syncing the mailbox; the message is the row's body.
         let hash = object_hash.as_ref().unwrap();
         let json: serde_json::Value = serde_json::from_str(payload).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
                 "v": 1,
-                "object": hash.0,
+                "source": "imap",
                 "from": "a@x.org",
                 "rcpts": ["b@y.org", "c@y.org"],
                 "subject": "hi",
@@ -1835,8 +1845,7 @@ mod tests {
         assert_eq!(
             PimdirSubmit::from_payload(payload).unwrap(),
             PimdirSubmit {
-                source: None,
-                object: hash.clone(),
+                source: "imap".into(),
                 from: "a@x.org".into(),
                 rcpts: vec!["b@y.org".into(), "c@y.org".into()],
                 subject: Some("hi".into()),
@@ -1856,7 +1865,8 @@ mod tests {
 
     #[test]
     fn a_send_asking_for_a_copy_leaves_it_to_the_caller_on_an_undeclared_owner() {
-        let (_dir, mut client) = sent_store();
+        let (dir, mut client) = sent_store();
+        syncs(dir.path());
 
         let carried = client
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
@@ -1895,14 +1905,13 @@ mod tests {
         else {
             panic!("expected a submit intent, got {:?}", pending[0].action);
         };
-        let hash = object_hash.as_ref().unwrap();
+        assert_eq!(object_hash.as_ref(), Some(&client.blobs.hash(RAW)));
         let json: serde_json::Value = serde_json::from_str(payload).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
                 "v": 1,
                 "source": "imap",
-                "object": hash.0,
                 "from": "a@x.org",
                 "rcpts": ["b@y.org", "c@y.org"],
                 "subject": "hi",
@@ -1912,8 +1921,7 @@ mod tests {
         assert_eq!(
             PimdirSubmit::from_payload(payload).unwrap(),
             PimdirSubmit {
-                source: Some("imap".into()),
-                object: hash.clone(),
+                source: "imap".into(),
                 from: "a@x.org".into(),
                 rcpts: vec!["b@y.org".into(), "c@y.org".into()],
                 subject: Some("hi".into()),
@@ -1938,9 +1946,35 @@ mod tests {
         );
     }
 
+    /// A `submit` names its performer, and an undeclared one is the source
+    /// syncing the mailbox: a mailbox no source syncs yet has none, and the
+    /// send is refused rather than queued for nobody.
+    #[test]
+    fn a_send_no_source_performs_stages_nothing() {
+        let (_dir, mut client) = sent_store();
+
+        let err = client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), false)
+            .unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::NoPerformer),
+            "{err:#}"
+        );
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
     #[test]
     fn a_send_with_no_recipient_stages_nothing() {
-        let (_dir, mut client) = sent_store();
+        let (dir, mut client) = sent_store();
+        syncs(dir.path());
         let raw = b"From: a@x.org\r\nSubject: hi\r\n\r\nhello".to_vec();
 
         assert!(client.send_message(Some("imap/Sent"), raw, false).is_err());
@@ -2047,7 +2081,7 @@ mod tests {
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap_err();
 
-        let body = client.blobs.path(&client.blobs.hash(DRAFT));
+        let body = client.blobs.path(&client.blobs.hash(DRAFT)).unwrap();
         assert!(!body.exists(), "a refused add left its body behind");
     }
 
@@ -2065,13 +2099,14 @@ mod tests {
             Some(ErrorCode::Unsupported),
             "{err:#}"
         );
-        let body = client.blobs.path(&client.blobs.hash(RAW));
+        let body = client.blobs.path(&client.blobs.hash(RAW)).unwrap();
         assert!(!body.exists(), "a refused send left its body behind");
     }
 
     #[test]
     fn a_sent_message_names_its_queue_row_and_message_id() {
-        let (_dir, mut client) = sent_store();
+        let (dir, mut client) = sent_store();
+        syncs(dir.path());
 
         let sent = client
             .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)
@@ -2090,7 +2125,8 @@ mod tests {
         stage: impl FnOnce(&mut PimdirClient) -> Result<i64> + Send + 'static,
     ) {
         let (dir, mut client) = sent_store();
-        let body = client.blobs.path(&client.blobs.hash(DRAFT));
+        syncs(dir.path());
+        let body = client.blobs.path(&client.blobs.hash(DRAFT)).unwrap();
 
         let lock = std::fs::OpenOptions::new()
             .read(true)
@@ -2162,39 +2198,42 @@ mod tests {
         );
     }
 
-    /// A cancel takes the owner role on the store as it stands: a schema
-    /// another io-pimdir revision wrote is refused, never reconciled to
-    /// this one, which would drop what that revision keeps.
+    /// A cancel takes the owner role on the store as it stands: a store
+    /// another draft wrote is refused, its stamp and its queue left as
+    /// they are, never reconciled to this draft.
     #[test]
-    fn a_cancel_leaves_a_store_of_another_revision_alone() {
+    fn a_cancel_leaves_a_store_of_another_draft_alone() {
         let (dir, mut client) = sent_store();
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
-        db.execute_batch("CREATE TABLE later_revision (data TEXT)")
-            .unwrap();
+        stamp_format(dir.path(), "storage-draft-07");
 
         let err = client.cancel_queued(staged.queue_id).unwrap_err();
 
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
-            Some(ErrorCode::StoreNotCurrent),
+            Some(ErrorCode::StoreVersion),
             "{err:#}"
         );
-        assert!(format!("{err:#}").contains("sync engine"), "{err:#}");
-        let tables: i64 = db
+        assert!(
+            format!("{err:#}").contains("neverest's MIGRATION.md"),
+            "{err:#}"
+        );
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        let (version, queued): (String, i64) = db
             .query_row(
-                "SELECT count(*) FROM sqlite_schema WHERE name = 'later_revision'",
-                [],
-                |row| row.get(0),
+                "SELECT format_version, (SELECT count(*) FROM queue WHERE id = ?1) \
+                 FROM store_meta",
+                [staged.queue_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
-        assert_eq!(tables, 1, "the cancel reshaped the store");
         assert_eq!(
-            client.store.pending_actions("imap/Sent").unwrap()[0].id,
-            staged.queue_id
+            version, "storage-draft-07",
+            "the cancel restamped the store"
         );
+        assert_eq!(queued, 1, "the cancel dropped the row");
     }
 
     /// A cancel while a sync owns the store is refused at once, coded so a
@@ -2225,38 +2264,60 @@ mod tests {
         );
     }
 
-    /// A store a newer sync engine stamped is refused saying to upgrade
-    /// Himalaya, never to delete it.
-    #[test]
-    fn a_newer_store_is_refused_saying_to_upgrade() {
-        let (dir, _client) = sent_store();
-        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
-        db.pragma_update(None, "user_version", 1000).unwrap();
-        drop(db);
-
-        let err = PimdirClient::new(PimdirConfig {
-            root: dir.path().to_path_buf(),
-            account: None,
-        })
-        .err()
+    /// Stamps the store in `dir` as another draft of the format wrote it,
+    /// as a store an earlier or a later neverest left.
+    fn stamp_format(dir: &std::path::Path, version: &str) {
+        let db = rusqlite::Connection::open(dir.join("pimdir.db")).unwrap();
+        db.execute(
+            "UPDATE store_meta SET format_version = ?1 WHERE id = 1",
+            [version],
+        )
         .unwrap();
+    }
 
-        assert_eq!(
-            pimalaya_cli::error::code_of::<ErrorCode>(&err),
-            Some(ErrorCode::StoreNewer),
-            "{err:#}"
-        );
-        let err = format!("{err:#}");
-        assert!(err.contains("upgrade this program"), "{err}");
-        assert!(!err.contains("delete"), "{err}");
+    /// A store of another draft, earlier or later, is refused pointing at
+    /// the reinstall neverest's MIGRATION.md walks through, never at
+    /// deleting the store.
+    #[test]
+    fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
+        for version in ["storage-draft-07", "storage-draft-09"] {
+            let (dir, _client) = sent_store();
+            stamp_format(dir.path(), version);
+
+            let err = PimdirClient::new(PimdirConfig {
+                root: dir.path().to_path_buf(),
+                account: None,
+            })
+            .err()
+            .unwrap();
+
+            assert_eq!(
+                pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                Some(ErrorCode::StoreVersion),
+                "{err:#}"
+            );
+            let err = format!("{err:#}");
+            assert!(err.contains(version), "{err}");
+            assert!(err.contains("upgrade Himalaya"), "{err}");
+            assert!(err.contains("neverest's MIGRATION.md"), "{err}");
+            assert!(!err.contains("delete"), "{err}");
+        }
     }
 
     #[test]
     fn a_database_another_program_wrote_is_refused_as_foreign() {
         let dir = tempfile::tempdir().unwrap();
-        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        let path = dir.path().join("pimdir.db");
+        let db = rusqlite::Connection::open(&path).unwrap();
         db.execute_batch("CREATE TABLE notes (body TEXT)").unwrap();
         drop(db);
+        // NOTE: a store others can read is refused before it is read, and
+        // neither tempfile nor SQLite restricts what they create.
+        #[cfg(unix)]
+        for (path, mode) in [(dir.path(), 0o700), (path.as_path(), 0o600)] {
+            std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(mode))
+                .unwrap();
+        }
 
         let err = PimdirClient::new(PimdirConfig {
             root: dir.path().to_path_buf(),
@@ -2272,10 +2333,10 @@ mod tests {
         );
     }
 
-    /// A store an earlier draft left without a canonical table is refused
-    /// saying to run its sync engine, never to delete it.
+    /// A store of this draft whose schema lacks a canonical table is
+    /// refused as corrupt, never reshaped nor deleted.
     #[test]
-    fn a_stale_store_is_refused_saying_to_run_the_sync_engine() {
+    fn a_damaged_store_is_refused_as_corrupt() {
         let (dir, _client) = sent_store();
         let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
         db.execute_batch("DROP TABLE item_address").unwrap();
@@ -2290,12 +2351,35 @@ mod tests {
 
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
-            Some(ErrorCode::StoreStale),
+            Some(ErrorCode::StoreCorrupt),
             "{err:#}"
         );
-        let err = format!("{err:#}");
-        assert!(err.contains("sync engine"), "{err}");
-        assert!(!err.contains("delete"), "{err}");
+        assert!(!format!("{err:#}").contains("delete"), "{err:#}");
+    }
+
+    /// A store another user can read is refused before anything in it is
+    /// read, saying to restrict it.
+    #[cfg(unix)]
+    #[test]
+    fn a_store_others_can_read_is_refused_as_exposed() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, _client) = sent_store();
+        std::fs::set_permissions(dir.path(), PermissionsExt::from_mode(0o755)).unwrap();
+
+        let err = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .err()
+        .unwrap();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreExposed),
+            "{err:#}"
+        );
+        assert!(format!("{err:#}").contains("chmod 700"), "{err:#}");
     }
 
     /// A store two accounts share, `work` and `home`, each holding one
@@ -2353,6 +2437,7 @@ mod tests {
     #[test]
     fn a_sent_message_reads_applied_once_its_sender_acknowledges_it() {
         let (dir, mut client) = sent_store();
+        syncs(dir.path());
         let sent = client
             .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)
             .unwrap();
@@ -2402,17 +2487,25 @@ mod tests {
         assert_eq!(item.seq, seq);
     }
 
-    /// Declares `names` for the `imap` source syncing `imap/Sent`.
-    fn declare(dir: &std::path::Path, names: &[&str]) {
-        let mut store = io_pimdir::client::PimdirStore::open(dir)
+    /// Makes the source `imap` sync `imap/Sent`, declaring nothing, as an
+    /// owner predating capabilities leaves it.
+    fn syncs(dir: &std::path::Path) {
+        io_pimdir::client::PimdirStore::open(dir)
             .unwrap()
-            .for_source("imap");
-        store
+            .for_source("imap")
             .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
                 collection: io_pimdir::collection::PimdirCollectionId("imap/Sent".into()),
                 checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
             }])
             .unwrap();
+    }
+
+    /// Declares `names` for the `imap` source syncing `imap/Sent`.
+    fn declare(dir: &std::path::Path, names: &[&str]) {
+        syncs(dir);
+        let mut store = io_pimdir::client::PimdirStore::open(dir)
+            .unwrap()
+            .for_source("imap");
         let declaration: Vec<_> = names
             .iter()
             .map(|name| io_pimdir::capability::PimdirCapability {
@@ -3181,6 +3274,34 @@ mod tests {
         );
     }
 
+    /// A flag the store cannot hold, reaching the backend past the flag
+    /// commands' own check, is refused by the enqueue as `flag-invalid`,
+    /// and nothing is queued.
+    #[test]
+    fn a_flag_the_store_cannot_hold_is_refused_and_stages_nothing() {
+        let (_dir, mut client) = flag_store(None);
+        let id = id_of(&mut client, 0);
+
+        for raw in ["to do", "été"] {
+            let err = client
+                .stage_flags("imap/INBOX", &[id.as_str()], &[keyword(raw)], FlagOp::Add)
+                .unwrap_err();
+
+            assert_eq!(
+                pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                Some(ErrorCode::FlagInvalid),
+                "{err:#}"
+            );
+        }
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
     #[test]
     fn a_keyword_is_removed_alone_and_dropped_by_a_set() {
         let (_dir, mut client) = flag_store(None);
@@ -3465,7 +3586,7 @@ mod tests {
             .id
             .clone();
         let item = client.get("imap/Sent", &id).unwrap().unwrap();
-        std::fs::remove_file(client.blobs.path(item.object.as_ref().unwrap())).unwrap();
+        std::fs::remove_file(client.blobs.path(item.object.as_ref().unwrap()).unwrap()).unwrap();
 
         let err = client.get_message("imap/Sent", &id, false).unwrap_err();
 

@@ -19,7 +19,7 @@ use io_pimdir::{
     change::PimdirWriteOp,
     client::PimdirStore,
     collection::PimdirCollectionId,
-    hash::PimdirHashAlgo,
+    hash,
     object::{PimdirHash, PimdirObject},
     placement::{
         PimdirBase, PimdirFlags, PimdirHandle, PimdirLevel, PimdirPlacement, PimdirStatus,
@@ -123,7 +123,7 @@ fn store(dir: &Path) {
     ];
 
     for (collection, handle, body) in &bodies {
-        let hash = PimdirHashAlgo::default().hash(body);
+        let hash = hash::hash(body);
         let derived = mail::derive(body);
         store
             .write(vec![

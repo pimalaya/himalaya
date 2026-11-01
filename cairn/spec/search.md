@@ -25,7 +25,7 @@ Each backend SHALL translate the shared query into its native surface. IMAP tran
 Graph SHALL refuse a filter holding a flag clause, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
 
 ### Requirement: pimdir searches through the store's index
-`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-05 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
+`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-08 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
 
 Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page carries `more`, whether hits or threads follow it.
 
@@ -56,17 +56,27 @@ The output of `pimdir search`, `count` and `tag` SHALL carry the coverage of the
 - THEN the coverage says mail before 2026-03-01 is not synced, and `complete` is false
 
 ### Requirement: A missing or outdated pimdir index is a coded error
-A store with no search index SHALL fail every index command with the code `index-missing`, and an index another version built with `index-outdated`, each saying the store's sync engine builds or rebuilds it. Neither SHALL advise deleting anything.
+A store with no search index SHALL fail every index command with the code `index-missing`, an index of this draft another build, tokenizer or store built with `index-outdated`, and an index of another draft or shape (pimdir SEARCH §2) with `index-version`, each saying the store's sync engine builds or rebuilds it; one of another shape or a later draft is left as it is. None SHALL advise deleting anything, and Himalaya SHALL NOT rebuild any of them.
 
 #### Scenario: No index yet
 - GIVEN a pimdir store whose sync engine never built its index
 - WHEN `himalaya --json pimdir search hello` runs
 - THEN the command exits 1 with the code `index-missing`
 
+#### Scenario: An index of an earlier draft
+- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-07`
+- WHEN `himalaya --json pimdir search lunch` runs
+- THEN the command exits 1 with the code `index-version`, and the index is left as it is
+
 ### Requirement: A refused pimdir query names its fault
-A query the SEARCH §8.4 rules refuse SHALL be refused whole with the code `query-refused`, nothing searched. The plain output SHALL render the fault's span over the query with Himalaya's ariadne setup; the JSON error's message SHALL name the §8.4 code, the span as Unicode scalar offsets and what was expected there.
+A query the SEARCH §8.4 rules refuse SHALL be refused whole with the code `query-refused`, nothing searched. A query past the bounds of SEARCH §8.3, more than 1,024 Unicode scalar values, more than 32 groups open at once or more than 128 terms, SHALL be refused so, its §8.4 code `limit-exceeded`. The plain output SHALL render the fault's span over the query with Himalaya's ariadne setup; the JSON error's message SHALL name the §8.4 code, the span as Unicode scalar offsets and what was expected there.
 
 #### Scenario: An unknown field
 - GIVEN any pimdir account with an index
 - WHEN `himalaya --json pimdir search frm:alice` runs
 - THEN the command exits 1 with the code `query-refused` and a message naming `unknown-field` at `0..4`
+
+#### Scenario: A query past its bounds
+- GIVEN any pimdir account with an index
+- WHEN `himalaya --json pimdir search` runs a query of 129 terms
+- THEN the command exits 1 with the code `query-refused` and a message naming `limit-exceeded` at the 129th term's span

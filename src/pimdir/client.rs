@@ -71,7 +71,7 @@ impl PimdirClient {
             .with_pending();
 
         let account = resolve_account(&store, config.account.clone())?;
-        let blobs = PimdirBlobs::open(&root, store.hash_algo());
+        let blobs = PimdirBlobs::open(&root);
 
         Ok(Self {
             store,
@@ -125,9 +125,8 @@ impl PimdirClient {
     /// account's collection is refused before the role is taken.
     ///
     /// The store is opened as it stands, never created, migrated nor
-    /// reconciled: another owner of another io-pimdir revision keeps its
-    /// schema, and reshaping it to this one drops what that revision
-    /// stores. Such a store is refused.
+    /// reconciled: a store of another draft is refused, as is a damaged
+    /// one, both left as they are.
     ///
     /// A sync in flight owns the store, and that is refused at once rather
     /// than waited out: the action is still queued, and may have been applied
@@ -144,9 +143,8 @@ impl PimdirClient {
             ),
         };
 
-        // NOTE: a store of another schema is refused with io-pimdir's
-        // advice, which tells a newer store (upgrade Himalaya) from an older
-        // or reshaped one (run the sync engine).
+        // NOTE: a store of another draft is refused saying how to reinstall
+        // it (`pimdir_error`).
         let mut owner = PimdirStore::open_current(&self.root).map_err(|err| match err {
             PimdirError::Owned(_) => CodedError::new(
                 ErrorCode::StoreOwned,
@@ -173,8 +171,9 @@ impl PimdirClient {
 
 impl PimdirClient {
     /// The source performing an intent `capability` for this account
-    /// (pimdir STORAGE §15.6), `None` in a store whose sources declare
-    /// nothing, where the owner picks as it always did.
+    /// (pimdir STORAGE §15.6), `None` when the sources syncing `collection`
+    /// declare nothing, the case
+    /// [`undeclared_performer`](Self::undeclared_performer) names.
     ///
     /// Several candidates and no recorded choice is the user's to settle:
     /// Himalaya never picks one.
@@ -210,6 +209,50 @@ impl PimdirClient {
             )
             .into()),
             Err(err) => Err(pimdir_error(err)),
+        }
+    }
+
+    /// The source performing an intent anchored on `collection` when the
+    /// sources syncing it declare nothing (pimdir STORAGE §15.6, Annex
+    /// B.2): an undeclared source is gated by nothing, and the payload
+    /// still names it.
+    ///
+    /// The one source syncing `collection` is it. None, the collection
+    /// being only declared, and several, none of which says what it
+    /// performs, are refused rather than guessed.
+    pub(crate) fn undeclared_performer(
+        &self,
+        producer: &PimdirProducer,
+        collection: &str,
+        capability: &str,
+    ) -> Result<String> {
+        let sources: Vec<String> = producer
+            .capabilities(collection)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read the sources of `{collection}`"))?
+            .into_iter()
+            .map(|source| source.source)
+            .collect();
+
+        match sources.as_slice() {
+            [source] => Ok(source.clone()),
+            [] => Err(CodedError::new(
+                ErrorCode::NoPerformer,
+                format!(
+                    "No source syncs `{collection}` yet, so none performs {capability} \
+                     there: run a sync first"
+                ),
+            )
+            .into()),
+            _ => Err(CodedError::new(
+                ErrorCode::AmbiguousPerformer,
+                format!(
+                    "Several sources sync `{collection}` ({}) and none declares \
+                     {capability}: their sync engine has to declare who performs it",
+                    sources.join(", "),
+                ),
+            )
+            .into()),
         }
     }
 

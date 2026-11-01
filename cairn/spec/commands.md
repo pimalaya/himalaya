@@ -42,23 +42,29 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 |---|---|
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
 | `message-too-complex` | a message is nested deeper than 8 levels, or holds more than 200 parts or 500 header lines; it is refused whole |
-| `store-newer` | a pimdir store's schema is newer than Himalaya's; upgrade Himalaya |
+| `store-version` | a pimdir store is of another draft of the format; upgrade Himalaya, or reinstall the store as neverest's MIGRATION.md says |
 | `store-uncreated` | a pimdir store has no schema yet; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |
-| `store-corrupt` | a pimdir store's version records disagree |
-| `store-not-current` | a pimdir store is not at Himalaya's schema; run or upgrade its sync engine |
-| `store-stale` | a pimdir store was written by an earlier draft; run or upgrade its sync engine |
+| `store-corrupt` | a pimdir store's version records disagree, or its schema is not its draft's |
+| `store-not-current` | a pimdir store holds no schema yet and the verb creates none; its sync engine creates it |
 | `store-hash-algo` | a pimdir store names its bodies with a hash Himalaya does not compute |
+| `sync-version` | a pimdir store's sync state was written by another version of its sync engine |
 | `store-busy` | another writer holds a pimdir store's write lock; retry |
 | `store-owned` | a sync owns a pimdir store; retry once it ends |
 | `store-staging` | a producer is staging a body in a pimdir store; retry |
 | `store-in-flight` | a pimdir store verb is between two of its chunks; retry |
+| `store-exposed` | a pimdir store is a link or another user can read or write it; restrict it |
 | `item-duplicate` | a pimdir mailbox holds the message already, or has its creation queued; nothing is staged |
+| `flag-invalid` | a flag a pimdir store cannot hold: empty, or holding whitespace, a control or a non-ASCII character; nothing is staged |
+| `action-malformed` | a pimdir action's payload breaks its schema; nothing is staged |
+| `conflict-unread` | a pimdir conflict holds a body nobody has read; fetch it first |
 | `unsupported` | a source of the pimdir store does not support the write; nothing is staged |
 | `no-performer` | no source of the pimdir store can perform the intent |
 | `ambiguous-performer` | several sources of the pimdir store can perform the intent and none is chosen |
 | `index-missing` | a pimdir store has no search index yet; its sync engine builds it |
 | `index-outdated` | a pimdir search index was built by another version; its sync engine rebuilds it |
+| `index-version` | a pimdir search index is of another draft or shape; its sync engine rebuilds one of an earlier draft |
+| `index-zone-unknown` | the zone a pimdir search index reads floating times in is no IANA zone |
 | `index-fts5-missing` | the SQLite Himalaya links lacks what a pimdir search index needs (FTS5, 3.43 or later) |
 | `query-refused` | a pimdir search query breaks a SEARCH §8.4 rule; nothing is searched |
 | `query-unanswerable` | a pimdir search index could not answer an accepted query, an implementation fault |

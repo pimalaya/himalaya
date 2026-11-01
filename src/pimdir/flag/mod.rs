@@ -14,12 +14,13 @@ use std::fmt;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use pimalaya_cli::table::sanitize;
+use pimalaya_cli::{error::CodedError, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     email::flag::{Flag, IanaFlag, classify_iana},
+    error::ErrorCode,
     pimdir::backend::PimdirFlagged,
     shared::flag::arg::MessageIdsArg,
 };
@@ -69,22 +70,26 @@ const SPECIALS: &[char] = &['(', ')', '{', '%', '*', '"', ']', '\\'];
 /// `\Deleted` is a deletion and `\Recent` belongs to the server, so
 /// neither can be staged as a flag. A backslash names a system flag, so
 /// one in front of any other word is refused, as are a character outside
-/// ASCII and one IMAP forbids in a flag.
+/// ASCII and one IMAP forbids in a flag. What the store cannot hold at all
+/// (empty, whitespace, a control or a non-ASCII character) is refused as
+/// `flag-invalid`, the code io-pimdir's enqueue gives it.
 pub fn parse_flag(raw: &str) -> Result<Flag> {
     if raw.is_empty() {
-        bail!("A flag cannot be empty");
+        return Err(invalid(String::from("A flag cannot be empty")));
     }
     if raw.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        bail!(
+        return Err(invalid(format!(
             "Flag `{}` holds whitespace or a control character",
             raw.escape_debug()
-        );
+        )));
     }
     if raw.eq_ignore_ascii_case("\\Recent") {
         bail!("`\\Recent` is set by the server and cannot be stored");
     }
     if let Some(c) = raw.chars().find(|c| !c.is_ascii()) {
-        bail!("Flag `{raw}` holds `{c}`: IMAP and JMAP flags are ASCII only");
+        return Err(invalid(format!(
+            "Flag `{raw}` holds `{c}`: IMAP and JMAP flags are ASCII only"
+        )));
     }
     let word = raw.strip_prefix('\\').unwrap_or(raw);
     if let Some(c) = word.chars().find(|c| SPECIALS.contains(c)) {
@@ -109,6 +114,12 @@ pub fn parse_flag(raw: &str) -> Result<Flag> {
         );
     }
     Ok(canonical)
+}
+
+/// A refusal of a flag the store cannot hold (pimdir STORAGE §13), coded
+/// `flag-invalid` as io-pimdir codes its own.
+fn invalid(message: String) -> anyhow::Error {
+    CodedError::new(ErrorCode::FlagInvalid, message).into()
 }
 
 /// The output of `pimdir flag add`, `set` and `remove`: the row each
@@ -213,6 +224,20 @@ mod tests {
         assert!(parse_flag("two words").is_err());
         assert!(parse_flag("tab\there").is_err());
         assert!(parse_flag("bell\u{7}").is_err());
+    }
+
+    /// A flag the store cannot hold (pimdir STORAGE §13) is refused with
+    /// io-pimdir's code, the one its enqueue would answer.
+    #[test]
+    fn a_flag_the_store_cannot_hold_is_coded_flag_invalid() {
+        for raw in ["", "two words", "tab\there", "bell\u{7}", "über"] {
+            let err = parse_flag(raw).unwrap_err();
+            assert_eq!(
+                pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                Some(ErrorCode::FlagInvalid),
+                "{raw:?}: {err}"
+            );
+        }
     }
 
     #[test]

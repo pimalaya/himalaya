@@ -25,7 +25,6 @@ use io_pimdir::{
     client::search::{
         PimdirIndex, PimdirSearchClock, PimdirSearchHit, PimdirSearchMatched, PimdirSearchOptions,
         PimdirSearchThread,
-        tag::{PimdirSearchTagPlacement, PimdirSearchTagSource},
     },
     search::{
         coverage::{PimdirSearchCoverage, PimdirSearchTemporal},
@@ -33,6 +32,7 @@ use io_pimdir::{
             PimdirQuery, PimdirQueryError, PimdirQueryErrorCode, PimdirQueryKind,
             PimdirQueryPredicate, PimdirQueryTerm,
         },
+        tag::{PimdirSearchTagPlacement, PimdirSearchTagSource},
     },
 };
 use pimalaya_cli::{
@@ -1042,6 +1042,34 @@ mod tests {
         );
     }
 
+    /// A query past the bounds of SEARCH §8.3 (1,024 characters, 32 groups
+    /// open at once, 128 terms) is refused whole as `limit-exceeded`, in
+    /// the ariadne drawing as in the JSON line.
+    #[test]
+    fn a_query_past_its_bounds_is_refused_as_limit_exceeded() {
+        let long = "a".repeat(1025);
+        let deep = format!("{}a{}", "(".repeat(33), ")".repeat(33));
+        let wide = vec!["a"; 129].join(" ");
+
+        for (text, span) in [(long, "1024..1025"), (deep, "32..33"), (wide, "256..257")] {
+            for json in [true, false] {
+                let err = parse_query(std::slice::from_ref(&text), json)
+                    .err()
+                    .unwrap();
+                assert_eq!(
+                    pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                    Some(ErrorCode::QueryRefused),
+                    "{err}"
+                );
+                let err = err.to_string();
+                assert!(err.contains("limit-exceeded"), "{err}");
+                if json {
+                    assert!(err.contains(&format!("limit-exceeded at {span}")), "{err}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn a_refused_query_names_its_code_and_span() {
         let cases = [
@@ -1106,6 +1134,41 @@ mod tests {
         }
         assert_coded(ErrorCode::IndexMissing);
         assert!(!dir.path().join("index.db").exists(), "the index was built");
+    }
+
+    /// An index another draft of SEARCH built is refused as
+    /// `index-version`, saying its sync engine rebuilds an earlier one,
+    /// and left as it is.
+    #[test]
+    fn an_index_of_another_draft_is_refused_as_index_version() {
+        let (dir, client) = indexed_store();
+        let conn = rusqlite::Connection::open(dir.path().join("index.db")).unwrap();
+        conn.execute(
+            "UPDATE index_meta SET format_version = 'search-draft-07'",
+            [],
+        )
+        .unwrap();
+
+        let err = client
+            .search_mail(query("lunch"), &PimdirSearchOptions::default())
+            .err()
+            .unwrap();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::IndexVersion),
+            "{err:#}"
+        );
+        let err = format!("{err:#}");
+        assert!(err.contains("search-draft-07"), "{err}");
+        assert!(err.contains("sync engine"), "{err}");
+        assert!(!err.contains("delete"), "{err}");
+        let version: String = conn
+            .query_row("SELECT format_version FROM index_meta", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(version, "search-draft-07", "the index was rebuilt");
     }
 
     #[test]

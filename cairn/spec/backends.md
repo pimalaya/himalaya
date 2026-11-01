@@ -150,12 +150,19 @@ A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the bo
 - THEN the add fails with `item-duplicate` and its body is not in the blob tree
 
 ### Requirement: A pimdir store failure carries its code
-A failure io-pimdir reports SHALL keep io-pimdir's message as a cause and carry, under `--json`, the code `PimdirError::code()` gives it, spelled the same, when it is one a caller acts on: `store-newer`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-stale`, `store-hash-algo`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `item-duplicate`, `unsupported`, `no-performer` and `ambiguous-performer`. An SQL, I/O or JSON failure and a malformed action carry none. Himalaya SHALL NOT derive a code from a message, and SHALL NOT advise deleting the store: a store newer than Himalaya's schema says to upgrade Himalaya, an older, stale or reshaped one to run or upgrade the store's sync engine.
+A failure io-pimdir reports SHALL keep io-pimdir's message as a cause and carry, under `--json`, the code `PimdirError::code()` gives it, spelled the same, when it is one a caller acts on: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `sync-version`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer` and `ambiguous-performer`. An SQL, I/O or JSON failure carries none. Himalaya SHALL NOT derive a code from a message, and SHALL NOT advise deleting the store.
 
-#### Scenario: A store a newer sync engine wrote
-- GIVEN a pimdir store stamped with a schema version above Himalaya's
+A store of another draft of the format (pimdir STORAGE §4.2), earlier or later, or one naming no format version, is `store-version`: drafts are exact, so it opens under no other draft and nothing reconciles or migrates it. Its message SHALL say to upgrade Himalaya when the store's sync engine is newer, else to reinstall the store as neverest's MIGRATION.md says, which syncs out the writes still queued in it before moving it aside. A store whose directory or pimdir.db another user can read or write, or a link where a lock file belongs, is `store-exposed`, refused before anything in it is read, its message saying to restrict it.
+
+#### Scenario: A store another draft wrote
+- GIVEN a pimdir store whose `store_meta.format_version` names another draft than Himalaya's io-pimdir follows
 - WHEN any pimdir command opens it
-- THEN the command fails with the code `store-newer`, saying to upgrade this program
+- THEN the command fails with the code `store-version`, naming the draft, saying to upgrade Himalaya or reinstall the store as neverest's MIGRATION.md says, and never to delete it
+
+#### Scenario: A store others can read
+- GIVEN a pimdir store whose directory is mode `0755`
+- WHEN any pimdir command opens it
+- THEN the command fails with the code `store-exposed`, saying to restrict it
 
 #### Scenario: A draft the mailbox holds already
 - GIVEN a pimdir mailbox holding a message whose `Message-ID` is `d1@x.org`
@@ -172,17 +179,17 @@ Under `--json` the message SHALL be printed as an `envelope` with the shared env
 
 `queue cancel` SHALL retract one pending or parked row of the account's queue, confirming first unless `--yes`, and SHALL name the row's action kind in its prompt and output. A row anchored on a collection of another account, or one neither pending nor parked, SHALL be refused before anything is opened, and stays as it was.
 
-Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); the backend read and write paths SHALL NOT reach it. The cancel SHALL open the store only as it stands (io-pimdir `open_current`): it SHALL NOT create, migrate nor reconcile the schema, which another owner of another revision keeps. A store that is not exactly this io-pimdir's schema SHALL be refused, saying the sync engine has to open it first. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
+Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); the backend read and write paths SHALL NOT reach it. The cancel SHALL open the store only as it stands (io-pimdir `open_current`): it SHALL NOT create, migrate nor reconcile the schema. A store of another draft SHALL be refused as `store-version` and a damaged one as `store-corrupt`, each left as it is. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
 
 #### Scenario: A queued creation is rendered from its body
 - GIVEN a queued `add` pinning a body whose headers carry a subject and a recipient
 - WHEN the queue is listed
 - THEN the row shows that subject and recipient, and its envelope's `id` is `null` under `--json`
 
-#### Scenario: A cancel on a store of another revision
-- GIVEN a store whose schema another io-pimdir revision wrote
+#### Scenario: A cancel on a store of another draft
+- GIVEN a store whose `store_meta.format_version` names another draft
 - WHEN `himalaya pimdir queue cancel` runs on one of its rows
-- THEN the command fails saying the sync engine has to open the store first, and neither the schema nor the row changes
+- THEN the command fails with the code `store-version`, pointing at neverest's MIGRATION.md, and neither the store's stamp nor the row changes
 
 #### Scenario: Another account's row
 - GIVEN a store shared by two accounts and a row queued on the other account's collection
@@ -190,7 +197,7 @@ Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); 
 - THEN the command fails saying the row is not in the account's queue, and the row stays queued
 
 ### Requirement: pimdir writes name their queue row
-`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, for an owner declaring no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"queued": [{"id": string, "queueId": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The shared commands SHALL keep printing no queue detail.
+`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, when its performer declares no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"queued": [{"id": string, "queueId": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The shared commands SHALL keep printing no queue detail.
 
 `pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"queueId", "state": "pending" | "parked" | "applied" | "unknown", "collection"?, "kind"?, "attempts"?, "error"?, "appliedAt"?, "seq"?}`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5).
 
@@ -228,7 +235,7 @@ The row SHALL be anchored on `parent`, which must be a mailbox of the account, e
 - THEN one `collection-create` row is queued with `{"v":1,"source":"imap","name":"Projets"}`, and the command prints its `queueId` and `"source":"imap"`
 
 ### Requirement: pimdir stages flags by their raw spelling
-`himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, compared without case and staged in the canonical case, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused. A backslash names a system flag, so one in front of any other word SHALL be refused, as SHALL a value that is empty or holds whitespace, a control character, a character outside ASCII or one IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`). Any other value is a keyword.
+`himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, compared without case and staged in the canonical case, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused. A backslash names a system flag, so one in front of any other word SHALL be refused, as SHALL a character IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`). A value the store cannot hold (pimdir STORAGE §13), empty or holding whitespace, a control character or a character outside ASCII, SHALL be refused with the code `flag-invalid`, the code io-pimdir's enqueue gives a flag set holding one, and nothing staged. Any other value is a keyword.
 
 `add`, `set` and `remove` SHALL fail when no message is named or none of the named ones exists, and SHALL stage one `SetFlags` per message through the backend's `stage_flags`, checked against the sources' declarations (pimdir STORAGE §15.6): a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the declaration's warning as it is. `list` SHALL print the flags a message carries as the overlaying reader shows them, and `null` under `--json` for a message whose flags the sync engine never read.
 
@@ -252,6 +259,11 @@ An add or a remove SHALL match the flags a message carries as flags, not as spel
 #### Scenario: A bare IANA name is refused
 - WHEN `himalaya pimdir flag add -m imap/INBOX -f seen 42` runs
 - THEN the command fails naming `\Seen`, and nothing is queued
+
+#### Scenario: A flag the store cannot hold
+- GIVEN any pimdir account
+- WHEN `himalaya --json pimdir flag add -m imap/INBOX -f 'to do' 42` runs
+- THEN the command exits 1 with the code `flag-invalid`, and nothing is queued
 
 ### Requirement: pimdir stages a flag change on every message or none
 `stage_flags`, which the shared `store_flags` goes through, SHALL check every message of a call the mailbox holds against the sources' declarations before it queues the first row, so a call the check refuses on any message queues nothing. An id the mailbox does not hold SHALL be skipped, the call staging the others and reporting how many it found (commands, "A command given message ids says how many it found"); a malformed id SHALL fail the call, as it does on IMAP. Each row is still its own transaction: an enqueue failing after the check leaves the rows queued before it. This holds for the shared `flag add|set|remove` on a pimdir account as for `pimdir flag`.
@@ -299,7 +311,7 @@ A page SHALL hold `--page-size` files (else `envelope.list.page-size`, else 25).
 ### Requirement: pimdir sends by queueing a submit intent
 The pimdir backend SHALL send a message by staging its raw bytes and enqueueing one `submit` action, which whatever owns the store performs through its own channel. It SHALL NOT open a network connection to send, and SHALL NOT use the account's `smtp` section.
 
-The payload SHALL be built by io-pimdir's `PimdirSubmit` (STORAGE Annex B.2), `v: 1` JSON carrying `source` when a performer is named, `object` (the body hash), `from`, `rcpts`, `subject`, and `copy` when the intent carries the copy, the keys and values a performer reads back with `PimdirSubmit::from_payload`. The envelope is derived from the headers by the same function the SMTP adapter uses: the first `From:` address, every `To:`, `Cc:` and `Bcc:` address, and the decoded subject. A message with no `From:` or no recipient SHALL be refused before anything is staged. The body SHALL be stored as given, `Bcc:` included; removing it is the sending channel's job.
+The payload SHALL be built by io-pimdir's `PimdirSubmit` (STORAGE Annex B.2), `v: 1` JSON carrying `source`, `from`, `rcpts`, `subject`, and `copy` when the intent carries the copy, the keys and values a performer reads back with `PimdirSubmit::from_payload`. The message is the row's body (`queue.object_hash`), never a member of the payload. `source` SHALL name the performer: the declared one, resolved as `pimdir performer` shows it, else, when the sources syncing the anchor declare nothing, the one source syncing it. An anchor no source syncs yet SHALL be refused with `no-performer`, and one several undeclared sources sync with `ambiguous-performer`, nothing staged. The envelope is derived from the headers by the same function the SMTP adapter uses: the first `From:` address, every `To:`, `Cc:` and `Bcc:` address, and the decoded subject. A message with no `From:` or no recipient SHALL be refused before anything is staged. The body SHALL be stored as given, `Bcc:` included; removing it is the sending channel's job.
 
 The row SHALL anchor on the `--save` mailbox when one is given, else on the mailbox `mailbox.alias.sent` names; with neither, the send SHALL be refused, naming the alias to set, rather than create a collection.
 
@@ -319,6 +331,11 @@ The command SHALL NOT report the queue row id in its output; the pimdir backend 
 - GIVEN a pimdir account with no `mailbox.alias.sent`
 - WHEN a message is sent without `--save`
 - THEN nothing is staged and the error names `mailbox.alias.sent`
+
+#### Scenario: A mailbox no source syncs yet
+- GIVEN a pimdir mailbox the sync engine declared and no source syncs yet
+- WHEN a message is sent anchored on it
+- THEN the command fails with the code `no-performer`, and nothing is queued
 
 ### Requirement: The queue view shows queued sends
 `himalaya pimdir queue list` SHALL render a queued `submit` as a message, derived from the body it pins as a create is, marked as a send, beside the queued creates of the same mailbox.
