@@ -8,25 +8,76 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Error, Result, anyhow, bail};
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve",
+    feature = "wizard"
+))]
+use anyhow::Result;
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
+use anyhow::bail;
+use anyhow::{Error, anyhow};
 use clap::ValueEnum;
 use crossterm::style::Color;
+#[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 use io_sasl::{
     login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
     rfc4616::plain::SaslPlainCreds, rfc5801::SaslGs2ChannelBinding, rfc5802::SaslScramCreds,
     rfc7628::oauthbearer::SaslOauthbearerCreds, xoauth2::SaslXoauth2Creds,
 };
 use pimalaya_cli::table::ContentArrangement;
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
+use pimalaya_config::secret::SecretResolver;
 use pimalaya_config::{
-    secret::{Secret, SecretResolver},
+    secret::Secret,
     toml::{TomlConfig, opt_shell_expanded_path, shell_expanded_path, shell_expanded_string},
 };
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
 use pimalaya_stream::{
     proxy::{Proxy, ProxyAuth},
     tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize, de::IgnoredAny};
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "sieve"
+))]
 use url::Url;
 
 use crate::backend::Backend;
@@ -678,6 +729,12 @@ impl From<TableArrangementConfig> for ContentArrangement {
 /// A full URL, a bare authority or a bare host, the two bare forms taking
 /// the default scheme. Absence of `://` is what detects them, the parser
 /// otherwise reading `mail.example.com:993` as a scheme.
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "sieve"
+))]
 pub fn parse_server(server: &str, default_scheme: &str, allowed: &[&str]) -> Result<Url> {
     let url = if server.contains("://") {
         Url::parse(server)?
@@ -921,7 +978,7 @@ pub struct PimdirConfig {
     #[serde(deserialize_with = "shell_expanded_path")]
     pub root: PathBuf,
     /// The sync engine account whose collections this client reads,
-    /// per pimdir SPEC section 9.2.
+    /// per pimdir STORAGE §9.2.
     ///
     /// Usually left unset, a store synced by one account being read as
     /// that one. Set it for a store several accounts share, where guessing
@@ -1031,6 +1088,14 @@ pub struct ProxyConfig {
 impl ProxyConfig {
     /// Resolves an optional configuration, an absent one reading the
     /// environment at connect time.
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    ))]
     pub fn resolve(config: Option<Self>, resolver: &mut SecretResolver) -> Result<Proxy> {
         match config {
             Some(config) => config.try_into_proxy(resolver),
@@ -1040,6 +1105,14 @@ impl ProxyConfig {
 
     /// Resolves the configuration into a runtime [`Proxy`], the password
     /// going through `resolver`.
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    ))]
     pub fn try_into_proxy(self, resolver: &mut SecretResolver) -> Result<Proxy> {
         let mut proxy = Proxy::from_url(&self.url)?;
 
@@ -1115,6 +1188,14 @@ impl TlsConfig {
     /// The TOML schema never exposes `tls.rustls.alpn` directly, the
     /// per-protocol `*.alpn` field standing for it. An empty list skips
     /// ALPN.
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    ))]
     pub fn into_tls(self, alpn: Vec<String>) -> Tls {
         Tls {
             provider: self.provider.map(|p| match p {
@@ -1245,6 +1326,7 @@ impl SaslConfig {
     ///
     /// The credential goes through `resolver`, so an account whose IMAP,
     /// SMTP and ManageSieve blocks name one command spawns it once.
+    #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
     pub fn try_into_sasl(
         self,
         host: impl ToString,
@@ -1461,6 +1543,12 @@ mod tests {
 
     use super::*;
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     const IMAP: &[&str] = &["imap", "imaps"];
 
     #[test]
@@ -1536,6 +1624,12 @@ mod tests {
         assert!(config.sasl.is_none());
     }
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     #[test]
     fn bare_host_defaults_to_secure_scheme() {
         let url = parse_server("mail.example.com", "imaps", IMAP).unwrap();
@@ -1546,6 +1640,12 @@ mod tests {
         assert_eq!(url.port(), None);
     }
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     #[test]
     fn bare_host_port_keeps_port_and_secure_scheme() {
         let url = parse_server("mail.example.com:1993", "imaps", IMAP).unwrap();
@@ -1554,6 +1654,12 @@ mod tests {
         assert_eq!(url.port(), Some(1993));
     }
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     #[test]
     fn full_url_scheme_host_port_is_kept_verbatim() {
         let url = parse_server("imap://mail.example.com:143", "imaps", IMAP).unwrap();
@@ -1562,6 +1668,12 @@ mod tests {
         assert_eq!(url.port(), Some(143));
     }
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     #[test]
     fn unknown_scheme_is_rejected() {
         let err = parse_server("ftp://mail.example.com", "imaps", IMAP).unwrap_err();
@@ -1652,6 +1764,12 @@ inbox = "~/spool""#,
         assert_eq!(tls.cert, None);
     }
 
+    #[cfg(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "sieve"
+    ))]
     #[test]
     fn path_is_preserved_for_full_url() {
         let url = parse_server("https://example.com/jmap/session", "https", &["https"]).unwrap();

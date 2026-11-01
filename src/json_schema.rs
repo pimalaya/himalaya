@@ -445,6 +445,23 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-pimdir-attachment-search",
             crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
+        insert!(
+            "himalaya-pimdir-search",
+            crate::pimdir::search::PimdirSearchOutput
+        );
+        insert!(
+            "himalaya-pimdir-search-threads",
+            crate::pimdir::search::PimdirSearchThreadsOutput
+        );
+        insert!(
+            "himalaya-pimdir-count",
+            crate::pimdir::count::PimdirCountOutput
+        );
+        insert!(
+            "himalaya-pimdir-thread",
+            crate::pimdir::thread::PimdirThreadOutput
+        );
+        insert!("himalaya-pimdir-tag", crate::pimdir::tag::PimdirTagOutput);
     }
 
     insert!("himalaya-error", ErrorReport<ErrorCode>);

@@ -67,7 +67,7 @@ pub struct PimdirMessageAddOutput {
 
 impl fmt::Display for PimdirMessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
             "Message {} queued as row {}",
             sanitize(&self.message_id),

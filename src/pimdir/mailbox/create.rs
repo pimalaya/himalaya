@@ -69,7 +69,7 @@ pub struct PimdirMailboxCreateOutput {
 
 impl fmt::Display for PimdirMailboxCreateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
             "Mailbox {} queued for creation by {} as row {}",
             sanitize(&self.name),

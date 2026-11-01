@@ -63,6 +63,13 @@ pub struct Envelope {
 /// A backend hands the whole `1*msg-id` value over as one string, so the
 /// ids are read off the angle brackets. A value carrying none is split on
 /// whitespace, a bare id being commoner than nothing at all.
+#[cfg(any(
+    feature = "imap",
+    feature = "gmail",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox"
+))]
 pub fn parse_message_ids(raw: &str) -> Vec<String> {
     if raw.contains('<') {
         return raw
@@ -82,6 +89,15 @@ pub fn parse_message_ids(raw: &str) -> Vec<String> {
 ///
 /// This is what makes [`Envelope::message_id`] comparable byte for byte
 /// whichever backend surfaced it.
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox"
+))]
 pub fn normalize_message_id(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     let inner = trimmed
@@ -97,7 +113,16 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    any(
+        feature = "imap",
+        feature = "gmail",
+        feature = "maildir",
+        feature = "m2dir",
+        feature = "mbox"
+    )
+))]
 mod tests {
     use super::*;
 

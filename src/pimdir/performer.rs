@@ -66,13 +66,13 @@ pub struct PimdirPerformers {
 impl fmt::Display for PimdirPerformers {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.candidates.is_empty() {
-            return write!(f, "No source of this account performs {}", self.capability);
+            return writeln!(f, "No source of this account performs {}", self.capability);
         }
         write!(f, "{}: {}", self.capability, self.candidates.join(", "))?;
-        match &self.chosen {
-            Some(chosen) => write!(f, " (chosen: {chosen})"),
-            None => Ok(()),
+        if let Some(chosen) = &self.chosen {
+            write!(f, " (chosen: {chosen})")?;
         }
+        writeln!(f)
     }
 }
 
@@ -89,12 +89,12 @@ pub struct PimdirPerformerChosen {
 impl fmt::Display for PimdirPerformerChosen {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.source {
-            Some(source) => write!(
+            Some(source) => writeln!(
                 f,
                 "{source} now performs {} for this account",
                 self.capability
             ),
-            None => write!(
+            None => writeln!(
                 f,
                 "The choice of performer for {} is withdrawn",
                 self.capability

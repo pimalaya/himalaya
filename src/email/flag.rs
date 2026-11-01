@@ -87,6 +87,15 @@ impl Flag {
     }
 
     /// The IANA classification, `None` for a custom keyword.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "maildir",
+        feature = "mbox",
+        feature = "msgraph",
+        feature = "pimdir"
+    ))]
     pub fn iana(&self) -> Option<IanaFlag> {
         self.iana
     }
@@ -254,11 +263,11 @@ mod tests {
     fn from_raw_populates_iana_when_recognised() {
         let f = Flag::from_raw("\\Seen");
         assert_eq!(f.raw(), "\\Seen");
-        assert_eq!(f.iana(), Some(IanaFlag::Seen));
+        assert_eq!(f.iana, Some(IanaFlag::Seen));
 
         let f = Flag::from_raw("custom-label");
         assert_eq!(f.raw(), "custom-label");
-        assert_eq!(f.iana(), None);
+        assert_eq!(f.iana, None);
     }
 
     #[test]

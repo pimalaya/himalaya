@@ -54,11 +54,12 @@ impl MessageAddCommand {
     ) -> Result<()> {
         let raw = self.message.parse()?;
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
+        let queued = client.queues_writes();
         let outcome = handler::apply(account, client, raw, &flags, Some(&self.mailbox), self.send)?;
         let Outcome::Saved { id, sent } = outcome else {
             unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
         };
-        printer.out(MessageAddOutput { id, sent })
+        printer.out(MessageAddOutput { id, sent, queued })
     }
 }
 
@@ -68,14 +69,53 @@ impl MessageAddCommand {
 pub(crate) struct MessageAddOutput {
     id: Option<String>,
     sent: bool,
+    /// Whether the backend queued the message for its sync engine rather
+    /// than added it, which only the wording says.
+    #[serde(skip)]
+    queued: bool,
 }
 
 impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.queued {
+            let suffix = if self.sent { " and sending" } else { "" };
+            return match &self.id {
+                Some(id) => writeln!(f, "Message {id} queued for adding{suffix}"),
+                None => writeln!(f, "Message queued for adding{suffix}"),
+            };
+        }
+
         let suffix = if self.sent { " and sent" } else { "" };
         match &self.id {
-            Some(id) => write!(f, "Message {id} successfully added{suffix}"),
-            None => write!(f, "Message successfully added{suffix}, id unavailable"),
+            Some(id) => writeln!(f, "Message {id} successfully added{suffix}"),
+            None => writeln!(f, "Message successfully added{suffix}, id unavailable"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::shared::message::add::MessageAddOutput;
+
+    #[test]
+    fn a_queued_add_says_it_is_queued_and_keeps_its_json() {
+        let output = |queued| MessageAddOutput {
+            id: Some("d1@x.org".into()),
+            sent: true,
+            queued,
+        };
+
+        assert_eq!(
+            output(true).to_string(),
+            "Message d1@x.org queued for adding and sending\n"
+        );
+        assert_eq!(
+            output(false).to_string(),
+            "Message d1@x.org successfully added and sent\n"
+        );
+        assert_eq!(
+            serde_json::to_string(&output(true)).unwrap(),
+            r#"{"id":"d1@x.org","sent":true}"#
+        );
     }
 }

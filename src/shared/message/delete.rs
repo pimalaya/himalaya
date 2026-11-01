@@ -58,19 +58,20 @@ impl MessageDeleteCommand {
         let current_id = client.resolve_mailbox_id(&mailbox)?;
         let trash_id = client.resolve_mailbox_id(&trash)?;
 
+        let queued = client.queues_writes();
         let report = if current_id == trash_id {
             let count = ids.len();
             if client.delete_messages(&current_id, &ids)? {
-                MessageDeleteOutput::new(DeleteAction::Deleted, count)
+                MessageDeleteOutput::new(DeleteAction::Deleted, count, queued)
             } else {
-                MessageDeleteOutput::new(DeleteAction::Flagged, count)
+                MessageDeleteOutput::new(DeleteAction::Flagged, count, queued)
             }
         } else {
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
             if moved == 0 {
                 bail!("No message deleted: no id matched in the mailbox");
             }
-            MessageDeleteOutput::new(DeleteAction::MovedToTrash, moved)
+            MessageDeleteOutput::new(DeleteAction::MovedToTrash, moved, queued)
         };
 
         printer.out(report)
@@ -83,12 +84,20 @@ impl MessageDeleteCommand {
 pub(crate) struct MessageDeleteOutput {
     action: DeleteAction,
     count: usize,
+    /// Whether the backend queued the action for its sync engine rather
+    /// than performed it, which only the wording says.
+    #[serde(skip)]
+    queued: bool,
 }
 
 impl MessageDeleteOutput {
-    /// Reports one action over a message count.
-    fn new(action: DeleteAction, count: usize) -> Self {
-        Self { action, count }
+    /// Reports one action over a message count, queued or done.
+    fn new(action: DeleteAction, count: usize, queued: bool) -> Self {
+        Self {
+            action,
+            count,
+            queued,
+        }
     }
 }
 
@@ -108,17 +117,50 @@ pub(crate) enum DeleteAction {
 impl fmt::Display for MessageDeleteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let count = self.count;
-        match self.action {
-            DeleteAction::MovedToTrash => {
+        match (&self.action, self.queued) {
+            (DeleteAction::MovedToTrash, true) => {
+                writeln!(f, "Queued the move of {count} message(s) to the trash")
+            }
+            (DeleteAction::Deleted, true) => {
+                writeln!(
+                    f,
+                    "Queued the deletion of {count} message(s) from the trash"
+                )
+            }
+            (DeleteAction::MovedToTrash, false) => {
                 writeln!(f, "Successfully moved {count} message(s) to the trash")
             }
-            DeleteAction::Deleted => {
+            (DeleteAction::Deleted, false) => {
                 writeln!(f, "Successfully deleted {count} message(s) from the trash")
             }
-            DeleteAction::Flagged => writeln!(
+            (DeleteAction::Flagged, _) => writeln!(
                 f,
                 "Flagged {count} message(s) as deleted; run an expunge on the trash to remove them",
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::shared::message::delete::{DeleteAction, MessageDeleteOutput};
+
+    #[test]
+    fn a_queued_delete_says_it_is_queued_and_keeps_its_json() {
+        let queued = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, true);
+        let done = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, false);
+
+        assert_eq!(
+            queued.to_string(),
+            "Queued the move of 2 message(s) to the trash\n"
+        );
+        assert_eq!(
+            done.to_string(),
+            "Successfully moved 2 message(s) to the trash\n"
+        );
+        assert_eq!(
+            serde_json::to_string(&queued).unwrap(),
+            serde_json::to_string(&done).unwrap()
+        );
     }
 }

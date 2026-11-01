@@ -968,6 +968,7 @@ dependencies = [
  "pimalaya-config",
  "pimalaya-stream",
  "rfc2047-decoder",
+ "rusqlite",
  "schemars",
  "secrecy",
  "serde",
@@ -1035,6 +1036,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "ical-rs"
+version = "0.6.1"
+source = "git+https://github.com/pimalaya/ical?rev=99b92736a6a076c72936fac29c9b85a5168e4c2f#99b92736a6a076c72936fac29c9b85a5168e4c2f"
+dependencies = [
+ "jiff",
+ "jiff-tzdb",
+ "memchr",
 ]
 
 [[package]]
@@ -1360,15 +1371,17 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.8.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=3b4bed845a291d848499b3288952bd6a663fd513#3b4bed845a291d848499b3288952bd6a663fd513"
 dependencies = [
  "blake3",
  "fs4",
+ "ical-rs",
  "log",
+ "mail-parser",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
+ "vcard-rs",
 ]
 
 [[package]]
@@ -1471,6 +1484,7 @@ dependencies = [
  "defmt",
  "jiff-core",
  "jiff-static",
+ "jiff-tzdb",
  "log",
  "portable-atomic",
  "portable-atomic-util",
@@ -1498,6 +1512,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "jiff-tzdb"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa8377070c6bae868759445e5a77f66d84f0b72f3a054bfb00e6d038b8282da7"
 
 [[package]]
 name = "jni"
@@ -2831,6 +2851,15 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
+name = "vcard-rs"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a40d51ee30e110bb162cb9bc8d5d27696eb2d5e39ecff4e67de6069d014b230b"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "vcpkg"

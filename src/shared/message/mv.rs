@@ -45,10 +45,12 @@ impl MessageMoveCommand {
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         let count = client.move_messages(&from, &to, &ids)?;
-        let message = match count {
-            0 => bail!("No message moved: no id matched in the source mailbox"),
-            1 => "1 message successfully moved".to_string(),
-            n => format!("{n} messages successfully moved"),
+        let message = match (count, client.queues_writes()) {
+            (0, _) => bail!("No message moved: no id matched in the source mailbox"),
+            (1, false) => "1 message successfully moved".to_string(),
+            (n, false) => format!("{n} messages successfully moved"),
+            (1, true) => "1 message queued for moving".to_string(),
+            (n, true) => format!("{n} messages queued for moving"),
         };
         printer.out(Message::new(message))
     }

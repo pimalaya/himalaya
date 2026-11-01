@@ -17,22 +17,21 @@
 //! would guess at the sync's convention rather than look it up, and
 //! `mailbox.alias` is how a user avoids typing it.
 
-use std::{io::Write, ops::ControlFlow};
+use std::{collections::BTreeSet, ops::ControlFlow};
 
-use anyhow::{Result, anyhow, bail};
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
+use anyhow::{Context, Result, anyhow, bail};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime};
 use io_pimdir::{
     capability,
     client::{
-        blobs::PimdirBlobWriter,
-        producer::{PimdirActionStatus, PimdirPendingAction},
+        producer::{PimdirActionStatus, PimdirParkedAction, PimdirPendingAction},
         reader::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
     },
     codec::PimdirAction,
     collection::{PimdirCollectionId, PimdirCoverage},
-    object::{PimdirHash, PimdirObject},
+    intent::{self, PimdirSubmit},
     placement::PimdirFlags,
     summary::{
         PimdirAddress, PimdirSummary,
@@ -41,6 +40,7 @@ use io_pimdir::{
 };
 use log::{info, warn};
 use pimalaya_cli::error::CodedError;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -48,7 +48,7 @@ use crate::{
         address::Address,
         envelope::Envelope,
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
+        mailbox::{Mailbox, MailboxIndex, MailboxRole},
         search::{
             eval,
             filter::query::SearchEmailsFilterQuery,
@@ -57,15 +57,12 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::ErrorCode,
+    error::{ErrorCode, pimdir_error},
     pimdir::client::PimdirClient,
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
 const MAIL_KIND: &str = "message/rfc822";
-
-/// The queue action kind of a message for the store's owner to send.
-const SUBMIT: &str = "submit";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
@@ -84,21 +81,23 @@ pub(crate) fn is_mail(kind: &str) -> bool {
 }
 
 impl PimdirClient {
-    /// The collection a user-typed mailbox addresses, which is the mailbox
-    /// itself: a pimdir mailbox is its collection id, verbatim.
+    /// The collection a user-typed mailbox addresses: the mailbox itself,
+    /// a pimdir mailbox being its collection id verbatim, else the mailbox
+    /// carrying the role it names.
     ///
     /// The id is checked against the account's mail collections rather than
     /// passed through, an id nothing was written under otherwise reading as
     /// a mailbox that exists and is empty.
     pub(crate) fn hub_id(&self, mailbox: &str) -> Result<String> {
+        let resolved = self.resolve_mailbox_id(mailbox)?;
         let mut ids: Vec<String> = self
             .mail_collections()?
             .into_iter()
             .map(|collection| collection.id)
             .collect();
 
-        if ids.iter().any(|id| id == mailbox) {
-            return Ok(mailbox.to_string());
+        if ids.contains(&resolved) {
+            return Ok(resolved);
         }
 
         ids.sort();
@@ -109,12 +108,56 @@ impl PimdirClient {
         )
     }
 
+    /// Maps a mailbox onto its collection id: an id of the account passes
+    /// through, then a role name resolves to the mailbox the store records
+    /// it on, erroring when several do. Anything else goes back as it is.
+    ///
+    /// A collection's name is not matched: two sources may each hold a
+    /// mailbox of one name.
+    pub fn resolve_mailbox_id(&self, mailbox: &str) -> Result<String> {
+        let index = self.mailbox_index()?;
+        if index.0.iter().any(|known| known.id == mailbox) {
+            return Ok(mailbox.to_string());
+        }
+
+        if let Some(role) = MailboxRole::known(mailbox)
+            && let Some(id) = index.with_role(&role)?
+        {
+            return Ok(id);
+        }
+
+        Ok(mailbox.to_string())
+    }
+
+    /// The id of the mailbox the store records `role` on, `None` when none
+    /// carries it.
+    pub fn role_mailbox_id(&self, role: &MailboxRole) -> Result<Option<String>> {
+        self.mailbox_index()?.with_role(role)
+    }
+
+    /// The account's mailboxes with the roles the store records, no counts.
+    fn mailbox_index(&self) -> Result<MailboxIndex> {
+        let mailboxes = self
+            .mail_collections()?
+            .into_iter()
+            .map(|collection| Mailbox {
+                role: collection.role.as_deref().map(MailboxRole::parse),
+                id: collection.id,
+                name: collection.name,
+                total: None,
+                unread: None,
+            })
+            .collect();
+        Ok(MailboxIndex(mailboxes))
+    }
+
     /// The account's mail collections, in store order.
     fn mail_collections(&self) -> Result<Vec<PimdirCollection>> {
         Ok(self
             .store
             .list_collections_by_account(self.account.as_deref())
-            .map_err(|err| anyhow!("List pimdir collections: {err}"))?
+            .map_err(pimdir_error)
+            .context("List pimdir collections")?
             .into_iter()
             .filter(|collection| is_mail(&collection.kind))
             .collect())
@@ -130,7 +173,8 @@ impl PimdirClient {
                 Some(
                     self.store
                         .count_items(&collection.id)
-                        .map_err(|err| anyhow!("Count items in `{}`: {err}", collection.id))?,
+                        .map_err(pimdir_error)
+                        .with_context(|| format!("Count items in `{}`", collection.id))?,
                 )
             } else {
                 None
@@ -161,18 +205,21 @@ impl PimdirClient {
         let unread = self
             .store
             .count_unread(&ids, None, None)
-            .map_err(|err| anyhow!("Count unread pimdir mail: {err}"))?;
+            .map_err(pimdir_error)
+            .context("Count unread pimdir mail")?;
 
         let mut mailboxes = Vec::new();
         for collection in collections {
             let total = self
                 .store
                 .count_items(&collection.id)
-                .map_err(|err| anyhow!("Count items in `{}`: {err}", collection.id))?;
+                .map_err(pimdir_error)
+                .with_context(|| format!("Count items in `{}`", collection.id))?;
             let round = self
                 .store
                 .list_coverage(&collection.id)
-                .map_err(|err| anyhow!("Read the coverage of `{}`: {err}", collection.id))?
+                .map_err(pimdir_error)
+                .with_context(|| format!("Read the coverage of `{}`", collection.id))?
                 .into_iter()
                 .find_map(|source| source.round);
             mailboxes.push(PimdirCoveredMailbox {
@@ -228,9 +275,9 @@ impl PimdirClient {
     }
 
     /// Searches envelopes in `mailbox`: builds them from the summaries,
-    /// applies the shared filter/sort/paginate. Body clauses cannot match on
-    /// an item whose body is not local (no bytes to scan); header/flag
-    /// clauses always do.
+    /// applies the shared filter/sort/paginate. A query holding a body clause
+    /// reads each candidate's local body, and a message whose body is not
+    /// local matches no body clause; the other clauses read no body.
     ///
     /// The store is read newest first, within the date bounds the query
     /// states and through the unread chip where it applies, and the read
@@ -284,6 +331,7 @@ impl PimdirClient {
         let start = pushdown.before.as_deref().map(|key| (key, 0));
         let mut hits: Vec<Envelope> = Vec::new();
         let mut ordered = true;
+        let mut failed = None;
         self.walk(collection, start, unread, batch(wanted), |item| {
             if !in_store_order(&item) {
                 ordered = false;
@@ -295,8 +343,13 @@ impl PimdirClient {
                 return ControlFlow::Break(());
             }
             let envelope = envelope_from_item(&item);
-            if filter.is_none_or(|filter| eval::matches_filter(&envelope, &[], filter)) {
-                hits.push(envelope);
+            match self.matches(&item, &envelope, filter) {
+                Ok(true) => hits.push(envelope),
+                Ok(false) => {}
+                Err(err) => {
+                    failed = Some(err);
+                    return ControlFlow::Break(());
+                }
             }
             let left = wanted.map(|wanted| wanted.saturating_sub(hits.len()));
             match left {
@@ -305,6 +358,9 @@ impl PimdirClient {
             }
         })?;
 
+        if let Some(err) = failed {
+            return Err(err);
+        }
         if !ordered {
             warn!("a row of `{collection}` is not filed under its date, searching it whole");
             return Ok(None);
@@ -323,17 +379,34 @@ impl PimdirClient {
         page: Option<u32>,
         page_size: Option<u32>,
     ) -> Result<Vec<Envelope>> {
-        let mut hits: Vec<Envelope> = self
-            .scan_items(collection)?
-            .iter()
-            .map(envelope_from_item)
-            .filter(|envelope| match filter {
-                Some(filter) => eval::matches_filter(envelope, &[], filter),
-                None => true,
-            })
-            .collect();
+        let mut hits: Vec<Envelope> = Vec::new();
+        for item in self.scan_items(collection)? {
+            let envelope = envelope_from_item(&item);
+            if self.matches(&item, &envelope, filter)? {
+                hits.push(envelope);
+            }
+        }
         eval::sort_envelopes(&mut hits, sort);
         Ok(paginate(hits, page, page_size))
+    }
+
+    /// Whether `item`, read as `envelope`, matches `filter`, its local body
+    /// read when the filter holds a body clause: an item with no local body,
+    /// or whose blob is gone, is matched with none.
+    fn matches(
+        &self,
+        item: &PimdirItem,
+        envelope: &Envelope,
+        filter: Option<&SearchEmailsFilterQuery>,
+    ) -> Result<bool> {
+        let Some(filter) = filter else {
+            return Ok(true);
+        };
+        let body = match &item.object {
+            Some(hash) if reads_body(filter) => self.blobs.get(hash)?.unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        Ok(eval::matches_filter(envelope, &body, filter))
     }
 
     /// The mailbox's queued creations and sends, rendered as mail.
@@ -359,13 +432,19 @@ impl PimdirClient {
     /// Reads one message's raw bytes from its content-addressed blob.
     ///
     /// An item with no local body fails as not fetched rather than as a data
-    /// loss, which is the cue to sync.
+    /// loss, which is the cue to sync. So does one whose blob file is gone,
+    /// which a purge leaves not hydrated rather than broken (pimdir GUIDE
+    /// §14).
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let collection = self.hub_id(mailbox)?;
         let Some(item) = self.get(&collection, id)? else {
             bail!("Message `{id}` not found in `{mailbox}`");
         };
-        let Some(hash) = item.object else {
+        let bytes = match &item.object {
+            Some(hash) => self.blobs.get(hash)?,
+            None => None,
+        };
+        let Some(bytes) = bytes else {
             return Err(CodedError::new(
                 ErrorCode::BodyPending,
                 format!(
@@ -375,10 +454,6 @@ impl PimdirClient {
             )
             .into());
         };
-        let bytes = self
-            .blobs
-            .get(&hash)?
-            .ok_or_else(|| anyhow!("Body blob missing for `{id}` in `{mailbox}`"))?;
 
         // NOTE: a store refusing the staged flag change must not fail the
         // read, which is non-mutating by default.
@@ -407,7 +482,8 @@ impl PimdirClient {
     }
 
     /// Stages a flag op on the messages of `ids` the mailbox holds,
-    /// returning the queue row each message's `SetFlags` waits in.
+    /// returning the queue row each message's `SetFlags` waits in, `None`
+    /// for one the op leaves as it shows, for which nothing is staged.
     ///
     /// An id the mailbox does not hold is skipped, so the caller reports
     /// how many messages it found. Every found message is checked against
@@ -433,25 +509,38 @@ impl PimdirClient {
                 warn!("Message `{id}` not found in `{collection}`, skipped");
                 continue;
             };
+            let replacement = apply_flag_op(&item.flags, flags, op)
+                .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
+            if replacement == item.flags {
+                checked.push((*id, None));
+                continue;
+            }
             let action = PimdirAction::SetFlags {
                 seq: item.seq,
-                flags: apply_flag_op(&item.flags, flags, op)
-                    .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?,
+                flags: replacement,
             };
             let partials = producer
                 .check(&collection, &action)
-                .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
-            checked.push((*id, action, partials));
+                .map_err(pimdir_error)
+                .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
+            checked.push((*id, Some((action, partials))));
         }
 
         let mut staged = Vec::with_capacity(checked.len());
-        for (id, action, partials) in checked {
-            let queue_id = producer
-                .enqueue(&collection, &action, None)
-                .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
-            for partial in &partials {
-                warn!("{partial}");
-            }
+        for (id, change) in checked {
+            let queue_id = match change {
+                Some((action, partials)) => {
+                    let queue_id = producer
+                        .enqueue(&collection, &action, None)
+                        .map_err(pimdir_error)
+                        .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
+                    for partial in &partials {
+                        warn!("{partial}");
+                    }
+                    Some(queue_id)
+                }
+                None => None,
+            };
             staged.push(PimdirFlagged {
                 id: id.to_owned(),
                 queue_id,
@@ -473,20 +562,15 @@ impl PimdirClient {
     /// Stages a locally-authored message for the next sync to upload,
     /// returning its queue row and the link id it is stored under.
     ///
-    /// The body lands in the blob store durably before the action referencing
-    /// it is enqueued, and the queue row pins the object, so nothing collects
-    /// a body between the two.
+    /// The body is written and the row appended in one step under the
+    /// producer's staging lock, the row pinning the body, so no collector
+    /// runs between the two and a refused add leaves no body behind.
     ///
     /// The link id is the bare `Message-ID`, derived the way the owner
-    /// derives it from the same body, and a staged add whose link id the
-    /// collection already holds parks rather than deduplicate or mint a
-    /// key of its own.
-    ///
-    /// The store answers its two producers differently on purpose. It mints
-    /// for a source, a replica owing the collection what the collection
-    /// holds, so one `Message-ID` twice keeps two items. It parks for a
-    /// producer, which named a key it does not own and is told so rather than
-    /// filed under one it never asked for.
+    /// derives it from the same body. One the mailbox already holds, or has
+    /// a creation queued under, is refused with `item-duplicate` and nothing
+    /// is staged: the owner would park the row rather than deduplicate or
+    /// mint a key of its own.
     pub fn add_message(
         &mut self,
         mailbox: &str,
@@ -496,26 +580,23 @@ impl PimdirClient {
         let collection = self.hub_id(mailbox)?;
         let link_id = mail::derive(&raw).link_id;
 
-        let hash = self.blobs.hash(&raw);
-        let writer = self.blobs.writer()?;
-        let size = write_blob(writer, &raw, &hash)?;
-        let object = PimdirObject {
-            hash,
-            size: size as usize,
-        };
-
-        let mut producer = self.producer()?;
-        let action = PimdirAction::Add {
-            link_id: Some(link_id.clone()),
-            flags: flags.iter().map(Flag::raw).collect(),
-            object: Some(object.hash.clone()),
-        };
-        let queue_id = self
-            .enqueue(&mut producer, &collection, &action, Some(&object))
-            .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
+        let flags: PimdirFlags = flags.iter().map(Flag::raw).collect();
+        let enqueued = self
+            .producer()?
+            .enqueue_with_body_checked(&collection, &raw, |hash| PimdirAction::Add {
+                link_id: Some(link_id.clone()),
+                flags,
+                object: Some(hash),
+                supersedes: None,
+            })
+            .map_err(pimdir_error)
+            .with_context(|| format!("Stage add in `{mailbox}`"))?;
+        for partial in &enqueued.partial {
+            warn!("{partial}");
+        }
 
         Ok(PimdirStaged {
-            queue_id,
+            queue_id: enqueued.id,
             message_id: link_id.0,
         })
     }
@@ -554,36 +635,30 @@ impl PimdirClient {
         let collection = self.hub_id(mailbox)?;
         let envelope = SubmissionEnvelope::parse(&raw)?;
 
-        let hash = self.blobs.hash(&raw);
-        let writer = self.blobs.writer()?;
-        let size = write_blob(writer, &raw, &hash)?;
-        let object = PimdirObject {
-            hash,
-            size: size as usize,
-        };
-
         let mut producer = self.producer()?;
         let source = self.performer(&producer, &collection, capability::MAIL_SUBMIT)?;
         let carried = copy && source.is_some();
 
-        let payload = SubmitPayload {
-            v: 1,
-            object: &object.hash.0,
-            from: &envelope.from,
-            rcpts: &envelope.rcpts,
-            subject: envelope.subject.as_deref(),
-            source: source.as_deref(),
-            copy: carried.then_some(collection.as_str()),
+        let submit = PimdirSubmit {
+            source,
+            object: producer.hash(&raw),
+            from: envelope.from,
+            rcpts: envelope.rcpts,
+            subject: envelope.subject,
+            copy: carried.then(|| PimdirCollectionId(collection.clone())),
         };
-        let action = PimdirAction::Unknown {
-            kind: SUBMIT.to_owned(),
-            payload: serde_json::to_string(&payload)?,
-            object_hash: Some(object.hash.clone()),
-        };
+        let action = submit
+            .to_action()
+            .with_context(|| format!("Queue send in `{mailbox}`"))?;
 
-        let id = self
-            .enqueue(&mut producer, &collection, &action, Some(&object))
-            .map_err(|err| anyhow!("Queue send in `{mailbox}`: {err}"))?;
+        let enqueued = producer
+            .enqueue_with_body_checked(&collection, &raw, |_| action)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Queue send in `{mailbox}`"))?;
+        for partial in &enqueued.partial {
+            warn!("{partial}");
+        }
+        let id = enqueued.id;
         info!("message queued for sending as action {id}, see `himalaya pimdir queue list`");
         Ok(PimdirSubmitted {
             staged: PimdirStaged {
@@ -601,7 +676,8 @@ impl PimdirClient {
         let status = self
             .store
             .action_status(id)
-            .map_err(|err| anyhow!("Read queue row {id}: {err}"))?;
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read queue row {id}"))?;
         let collection = match &status {
             PimdirActionStatus::Pending { collection, .. }
             | PimdirActionStatus::Parked { collection, .. }
@@ -612,7 +688,8 @@ impl PimdirClient {
         let ours = self
             .store
             .list_collections_by_account(self.account.as_deref())
-            .map_err(|err| anyhow!("List the account's collections: {err}"))?
+            .map_err(pimdir_error)
+            .context("List the account's collections")?
             .iter()
             .any(|ours| &ours.id == collection);
         Ok(if ours {
@@ -679,31 +756,39 @@ impl PimdirClient {
 
         let queue_id = producer
             .enqueue_collection_create(&anchor, name, parent.as_deref(), Some(&source))
-            .map_err(|err| anyhow!("Queue the creation of `{name}`: {err}"))?;
+            .map_err(pimdir_error)
+            .with_context(|| format!("Queue the creation of `{name}`"))?;
         Ok(PimdirCreated { queue_id, source })
     }
 
-    /// Deletes each id from `mailbox`, staged as `Remove` (the next sync pushes
-    /// it as the backend's own disposal).
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<()> {
+    /// Deletes each id `mailbox` holds, staged as `Remove` (the next sync
+    /// pushes it as the backend's own disposal), returning how many it found.
+    ///
+    /// Every id is checked before the first row is staged, an unknown one
+    /// skipped, so the caller reports how many messages it found.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
         let collection = self.hub_id(mailbox)?;
+        let found = self.found(&collection, ids)?;
         let mut producer = self.producer()?;
 
-        for id in ids {
-            let seq = self.seq(&collection, id)?;
+        for (id, seq) in &found {
             self.enqueue(
                 &mut producer,
                 &collection,
-                &PimdirAction::Remove { seq },
+                &PimdirAction::Remove { seq: *seq },
                 None,
             )
-            .map_err(|err| anyhow!("Stage delete of `{id}` in `{mailbox}`: {err}"))?;
+            .map_err(pimdir_error)
+            .with_context(|| format!("Stage delete of `{id}` in `{mailbox}`"))?;
         }
-        Ok(())
+        Ok(found.len())
     }
 
-    /// Stages one refiling action per id, `build` deciding whether the source
-    /// copy stays.
+    /// Stages one refiling action per id `from` holds, `build` deciding
+    /// whether the source copy stays, returning how many it found.
+    ///
+    /// Every id is checked before the first row is staged, an unknown one
+    /// skipped, so the caller reports how many messages it found.
     fn refile(
         &mut self,
         from: &str,
@@ -713,30 +798,37 @@ impl PimdirClient {
     ) -> Result<usize> {
         let source = self.hub_id(from)?;
         let target = PimdirCollectionId(self.hub_id(to)?);
+        let found = self.found(&source, ids)?;
         let mut producer = self.producer()?;
 
-        for id in ids {
-            let seq = self.seq(&source, id)?;
-            self.enqueue(&mut producer, &source, &build(seq, target.clone()), None)
-                .map_err(|err| anyhow!("Stage refile of `{id}` from `{from}` to `{to}`: {err}"))?;
+        for (id, seq) in &found {
+            self.enqueue(&mut producer, &source, &build(*seq, target.clone()), None)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Stage refile of `{id}` from `{from}` to `{to}`"))?;
         }
-        Ok(ids.len())
+        Ok(found.len())
     }
 
     /// The item behind a public id, or `None` when the collection holds none.
     fn get(&self, collection: &str, id: &str) -> Result<Option<PimdirItem>> {
         self.store
             .get_item(collection, parse_id(id)?)
-            .map_err(|err| anyhow!("Read `{id}` in `{collection}`: {err}"))
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read `{id}` in `{collection}`"))
     }
 
-    /// The public id an action addresses, checked against the collection so a
-    /// stale id is refused here rather than parked by the owner much later.
-    fn seq(&self, collection: &str, id: &str) -> Result<i64> {
-        match self.get(collection, id)? {
-            Some(item) => Ok(item.seq),
-            None => bail!("Message `{id}` not found in `{}`", collection),
+    /// The public ids of `ids` the collection holds, checked here so a stale
+    /// id is skipped rather than parked by the owner much later; a malformed
+    /// one fails.
+    fn found<'a>(&self, collection: &str, ids: &[&'a str]) -> Result<Vec<(&'a str, i64)>> {
+        let mut found = Vec::with_capacity(ids.len());
+        for id in ids {
+            match self.get(collection, id)? {
+                Some(item) => found.push((*id, item.seq)),
+                None => warn!("Message `{id}` not found in `{collection}`, skipped"),
+            }
         }
+        Ok(found)
     }
 
     /// Walks a mailbox newest first by keyset pages, from below `start`
@@ -787,7 +879,8 @@ impl PimdirClient {
             return self
                 .store
                 .list_summaries(collection, after, limit)
-                .map_err(|err| anyhow!("List items in `{collection}`: {err}"));
+                .map_err(pimdir_error)
+                .with_context(|| format!("List items in `{collection}`"));
         }
 
         let filter = PimdirMailFilter {
@@ -802,7 +895,8 @@ impl PimdirClient {
         let entries = self
             .store
             .list_mail_page_filtered(&[collection], filter, None, cursor.as_ref(), limit)
-            .map_err(|err| anyhow!("List unread items in `{collection}`: {err}"))?;
+            .map_err(pimdir_error)
+            .with_context(|| format!("List unread items in `{collection}`"))?;
         Ok(entries.into_iter().map(|entry| entry.item).collect())
     }
 
@@ -839,7 +933,8 @@ impl PimdirClient {
             let page = self
                 .store
                 .list_summaries(collection, after, SCAN_BATCH)
-                .map_err(|err| anyhow!("List items in `{collection}`: {err}"))?;
+                .map_err(pimdir_error)
+                .with_context(|| format!("List items in `{collection}`"))?;
             let n = page.len();
             all.extend(page);
             if n < SCAN_BATCH {
@@ -849,6 +944,23 @@ impl PimdirClient {
         Ok(all)
     }
 
+    /// The mailbox's parked rows, any action kind, in append order: what the
+    /// owner refused to apply and leaves to an operator (pimdir STORAGE
+    /// §15.3), which no listing shows otherwise.
+    pub fn parked_actions(&self, mailbox: &str) -> Result<Vec<PimdirParkedAction>> {
+        let collection = self.hub_id(mailbox)?;
+        let parked = self
+            .store
+            .parked_actions()
+            .map_err(pimdir_error)
+            .with_context(|| format!("List parked actions in `{mailbox}`"))?;
+
+        Ok(parked
+            .into_iter()
+            .filter(|parked| parked.collection == collection)
+            .collect())
+    }
+
     /// The mailbox's pending creates and sends, in append order: the queued
     /// rows that are mail with no public id yet.
     fn queued_mail(&self, mailbox: &str) -> Result<Vec<PimdirPendingAction>> {
@@ -856,7 +968,8 @@ impl PimdirClient {
         let pending = self
             .store
             .pending_actions(&collection)
-            .map_err(|err| anyhow!("List queued messages in `{mailbox}`: {err}"))?;
+            .map_err(pimdir_error)
+            .with_context(|| format!("List queued messages in `{mailbox}`"))?;
 
         Ok(pending
             .into_iter()
@@ -865,34 +978,19 @@ impl PimdirClient {
     }
 }
 
-/// The payload of a `submit` intent, version 1.
-#[derive(Serialize)]
-struct SubmitPayload<'a> {
-    v: u8,
-    object: &'a str,
-    from: &'a str,
-    rcpts: &'a [String],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    subject: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    source: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    copy: Option<&'a str>,
-}
-
 /// Whether a queued action is a message waiting for a public id: a create,
 /// or a send the owner performs.
 fn is_queued_mail(action: &PimdirAction) -> bool {
     match action {
         PimdirAction::Add { .. } => true,
-        PimdirAction::Unknown { kind, .. } => kind == SUBMIT,
+        PimdirAction::Unknown { kind, .. } => kind == intent::SUBMIT,
         _ => false,
     }
 }
 
 /// Builds a shared [`Envelope`] from a stored item (no body read): the
 /// flags from the item, the display fields from its mail summary.
-fn envelope_from_item(item: &PimdirItem) -> Envelope {
+pub(crate) fn envelope_from_item(item: &PimdirItem) -> Envelope {
     // NOTE: the public id is a short store-global integer rather than the
     // long link id.
     envelope(
@@ -911,24 +1009,19 @@ fn mail_summary(summary: Option<&PimdirSummary>) -> Option<&PimdirMailSummary> {
 }
 
 /// Builds an envelope from a flag set and a mail summary, `id` being the
-/// public `seq`, or empty for a queued creation that has none yet.
-fn envelope(id: String, flags: &PimdirFlags, summary: Option<&PimdirMailSummary>) -> Envelope {
-    let flags = flags
-        .known()
-        .map(|flags| {
-            flags
-                .iter()
-                .map(|raw| Flag::from_raw(raw.clone()))
-                .collect()
-        })
-        .unwrap_or_default();
+/// public `seq`.
+pub(crate) fn envelope(
+    id: String,
+    flags: &PimdirFlags,
+    summary: Option<&PimdirMailSummary>,
+) -> Envelope {
     let mail = summary.cloned().unwrap_or_default();
 
     Envelope {
         id,
         message_id: mail.message_id,
         in_reply_to: mail.in_reply_to,
-        flags,
+        flags: known_flags(flags),
         subject: mail.subject,
         from: mail.from.into_iter().map(address).collect(),
         to: mail.to.into_iter().map(address).collect(),
@@ -939,6 +1032,19 @@ fn envelope(id: String, flags: &PimdirFlags, summary: Option<&PimdirMailSummary>
         size: mail.size.unwrap_or(0),
         has_attachment: mail.attachment,
     }
+}
+
+/// The flags of a set as shared ones, none when the set is unknown.
+fn known_flags(flags: &PimdirFlags) -> BTreeSet<Flag> {
+    flags
+        .known()
+        .map(|flags| {
+            flags
+                .iter()
+                .map(|raw| Flag::from_raw(raw.clone()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// A summary's canonical address as the shared one.
@@ -994,8 +1100,9 @@ pub struct PimdirCreated {
 pub struct PimdirFlagged {
     /// The message's public id.
     pub id: String,
-    /// The `set-flags` row it waits in.
-    pub queue_id: i64,
+    /// The `set-flags` row it waits in, `None` when the change left the
+    /// message as it shows and nothing was staged.
+    pub queue_id: Option<i64>,
 }
 
 /// One queued creation or send, as `pimdir queue list` shows it: the row an
@@ -1010,18 +1117,44 @@ pub struct PimdirQueued {
     pub producer: String,
     /// Whether the row sends the message rather than files it.
     pub send: bool,
-    /// The message the action carries, derived from the body it pins. It has
-    /// no `id`: a create has none until the owner applies it, a send none at
-    /// all.
-    pub envelope: Envelope,
+    /// The message the action carries, derived from the body it pins.
+    pub envelope: PimdirQueuedEnvelope,
+}
+
+/// The message a queued creation or send carries: the shared envelope's
+/// fields, its id aside.
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PimdirQueuedEnvelope {
+    /// Always `None`: a create has no id until the owner applies it, a send
+    /// none at all. The queue row id names the action, not the message, so
+    /// it does not stand in.
+    pub id: Option<String>,
+    /// The bare `Message-ID:`.
+    pub message_id: Option<String>,
+    /// The bare ids of its `In-Reply-To:`.
+    pub in_reply_to: Vec<String>,
+    /// The flags it is staged with.
+    pub flags: BTreeSet<Flag>,
+    /// The `Subject:` header.
+    pub subject: String,
+    /// The senders.
+    pub from: Vec<Address>,
+    /// The primary recipients.
+    pub to: Vec<Address>,
+    /// The `Date:` header, `None` when missing or unparseable.
+    pub date: Option<DateTime<FixedOffset>>,
+    /// The size of the raw message, in bytes.
+    pub size: u64,
+    /// Whether the message carries an attachment.
+    pub has_attachment: Option<bool>,
 }
 
 /// Builds a queued row from a pending add or send and the body it pins,
 /// skipping every other action.
 ///
-/// The envelope keeps an empty id on purpose: the message has no public id
-/// yet, and the queue row id belongs to another space than the field every
-/// command reads back.
+/// The envelope has no id: the message has none yet, and the queue row id
+/// belongs to another space than the field every command reads back.
 fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Option<PimdirQueued> {
     // NOTE: a send is filed nowhere and carries no flags; it shows as read,
     // the way a sent copy is saved.
@@ -1036,7 +1169,23 @@ fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Opti
     };
 
     let summary = body.map(mail::derive).and_then(|derived| derived.summary);
-    let envelope = envelope(String::new(), flags, mail_summary(summary.as_ref()));
+    let mail = mail_summary(summary.as_ref()).cloned().unwrap_or_default();
+
+    let envelope = PimdirQueuedEnvelope {
+        id: None,
+        message_id: mail.message_id,
+        in_reply_to: mail.in_reply_to,
+        flags: known_flags(flags),
+        subject: mail.subject,
+        from: mail.from.into_iter().map(address).collect(),
+        to: mail.to.into_iter().map(address).collect(),
+        date: mail
+            .date
+            .as_deref()
+            .and_then(|date| DateTime::parse_from_rfc3339(date).ok()),
+        size: mail.size.unwrap_or(0),
+        has_attachment: mail.attachment,
+    };
 
     Some(PimdirQueued {
         id: queued.id,
@@ -1045,13 +1194,6 @@ fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Opti
         send,
         envelope,
     })
-}
-
-/// Streams `raw` into the blob store under `hash` and commits it durably,
-/// returning the stored size.
-fn write_blob(mut writer: PimdirBlobWriter, raw: &[u8], hash: &PimdirHash) -> Result<u64> {
-    writer.write_all(raw)?;
-    Ok(writer.commit(hash)?)
 }
 
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
@@ -1168,6 +1310,19 @@ impl PimdirPushdown {
     }
 }
 
+/// Whether a filter holds a body clause anywhere, which only a body read
+/// answers.
+fn reads_body(filter: &SearchEmailsFilterQuery) -> bool {
+    use SearchEmailsFilterQuery as Q;
+
+    match filter {
+        Q::And(left, right) | Q::Or(left, right) => reads_body(left) || reads_body(right),
+        Q::Not(inner) => reads_body(inner),
+        Q::Body(_) => true,
+        _ => false,
+    }
+}
+
 /// A day as the sort key it bounds, `None` for a year the key's four
 /// digits cannot spell.
 fn day_key(day: NaiveDate) -> Option<String> {
@@ -1241,7 +1396,10 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 mod tests {
     use std::collections::BTreeSet;
 
-    use io_pimdir::placement::{PimdirLevel, PimdirLinkId};
+    use io_pimdir::{
+        object::PimdirHash,
+        placement::{PimdirLevel, PimdirLinkId},
+    };
 
     use super::*;
     use crate::config::PimdirConfig;
@@ -1285,6 +1443,45 @@ mod tests {
                 ("imap/Work".into(), None),
             ]
         );
+    }
+
+    /// A role name addresses the mailbox the store records it on, after the
+    /// collection ids; a name does not.
+    #[test]
+    fn a_role_name_addresses_its_mailbox() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+            for id in ["imap/INBOX", "imap/Trash", "imap/Bin", "imap/Junk"] {
+                store.ensure_collection(id, MAIL_KIND).unwrap();
+            }
+            store
+                .set_collection_role("imap/INBOX", Some("inbox"))
+                .unwrap();
+            for id in ["imap/Trash", "imap/Bin"] {
+                store.set_collection_role(id, Some("trash")).unwrap();
+            }
+        }
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+
+        assert_eq!(client.hub_id("inbox").unwrap(), "imap/INBOX");
+        assert_eq!(client.hub_id("INBOX").unwrap(), "imap/INBOX");
+        assert!(client.list_envelopes("inbox", None, None, false).is_ok());
+        assert_eq!(client.hub_id("imap/Junk").unwrap(), "imap/Junk");
+        let err = client.hub_id("junk").unwrap_err().to_string();
+        assert!(err.contains("not found"), "{err}");
+        // NOTE: the store keeps a role on one mailbox of an account, the
+        // last one it was recorded on.
+        assert_eq!(client.hub_id("trash").unwrap(), "imap/Bin");
+        assert_eq!(
+            client.role_mailbox_id(&MailboxRole::Inbox).unwrap(),
+            Some("imap/INBOX".into())
+        );
+        assert_eq!(client.role_mailbox_id(&MailboxRole::Sent).unwrap(), None);
     }
 
     /// A mailbox carries the coverage its sources' closed rounds left and
@@ -1536,7 +1733,7 @@ mod tests {
     /// A queued add carries no summary, so the row is derived from the body
     /// the action pins, the way the owner will derive it.
     #[test]
-    fn a_queued_creation_renders_as_mail_with_no_id() {
+    fn a_queued_creation_renders_as_mail_with_a_null_id() {
         let queued = PimdirPendingAction {
             id: 7,
             created_at: "2026-08-27T10:00:00Z".into(),
@@ -1546,6 +1743,7 @@ mod tests {
                 link_id: Some(PimdirLinkId("draft@x.org".into())),
                 flags: known(&["\\Draft"]),
                 object: Some(PimdirHash("cafe".into())),
+                supersedes: None,
             },
             attempts: 0,
         };
@@ -1560,8 +1758,11 @@ mod tests {
         assert_eq!(queued.envelope.message_id.as_deref(), Some("draft@x.org"));
         assert!(queued.envelope.flags.iter().any(|f| f.raw() == "\\Draft"));
         // NOTE: the row id names an action rather than a message, so it
-        // belongs to another space than the field commands read back.
-        assert!(queued.envelope.id.is_empty());
+        // belongs to another space than the field commands read back, and
+        // no placeholder stands in for the id the message lacks.
+        let json = serde_json::to_value(&queued.envelope).unwrap();
+        assert_eq!(json["id"], serde_json::Value::Null);
+        assert_eq!(json["subject"], "Re: lunch");
     }
 
     #[test]
@@ -1615,14 +1816,14 @@ mod tests {
         else {
             panic!("expected a submit intent, got {:?}", pending[0].action);
         };
-        assert_eq!(kind, SUBMIT);
+        assert_eq!(kind, intent::SUBMIT);
 
         // NOTE: the `submit` payload a store owner decodes, `object` being
         // the pinned body by the shared queue convention.
         let hash = object_hash.as_ref().unwrap();
-        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+        let json: serde_json::Value = serde_json::from_str(payload).unwrap();
         assert_eq!(
-            payload,
+            json,
             serde_json::json!({
                 "v": 1,
                 "object": hash.0,
@@ -1630,6 +1831,17 @@ mod tests {
                 "rcpts": ["b@y.org", "c@y.org"],
                 "subject": "hi",
             })
+        );
+        assert_eq!(
+            PimdirSubmit::from_payload(payload).unwrap(),
+            PimdirSubmit {
+                source: None,
+                object: hash.clone(),
+                from: "a@x.org".into(),
+                rcpts: vec!["b@y.org".into(), "c@y.org".into()],
+                subject: Some("hi".into()),
+                copy: None,
+            }
         );
 
         // NOTE: the body keeps its Bcc field, which the sending channel
@@ -1675,11 +1887,39 @@ mod tests {
 
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1, "the copy rides on the submit, not an add");
-        let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
+        let PimdirAction::Unknown {
+            payload,
+            object_hash,
+            ..
+        } = &pending[0].action
+        else {
             panic!("expected a submit intent, got {:?}", pending[0].action);
         };
-        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
-        assert_eq!(payload["copy"], "imap/Sent");
+        let hash = object_hash.as_ref().unwrap();
+        let json: serde_json::Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "v": 1,
+                "source": "imap",
+                "object": hash.0,
+                "from": "a@x.org",
+                "rcpts": ["b@y.org", "c@y.org"],
+                "subject": "hi",
+                "copy": "imap/Sent",
+            })
+        );
+        assert_eq!(
+            PimdirSubmit::from_payload(payload).unwrap(),
+            PimdirSubmit {
+                source: Some("imap".into()),
+                object: hash.clone(),
+                from: "a@x.org".into(),
+                rcpts: vec!["b@y.org".into(), "c@y.org".into()],
+                subject: Some("hi".into()),
+                copy: Some(PimdirCollectionId("imap/Sent".into())),
+            }
+        );
     }
 
     #[test]
@@ -1731,6 +1971,105 @@ mod tests {
     }
 
     #[test]
+    fn an_add_already_queued_is_refused_and_stages_nothing() {
+        let (_dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+
+        let err = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::ItemDuplicate),
+            "{err:#}"
+        );
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, staged.queue_id);
+    }
+
+    #[test]
+    fn an_add_the_mailbox_holds_is_refused_and_stages_nothing() {
+        let (dir, mut client) = sent_store();
+        let held = PimdirMailSummary {
+            message_id: Some("d1@x.org".into()),
+            ..Default::default()
+        };
+        seed(
+            dir.path(),
+            "imap/Sent",
+            &[Seeded {
+                handle: "1".into(),
+                flags: known(&[]),
+                summary: Some(held),
+            }],
+        );
+
+        let err = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::ItemDuplicate),
+            "{err:#}"
+        );
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_refused_add_leaves_no_body_behind() {
+        let (dir, mut client) = sent_store();
+        let held = PimdirMailSummary {
+            message_id: Some("d1@x.org".into()),
+            ..Default::default()
+        };
+        seed(
+            dir.path(),
+            "imap/Sent",
+            &[Seeded {
+                handle: "1".into(),
+                flags: known(&[]),
+                summary: Some(held),
+            }],
+        );
+
+        client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap_err();
+
+        let body = client.blobs.path(&client.blobs.hash(DRAFT));
+        assert!(!body.exists(), "a refused add left its body behind");
+    }
+
+    #[test]
+    fn a_refused_send_leaves_no_body_behind() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::MAIL_SUBMIT]);
+
+        let err = client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), true)
+            .unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::Unsupported),
+            "{err:#}"
+        );
+        let body = client.blobs.path(&client.blobs.hash(RAW));
+        assert!(!body.exists(), "a refused send left its body behind");
+    }
+
+    #[test]
     fn a_sent_message_names_its_queue_row_and_message_id() {
         let (_dir, mut client) = sent_store();
 
@@ -1741,6 +2080,63 @@ mod tests {
         assert_eq!(sent.staged.message_id, "d1@x.org");
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending[0].id, sent.staged.queue_id);
+    }
+
+    /// Runs `stage` on a client of a store whose staging lock is held
+    /// exclusively, as the collector holds it (pimdir STORAGE §8), and
+    /// checks no body reached the blob tree before the lock was released,
+    /// and that the staged row landed after.
+    fn assert_stages_after_the_collector(
+        stage: impl FnOnce(&mut PimdirClient) -> Result<i64> + Send + 'static,
+    ) {
+        let (dir, mut client) = sent_store();
+        let body = client.blobs.path(&client.blobs.hash(DRAFT));
+
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(dir.path().join("objects.lock"))
+            .unwrap();
+        lock.lock().unwrap();
+
+        let staging = std::thread::spawn(move || {
+            let id = stage(&mut client);
+            (client, id)
+        });
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        assert!(
+            !body.exists(),
+            "a body was written while the collector held the lock"
+        );
+
+        lock.unlock().unwrap();
+        let (client, id) = staging.join().unwrap();
+        let id = id.unwrap();
+        assert!(body.exists());
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, id);
+    }
+
+    #[test]
+    fn an_added_body_waits_for_the_collector() {
+        assert_stages_after_the_collector(|client| {
+            Ok(client
+                .add_message("imap/Sent", &[], DRAFT.to_vec())?
+                .queue_id)
+        });
+    }
+
+    #[test]
+    fn a_sent_body_waits_for_the_collector() {
+        assert_stages_after_the_collector(|client| {
+            Ok(client
+                .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)?
+                .staged
+                .queue_id)
+        });
     }
 
     #[test]
@@ -1759,11 +2155,199 @@ mod tests {
         assert_eq!(collection, "imap/Sent");
         assert_eq!(kind, "add");
 
-        assert!(client.cancel_queued(staged.queue_id).unwrap());
+        assert_eq!(client.cancel_queued(staged.queue_id).unwrap(), "add");
         assert_eq!(
             client.queue_row(staged.queue_id).unwrap(),
             PimdirActionStatus::Unknown
         );
+    }
+
+    /// A cancel takes the owner role on the store as it stands: a schema
+    /// another io-pimdir revision wrote is refused, never reconciled to
+    /// this one, which would drop what that revision keeps.
+    #[test]
+    fn a_cancel_leaves_a_store_of_another_revision_alone() {
+        let (dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        db.execute_batch("CREATE TABLE later_revision (data TEXT)")
+            .unwrap();
+
+        let err = client.cancel_queued(staged.queue_id).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreNotCurrent),
+            "{err:#}"
+        );
+        assert!(format!("{err:#}").contains("sync engine"), "{err:#}");
+        let tables: i64 = db
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE name = 'later_revision'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(tables, 1, "the cancel reshaped the store");
+        assert_eq!(
+            client.store.pending_actions("imap/Sent").unwrap()[0].id,
+            staged.queue_id
+        );
+    }
+
+    /// A cancel while a sync owns the store is refused at once, coded so a
+    /// caller retries rather than reports a loss.
+    #[test]
+    fn a_cancel_during_a_sync_is_refused_as_owned() {
+        let (dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        // NOTE: the sync runs in another process, which holds the owner
+        // lock; owners in one process share it.
+        let sync = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(dir.path().join("owner.lock"))
+            .unwrap();
+        sync.lock().unwrap();
+
+        let err = client.cancel_queued(staged.queue_id).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreOwned),
+            "{err:#}"
+        );
+    }
+
+    /// A store a newer sync engine stamped is refused saying to upgrade
+    /// Himalaya, never to delete it.
+    #[test]
+    fn a_newer_store_is_refused_saying_to_upgrade() {
+        let (dir, _client) = sent_store();
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        db.pragma_update(None, "user_version", 1000).unwrap();
+        drop(db);
+
+        let err = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .err()
+        .unwrap();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreNewer),
+            "{err:#}"
+        );
+        let err = format!("{err:#}");
+        assert!(err.contains("upgrade this program"), "{err}");
+        assert!(!err.contains("delete"), "{err}");
+    }
+
+    #[test]
+    fn a_database_another_program_wrote_is_refused_as_foreign() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        db.execute_batch("CREATE TABLE notes (body TEXT)").unwrap();
+        drop(db);
+
+        let err = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .err()
+        .unwrap();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreForeign),
+            "{err:#}"
+        );
+    }
+
+    /// A store an earlier draft left without a canonical table is refused
+    /// saying to run its sync engine, never to delete it.
+    #[test]
+    fn a_stale_store_is_refused_saying_to_run_the_sync_engine() {
+        let (dir, _client) = sent_store();
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        db.execute_batch("DROP TABLE item_address").unwrap();
+        drop(db);
+
+        let err = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .err()
+        .unwrap();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreStale),
+            "{err:#}"
+        );
+        let err = format!("{err:#}");
+        assert!(err.contains("sync engine"), "{err}");
+        assert!(!err.contains("delete"), "{err}");
+    }
+
+    /// A store two accounts share, `work` and `home`, each holding one
+    /// mailbox, and a client reading each.
+    fn shared_store() -> (tempfile::TempDir, PimdirClient, PimdirClient) {
+        let dir = tempfile::tempdir().unwrap();
+        for account in ["work", "home"] {
+            io_pimdir::client::PimdirStore::open(dir.path())
+                .unwrap()
+                .for_account(account)
+                .ensure_collection(format!("{account}/INBOX"), MAIL_KIND)
+                .unwrap();
+        }
+
+        let client = |account: &str| {
+            PimdirClient::new(PimdirConfig {
+                root: dir.path().to_path_buf(),
+                account: Some(account.into()),
+            })
+            .unwrap()
+        };
+        let (work, home) = (client("work"), client("home"));
+        (dir, work, home)
+    }
+
+    #[test]
+    fn a_cancel_refuses_another_accounts_row() {
+        let (_dir, mut work, mut home) = shared_store();
+        let staged = home.add_message("home/INBOX", &[], DRAFT.to_vec()).unwrap();
+
+        let err = work.cancel_queued(staged.queue_id).unwrap_err();
+
+        assert!(err.to_string().contains("account"), "{err}");
+        assert_eq!(home.store.pending_actions("home/INBOX").unwrap().len(), 1);
+        let ours = work.add_message("work/INBOX", &[], DRAFT.to_vec()).unwrap();
+        assert_eq!(work.cancel_queued(ours.queue_id).unwrap(), "add");
+    }
+
+    #[test]
+    fn a_store_two_accounts_share_is_refused_without_an_account() {
+        let (dir, _work, _home) = shared_store();
+
+        let err = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .err()
+        .unwrap()
+        .to_string();
+
+        assert!(err.contains("home, work"), "{err}");
+        assert!(err.contains("pimdir.account"), "{err}");
     }
 
     #[test]
@@ -2221,7 +2805,7 @@ mod tests {
             .store_flags(
                 "imap/Archive",
                 &[id.as_str()],
-                &[Flag::from_iana(IanaFlag::Seen)],
+                &[Flag::from_raw("act")],
                 FlagOp::Add,
             )
             .unwrap();
@@ -2311,6 +2895,67 @@ mod tests {
         );
         assert_eq!(pushdown("flag seen and from x"), PimdirPushdown::default());
         assert_eq!(pushdown("after 9999-12-31"), PimdirPushdown::default());
+    }
+
+    /// A body clause matches against the local body, on both search paths;
+    /// a message whose body is not local matches none.
+    #[test]
+    fn a_body_clause_reads_the_local_body() {
+        let (dir, mut client) = sent_store();
+        for (id, text) in [("a", "See attached."), ("b", "Nothing here.")] {
+            let raw = format!(
+                "Message-ID: <{id}@x.org>\r\nFrom: a@x.org\r\nDate: Thu, 14 May 2026 \
+                 10:00:00 +0000\r\nSubject: {id}\r\n\r\n{text}\r\n"
+            );
+            client
+                .add_message("imap/Sent", &[], raw.into_bytes())
+                .unwrap();
+        }
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 2);
+        drop(owner);
+        seed(
+            dir.path(),
+            "imap/Sent",
+            &[Seeded {
+                handle: "c".into(),
+                flags: known(&[]),
+                summary: Some(PimdirMailSummary {
+                    message_id: Some("c@x.org".into()),
+                    subject: "attached".into(),
+                    date: Some("2026-05-14T10:00:00Z".into()),
+                    ..Default::default()
+                }),
+            }],
+        );
+
+        let subjects = |client: &mut PimdirClient, query: &str| {
+            let query = query.parse::<SearchEmailsQuery>().unwrap();
+            let filter = query.filter.as_ref();
+            let scanned = client
+                .search_scanned("imap/Sent", filter, None, None, None)
+                .unwrap();
+            let mut subjects: Vec<String> = client
+                .search_envelopes("imap/Sent", Some(&query), None, None, false)
+                .unwrap()
+                .into_iter()
+                .map(|envelope| envelope.subject)
+                .collect();
+            let mut other: Vec<String> = scanned.into_iter().map(|e| e.subject).collect();
+            subjects.sort();
+            other.sort();
+            assert_eq!(subjects, other, "the two search paths disagree");
+            subjects
+        };
+
+        assert_eq!(subjects(&mut client, "body attached"), ["a"]);
+        assert_eq!(
+            subjects(&mut client, "not body attached"),
+            ["attached", "b"]
+        );
+        assert_eq!(subjects(&mut client, "subject attached"), ["attached"]);
     }
 
     #[test]
@@ -2410,6 +3055,31 @@ mod tests {
             });
             eprintln!("envelope search -s 50 `{query}`: whole {scanned:?}, paged {pushed:?}");
         }
+
+        let indexed = Instant::now();
+        io_pimdir::client::search::PimdirIndex::open(dir.path())
+            .unwrap()
+            .refresh(&Default::default())
+            .unwrap();
+        eprintln!("indexed 50,000 mails in {:?}", indexed.elapsed());
+        let options = io_pimdir::client::search::PimdirSearchOptions::default();
+        for query in [
+            "is:unread",
+            "date:2026-08-01..",
+            "from:user1",
+            "subject:release",
+        ] {
+            let parsed = crate::pimdir::index::parse_query(&[query.to_string()], true).unwrap();
+            let searched = median(|| {
+                client
+                    .search_mail(parsed.clone(), &options)
+                    .unwrap()
+                    .hits
+                    .len()
+            });
+            let counted = median(|| client.count_mail(parsed.clone()).unwrap().0 as usize);
+            eprintln!("pimdir search `{query}`: page {searched:?}, count {counted:?}");
+        }
     }
 
     /// A store holding `imap/INBOX` with five mails: `k0` carrying no flag,
@@ -2504,7 +3174,7 @@ mod tests {
         assert_eq!(staged[0].id, id);
         let pending = client.store.pending_actions("imap/INBOX").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, staged[0].queue_id);
+        assert_eq!(Some(pending[0].id), staged[0].queue_id);
         assert_eq!(
             client.read_flags("imap/INBOX", &id).unwrap(),
             Some(vec!["todo".to_string()])
@@ -2568,8 +3238,13 @@ mod tests {
                 &[keyword("todo")],
                 FlagOp::Add,
             )
-            .unwrap_err()
-            .to_string();
+            .unwrap_err();
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::Unsupported),
+            "{err:#}"
+        );
+        let err = format!("{err:#}");
 
         assert!(
             err.contains(
@@ -2632,8 +3307,8 @@ mod tests {
                     &[Flag::from_iana(IanaFlag::Flagged)],
                     op,
                 )
-                .unwrap_err()
-                .to_string();
+                .unwrap_err();
+            let err = format!("{err:#}");
             assert!(err.contains("never synced"), "{err}");
             assert!(err.contains(&format!("`{unread}`")), "{err}");
         }
@@ -2707,8 +3382,8 @@ mod tests {
                 &[Flag::from_iana(IanaFlag::Seen)],
                 FlagOp::Set,
             )
-            .unwrap_err()
-            .to_string();
+            .unwrap_err();
+        let err = format!("{err:#}");
 
         assert!(err.contains(MAIL_FLAGS_KEYWORDS), "{err}");
         assert!(err.contains(&format!("`{}`", ids[1])), "{err}");
@@ -2740,5 +3415,126 @@ mod tests {
             .unwrap();
         assert!(staged.is_empty());
         assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
+    }
+
+    /// A refile or a delete stages the ids the mailbox holds and counts them,
+    /// an unknown one skipped; none known stages nothing.
+    #[test]
+    fn a_refile_or_delete_stages_the_ids_it_found() {
+        let (dir, mut client) = flag_store(None);
+        seed(dir.path(), "imap/Archive", &[]);
+        let ids: Vec<String> = (0..3).map(|n| id_of(&mut client, n)).collect();
+        let queued = |client: &PimdirClient| client.store.list_pending_actions().unwrap().len();
+
+        let copied = client.copy_messages("imap/INBOX", "imap/Archive", &[&ids[0], "999"]);
+        assert_eq!(copied.unwrap(), 1);
+        assert_eq!(queued(&client), 1);
+        let moved = client.move_messages("imap/INBOX", "imap/Archive", &[&ids[1], "999"]);
+        assert_eq!(moved.unwrap(), 1);
+        assert_eq!(queued(&client), 2);
+        let deleted = client.delete_messages("imap/INBOX", &[&ids[2], "999"]);
+        assert_eq!(deleted.unwrap(), 1);
+        assert_eq!(queued(&client), 3);
+
+        let none = client.copy_messages("imap/INBOX", "imap/Archive", &["998", "999"]);
+        assert_eq!(none.unwrap(), 0);
+        assert!(
+            client
+                .delete_messages("imap/INBOX", &[&ids[0], "x"])
+                .is_err()
+        );
+        assert_eq!(queued(&client), 3);
+    }
+
+    /// A held item whose blob file is gone reads as not local yet, the
+    /// cue to sync, and not as a loss (pimdir GUIDE §14).
+    #[test]
+    fn a_body_gone_from_the_blob_tree_reads_as_pending() {
+        let (dir, mut client) = sent_store();
+        client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+        let id = client
+            .list_envelopes("imap/Sent", None, None, false)
+            .unwrap()[0]
+            .id
+            .clone();
+        let item = client.get("imap/Sent", &id).unwrap().unwrap();
+        std::fs::remove_file(client.blobs.path(item.object.as_ref().unwrap())).unwrap();
+
+        let err = client.get_message("imap/Sent", &id, false).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::BodyPending),
+            "{err}"
+        );
+    }
+
+    /// A flag change leaving a message as it shows stages nothing for it,
+    /// and still counts it found.
+    #[test]
+    fn a_flag_change_the_message_shows_already_stages_nothing() {
+        let (_dir, mut client) = flag_store(None);
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+        let ids = [id_of(&mut client, 2), id_of(&mut client, 4)];
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+
+        let count = client
+            .store_flags("imap/INBOX", &ids, &seen, FlagOp::Add)
+            .unwrap();
+
+        assert_eq!(count, 2);
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// A row the owner parked shows in the mailbox it was queued in, with
+    /// why, and is cancelled as a pending one is.
+    #[test]
+    fn a_parked_row_is_listed_and_cancelled() {
+        let (dir, mut client) = sent_store();
+        let twin = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        // NOTE: the source lists the same message before the owner drains
+        // the add, which then parks.
+        let listed = PimdirMailSummary {
+            message_id: Some("d1@x.org".into()),
+            ..Default::default()
+        };
+        seed(
+            dir.path(),
+            "imap/Sent",
+            &[Seeded {
+                handle: "1".into(),
+                flags: known(&[]),
+                summary: Some(listed),
+            }],
+        );
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        owner.drain().unwrap();
+        drop(owner);
+
+        let parked = client.parked_actions("imap/Sent").unwrap();
+        assert_eq!(parked.len(), 1, "{parked:?}");
+        assert_eq!(parked[0].id, twin.queue_id);
+        assert_eq!(parked[0].action, "add");
+        assert!(!parked[0].error.is_empty());
+
+        assert_eq!(client.cancel_queued(twin.queue_id).unwrap(), "add");
+        assert!(client.parked_actions("imap/Sent").unwrap().is_empty());
     }
 }

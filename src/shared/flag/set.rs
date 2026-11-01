@@ -50,7 +50,12 @@ impl FlagSetCommand {
         }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(FlagSetOutput { flags, count })
+        let queued = client.queues_writes();
+        printer.out(FlagSetOutput {
+            flags,
+            count,
+            queued,
+        })
     }
 }
 
@@ -61,11 +66,18 @@ pub(crate) struct FlagSetOutput {
     flags: Vec<String>,
     /// How many of the given messages were found.
     count: usize,
+    /// Whether the backend queued the change for its sync engine rather
+    /// than made it, which only the wording says.
+    #[serde(skip)]
+    queued: bool,
 }
 
 impl fmt::Display for FlagSetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (count, flags) = (self.count, self.flags.join(", "));
+        if self.queued {
+            return writeln!(f, "Flags queued for setting on {count} message(s): {flags}");
+        }
         writeln!(f, "Successfully set flags on {count} message(s): {flags}")
     }
 }
@@ -79,6 +91,7 @@ mod tests {
         let output = FlagSetOutput {
             flags: vec!["seen".into(), "flagged".into()],
             count: 2,
+            queued: false,
         };
 
         assert_eq!(

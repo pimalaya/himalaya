@@ -31,11 +31,15 @@ use crate::{
 /// Every backend `--backend` allows is opened, which exercises the same
 /// handshake and authentication paths a real command takes. The report
 /// names each backend and whether it answered.
+///
+/// A backend that fails fails the command, with one error naming each
+/// failed backend and why.
 #[derive(Debug, Parser)]
 pub struct AccountCheckCommand;
 
 impl AccountCheckCommand {
-    /// Checks every allowed backend of the account and prints the report.
+    /// Checks every allowed backend of the account and prints the report,
+    /// or fails naming every backend that did not answer.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -52,6 +56,21 @@ impl AccountCheckCommand {
             .take_account(account_name)?
             .ok_or_else(|| anyhow::anyhow!("Cannot find account"))?;
 
+        #[cfg_attr(
+            not(any(
+                feature = "imap",
+                feature = "jmap",
+                feature = "gmail",
+                feature = "msgraph",
+                feature = "maildir",
+                feature = "m2dir",
+                feature = "mbox",
+                feature = "pimdir",
+                feature = "smtp",
+                feature = "sieve"
+            )),
+            allow(unused_mut)
+        )]
         let mut report = AccountCheckOutput {
             account: name,
             backends: Vec::new(),
@@ -140,6 +159,15 @@ impl AccountCheckCommand {
                 .push(BackendCheck::from("mbox", connect_mbox(mbox_config)));
         }
 
+        #[cfg(feature = "pimdir")]
+        if backend.allows_pimdir()
+            && let Some(pimdir_config) = &account_config.pimdir
+        {
+            report
+                .backends
+                .push(BackendCheck::from("pimdir", connect_pimdir(pimdir_config)));
+        }
+
         #[cfg(feature = "smtp")]
         if backend.allows_smtp()
             && let Some(smtp_config) = &account_config.smtp
@@ -166,6 +194,23 @@ impl AccountCheckCommand {
                 backend,
                 Backend::COMPILED,
             ));
+        }
+
+        let failed: Vec<String> = report
+            .backends
+            .iter()
+            .filter_map(|check| {
+                let err = check.error.as_ref()?;
+                Some(format!("{}: {err}", check.backend))
+            })
+            .collect();
+
+        if !failed.is_empty() {
+            bail!(
+                "Account `{}` failed its check: {}",
+                report.account,
+                failed.join("; ")
+            );
         }
 
         printer.out(report)
@@ -424,6 +469,25 @@ fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
     Ok(())
 }
 
+/// Opens the pimdir store as a reader, lists its mailboxes, then opens a
+/// producer and probes it, so a missing, foreign or busy store fails here
+/// rather than on the first read or write.
+///
+/// The probe takes and releases the staging lock without waiting on a
+/// collector, and the database's write lock, writing nothing.
+#[cfg(feature = "pimdir")]
+fn connect_pimdir(pimdir_config: &crate::config::PimdirConfig) -> Result<()> {
+    use anyhow::Context;
+
+    let mut client = crate::pimdir::client::PimdirClient::new(pimdir_config.clone())?;
+    client.list_mailboxes(false)?;
+    client
+        .producer()?
+        .probe()
+        .map_err(crate::error::pimdir_error)
+        .with_context(|| format!("Probe pimdir store `{}`", pimdir_config.root.display()))
+}
+
 /// Opens an authenticated SMTP session and drops it.
 #[cfg(feature = "smtp")]
 pub(crate) fn connect_smtp(
@@ -501,6 +565,18 @@ pub struct BackendCheck {
 
 impl BackendCheck {
     /// Folds a connection attempt into its outcome.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir",
+        feature = "mbox",
+        feature = "pimdir",
+        feature = "smtp",
+        feature = "sieve"
+    ))]
     fn from(backend: &'static str, result: Result<()>) -> Self {
         match result {
             Ok(()) => Self {
@@ -527,5 +603,118 @@ impl fmt::Display for AccountCheckOutput {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "pimdir"))]
+mod tests {
+    use std::{
+        fmt,
+        fs::{self, OpenOptions},
+    };
+
+    use anyhow::Result;
+    use io_pimdir::client::PimdirStore;
+    use pimalaya_cli::{error::code_of, printer::Printer};
+    use serde::Serialize;
+
+    use crate::{
+        account::check::{AccountCheckCommand, connect_pimdir},
+        backend::Backend,
+        config::PimdirConfig,
+        error::ErrorCode,
+    };
+
+    /// A printer keeping what it is handed, as text.
+    #[derive(Default)]
+    struct Capture(String);
+
+    impl Printer for Capture {
+        fn out<T: fmt::Display + Serialize>(&mut self, data: T) -> Result<()> {
+            self.0.push_str(&data.to_string());
+            Ok(())
+        }
+
+        fn is_json(&self) -> bool {
+            false
+        }
+    }
+
+    /// An account reading a pimdir store alone is checked rather than
+    /// refused as declaring no backend, and a store that does not answer
+    /// fails the command, naming the backend and why, so a script reads
+    /// the verdict from the exit code.
+    #[test]
+    fn a_pimdir_account_is_checked() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = dir.path().join("store");
+        let config = dir.path().join("config.toml");
+        std::fs::write(
+            &config,
+            format!(
+                "[accounts.test]\ndefault = true\npimdir.root = {:?}\n",
+                store.display().to_string(),
+            ),
+        )
+        .unwrap();
+        let check = || {
+            let mut printer = Capture::default();
+            let result = AccountCheckCommand.execute(
+                &mut printer,
+                std::slice::from_ref(&config),
+                None,
+                Backend::Auto,
+            );
+            (result, printer.0)
+        };
+
+        let (result, out) = check();
+        let err = format!("{:#}", result.unwrap_err());
+        assert!(err.contains("pimdir: No pimdir store"), "{err}");
+        assert!(out.is_empty(), "{out}");
+
+        io_pimdir::client::PimdirStore::open(&store)
+            .unwrap()
+            .ensure_collection("imap/INBOX", "message/rfc822")
+            .unwrap();
+        let (result, out) = check();
+        result.unwrap();
+        assert!(out.contains("pimdir: OK"), "{out}");
+    }
+
+    /// A collector holding the staging lock fails the check at once with
+    /// `store-busy`, a store the reader opens being one a write may still
+    /// not reach, and the check stages nothing into the blob tree.
+    #[test]
+    fn a_held_staging_lock_fails_the_check_as_busy() {
+        let dir = tempfile::tempdir().unwrap();
+        PimdirStore::open(dir.path())
+            .unwrap()
+            .ensure_collection("imap/INBOX", "message/rfc822")
+            .unwrap();
+        let collector = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(dir.path().join("objects.lock"))
+            .unwrap();
+        collector.try_lock().unwrap();
+
+        let config = PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        };
+        let err = connect_pimdir(&config).unwrap_err();
+        assert_eq!(code_of(&err), Some(ErrorCode::StoreBusy), "{err:#}");
+
+        drop(collector);
+        connect_pimdir(&config).unwrap();
+
+        let objects = dir.path().join("objects");
+        let left: Vec<_> = match fs::read_dir(&objects) {
+            Ok(entries) => entries.map(|entry| entry.unwrap().path()).collect(),
+            Err(_) => Vec::new(),
+        };
+        assert!(left.is_empty(), "{left:?}");
     }
 }

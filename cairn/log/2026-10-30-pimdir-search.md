@@ -1,0 +1,23 @@
+---
+cairn: log
+change: pimdir-search
+landed: 2026-10-30
+---
+
+# pimdir search through the store's index
+
+Phases 1 to 4 of the plan approved on 2026-10-30 (plan-himalaya-pimdir-search.md), on io-pimdir's query-only index of the same day (its log a-query-only-index). Phase 0 landed earlier as a-body-clause-reads-the-local-body.
+
+- The `pimdir` feature enables io-pimdir `search`. The lockfile gains ical-rs (pinned to the git revision io-pimdir builds against, 99b9273, the crates.io 0.6.1 lacking the instant walk and the versioned time zone database it uses), vcard-rs 0.5.2 and jiff-tzdb; nothing else moved.
+- src/pimdir/index.rs: the query client. `PimdirIndex::open_query`, read-only, never built, rebuilt nor refreshed; the user's query scoped as its conjuncts plus `kind:mail` and `account:<account>` when the store names it, the conjuncts kept at the top where io-pimdir reads the date range its coverage is computed over. A hit carries the envelope of its first placement, read from the store reader with no queue overlay, the mailboxes holding it, what matched and the snippet.
+- `pimdir search`, `pimdir count`, `pimdir thread`, `pimdir tag` (src/pimdir/search.rs, count.rs, thread.rs, tag.rs), JSON schemas `himalaya-pimdir-search`, `-search-threads`, `-count`, `-thread`, `-tag`. The plan spelled the last two `pimdir search count|tag`; a `search` taking its query as a positional would read `pimdir search count` as a search for `count`, so the four are siblings, as io-pimdir's own CLI has them. `tag` stages through io-pimdir's `PimdirSearchTagPlan::stage` (every action through the gate before the first), never drains, and has `--dry-run`.
+- Coverage: `PimdirMailCoverage` (`complete`, `bodiless`, `unindexed`, `behind`, `since`, `until`, `filling`) in every answer, a line under the table when incomplete. `complete` also requires `behind` at 0, which io-pimdir's `is_complete` leaves out.
+- Codes: `index-missing`, `index-outdated`, `index-fts5-missing`, `query-refused`, `query-unanswerable`, `tag-refused`, relayed by io-pimdir's spelling; the missing and outdated messages are io-pimdir's, saying the store's sync engine builds or rebuilds the index.
+- Deviation, open question: the plan asked for the SEARCH §8.4 refusal object as the JSON error. Himalaya's error contract has one failure shape (`himalaya-error`: `code`, `error`, `sources`, `backtrace`), so a refusal is `query-refused` with the §8.4 code, span and expectations in `error` under `--json`, and an ariadne drawing of the span in plain output. Carrying the object itself needs pimalaya-cli's error report to take structured details.
+- The draft a-search-says-what-it-covered is closed as abandoned, absorbed here: the coverage lives on the pimdir commands, the shared `envelope list` keeping none.
+
+Tests (src/pimdir/index.rs), on scratch stores whose adds a test owner drains and whose index the test builds with io-pimdir's owner-side `PimdirIndex::open` and `refresh`: body, subject, address (`from:`, `to:`), flag, date and range hits, negation, a summary-only match and its `bodiless` count, paging and `more`, a count, a queued add not found until drained and refreshed with `behind` reported in between, threads and `pimdir thread`, tag staging, `unchanged`, `unknownFlags` and `--dry-run`, a tag naming no flag, every §8.4 refusal code in both renderings, a missing and an outdated index, a range below the coverage, the configured account alone in a store of two. Removing the account term fails `a_search_reads_the_configured_account_alone` (`left: 2`, `right: 1`); nesting the user's conjunction fails `a_range_below_the_coverage_is_not_complete`.
+
+Benchmark: `fifty_thousand_mails_list_one_page` (ignored, release, pimdir alone) now builds the index and times a page of 50 and a count. On 50,000 summary-only mails: the owner-side build took 454 s; `date:2026-08-01..`, `from:user1` and `subject:release` answer a page in about 530 to 590 ms and a count in 90 to 140 ms; `is:unread` takes 25 s a page and 24 s a count. Both the build time and `is:unread` are io-pimdir's (the count is its query alone), reported there; the shared `envelope search -s 50` path stays at 9 to 35 ms for the same filters.
+
+Capabilities moved: **search** (pimdir searches through the store's index; pimdir counts, threads and tags from the index; A pimdir search says what it did not cover; A missing or outdated pimdir index is a coded error; A refused pimdir query names its fault, added), **backends** (pimdir is a reader and a producer, never the owner: the index is read-only), **commands** (the JSON error code table).

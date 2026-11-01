@@ -126,8 +126,10 @@ pub struct PimdirFlagStageOutput {
 pub struct PimdirFlagRow {
     /// The message's public id.
     pub id: String,
-    /// The `set-flags` row, which `pimdir queue show` and `cancel` take.
-    pub queue_id: i64,
+    /// The `set-flags` row, which `pimdir queue show` and `cancel` take,
+    /// `null` when the change left the message as it was and nothing was
+    /// staged.
+    pub queue_id: Option<i64>,
 }
 
 impl PimdirFlagStageOutput {
@@ -159,7 +161,10 @@ impl fmt::Display for PimdirFlagStageOutput {
         let rows: Vec<String> = self
             .queued
             .iter()
-            .map(|row| format!("{} as row {}", sanitize(&row.id), row.queue_id))
+            .map(|row| match row.queue_id {
+                Some(queue_id) => format!("{} as row {queue_id}", sanitize(&row.id)),
+                None => format!("{} unchanged", sanitize(&row.id)),
+            })
             .collect();
         writeln!(
             f,
@@ -260,20 +265,20 @@ mod tests {
         let output = PimdirFlagStageOutput::from(vec![
             PimdirFlagged {
                 id: "42".into(),
-                queue_id: 7,
+                queue_id: Some(7),
             },
             PimdirFlagged {
                 id: "43".into(),
-                queue_id: 8,
+                queue_id: None,
             },
         ]);
         assert_eq!(
             output.to_string(),
-            "Flags staged on 2 message(s): 42 as row 7, 43 as row 8\n"
+            "Flags staged on 2 message(s): 42 as row 7, 43 unchanged\n"
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"queued":[{"id":"42","queueId":7},{"id":"43","queueId":8}]}"#
+            r#"{"queued":[{"id":"42","queueId":7},{"id":"43","queueId":null}]}"#
         );
     }
 }

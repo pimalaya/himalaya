@@ -100,6 +100,10 @@ pub struct Cli {
 }
 
 /// Top-level subcommands.
+///
+/// NOTE: parsed once per run, so the size of its largest variant, which
+/// depends on the features built, costs nothing worth a box.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Subcommand)]
 pub enum Command {
     #[cfg(backend)]

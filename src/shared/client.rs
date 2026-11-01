@@ -317,6 +317,18 @@ impl EmailClient {
     /// Adds a raw message to a mailbox with the given flags, which Gmail
     /// and Microsoft Graph do not implement. Returns the new message id,
     /// absent when an IMAP or JMAP server does not report it.
+    #[cfg_attr(
+        not(any(
+            feature = "imap",
+            feature = "jmap",
+            feature = "gmail",
+            feature = "maildir",
+            feature = "m2dir",
+            feature = "mbox",
+            feature = "pimdir"
+        )),
+        allow(unused_variables)
+    )]
     pub fn add_message(
         &mut self,
         mailbox: &str,
@@ -406,11 +418,22 @@ impl EmailClient {
     /// The id of the mailbox the backend marks with `role`, `None` when it
     /// marks none.
     ///
-    /// JMAP, Gmail and Graph carry roles, IMAP only the reserved `INBOX`
-    /// until SPECIAL-USE is read, mbox the spool as `INBOX`, and Maildir,
-    /// m2dir and pimdir none, the caller falling back on the
+    /// JMAP, Gmail, Graph and pimdir carry roles, IMAP only the reserved
+    /// `INBOX` until SPECIAL-USE is read, mbox the spool as `INBOX`, and
+    /// Maildir and m2dir none, the caller falling back on the
     /// `mailbox.alias.<role>` entry.
     #[cfg(backend)]
+    #[cfg_attr(
+        not(any(
+            feature = "imap",
+            feature = "jmap",
+            feature = "gmail",
+            feature = "msgraph",
+            feature = "mbox",
+            feature = "pimdir"
+        )),
+        allow(unused_variables)
+    )]
     pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -430,7 +453,7 @@ impl EmailClient {
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => Ok(client.role_mailbox_id(role)),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(_) => Ok(None),
+            BackendClient::Pimdir(client) => client.role_mailbox_id(role),
         }
     }
 
@@ -439,6 +462,16 @@ impl EmailClient {
     /// Returns whether they were really removed, an IMAP server without
     /// UIDPLUS only flagging them `\Deleted`.
     #[cfg(backend)]
+    #[cfg_attr(
+        not(any(
+            feature = "imap",
+            feature = "maildir",
+            feature = "m2dir",
+            feature = "mbox",
+            feature = "pimdir"
+        )),
+        allow(unused_variables)
+    )]
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -456,8 +489,19 @@ impl EmailClient {
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client.delete_messages(mailbox, ids).map(|()| true),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            BackendClient::Pimdir(client) => client.delete_messages(mailbox, ids).map(|_| true),
         }
+    }
+
+    /// Whether the storage backend queues its writes for a sync engine to
+    /// apply later rather than performing them, so a confirmation says the
+    /// write is queued rather than done.
+    pub fn queues_writes(&self) -> bool {
+        #[cfg(feature = "pimdir")]
+        if let Some(BackendClient::Pimdir(_)) = &self.storage {
+            return true;
+        }
+        false
     }
 
     /// Sends a raw message through the storage backend when it can send,
@@ -538,6 +582,9 @@ impl EmailClient {
             BackendClient::Gmail(client) => client.resolve_mailbox_id(mailbox),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(client) => client.resolve_mailbox_id(mailbox),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.resolve_mailbox_id(mailbox),
+            #[allow(unreachable_patterns)]
             _ => Ok(mailbox.to_string()),
         }
     }

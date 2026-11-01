@@ -50,7 +50,12 @@ impl FlagRemoveCommand {
         }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(FlagRemoveOutput { flags, count })
+        let queued = client.queues_writes();
+        printer.out(FlagRemoveOutput {
+            flags,
+            count,
+            queued,
+        })
     }
 }
 
@@ -61,11 +66,21 @@ pub(crate) struct FlagRemoveOutput {
     flags: Vec<String>,
     /// How many of the given messages were found.
     count: usize,
+    /// Whether the backend queued the change for its sync engine rather
+    /// than made it, which only the wording says.
+    #[serde(skip)]
+    queued: bool,
 }
 
 impl fmt::Display for FlagRemoveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (count, flags) = (self.count, self.flags.join(", "));
+        if self.queued {
+            return writeln!(
+                f,
+                "Flags queued for removal from {count} message(s): {flags}"
+            );
+        }
         writeln!(
             f,
             "Successfully removed flags from {count} message(s): {flags}"
@@ -82,6 +97,7 @@ mod tests {
         let output = FlagRemoveOutput {
             flags: vec!["seen".into(), "flagged".into()],
             count: 2,
+            queued: false,
         };
 
         assert_eq!(

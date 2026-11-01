@@ -50,7 +50,12 @@ impl FlagAddCommand {
         }
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(FlagAddOutput { flags, count })
+        let queued = client.queues_writes();
+        printer.out(FlagAddOutput {
+            flags,
+            count,
+            queued,
+        })
     }
 }
 
@@ -61,11 +66,18 @@ pub(crate) struct FlagAddOutput {
     flags: Vec<String>,
     /// How many of the given messages were found.
     count: usize,
+    /// Whether the backend queued the change for its sync engine rather
+    /// than made it, which only the wording says.
+    #[serde(skip)]
+    queued: bool,
 }
 
 impl fmt::Display for FlagAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (count, flags) = (self.count, self.flags.join(", "));
+        if self.queued {
+            return writeln!(f, "Flags queued for adding on {count} message(s): {flags}");
+        }
         writeln!(f, "Successfully added flags to {count} message(s): {flags}")
     }
 }
@@ -79,6 +91,7 @@ mod tests {
         let output = FlagAddOutput {
             flags: vec!["seen".into(), "flagged".into()],
             count: 2,
+            queued: false,
         };
 
         assert_eq!(
@@ -88,6 +101,24 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
             r#"{"flags":["seen","flagged"],"count":2}"#
+        );
+    }
+
+    #[test]
+    fn a_queued_change_says_it_is_queued_and_keeps_its_json() {
+        let output = FlagAddOutput {
+            flags: vec!["seen".into()],
+            count: 1,
+            queued: true,
+        };
+
+        assert_eq!(
+            output.to_string(),
+            "Flags queued for adding on 1 message(s): seen\n"
+        );
+        assert_eq!(
+            serde_json::to_string(&output).unwrap(),
+            r#"{"flags":["seen"],"count":1}"#
         );
     }
 }

@@ -361,6 +361,7 @@ himalaya sieve list
 himalaya sieve check --script-file filters.sieve
 himalaya sieve put main --script-file filters.sieve
 himalaya sieve activate main
+himalaya pimdir search from:alice@example.com has:attachment date:2026-01..2026-03
 ```
 
 ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port, 4190, and reaches TLS on it through STARTTLS, so a bare server address takes `sieve://` with the upgrade on where the IMAP and SMTP ones take their implicit-TLS scheme.
@@ -368,6 +369,8 @@ ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port
 `sieves://` is accepted too, for the deployments listening for a handshake straight away. A password or a bearer token is refused on an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
 
 `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw` are available, and `put` and `check` accept a script file, inline text or stdin.
+
+On a pimdir account, `pimdir search`, `pimdir count`, `pimdir thread` and `pimdir tag` ask the store's search index in the [pimdir query language](https://github.com/pimalaya/pimdir/blob/master/SEARCH.md): words, phrases, `field:value` terms, `and`, `or`, `not` and parentheses, over the account's mail. The store's sync engine builds the index and refreshes it after each run; Himalaya only reads it, so a message shows once it is synced and indexed, and a line under the results says what they could not see (bodies not downloaded, mail older than what the store holds, the index lagging the store). `pimdir tag` queues one flag change per matched message for the sync engine to apply.
 
 ### Composing messages
 

@@ -138,8 +138,8 @@
 #
 # An entry named after a mailbox role (inbox, sent, drafts, trash, junk,
 # archive, flagged, important) overrides the role the backend reports. JMAP,
-# Gmail and Graph report their roles, IMAP and mbox the inbox alone for now,
-# and Maildir, m2dir and pimdir none, so set them by hand there. The `inbox` role
+# Gmail, Graph and pimdir report their roles, IMAP and mbox the inbox alone for
+# now, and Maildir and m2dir none, so set them by hand there. The `inbox` role
 # is the default mailbox every shared command falls back to when
 # `-m/--mailbox` is not passed.
 #mailbox.alias.inbox = "INBOX"
@@ -461,7 +461,7 @@ imap.sasl.plain.password.raw = "***"
 # under. Leave it unset: a store synced by one account is read as that one. Set
 # it for a store several accounts share, where guessing shows the wrong
 # mailboxes.
-#pimdir.account = "posteo"
+#pimdir.account = "example"
 
 # A mailbox is its collection id, verbatim: Neverest binds a source's
 # collections under a namespace, so the mailbox your server calls `INBOX` is

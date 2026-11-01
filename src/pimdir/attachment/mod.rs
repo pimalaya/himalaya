@@ -14,10 +14,10 @@ pub mod cli;
 pub mod list;
 pub mod search;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use io_pimdir::client::reader::{PimdirAccountAttachment, PimdirAccountAttachmentCursor};
 
-use crate::pimdir::client::PimdirClient;
+use crate::{error::pimdir_error, pimdir::client::PimdirClient};
 
 /// How many stand-ins a search reads per keyset page, so a sparse match
 /// does not cost a query per row.
@@ -58,7 +58,8 @@ impl PimdirClient {
             let page = self
                 .store
                 .list_attachments_by_account(self.account.as_deref(), after.as_ref(), batch)
-                .map_err(|err| anyhow!("List the account's attachments: {err}"))?;
+                .map_err(pimdir_error)
+                .context("List the account's attachments")?;
             let read = page.len();
             for attachment in page {
                 after = Some(attachment.cursor());

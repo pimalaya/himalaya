@@ -69,7 +69,7 @@ Keyword reading is not a round trip: no command can name a custom keyword, so a 
 A sidecar that is absent, unreadable or disabled SHALL yield no keywords rather than fail the listing, since a mailbox without one is the normal case rather than an error.
 
 ### Requirement: A Message-ID is not an address
-The pimdir backend SHALL NOT assume an item's link id is the `Message-ID` its body carries, nor that a `Message-ID` identifies at most one message in a mailbox. A store may hold two messages of one mailbox sharing a `Message-ID`, keyed apart by the store (pimdir SPEC §9), and both SHALL list, read and act as ordinary messages, each with its own public id and neither marked.
+The pimdir backend SHALL NOT assume an item's link id is the `Message-ID` its body carries, nor that a `Message-ID` identifies at most one message in a mailbox. A store may hold two messages of one mailbox sharing a `Message-ID`, keyed apart by the store (pimdir STORAGE §9), and both SHALL list, read and act as ordinary messages, each with its own public id and neither marked.
 
 What stays unique is the key and the public id: `(collection, link_id)` still names one item and `seq` still names one message. What ends is the link id being derivable from the body, so a read that re-derives an identity in order to address a row is addressing an unknown number of them.
 
@@ -83,59 +83,139 @@ Addressing by the public id is what keeps two duplicated messages distinguishabl
 ### Requirement: A pimdir mailbox is its collection id
 The pimdir backend SHALL show and accept a mailbox as the store's collection id, verbatim: the collection `imap/INBOX` is the mailbox `imap/INBOX`. It SHALL NOT derive, strip or accept a shortened spelling, and no configuration SHALL offer one.
 
-The id is opaque to the store, which neither parses nor validates it (pimdir SPEC 9.2) and models hierarchy through `parent` rather than through a separator. Any shortening is therefore a guess at the producer's convention, and one that makes a single mailbox answer to two spellings. This is the JMAP backend's shape, whose ids are opaque server strings, and `[mailbox.alias]` is the shortcut for both.
+The id is opaque to the store, which neither parses nor validates it (pimdir STORAGE §9.2) and models hierarchy through `parent` rather than through a separator. Any shortening is therefore a guess at the producer's convention, and one that makes a single mailbox answer to two spellings. This is the JMAP backend's shape, whose ids are opaque server strings, and `[mailbox.alias]` is the shortcut for both.
 
 `Mailbox.name` SHALL carry the collection row's own name rather than one derived from the id.
 
 A mailbox is a collection declared `message/rfc822`, matched on the bare media type. A collection declaring no kind is not a mailbox: the store cannot summarise it, and the draft that left kinds undeclared is refused on open rather than read.
 
-A mailbox matching no collection of the account SHALL be refused naming the ones it holds. It SHALL NOT be passed to the store unresolved, which reads as a mailbox that exists and is empty.
+A value matching no collection id of the account SHALL be taken as a role name when it is one (`inbox`, `sent`, `drafts`, `trash`, ...), addressing the account's mailbox whose recorded role (`collections.role`) it is; several mailboxes carrying the role SHALL be refused naming them. A collection's name SHALL NOT address it: two sources may hold mailboxes of one name. A value matching neither SHALL be refused naming the mailboxes the account holds. It SHALL NOT be passed to the store unresolved, which reads as a mailbox that exists and is empty.
+
+#### Scenario: The inbox by its role
+- GIVEN a pimdir account whose store records the role `inbox` on `imap/INBOX`
+- WHEN `envelope list` runs without `-m`
+- THEN the envelopes of `imap/INBOX` are listed
+
+#### Scenario: The trash by its role
+- GIVEN a pimdir account with no `mailbox.alias.trash` and a mailbox recorded with the role `trash`
+- WHEN `message delete` runs on a message of another mailbox
+- THEN the message is staged as a move to that mailbox
 
 ### Requirement: pimdir reads one account
-The pimdir backend SHALL show the collections of one account (pimdir SPEC §9.2), `pimdir.account` naming it. Unset, it is derived: a store holding one account, or one ungrouped set, is read as that one, and a store holding several is refused naming them rather than guessing one and showing the wrong mailbox set.
+The pimdir backend SHALL show the collections of one account (pimdir STORAGE §9.2), `pimdir.account` naming it. Unset, it is derived: a store holding one account, or one ungrouped set, is read as that one, and a store holding several is refused naming them rather than guessing one and showing the wrong mailbox set.
 
 ### Requirement: pimdir is a reader and a producer, never the owner
-The pimdir backend SHALL treat the store as a possibly-partial cache owned by the sync engine. `get_message` on an item whose body is not local (`level < Full`, no stored object) SHALL fail with the code `body-pending` (commands, "A JSON error carries a stable code"), the cue to sync, not a data-loss error; the item still lists.
+The pimdir backend SHALL treat the store as a possibly-partial cache owned by the sync engine. `get_message` on an item whose body is not local (`level < Full`, no stored object, or a stored object whose blob file is gone, pimdir GUIDE §14) SHALL fail with the code `body-pending` (commands, "A JSON error carries a stable code"), the cue to sync, not a data-loss error; the item still lists.
 
-Reads SHALL go through `PimdirReader`, the role that takes no lock (pimdir SPEC §8) and carries no write at all, so a sync in flight neither blocks Himalaya nor is blocked by it, and the backend cannot drain the queue or sweep the store even by mistake.
+Reads SHALL go through `PimdirReader`, the role that takes no lock (pimdir STORAGE §8) and carries no write at all, so a sync in flight neither blocks Himalaya nor is blocked by it, and the backend cannot drain the queue or sweep the store even by mistake.
+
+The store's search index (index.db) SHALL be opened read-only, never created, rebuilt nor refreshed: the sync engine owning the store builds and refreshes it (search, "pimdir searches through the store's index").
 
 An envelope SHALL be built from the item's typed mail summary and the addresses joined to it (pimdir STORAGE Annex A.1, A.6): every `From` and `To` address with its display name, the `In-Reply-To` list, the date, the size and the attachment mark as stored, with no body read. `hasAttachment` SHALL be `true` or `false` as the store marks it, and `null` on a row that holds no mark. A listing SHALL take the store's own order, newest first, the mail sort key being the date.
 
-The reader SHALL overlay the queue (pimdir SPEC §15.4), so an action this client staged is visible on the next read rather than on the next sync: a staged `set-flags`, `update`, `remove`, `move` or `copy` changes what a listing shows. Each addresses a message that already exists and keeps its public id, so a staged write never changes how a message is addressed.
+The reader SHALL overlay the queue (pimdir STORAGE §15.4), so an action this client staged is visible on the next read rather than on the next sync: a staged `set-flags`, `update`, `remove`, `move` or `copy` changes what a listing shows. Each addresses a message that already exists and keeps its public id, so a staged write never changes how a message is addressed.
 
-A write SHALL be staged as a queued `PimdirAction` through a producer handle (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`), addressed by the public `seq`, for the store's owner to apply and push. The backend SHALL NOT write the index, load a collection, or run the owner's object sweep: a sweep run beside a sync destroys the bodies it has streamed but not yet attached, which SPEC §14 explicitly invites it to leave pending. A body an action references SHALL be written to the blob store durably before the action is enqueued, the queue row being what pins it.
+A write SHALL be staged as a queued `PimdirAction` through a producer handle (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`), addressed by the public `seq`, for the store's owner to apply and push. The backend SHALL NOT write the index, load a collection, or run the owner's object sweep: a sweep run beside a sync destroys the bodies it has streamed but not yet attached, which STORAGE §14 explicitly invites it to leave pending. A body an action references SHALL be written to the blob store in the transaction appending the action, the queue row being what pins it.
 
-`SetFlags` carries the whole replacement set, so applying it twice lands the same state. An add or a remove on a set the store reports as unknown SHALL be refused, saying the message's flags were never synced: it has no markers to build on, and the replacement would erase whatever the server holds. A `set` replaces the whole set, so it SHALL stage one regardless. pimdir has no native trash.
+`SetFlags` carries the whole replacement set, so applying it twice lands the same state. An add or a remove on a set the store reports as unknown SHALL be refused, saying the message's flags were never synced: it has no markers to build on, and the replacement would erase whatever the server holds. A `set` replaces the whole set, so it SHALL stage one regardless. A change whose replacement set equals the set the message shows SHALL stage nothing for it, the message still counting as found. pimdir has no native trash.
 
-An added message SHALL derive its link id through io-pimdir's mail derivation (`summary::mail::derive`), the one implementation of SPEC Annex A.1, which is the bare `Message-ID` with nothing prepended, and SHALL name it on the queued `Add`. The action carries no summary: the owner derives the summary and the sort key from the body when it applies the action, through the same call, so the two never disagree. A staged `Add` whose link id the collection already holds SHALL park (pimdir SPEC §15.3): it neither deduplicates against the stored copy nor mints a second key. Minting is the store's answer to what a source hands over; parking is its answer to a producer authoring a message the collection already has.
+An added message SHALL derive its link id through io-pimdir's mail derivation (`summary::mail::derive`), the one implementation of STORAGE Annex A.1, which is the bare `Message-ID` with nothing prepended, and SHALL name it on the queued `Add`. The action carries no summary: the owner derives the summary and the sort key from the body when it applies the action, through the same call, so the two never disagree. An `Add` whose link id the mailbox already holds live, or has an `add` queued under, SHALL be refused with the code `item-duplicate` through io-pimdir's `enqueue_with_body_checked`, and nothing SHALL be queued nor written: the owner would park such a row (pimdir STORAGE §15.3) rather than deduplicate against the stored copy or mint a second key. Minting is the store's answer to what a source hands over; refusing is its answer to a producer authoring a message the collection already has. An `add` still parks when the source lists the same `Message-ID` after it was staged.
 
 #### Scenario: An add on flags never synced is refused
 - GIVEN a pimdir message whose flags the sync engine never read
 - WHEN `himalaya flag add -m imap/INBOX -f flagged 42` runs
 - THEN the command fails saying the flags of `42` were never synced, and nothing is queued
 
+#### Scenario: A flag the message carries already
+- GIVEN a pimdir message showing `\Seen`
+- WHEN `himalaya flag add -m imap/INBOX -f seen 6` runs
+- THEN no row is queued, and the command reports one message found
+
+#### Scenario: A body purged under a held item
+- GIVEN a pimdir item whose stored object's blob file is gone
+- WHEN `message read` runs on it
+- THEN the command fails with the code `body-pending`
+
+### Requirement: A pimdir body is written under the staging lock
+A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the body to its producer with the action in one step (`enqueue_with_body_checked`): the capability gate and, for an add, the duplicate check run on the bytes in hand, then the body is written inside the producer's staging window (pimdir STORAGE §8) and the row pinning it appended, in one transaction. A write refused by the gate or the duplicate check SHALL leave no body in the blob tree. No body SHALL reach the blob tree while a collector holds the lock: the write waits for it.
+
+#### Scenario: A collector running beside a staged add
+- GIVEN a pimdir store whose collector holds `objects.lock` exclusively
+- WHEN a message is added to a mailbox
+- THEN no body is written until the collector releases the lock, and then the body lands and its `add` is queued
+
+#### Scenario: A refused add
+- GIVEN a pimdir mailbox holding a message whose `Message-ID` is `d1@x.org`
+- WHEN another body with that `Message-ID` is added to it
+- THEN the add fails with `item-duplicate` and its body is not in the blob tree
+
+### Requirement: A pimdir store failure carries its code
+A failure io-pimdir reports SHALL keep io-pimdir's message as a cause and carry, under `--json`, the code `PimdirError::code()` gives it, spelled the same, when it is one a caller acts on: `store-newer`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-stale`, `store-hash-algo`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `item-duplicate`, `unsupported`, `no-performer` and `ambiguous-performer`. An SQL, I/O or JSON failure and a malformed action carry none. Himalaya SHALL NOT derive a code from a message, and SHALL NOT advise deleting the store: a store newer than Himalaya's schema says to upgrade Himalaya, an older, stale or reshaped one to run or upgrade the store's sync engine.
+
+#### Scenario: A store a newer sync engine wrote
+- GIVEN a pimdir store stamped with a schema version above Himalaya's
+- WHEN any pimdir command opens it
+- THEN the command fails with the code `store-newer`, saying to upgrade this program
+
+#### Scenario: A draft the mailbox holds already
+- GIVEN a pimdir mailbox holding a message whose `Message-ID` is `d1@x.org`
+- WHEN `himalaya message add -m imap/Drafts` stages a message with that `Message-ID`
+- THEN the command fails with the code `item-duplicate`, and nothing is queued
+
 ### Requirement: A queued creation is reported, not listed
 A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window. `himalaya pimdir queue list` is where queued creations show.
 
 ### Requirement: The pimdir subcommand reads and retracts the queue
-Himalaya SHALL carry a `pimdir` subcommand for what the operator CLI cannot do without knowing mail. `queue list` SHALL render a queued creation as a message (flags, subject, recipient, and when it was queued, from the row's `created_at`) where the kind-agnostic `pimdir` binary can only print ids and hashes. The queued action carries no summary, so the row SHALL be derived from the body the action pins, through the same derivation the owner applies; an action pinning no body renders with its flags alone. `queue cancel` SHALL retract one row through io-pimdir's scoped owner operation, confirming first unless `--yes`.
+Himalaya SHALL carry a `pimdir` subcommand for what the operator CLI cannot do without knowing mail. `queue list` SHALL render a queued creation as a message (flags, subject, recipient, and when it was queued, from the row's `created_at`) where the kind-agnostic `pimdir` binary can only print ids and hashes. The queued action carries no summary, so the row SHALL be derived from the body the action pins, through the same derivation the owner applies; an action pinning no body renders with its flags alone.
 
-Taking the owner role briefly is what cancelling costs (pimdir SPEC §15.5); the backend read and write paths SHALL NOT reach it. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
+Under `--json` the message SHALL be printed as an `envelope` with the shared envelope's keys and `"id": null`, a queued message having no id until the owner applies its action. No placeholder SHALL stand in for it (no `""`, `0` nor row id): the row id is the row's own `id`, shown under ROW.
+
+`queue cancel` SHALL retract one pending or parked row of the account's queue, confirming first unless `--yes`, and SHALL name the row's action kind in its prompt and output. A row anchored on a collection of another account, or one neither pending nor parked, SHALL be refused before anything is opened, and stays as it was.
+
+Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); the backend read and write paths SHALL NOT reach it. The cancel SHALL open the store only as it stands (io-pimdir `open_current`): it SHALL NOT create, migrate nor reconcile the schema, which another owner of another revision keeps. A store that is not exactly this io-pimdir's schema SHALL be refused, saying the sync engine has to open it first. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
 
 #### Scenario: A queued creation is rendered from its body
 - GIVEN a queued `add` pinning a body whose headers carry a subject and a recipient
 - WHEN the queue is listed
-- THEN the row shows that subject and recipient, and an empty message id
+- THEN the row shows that subject and recipient, and its envelope's `id` is `null` under `--json`
+
+#### Scenario: A cancel on a store of another revision
+- GIVEN a store whose schema another io-pimdir revision wrote
+- WHEN `himalaya pimdir queue cancel` runs on one of its rows
+- THEN the command fails saying the sync engine has to open the store first, and neither the schema nor the row changes
+
+#### Scenario: Another account's row
+- GIVEN a store shared by two accounts and a row queued on the other account's collection
+- WHEN `himalaya pimdir queue cancel` runs on that row
+- THEN the command fails saying the row is not in the account's queue, and the row stays queued
 
 ### Requirement: pimdir writes name their queue row
-`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, for an owner declaring no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they stage: `{"queued": [{"id": string, "queueId": i64}]}`. The shared commands SHALL keep printing no queue detail.
+`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, for an owner declaring no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"queued": [{"id": string, "queueId": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The shared commands SHALL keep printing no queue detail.
 
 `pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"queueId", "state": "pending" | "parked" | "applied" | "unknown", "collection"?, "kind"?, "attempts"?, "error"?, "appliedAt"?, "seq"?}`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5).
+
+The plain output of every `pimdir` subcommand SHALL end with a newline.
 
 #### Scenario: A staged draft is followed by its row
 - GIVEN a pimdir account
 - WHEN `himalaya --json pimdir message add -m imap/Drafts` stages a message
 - THEN it prints `{"queueId":12,"messageId":"d1@x.org"}`, and `pimdir queue show 12` prints `"state":"pending"` until the sync engine applies the row, then `"state":"applied"` with the `seq` the message is read by
+
+### Requirement: A pimdir refile or delete stages the ids it found
+`copy_messages`, `move_messages` and `delete_messages` SHALL check every given id against the mailbox before staging the first row, skip an id the mailbox does not hold, stage one row per id found and report how many they found (commands, "A command given message ids says how many it found"). A call finding none SHALL stage nothing. A malformed id SHALL fail the call before anything is staged.
+
+#### Scenario: One id of two exists
+- GIVEN a pimdir mailbox holding message 3 and no message 999
+- WHEN `message copy --from imap/INBOX --to imap/Trash 3 999` runs
+- THEN one `copy` row is queued for 3, and the command succeeds reporting one message
+
+### Requirement: The pimdir queue view shows parked rows
+`himalaya pimdir queue list` SHALL list the mailbox's parked rows, any action kind, beside its queued creations and sends: the row id, the action kind, when it was queued, and the error that parked it, as `parked` under `--json`. `queue cancel` SHALL take a parked row as it takes a pending one.
+
+#### Scenario: A duplicate draft parks
+- GIVEN a staged `add` the sync engine parked because the source listed the same `Message-ID` before applying it
+- WHEN `himalaya pimdir queue list -m imap/Drafts` runs
+- THEN the row is listed as parked with its error, and `pimdir queue cancel` on its id removes it
 
 ### Requirement: pimdir creates a mailbox by queueing an intent
 `pimdir mailbox create <NAME> [--parent <MAILBOX>]` SHALL enqueue one `collection-create` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text, "parent": collection?}`, and print `{"queueId": i64, "name": text, "parent"?: collection, "source": id}`. It SHALL NOT create a collection in the store: the mailbox arrives with the sync that performs the intent.
@@ -219,7 +299,7 @@ A page SHALL hold `--page-size` files (else `envelope.list.page-size`, else 25).
 ### Requirement: pimdir sends by queueing a submit intent
 The pimdir backend SHALL send a message by staging its raw bytes and enqueueing one `submit` action, which whatever owns the store performs through its own channel. It SHALL NOT open a network connection to send, and SHALL NOT use the account's `smtp` section.
 
-The payload SHALL be `v: 1` JSON carrying `object` (the body hash), `from`, `rcpts` and `subject`, derived from the headers by the same function the SMTP adapter uses: the first `From:` address, every `To:`, `Cc:` and `Bcc:` address, and the decoded subject. A message with no `From:` or no recipient SHALL be refused before anything is staged. The body SHALL be stored as given, `Bcc:` included; removing it is the sending channel's job.
+The payload SHALL be built by io-pimdir's `PimdirSubmit` (STORAGE Annex B.2), `v: 1` JSON carrying `source` when a performer is named, `object` (the body hash), `from`, `rcpts`, `subject`, and `copy` when the intent carries the copy, the keys and values a performer reads back with `PimdirSubmit::from_payload`. The envelope is derived from the headers by the same function the SMTP adapter uses: the first `From:` address, every `To:`, `Cc:` and `Bcc:` address, and the decoded subject. A message with no `From:` or no recipient SHALL be refused before anything is staged. The body SHALL be stored as given, `Bcc:` included; removing it is the sending channel's job.
 
 The row SHALL anchor on the `--save` mailbox when one is given, else on the mailbox `mailbox.alias.sent` names; with neither, the send SHALL be refused, naming the alias to set, rather than create a collection.
 
@@ -255,4 +335,4 @@ Backends that self-send (JMAP, Gmail, Graph) SHALL route `send_message` through 
 A JMAP send SHALL stage the message in the drafts mailbox with `$draft`, then submit it with an `onSuccessUpdateEmail` patch (RFC 8621 section 7.5) moving it to the sent mailbox, unsetting `$draft` and setting `$seen`. The drafts mailbox SHALL be `jmap.drafts-mailbox-id`, else the `drafts`-role one, the send failing without either; the sent mailbox SHALL be `jmap.sent-mailbox-id`, else the `sent`-role one, the message only losing `$draft` without either.
 
 ### Requirement: Mailbox role
-A shared mailbox SHALL carry an optional role (inbox, all, archive, drafts, flagged, important, junk, sent, subscribed, trash, or a verbatim unknown one), shown by `mailbox list` in its table and JSON output. JMAP reads it from the mailbox `role`, Gmail from its fixed system-label ids, Microsoft Graph from its well-known folder names resolved to folder ids in one `$batch` request, and IMAP marks only `INBOX`, as mbox marks its spool when one is configured. Maildir, m2dir and pimdir have no native role. A `mailbox.alias.<role>` entry overrides the native role of the mailbox it names, and `message delete` takes its trash from that alias before the backend's trash role.
+A shared mailbox SHALL carry an optional role (inbox, all, archive, drafts, flagged, important, junk, sent, subscribed, trash, or a verbatim unknown one), shown by `mailbox list` in its table and JSON output. JMAP reads it from the mailbox `role`, Gmail from its fixed system-label ids, Microsoft Graph from its well-known folder names resolved to folder ids in one `$batch` request, pimdir from the role its sync engine recorded from the server (`collections.role`), and IMAP marks only `INBOX`, as mbox marks its spool when one is configured. Maildir and m2dir have no native role. On JMAP, Gmail, Graph and pimdir a role name addresses the mailbox carrying it. A `mailbox.alias.<role>` entry overrides the native role of the mailbox it names, and `message delete` takes its trash from that alias before the backend's trash role.

@@ -14,8 +14,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::envelope::Envelope,
-    pimdir::client::PimdirClient,
+    pimdir::{backend::PimdirQueuedEnvelope, client::PimdirClient},
     shared::{
         envelope::list::{format_addresses, format_flags},
         mailbox::arg::MailboxArg,
@@ -32,7 +31,9 @@ use crate::{
 /// row id to cancel one by, when it was queued, and the mail.
 ///
 /// Staged flags, moves and deletions need no such view, addressing messages
-/// that already exist.
+/// that already exist. A row of any kind the sync engine parked, refusing to
+/// apply it without an operator, is listed under them with why: cancel it,
+/// or fix what parked it.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     #[command(flatten)]
@@ -49,6 +50,7 @@ impl PimdirQueueListCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
         let queued = client.queued_envelopes(&mailbox)?;
+        let parked = client.parked_actions(&mailbox)?;
 
         printer.out(PimdirQueueListOutput {
             preset: account.table_preset().to_string(),
@@ -69,6 +71,17 @@ impl PimdirQueueListCommand {
                     envelope: queued.envelope,
                 })
                 .collect(),
+            parked: parked
+                .into_iter()
+                .map(|parked| PimdirParkedRow {
+                    id: parked.id,
+                    queued_at: parked.created_at,
+                    producer: parked.producer,
+                    kind: parked.action,
+                    attempts: parked.attempts,
+                    error: parked.error,
+                })
+                .collect(),
         })
     }
 }
@@ -87,9 +100,28 @@ pub struct PimdirQueuedMessage {
     pub producer: String,
     /// Whether the row sends the message rather than files it.
     pub send: bool,
-    /// The mail the action carries, read from its stored summary. Its `id` is
-    /// empty, a queued message having none yet.
-    pub envelope: Envelope,
+    /// The mail the action carries, derived from the body it pins. Its `id`
+    /// is `null`, a queued message having none yet.
+    pub envelope: PimdirQueuedEnvelope,
+}
+
+/// One row the sync engine parked: it will not apply it again without an
+/// operator.
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PimdirParkedRow {
+    /// The queue row id, which `pimdir queue cancel` takes.
+    pub id: i64,
+    /// When the row was appended, stamped by the store's own clock.
+    pub queued_at: String,
+    /// The process that staged it.
+    pub producer: String,
+    /// The action kind: `add`, `submit`, `set-flags`, ...
+    pub kind: String,
+    /// How many times the engine tried it before parking it.
+    pub attempts: i64,
+    /// Why it was parked.
+    pub error: String,
 }
 
 /// The `pimdir queue list` output.
@@ -122,14 +154,28 @@ pub struct PimdirQueueListOutput {
     pub flagged_char: char,
     /// The messages staged for creation in the mailbox.
     pub messages: Vec<PimdirQueuedMessage>,
+    /// The mailbox's parked rows, any kind.
+    pub parked: Vec<PimdirParkedRow>,
 }
 
 impl fmt::Display for PimdirQueueListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.messages.is_empty() {
+        if self.messages.is_empty() && self.parked.is_empty() {
             return writeln!(f, "No message queued in this mailbox");
         }
+        if !self.messages.is_empty() {
+            self.fmt_queued(f)?;
+        }
+        if !self.parked.is_empty() {
+            self.fmt_parked(f)?;
+        }
+        Ok(())
+    }
+}
 
+impl PimdirQueueListOutput {
+    /// The table of queued creations and sends.
+    fn fmt_queued(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let chars = crate::shared::envelope::list::FlagChars {
             unseen: self.unseen_char,
             replied: self.replied_char,
@@ -167,6 +213,36 @@ impl fmt::Display for PimdirQueueListOutput {
         writeln!(
             f,
             "Queued until the next sync. Cancel one with `himalaya pimdir queue cancel <ROW>`"
+        )
+    }
+
+    /// The table of parked rows.
+    fn fmt_parked(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut table = Table::new();
+        table
+            .load_style(style_from_preset(&self.preset))
+            .set_header(Row::from([
+                Cell::new("ROW"),
+                Cell::new("ACTION"),
+                Cell::new("QUEUED"),
+                Cell::new("ERROR"),
+            ]))
+            .add_rows(self.parked.iter().map(|parked| {
+                let mut row = Row::new();
+                row.max_height(1);
+                row.add_cell(Cell::new(parked.id).fg(self.id_color));
+                row.add_cell(Cell::new(sanitize(&parked.kind)));
+                row.add_cell(Cell::new(&parked.queued_at).fg(self.date_color));
+                row.add_cell(Cell::new(sanitize(&parked.error)));
+                row
+            }));
+
+        writeln!(f)?;
+        writeln!(f, "{table}")?;
+        writeln!(
+            f,
+            "Parked by the sync engine, which will not retry them. Cancel one with \
+             `himalaya pimdir queue cancel <ROW>`"
         )
     }
 }

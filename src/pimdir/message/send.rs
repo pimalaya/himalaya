@@ -110,6 +110,6 @@ impl fmt::Display for PimdirMessageSendOutput {
         if let Some(copy) = self.copy_queue_id {
             write!(f, ", its copy as row {copy}")?;
         }
-        Ok(())
+        writeln!(f)
     }
 }

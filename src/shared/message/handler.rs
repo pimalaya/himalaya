@@ -106,6 +106,7 @@ pub fn route(
         return printer.out(MessageTemplateOutput::parse(&raw)?);
     }
 
+    let queued = client.queues_writes();
     let outcome = apply(
         account,
         client,
@@ -114,11 +115,14 @@ pub fn route(
         save,
         send,
     )?;
-    let message = match outcome {
-        Outcome::Stdout => return Ok(()),
-        Outcome::Saved { sent: true, .. } => "Message successfully saved and sent",
-        Outcome::Saved { sent: false, .. } => "Message successfully saved",
-        Outcome::Sent => "Message successfully sent",
+    let message = match (outcome, queued) {
+        (Outcome::Stdout, _) => return Ok(()),
+        (Outcome::Saved { sent: true, .. }, false) => "Message successfully saved and sent",
+        (Outcome::Saved { sent: false, .. }, false) => "Message successfully saved",
+        (Outcome::Sent, false) => "Message successfully sent",
+        (Outcome::Saved { sent: true, .. }, true) => "Message queued for saving and sending",
+        (Outcome::Saved { sent: false, .. }, true) => "Message queued for saving",
+        (Outcome::Sent, true) => "Message queued for sending",
     };
     printer.out(MessageRouteOutput {
         message: message.to_owned(),
@@ -135,7 +139,7 @@ pub struct MessageRouteOutput {
 
 impl fmt::Display for MessageRouteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+        writeln!(f, "{}", self.message)
     }
 }
 

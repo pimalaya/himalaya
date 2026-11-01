@@ -45,10 +45,12 @@ impl MessageCopyCommand {
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         let count = client.copy_messages(&from, &to, &ids)?;
-        let message = match count {
-            0 => bail!("No message copied: no id matched in the source mailbox"),
-            1 => "1 message successfully copied".to_string(),
-            n => format!("{n} messages successfully copied"),
+        let message = match (count, client.queues_writes()) {
+            (0, _) => bail!("No message copied: no id matched in the source mailbox"),
+            (1, false) => "1 message successfully copied".to_string(),
+            (n, false) => format!("{n} messages successfully copied"),
+            (1, true) => "1 message queued for copying".to_string(),
+            (n, true) => format!("{n} messages queued for copying"),
         };
         printer.out(Message::new(message))
     }

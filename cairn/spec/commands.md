@@ -26,6 +26,9 @@ The `imap raw` and `smtp raw` commands SHALL forward the command bytes to the se
 ### Requirement: Account threaded as a sibling argument
 The active account context SHALL be threaded as a sibling argument through every `execute` chain, never reached through the client. Subcommands receive `account` and `client` side by side.
 
+### Requirement: account check covers every declared backend
+`account check` SHALL check every backend the account declares and `--backend` allows, printing one verdict per backend when all of them pass. When any fails, it SHALL exit non-zero with one error naming each failed backend and why, so a script reads the outcome from the exit code alone, as calendula and cardamum do. A pimdir block SHALL be checked by opening the store as a reader, listing its mailboxes, then opening a producer and probing it (`PimdirProducer::probe`), which takes and releases the staging lock without waiting and the database's write lock, writing nothing into the store, so an account declaring only a pimdir block is checked rather than refused as declaring no backend, and a store a write cannot reach fails the check rather than the first write: a collector holding the staging lock fails it at once with `store-busy`, and the check leaves nothing in objects/.
+
 ### Requirement: Output discipline
 Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
 
@@ -39,6 +42,27 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 |---|---|
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
 | `message-too-complex` | a message is nested deeper than 8 levels, or holds more than 200 parts or 500 header lines; it is refused whole |
+| `store-newer` | a pimdir store's schema is newer than Himalaya's; upgrade Himalaya |
+| `store-uncreated` | a pimdir store has no schema yet; its sync engine creates it |
+| `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |
+| `store-corrupt` | a pimdir store's version records disagree |
+| `store-not-current` | a pimdir store is not at Himalaya's schema; run or upgrade its sync engine |
+| `store-stale` | a pimdir store was written by an earlier draft; run or upgrade its sync engine |
+| `store-hash-algo` | a pimdir store names its bodies with a hash Himalaya does not compute |
+| `store-busy` | another writer holds a pimdir store's write lock; retry |
+| `store-owned` | a sync owns a pimdir store; retry once it ends |
+| `store-staging` | a producer is staging a body in a pimdir store; retry |
+| `store-in-flight` | a pimdir store verb is between two of its chunks; retry |
+| `item-duplicate` | a pimdir mailbox holds the message already, or has its creation queued; nothing is staged |
+| `unsupported` | a source of the pimdir store does not support the write; nothing is staged |
+| `no-performer` | no source of the pimdir store can perform the intent |
+| `ambiguous-performer` | several sources of the pimdir store can perform the intent and none is chosen |
+| `index-missing` | a pimdir store has no search index yet; its sync engine builds it |
+| `index-outdated` | a pimdir search index was built by another version; its sync engine rebuilds it |
+| `index-fts5-missing` | the SQLite Himalaya links lacks what a pimdir search index needs (FTS5, 3.43 or later) |
+| `query-refused` | a pimdir search query breaks a SEARCH §8.4 rule; nothing is searched |
+| `query-unanswerable` | a pimdir search index could not answer an accepted query, an implementation fault |
+| `tag-refused` | a pimdir tag names no flag, or adds and removes one flag; nothing is staged |
 
 #### Scenario: A body not downloaded yet
 - GIVEN a pimdir item whose body is not local
@@ -146,3 +170,16 @@ Attachment downloads SHALL atomically create a new file, refusing to follow an e
 - GIVEN a mailbox holding message `42` and no message `99999999`
 - WHEN `himalaya --json flag add --flag flagged 42 99999999` runs
 - THEN the command exits 0 and prints `{"flags":["flagged"],"count":1}`
+
+### Requirement: A queued write says it is queued
+On a backend that queues its writes for a sync engine to apply later (pimdir), the confirmation of a shared write SHALL say the write is queued rather than done: `message send`, `message add`, a composer's save or send, `message delete`, `message move`, `message copy` and `flag add|set|remove`. The JSON shapes SHALL NOT change, and no queue detail SHALL reach a shared output; the prose of a `message` confirmation carries the wording. Every other backend SHALL keep confirming the write as done.
+
+#### Scenario: A send on a pimdir account
+- GIVEN a pimdir account with `mailbox.alias.sent` set
+- WHEN `message send` runs
+- THEN it prints `Message queued for sending`, not that the message was sent
+
+#### Scenario: A delete on a pimdir account
+- GIVEN a pimdir account with a trash mailbox
+- WHEN `message delete 3` runs on another mailbox
+- THEN it prints `Queued the move of 1 message(s) to the trash`

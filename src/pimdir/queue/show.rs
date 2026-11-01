@@ -141,19 +141,21 @@ impl fmt::Display for PimdirQueueShowOutput {
         let kind = sanitize(self.kind.as_deref().unwrap_or_default());
 
         match self.state {
-            PimdirQueueState::Pending => write!(f, "Row {id} ({kind} in {collection}) is pending"),
+            PimdirQueueState::Pending => {
+                writeln!(f, "Row {id} ({kind} in {collection}) is pending")
+            }
             PimdirQueueState::Parked => {
                 let error = sanitize(self.error.as_deref().unwrap_or_default());
-                write!(f, "Row {id} ({kind} in {collection}) is parked: {error}")
+                writeln!(f, "Row {id} ({kind} in {collection}) is parked: {error}")
             }
             PimdirQueueState::Applied => {
                 write!(f, "Row {id} was applied in {collection}")?;
-                match self.seq {
-                    Some(seq) => write!(f, ", creating message {seq}"),
-                    None => Ok(()),
+                if let Some(seq) = self.seq {
+                    write!(f, ", creating message {seq}")?;
                 }
+                writeln!(f)
             }
-            PimdirQueueState::Unknown => write!(
+            PimdirQueueState::Unknown => writeln!(
                 f,
                 "Row {id} is neither queued nor known applied: cancelled, or applied long ago"
             ),

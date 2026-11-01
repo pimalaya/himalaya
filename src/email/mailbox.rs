@@ -4,7 +4,12 @@
 
 use std::fmt;
 
-#[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+#[cfg(any(
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "pimdir"
+))]
 use anyhow::{Result, bail};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -41,11 +46,21 @@ pub struct Mailbox {
 
 /// The mailboxes of a backend minting opaque ids, which names and roles
 /// resolve through.
-#[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+#[cfg(any(
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "pimdir"
+))]
 #[derive(Clone, Debug, Default)]
 pub struct MailboxIndex(pub Vec<Mailbox>);
 
-#[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+#[cfg(any(
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "pimdir"
+))]
 impl MailboxIndex {
     /// Maps a mailbox id, name or role onto its id.
     ///
@@ -53,6 +68,7 @@ impl MailboxIndex {
     /// which errors when several mailboxes carry the role. An unknown
     /// value goes back as it is, so the backend surfaces the error or
     /// takes it as a native name.
+    #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
     pub fn resolve(&self, mailbox: &str) -> Result<String> {
         if self.0.iter().any(|m| m.id == mailbox) {
             return Ok(mailbox.to_string());
