@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `-c/--config` being split on `:`, which cut every absolute Windows path at its drive letter: `-c C:\Users\me\config.toml` reached the loader as `C` and `\Users\me\config.toml`, neither of which exists, so the configuration was never read. The delimiter now follows `$PATH` on the platform, `;` on Windows and `:` elsewhere, and the help text says so; `HIMALAYA_CONFIG` and repeated `-c` flags take absolute paths whole. On Windows a colon-joined list is no longer split, so pass several paths with `;` or repeat `-c`.
 - Fixed `account check` refusing an account declaring only a pimdir block as configuring no backend: the store is opened, its mailboxes listed, and a producer probed without writing anything, so a store whose staging lock a collector holds fails the check at once with `store-busy`.
 - Fixed `account check` exiting 0 when a backend failed: it now fails with one error naming each failed backend and why.
 - Fixed `pimdir queue cancel` reshaping the store's schema to Himalaya's io-pimdir revision, which dropped the tables and columns another app's revision keeps: the store is opened as it stands, and one of another draft is refused with `store-version`.
