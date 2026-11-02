@@ -69,7 +69,8 @@
 //! the command needs on first use and keeps it, dropping it when a command
 //! fails on it. A one-shot run uses a fresh session for its single command;
 //! the [`repl`] keeps one across the lines of its stdin, so each client
-//! connects once for the whole session.
+//! connects once for the whole session. The [`mcp`] server keeps one the
+//! same way, each tool call parsed back into a shared API command.
 //!
 //! ## Configuration and output
 //!
@@ -107,6 +108,7 @@ mod m2dir;
 mod maildir;
 #[cfg(feature = "mbox")]
 mod mbox;
+mod mcp;
 #[cfg(feature = "msgraph")]
 mod msgraph;
 #[cfg(feature = "pimdir")]

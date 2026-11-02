@@ -16,7 +16,7 @@ use anyhow::{Context, bail};
 use clap::Parser;
 use pimalaya_cli::clap::parsers::path_parser;
 
-use crate::{repl, shared::crlf};
+use crate::{mcp, repl, shared::crlf};
 
 /// Trailing positional resolving to a raw RFC 5322 message.
 ///
@@ -57,7 +57,13 @@ impl MessageArg {
 
             // NOTE: a real file that fails to read is a hard error, never
             // silently reinterpreted as the message body.
-            if let Some(path) = path_parser(&mime).ok().filter(|path| path.is_file()) {
+            // NOTE: an MCP caller names no local file: what it gives is
+            // the message, whatever path it happens to spell.
+            let path = path_parser(&mime)
+                .ok()
+                .filter(|path| !mcp::paths_closed() && path.is_file());
+
+            if let Some(path) = path {
                 let contents = fs::read(&path)
                     .with_context(|| format!("Failed to read message file `{}`", path.display()))?;
                 return Ok(crlf::normalize(&contents));

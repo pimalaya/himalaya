@@ -59,6 +59,7 @@ use crate::{
     backend::Backend,
     config::{AccountConfig, Config, NO_CONFIG_HINT},
     json_schema,
+    mcp::McpCommand,
     repl::ReplCommand,
     session::Session,
 };
@@ -154,6 +155,7 @@ pub enum Command {
     #[command(subcommand)]
     Sieve(SieveCommand),
     Repl(ReplCommand),
+    Mcp(McpCommand),
     /// Configure an account interactively.
     #[cfg(feature = "wizard")]
     #[command(visible_alias = "wizard")]
@@ -411,6 +413,7 @@ impl Command {
             ),
 
             Self::Repl(cmd) => cmd.execute(printer, session),
+            Self::Mcp(cmd) => cmd.execute(printer, session),
             #[cfg(feature = "wizard")]
             Self::Configure(cmd) => cmd.execute(printer, account.config_paths),
             Self::Account(cmd) => {

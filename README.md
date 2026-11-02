@@ -46,6 +46,7 @@
 - **TOML configuration** with multi-account support
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
+- **MCP server** via `himalaya mcp`, the shared API as tools, read-only by default
 
 > [!TIP]
 > Himalaya is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate backend support. The default feature set is declared in [Cargo.toml](./Cargo.toml).
@@ -391,6 +392,20 @@ Each invocation opens a fresh TCP+TLS+SASL session. To amortize the handshake, t
 
 - `himalaya repl` keeps one process alive for one account: each stdin line is a command without the binary name (`envelope list`, `message read 42`), run over clients that connect the first time a command needs them and stay connected for the session. Quote arguments as in a shell; `quit`, `exit` or EOF ends it. The account, `--backend` and `--json` are given once, on the `repl` command. Piped, every line gets one answer on stdout (one JSON value per line under `--json`, a failure being the error object), so a program can drive it. Stdin carries the commands, so a command takes its input as an argument or a file path, never from stdin. SMTP still connects per send, a server dropping an idle SMTP connection after a few minutes, and a command that fails drops its client so the next one connects again.
 - [sirup](https://github.com/pimalaya/sirup) serves a pre-authenticated IMAP/SMTP session over a Unix socket that `imap.server` / `smtp.server` can point at, shared by every process: the choice for many short invocations, or several tools at once. Do not point a `himalaya repl` at a sirup socket yet: sirup serves one client at a time and keeps the upstream alive only while none is attached.
+
+### MCP server
+
+`himalaya mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio for one account, exposing the shared API as tools (`mailbox_list`, `envelope_list`, `envelope_search`, `message_read`, `attachment_list`, the composers, and so on). Each tool takes the arguments of its command, spelled as on the command line (`mailbox`, `page-size`, `message-ids`), and answers the same JSON as `--json`; an argument a tool does not take is refused, never ignored. Clients connect once for the server's lifetime, as in `himalaya repl`.
+
+Only the tools that read are listed by default. `--allow-write` adds the ones that change the store (flags, add, copy, move, delete, saving a composed message, marking a read one seen), and `--allow-send` the ones that send mail. An agent reading mail can be told by a message to send mail, so think twice before giving it both. Tools never read nor write local files: `attachment download`, `message parse` and the file arguments of the composers are left out, and a message given to `message_add` or `message_send` is taken as the message itself, even when it spells a path.
+
+```json
+{
+  "mcpServers": {
+    "himalaya": { "command": "himalaya", "args": ["mcp", "--account", "work"] }
+  }
+}
+```
 
 ## Interfaces
 

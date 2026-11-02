@@ -58,7 +58,7 @@ impl ReplCommand {
         // account fails the session rather than its first command.
         resolve_account(printer, account.config_paths, account.name)?;
 
-        IN_SESSION.store(true, Ordering::Relaxed);
+        claim_stdin();
 
         let stdin = io::stdin();
         let interactive = stdin.is_terminal();
@@ -89,7 +89,7 @@ impl ReplCommand {
             let result = match shlex::split(input).map(ReplLine::try_parse_from) {
                 None => Err(anyhow!("Cannot split the line: a quote is not closed")),
                 Some(Ok(ReplLine {
-                    cmd: Command::Repl(_),
+                    cmd: Command::Repl(_) | Command::Mcp(_),
                 })) => Err(anyhow!("Cannot start a session inside a session")),
                 #[cfg(feature = "wizard")]
                 Some(Ok(ReplLine {
@@ -123,6 +123,12 @@ impl ReplCommand {
 
         Ok(())
     }
+}
+
+/// Marks standard input as the session's own, read by the session loop
+/// rather than by the commands it runs.
+pub fn claim_stdin() {
+    IN_SESSION.store(true, Ordering::Relaxed);
 }
 
 /// Refuses to read a command's input off standard input inside a session,
