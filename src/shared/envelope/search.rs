@@ -5,14 +5,15 @@
 
 use std::io::{IsTerminal, stdout};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{error::CodedError, printer::Printer};
 
 use crate::{
     account::context::Account,
     email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
+    error::ErrorCode,
     shared::{
         client::EmailClient,
         envelope::list::{EnvelopeColors, EnvelopeListOutput, FlagChars},
@@ -22,8 +23,13 @@ use crate::{
 
 /// Search the envelopes of a mailbox with the shared query language.
 ///
-/// A date clause reads the `Date:` header, the sent-at, and a text clause
-/// matches a case-insensitive substring.
+/// A date clause reads the `Date:` header, the sent-at. A text clause is
+/// matched as the backend matches text: a case-insensitive substring on IMAP,
+/// Maildir, m2dir, mbox and pimdir, whole words over the whole message on
+/// Gmail, KQL terms on Microsoft Graph, and as the server defines it on JMAP.
+/// A clause the backend cannot search is refused with `search-unsupported`,
+/// never dropped: every flag on Microsoft Graph, `flag answered` and keywords
+/// on Gmail, `attachment` on IMAP.
 #[derive(Debug, Parser)]
 pub struct EnvelopeSearchCommand {
     #[command(flatten)]
@@ -49,13 +55,32 @@ pub struct EnvelopeSearchCommand {
     /// Fill the ATT column.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
-    /// Filter and sort query.
+    /// Query: date, after, before, from, to, cc, bcc, address, subject, body,
+    /// flag, attachment; and, or, not, ( ); order by. See --help.
     ///
-    /// Conditions: `date <yyyy-mm-dd>`, `after <yyyy-mm-dd>`,
-    /// `from <pattern>`, `to <pattern>`, `subject <pattern>`,
-    /// `body <pattern>`, `flag <seen|answered|flagged|draft>`. Combine
-    /// with `and`, `or`, `not`, group with parentheses. Sort with
-    /// `order by <date|from|to|subject> [asc|desc]…`.
+    /// Clauses:
+    ///
+    /// - `date <yyyy-mm-dd>`: sent on that day;
+    /// - `after <yyyy-mm-dd>`, `before <yyyy-mm-dd>`: sent strictly after,
+    ///   strictly before that day;
+    /// - `from <pattern>`, `to <pattern>`, `cc <pattern>`, `bcc <pattern>`:
+    ///   that header holds the pattern, in a name or an address;
+    /// - `address <pattern>`: any of those four headers holds it;
+    /// - `subject <pattern>`, `body <pattern>`: the subject, a text body;
+    /// - `flag <name>`: carrying the flag, `seen`, `answered`, `flagged`,
+    ///   `draft` or a keyword;
+    /// - `attachment`: holding an attachment.
+    ///
+    /// Dates also read `yyyy/mm/dd`, `dd-mm-yyyy` and `dd/mm/yyyy`. A pattern
+    /// holding spaces is quoted, `"weekly report"`, or its spaces are
+    /// escaped, `weekly\ report`.
+    ///
+    /// Clauses join with `not`, `and` and `or`, binding in that order, and
+    /// group with parentheses: `from alice and (subject report or
+    /// attachment)`.
+    ///
+    /// The sort comes last, `order by <date|from|to|subject> [asc|desc]...`,
+    /// several keys applying left to right: `from alice order by date desc`.
     #[arg(value_name = "QUERY")]
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Option<Vec<String>>,
@@ -136,7 +161,9 @@ fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
 
     match trimmed.parse::<SearchEmailsQuery>() {
         Ok(query) => Ok(Some(query)),
-        Err(err) => bail!(render_query_parse_error(&err)),
+        Err(err) => {
+            Err(CodedError::new(ErrorCode::SearchInvalid, render_query_parse_error(&err)).into())
+        }
     }
 }
 

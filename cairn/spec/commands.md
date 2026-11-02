@@ -43,6 +43,8 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
 | `message-too-complex` | a message is nested deeper than 8 levels, or holds more than 200 parts or 500 header lines; it is refused whole |
 | `stdin-taken` | a command inside a `repl` session would read its input from stdin, which carries the session's commands; pass it as an argument or a file path |
+| `search-invalid` | an `envelope search` query does not parse; nothing is searched |
+| `search-unsupported` | an `envelope search` clause the account's backend cannot search, quoted as written; nothing is searched, no clause dropped |
 | `store-version` | a pimdir store is of another draft of the format; upgrade Himalaya, or reinstall the store as neverest's MIGRATION.md says |
 | `store-uncreated` | a pimdir store has no schema yet; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |

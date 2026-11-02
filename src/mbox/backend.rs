@@ -114,7 +114,7 @@ impl MboxClient {
         for (envelope, contents) in self.envelopes(&path, filter.is_some())? {
             let keep = match (filter, contents) {
                 (Some(filter), Some(contents)) => {
-                    eval::matches_filter(&envelope, &contents, filter)
+                    eval::matches_filter(&envelope, None, &contents, filter)
                 }
                 _ => true,
             };

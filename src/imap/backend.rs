@@ -51,6 +51,7 @@ use crate::{
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
         search::{
+            error::unsupported,
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
@@ -826,10 +827,32 @@ fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>
             SearchKey::SentSince(imap_date(bumped)?)
         }
 
+        // NOTE: SENTBEFORE is strictly earlier than the day, as the shared
+        // clause is.
+        Q::BeforeDate(date) => SearchKey::SentBefore(imap_date(*date)?),
+
         Q::From(pattern) => SearchKey::From(astring(pattern)?),
         Q::To(pattern) => SearchKey::To(astring(pattern)?),
+        Q::Cc(pattern) => SearchKey::Cc(astring(pattern)?),
+        Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
+        Q::Address(pattern) => SearchKey::Or(
+            Box::new(SearchKey::From(astring(pattern)?)),
+            Box::new(SearchKey::Or(
+                Box::new(SearchKey::To(astring(pattern)?)),
+                Box::new(SearchKey::Or(
+                    Box::new(SearchKey::Cc(astring(pattern)?)),
+                    Box::new(SearchKey::Bcc(astring(pattern)?)),
+                )),
+            )),
+        ),
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
+        Q::Attachment => {
+            return Err(unsupported(
+                filter,
+                "IMAP SEARCH has no key for attachments",
+            ));
+        }
 
         Q::Flag(flag) => match flag.iana() {
             Some(IanaFlag::Seen) => SearchKey::Seen,
@@ -918,7 +941,36 @@ fn reorder_envelopes(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_rfc2822_date;
+    use chrono::NaiveDate;
+    use pimalaya_cli::error::code_of;
+
+    use super::{SearchKey, convert_filter, parse_rfc2822_date};
+    use crate::{email::search::filter::query::SearchEmailsFilterQuery, error::ErrorCode};
+
+    #[test]
+    fn copies_addresses_and_before_become_search_keys() {
+        let day = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let before = convert_filter(&SearchEmailsFilterQuery::BeforeDate(day)).unwrap();
+        let address = convert_filter(&SearchEmailsFilterQuery::Address("eve".into())).unwrap();
+
+        assert!(matches!(before, SearchKey::SentBefore(_)));
+        assert!(matches!(
+            convert_filter(&SearchEmailsFilterQuery::Cc("c".into())).unwrap(),
+            SearchKey::Cc(_)
+        ));
+        assert!(matches!(address, SearchKey::Or(..)));
+    }
+
+    #[test]
+    fn an_attachment_clause_is_refused_with_its_code() {
+        let err = convert_filter(&SearchEmailsFilterQuery::Attachment).unwrap_err();
+
+        assert_eq!(
+            code_of::<ErrorCode>(&err),
+            Some(ErrorCode::SearchUnsupported)
+        );
+        assert!(err.to_string().contains("`attachment`"), "{err}");
+    }
 
     #[test]
     fn parses_a_well_formed_date() {

@@ -1,17 +1,17 @@
 //! # Microsoft Graph search
 //!
-//! Translation of the shared search filter into a KQL `$search` value,
-//! the one Graph query that matches sender, recipient, subject and body by
-//! substring, as the other backends do. Graph refuses `$search` beside
-//! `$filter`, and KQL carries no flag property, so a flag clause is refused
-//! rather than dropped.
+//! Translation of the shared search filter into a KQL `$search` value, the
+//! one Graph query reaching the address fields, subject and body, matched as
+//! KQL matches them rather than by substring. Graph refuses `$search`
+//! beside `$filter`, and KQL carries no flag property, so a flag clause is
+//! refused with `search-unsupported` rather than dropped.
 //!
 //! <https://learn.microsoft.com/en-us/graph/search-query-parameter>
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use chrono::NaiveDate;
 
-use crate::email::search::filter::query::SearchEmailsFilterQuery;
+use crate::email::search::{error::unsupported, filter::query::SearchEmailsFilterQuery};
 
 /// Translates the filter half of a shared query into the quoted `$search`
 /// value Graph takes.
@@ -33,14 +33,24 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
         // what Graph indexes as `sent`.
         SearchEmailsFilterQuery::Date(date) => format!("sent:{}", date_kql(*date)),
         SearchEmailsFilterQuery::AfterDate(date) => format!("sent>{}", date_kql(*date)),
+        SearchEmailsFilterQuery::BeforeDate(date) => format!("sent<{}", date_kql(*date)),
         SearchEmailsFilterQuery::From(pattern) => format!("from:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::To(pattern) => format!("to:{}", value_kql(pattern)),
+        SearchEmailsFilterQuery::Cc(pattern) => format!("cc:{}", value_kql(pattern)),
+        SearchEmailsFilterQuery::Bcc(pattern) => format!("bcc:{}", value_kql(pattern)),
+        // NOTE: KQL's `participants` reads the From, To, Cc and Bcc fields.
+        SearchEmailsFilterQuery::Address(pattern) => {
+            format!("participants:{}", value_kql(pattern))
+        }
         SearchEmailsFilterQuery::Subject(pattern) => format!("subject:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::Body(pattern) => format!("body:{}", value_kql(pattern)),
-        SearchEmailsFilterQuery::Flag(flag) => bail!(
-            "Microsoft Graph search cannot filter on the {} flag; use `himalaya msgraph messages list --filter`",
-            flag.raw()
-        ),
+        SearchEmailsFilterQuery::Attachment => String::from("hasAttachments:true"),
+        SearchEmailsFilterQuery::Flag(_) => {
+            return Err(unsupported(
+                filter,
+                "Microsoft Graph search has no flag property; use `himalaya msgraph messages list --filter`",
+            ));
+        }
     })
 }
 
@@ -91,6 +101,28 @@ mod tests {
         assert_eq!(
             filter_to_kql(&SearchEmailsFilterQuery::AfterDate(day)).unwrap(),
             "sent>2026-08-14"
+        );
+    }
+
+    #[test]
+    fn copies_addresses_dates_and_attachments() {
+        let day = NaiveDate::from_ymd_opt(2026, 8, 14).unwrap();
+
+        assert_eq!(
+            filter_to_kql(&SearchEmailsFilterQuery::BeforeDate(day)).unwrap(),
+            "sent<2026-08-14"
+        );
+        assert_eq!(
+            filter_to_kql(&SearchEmailsFilterQuery::Cc("carol".into())).unwrap(),
+            "cc:carol"
+        );
+        assert_eq!(
+            filter_to_kql(&SearchEmailsFilterQuery::Address("eve".into())).unwrap(),
+            "participants:eve"
+        );
+        assert_eq!(
+            filter_to_kql(&SearchEmailsFilterQuery::Attachment).unwrap(),
+            "hasAttachments:true"
         );
     }
 

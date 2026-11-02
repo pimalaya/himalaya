@@ -82,7 +82,7 @@ impl MaildirClient {
         for full in &fulls {
             let envelope = envelope_from_entry(full);
             let keep = match filter {
-                Some(filter) => eval::matches_filter(&envelope, full.contents(), filter),
+                Some(filter) => eval::matches_filter(&envelope, None, full.contents(), filter),
                 None => true,
             };
             if keep {

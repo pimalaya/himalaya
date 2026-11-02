@@ -6,12 +6,14 @@
 //! The filter is matched against each envelope, `body` clauses reaching
 //! for the raw bytes, then the sort chain orders the hits, `Date:`
 //! descending by default. Date clauses read the `Date:` header, as the
-//! server-side backends do.
+//! server-side backends do. The copy recipients, which an envelope does not
+//! carry, come from [`EnvelopeCopies`] when the caller has them, else from
+//! the raw headers, read only when a clause needs them.
 
 use std::cmp::Ordering;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
-use mail_parser::MessageParser;
+use mail_parser::{Address as MailParserAddress, MessageParser};
 
 use crate::email::{
     address::Address,
@@ -22,27 +24,52 @@ use crate::email::{
     },
 };
 
+/// The copy recipients of a message, which an [`Envelope`] does not carry.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct EnvelopeCopies {
+    /// The `Cc:` recipients.
+    pub cc: Vec<Address>,
+    /// The `Bcc:` recipients.
+    pub bcc: Vec<Address>,
+}
+
+impl EnvelopeCopies {
+    /// Reads the copy recipients off a raw message's headers, none when it
+    /// does not parse.
+    pub fn from_raw(raw: &[u8]) -> Self {
+        let Some(message) = MessageParser::new().parse_headers(raw) else {
+            return Self::default();
+        };
+
+        Self {
+            cc: message.cc().map(addresses_from).unwrap_or_default(),
+            bcc: message.bcc().map(addresses_from).unwrap_or_default(),
+        }
+    }
+}
+
 /// Evaluates a filter against an envelope, a `body` clause re-parsing the
 /// raw message.
-pub fn matches_filter(envelope: &Envelope, raw: &[u8], filter: &SearchEmailsFilterQuery) -> bool {
-    use SearchEmailsFilterQuery as Q;
+///
+/// The copy recipients are `copies` when the caller has them, else read
+/// off `raw` once, when the filter holds a clause over them.
+pub fn matches_filter(
+    envelope: &Envelope,
+    copies: Option<&EnvelopeCopies>,
+    raw: &[u8],
+    filter: &SearchEmailsFilterQuery,
+) -> bool {
+    let read;
+    let copies = match copies {
+        Some(copies) => copies,
+        None if reads_copies(filter) => {
+            read = EnvelopeCopies::from_raw(raw);
+            &read
+        }
+        None => &EnvelopeCopies::default(),
+    };
 
-    match filter {
-        Q::And(left, right) => {
-            matches_filter(envelope, raw, left) && matches_filter(envelope, raw, right)
-        }
-        Q::Or(left, right) => {
-            matches_filter(envelope, raw, left) || matches_filter(envelope, raw, right)
-        }
-        Q::Not(inner) => !matches_filter(envelope, raw, inner),
-        Q::Date(target) => same_day(envelope.date, *target),
-        Q::AfterDate(target) => after_day(envelope.date, *target),
-        Q::From(pattern) => addresses_contain(&envelope.from, pattern),
-        Q::To(pattern) => addresses_contain(&envelope.to, pattern),
-        Q::Subject(pattern) => contains_ci(&envelope.subject, pattern),
-        Q::Body(pattern) => body_contains(raw, pattern),
-        Q::Flag(flag) => envelope.flags.contains(flag),
-    }
+    matches(envelope, copies, raw, filter)
 }
 
 /// Sorts envelopes by the given chain, or by `Date:` descending when the
@@ -52,6 +79,79 @@ pub fn sort_envelopes(envelopes: &mut [Envelope], sort: Option<&[SearchEmailsSor
         Some(chain) if !chain.is_empty() => envelopes.sort_by(|a, b| compare_with(a, b, chain)),
         _ => envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date)),
     }
+}
+
+fn matches(
+    envelope: &Envelope,
+    copies: &EnvelopeCopies,
+    raw: &[u8],
+    filter: &SearchEmailsFilterQuery,
+) -> bool {
+    use SearchEmailsFilterQuery as Q;
+
+    match filter {
+        Q::And(left, right) => {
+            matches(envelope, copies, raw, left) && matches(envelope, copies, raw, right)
+        }
+        Q::Or(left, right) => {
+            matches(envelope, copies, raw, left) || matches(envelope, copies, raw, right)
+        }
+        Q::Not(inner) => !matches(envelope, copies, raw, inner),
+        Q::Date(target) => same_day(envelope.date, *target),
+        Q::AfterDate(target) => after_day(envelope.date, *target),
+        Q::BeforeDate(target) => before_day(envelope.date, *target),
+        Q::From(pattern) => addresses_contain(&envelope.from, pattern),
+        Q::To(pattern) => addresses_contain(&envelope.to, pattern),
+        Q::Cc(pattern) => addresses_contain(&copies.cc, pattern),
+        Q::Bcc(pattern) => addresses_contain(&copies.bcc, pattern),
+        Q::Address(pattern) => [&envelope.from, &envelope.to, &copies.cc, &copies.bcc]
+            .into_iter()
+            .any(|addrs| addresses_contain(addrs, pattern)),
+        Q::Subject(pattern) => contains_ci(&envelope.subject, pattern),
+        Q::Body(pattern) => body_contains(raw, pattern),
+        Q::Flag(flag) => envelope.flags.contains(flag),
+        Q::Attachment => has_attachment(envelope, raw),
+    }
+}
+
+/// Whether a filter holds a clause over the copy recipients anywhere.
+fn reads_copies(filter: &SearchEmailsFilterQuery) -> bool {
+    use SearchEmailsFilterQuery as Q;
+
+    match filter {
+        Q::And(left, right) | Q::Or(left, right) => reads_copies(left) || reads_copies(right),
+        Q::Not(inner) => reads_copies(inner),
+        Q::Cc(_) | Q::Bcc(_) | Q::Address(_) => true,
+        _ => false,
+    }
+}
+
+/// Whether the message holds an attachment: the envelope's mark when the
+/// backend set it, else the raw message's parts, none when it is empty.
+fn has_attachment(envelope: &Envelope, raw: &[u8]) -> bool {
+    if let Some(has_attachment) = envelope.has_attachment {
+        return has_attachment;
+    }
+
+    MessageParser::new()
+        .parse(raw)
+        .is_some_and(|message| message.attachment_count() > 0)
+}
+
+fn addresses_from(addrs: &MailParserAddress<'_>) -> Vec<Address> {
+    addrs
+        .clone()
+        .into_list()
+        .into_iter()
+        .filter_map(|addr| {
+            let email = addr.address?.into_owned();
+            if email.is_empty() {
+                return None;
+            }
+            let name = addr.name.map(|name| name.into_owned());
+            Some(Address { name, email })
+        })
+        .collect()
 }
 
 fn body_contains(raw: &[u8], pattern: &str) -> bool {
@@ -91,6 +191,10 @@ fn same_day(date: Option<DateTime<FixedOffset>>, target: NaiveDate) -> bool {
 
 fn after_day(date: Option<DateTime<FixedOffset>>, target: NaiveDate) -> bool {
     date.map(|d| d.date_naive() > target).unwrap_or(false)
+}
+
+fn before_day(date: Option<DateTime<FixedOffset>>, target: NaiveDate) -> bool {
+    date.map(|d| d.date_naive() < target).unwrap_or(false)
 }
 
 fn addresses_contain(addrs: &[Address], pattern: &str) -> bool {
@@ -183,16 +287,19 @@ mod tests {
         let raw = Vec::new();
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::From("ALICE".into())
         ));
         assert!(!matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::From("bob".into())
         ));
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Subject("release".into())
         ));
@@ -204,11 +311,13 @@ mod tests {
         let raw = raw_with_body("Hello, this is a quarterly review.");
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Body("QUARTERLY".into())
         ));
         assert!(!matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Body("absent".into())
         ));
@@ -220,21 +329,25 @@ mod tests {
         let raw = Vec::new();
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Date(naive(2026, 5, 15))
         ));
         assert!(!matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Date(naive(2026, 5, 14))
         ));
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::AfterDate(naive(2026, 5, 14))
         ));
         assert!(!matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::AfterDate(naive(2026, 5, 15))
         ));
@@ -247,11 +360,13 @@ mod tests {
         env.flags.insert(Flag::from_iana(IanaFlag::Seen));
         assert!(matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Flag(Flag::from_iana(IanaFlag::Seen))
         ));
         assert!(!matches_filter(
             &env,
+            None,
             &raw,
             &SearchEmailsFilterQuery::Flag(Flag::from_iana(IanaFlag::Flagged))
         ));
@@ -267,5 +382,123 @@ mod tests {
             SearchEmailsSorterOrder::Descending,
         )];
         assert_eq!(compare_with(&newer, &older, &sort), Ordering::Less);
+    }
+
+    #[test]
+    fn copies_are_read_off_the_raw_headers_when_none_are_given() {
+        let env = envelope();
+        let raw =
+            b"From: a@b\r\nCc: Carol <carol@example.org>\r\nBcc: dave@example.org\r\n\r\nbody";
+
+        assert!(matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Cc("carol".into())
+        ));
+        assert!(matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Bcc("DAVE".into())
+        ));
+        assert!(!matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Cc("dave".into())
+        ));
+    }
+
+    #[test]
+    fn given_copies_win_over_the_raw_headers() {
+        let env = envelope();
+        let copies = EnvelopeCopies {
+            cc: vec![Address {
+                name: None,
+                email: String::from("zoe@example.org"),
+            }],
+            bcc: Vec::new(),
+        };
+        let raw = b"Cc: carol@example.org\r\n\r\n";
+
+        assert!(matches_filter(
+            &env,
+            Some(&copies),
+            raw,
+            &SearchEmailsFilterQuery::Cc("zoe".into())
+        ));
+        assert!(!matches_filter(
+            &env,
+            Some(&copies),
+            raw,
+            &SearchEmailsFilterQuery::Cc("carol".into())
+        ));
+    }
+
+    #[test]
+    fn address_reads_every_role() {
+        let env = envelope();
+        let raw = b"Cc: carol@example.org\r\n\r\n";
+
+        for pattern in ["alice", "team", "carol"] {
+            assert!(matches_filter(
+                &env,
+                None,
+                raw,
+                &SearchEmailsFilterQuery::Address(pattern.into())
+            ));
+        }
+        assert!(!matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Address("nobody".into())
+        ));
+    }
+
+    #[test]
+    fn before_is_strict() {
+        let env = envelope();
+
+        assert!(matches_filter(
+            &env,
+            None,
+            &[],
+            &SearchEmailsFilterQuery::BeforeDate(naive(2026, 5, 16))
+        ));
+        assert!(!matches_filter(
+            &env,
+            None,
+            &[],
+            &SearchEmailsFilterQuery::BeforeDate(naive(2026, 5, 15))
+        ));
+    }
+
+    #[test]
+    fn attachment_reads_the_mark_else_the_parts() {
+        let mut env = envelope();
+        let raw = b"Content-Type: multipart/mixed; boundary=m\r\n\r\n--m\r\nContent-Type: text/plain\r\n\r\nhi\r\n--m\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=a.pdf\r\n\r\nPDF\r\n--m--\r\n";
+
+        assert!(matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Attachment
+        ));
+        assert!(!matches_filter(
+            &env,
+            None,
+            &[],
+            &SearchEmailsFilterQuery::Attachment
+        ));
+
+        env.has_attachment = Some(false);
+        assert!(!matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Attachment
+        ));
     }
 }

@@ -108,7 +108,7 @@ impl M2dirClient {
             let flags = self.read_flags(&m2dir, entry.id())?;
             let envelope = envelope_from(entry, &flags, &parsed);
             let keep = match filter {
-                Some(filter) => eval::matches_filter(&envelope, &bytes, filter),
+                Some(filter) => eval::matches_filter(&envelope, None, &bytes, filter),
                 None => true,
             };
             if keep {

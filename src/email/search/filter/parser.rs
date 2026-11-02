@@ -22,11 +22,16 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserEr
         let filter = choice((
             date(),
             after_date(),
+            before_date(),
             from(),
             to(),
+            cc(),
+            bcc(),
+            address(),
             subject(),
             body(),
             flag(),
+            attachment(),
             filter
                 .delimited_by(lparen(), rparen())
                 .labelled("(nested filter)"),
@@ -104,6 +109,55 @@ fn after_date<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserE
         )
         .ignore_then(naive_date().labelled("pattern after `after`"))
         .map(SearchEmailsFilterQuery::AfterDate)
+}
+
+fn before_date<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("before", "`before`", "space after `before`")
+        .ignore_then(naive_date().labelled("date format after `before`"))
+        .map(SearchEmailsFilterQuery::BeforeDate)
+}
+
+fn cc<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("cc", "`cc`", "space after `cc`")
+        .ignore_then(pattern().labelled("pattern after `cc`"))
+        .map(SearchEmailsFilterQuery::Cc)
+}
+
+fn bcc<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("bcc", "`bcc`", "space after `bcc`")
+        .ignore_then(pattern().labelled("pattern after `bcc`"))
+        .map(SearchEmailsFilterQuery::Bcc)
+}
+
+fn address<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("address", "`address`", "space after `address`")
+        .ignore_then(pattern().labelled("pattern after `address`"))
+        .map(SearchEmailsFilterQuery::Address)
+}
+
+/// The valueless attachment clause, which ends where its word does.
+fn attachment<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    just("attachment")
+        .labelled("`attachment`")
+        .then_ignore(
+            choice((space(), rparen()))
+                .rewind()
+                .ignored()
+                .or(end())
+                .labelled("space or end after `attachment`"),
+        )
+        .to(SearchEmailsFilterQuery::Attachment)
+}
+
+/// A clause keyword followed by the spaces separating it from its value.
+fn keyword<'a>(
+    word: &'static str,
+    label: &'static str,
+    space_label: &'static str,
+) -> impl Parser<'a, &'a str, (), ParserError<'a>> + Clone {
+    just(word)
+        .labelled(label)
+        .ignore_then(space().labelled(space_label).repeated().at_least(1))
 }
 
 fn from<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
@@ -381,5 +435,45 @@ mod tests {
                 )),
             )),
         );
+    }
+
+    #[test]
+    fn copies_addresses_dates_and_attachments() {
+        let day = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+
+        assert_eq!(
+            super::query().parse("before 2026-01-01").into_result(),
+            Ok(BeforeDate(day)),
+        );
+        assert_eq!(
+            super::query().parse("cc carol and bcc dave").into_result(),
+            Ok(And(
+                Box::new(Cc("carol".into())),
+                Box::new(Bcc("dave".into()))
+            )),
+        );
+        assert_eq!(
+            super::query().parse("address \"eve smith\"").into_result(),
+            Ok(Address("eve smith".into())),
+        );
+        assert_eq!(
+            super::query()
+                .parse("not attachment and from a")
+                .into_result(),
+            Ok(And(
+                Box::new(Not(Box::new(Attachment))),
+                Box::new(From("a".into()))
+            )),
+        );
+        assert_eq!(
+            super::query().parse("(attachment)").into_result(),
+            Ok(Attachment),
+        );
+    }
+
+    #[test]
+    fn attachment_ends_where_its_word_does() {
+        assert!(super::query().parse("attachments").into_result().is_err());
+        assert!(super::query().parse("attachment x").into_result().is_err());
     }
 }

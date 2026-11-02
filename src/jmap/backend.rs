@@ -594,6 +594,7 @@ fn parse_rfc3339(raw: &str) -> Option<DateTime<FixedOffset>> {
 enum PostFilter {
     Date(NaiveDate),
     AfterDate(NaiveDate),
+    BeforeDate(NaiveDate),
 }
 
 /// JMAP-side filter + sort, plus the residual client-side predicates.
@@ -613,7 +614,7 @@ fn build(query: Option<&SearchEmailsQuery>, mailbox_id: String) -> Converted {
     let mut post_filters = Vec::new();
     let user_filter = query
         .and_then(|q| q.filter.as_ref())
-        .map(|filter| convert_filter(filter, &mut post_filters));
+        .map(|filter| convert_filter(filter, Some(&mut post_filters)));
 
     let filter = match user_filter {
         Some(user_filter) => JmapFilter::and(vec![mailbox_scope, user_filter]),
@@ -633,79 +634,145 @@ fn build(query: Option<&SearchEmailsQuery>, mailbox_id: String) -> Converted {
     }
 }
 
-/// Recursively translates `node` into a JMAP filter tree; date leaves
-/// push a [`PostFilter`] so the strict sentAt rule can be re-applied.
+/// Recursively translates `node` into a JMAP filter tree.
+///
+/// JMAP dates read the received-at, the shared clauses the sent-at. On the
+/// chain of `and` from the root, `post_filters` is given: a date leaf
+/// over-approximates on the wire and pushes a [`PostFilter`] re-checking
+/// the sent-at exactly, every residual having to hold. Under `or` or `not`
+/// a residual cannot be ANDed onto the whole result, so a date leaf there
+/// reads the received-at day alone.
 fn convert_filter(
     node: &SearchEmailsFilterQuery,
-    post_filters: &mut Vec<PostFilter>,
+    mut post_filters: Option<&mut Vec<PostFilter>>,
 ) -> JmapFilter<JmapEmailFilter> {
     use SearchEmailsFilterQuery as Q;
 
     match node {
         Q::And(left, right) => JmapFilter::and(vec![
-            convert_filter(left, post_filters),
+            convert_filter(left, post_filters.as_deref_mut()),
             convert_filter(right, post_filters),
         ]),
         Q::Or(left, right) => JmapFilter::or(vec![
-            convert_filter(left, post_filters),
-            convert_filter(right, post_filters),
+            convert_filter(left, None),
+            convert_filter(right, None),
         ]),
-        Q::Not(inner) => JmapFilter::not(vec![convert_filter(inner, post_filters)]),
+        Q::Not(inner) => JmapFilter::not(vec![convert_filter(inner, None)]),
 
-        Q::From(pattern) => JmapFilter::Condition(JmapEmailFilter {
+        Q::From(pattern) => condition(JmapEmailFilter {
             from: Some(pattern.clone()),
             ..Default::default()
         }),
-        Q::To(pattern) => JmapFilter::Condition(JmapEmailFilter {
+        Q::To(pattern) => condition(JmapEmailFilter {
             to: Some(pattern.clone()),
             ..Default::default()
         }),
-        Q::Subject(pattern) => JmapFilter::Condition(JmapEmailFilter {
+        Q::Cc(pattern) => condition(JmapEmailFilter {
+            cc: Some(pattern.clone()),
+            ..Default::default()
+        }),
+        Q::Bcc(pattern) => condition(JmapEmailFilter {
+            bcc: Some(pattern.clone()),
+            ..Default::default()
+        }),
+        Q::Address(pattern) => JmapFilter::or(vec![
+            condition(JmapEmailFilter {
+                from: Some(pattern.clone()),
+                ..Default::default()
+            }),
+            condition(JmapEmailFilter {
+                to: Some(pattern.clone()),
+                ..Default::default()
+            }),
+            condition(JmapEmailFilter {
+                cc: Some(pattern.clone()),
+                ..Default::default()
+            }),
+            condition(JmapEmailFilter {
+                bcc: Some(pattern.clone()),
+                ..Default::default()
+            }),
+        ]),
+        Q::Subject(pattern) => condition(JmapEmailFilter {
             subject: Some(pattern.clone()),
             ..Default::default()
         }),
-        Q::Body(pattern) => JmapFilter::Condition(JmapEmailFilter {
+        Q::Body(pattern) => condition(JmapEmailFilter {
             body: Some(pattern.clone()),
             ..Default::default()
         }),
-        Q::Flag(flag) => JmapFilter::Condition(JmapEmailFilter {
+        Q::Flag(flag) => condition(JmapEmailFilter {
             has_keyword: Some(keyword_from(flag)),
             ..Default::default()
         }),
+        Q::Attachment => condition(JmapEmailFilter {
+            has_attachment: Some(true),
+            ..Default::default()
+        }),
 
-        // NOTE: the wire filter over-approximates from the start of the
-        // day, the exact sent-at rule being rechecked client-side.
-        Q::Date(target) => {
-            post_filters.push(PostFilter::Date(*target));
-            JmapFilter::Condition(JmapEmailFilter {
+        // NOTE: a message is received no earlier than it is sent, so the
+        // start of the day bounds the received-at from below.
+        Q::Date(target) => match post_filters {
+            Some(post_filters) => {
+                post_filters.push(PostFilter::Date(*target));
+                condition(JmapEmailFilter {
+                    after: Some(utc_midnight(*target)),
+                    ..Default::default()
+                })
+            }
+            None => condition(JmapEmailFilter {
                 after: Some(utc_midnight(*target)),
+                before: Some(utc_midnight(next_day(*target))),
                 ..Default::default()
-            })
-        }
-        // NOTE: the wire filter over-approximates from the start of the
-        // next day, the strict rule being rechecked client-side.
+            }),
+        },
         Q::AfterDate(target) => {
-            post_filters.push(PostFilter::AfterDate(*target));
-            let bumped = target.succ_opt().unwrap_or(*target);
-            JmapFilter::Condition(JmapEmailFilter {
-                after: Some(utc_midnight(bumped)),
+            if let Some(post_filters) = post_filters {
+                post_filters.push(PostFilter::AfterDate(*target));
+            }
+            condition(JmapEmailFilter {
+                after: Some(utc_midnight(next_day(*target))),
                 ..Default::default()
             })
         }
+        // NOTE: a message sent before the day may be received any time
+        // after, so nothing bounds the received-at and the sent-at is
+        // checked client-side alone.
+        Q::BeforeDate(target) => match post_filters {
+            Some(post_filters) => {
+                post_filters.push(PostFilter::BeforeDate(*target));
+                condition(JmapEmailFilter::default())
+            }
+            None => condition(JmapEmailFilter {
+                before: Some(utc_midnight(*target)),
+                ..Default::default()
+            }),
+        },
     }
+}
+
+/// Wraps one filter condition.
+fn condition(filter: JmapEmailFilter) -> JmapFilter<JmapEmailFilter> {
+    JmapFilter::Condition(filter)
+}
+
+/// The day after `date`, `date` itself at the end of the calendar.
+fn next_day(date: NaiveDate) -> NaiveDate {
+    date.succ_opt().unwrap_or(date)
 }
 
 /// True when `envelope` matches every residual predicate.
 fn post_match(envelope: &Envelope, post_filters: &[PostFilter]) -> bool {
-    post_filters.iter().all(|post_filter| match post_filter {
-        PostFilter::Date(target) => envelope
-            .date
-            .map(|d| d.date_naive() == *target)
-            .unwrap_or(false),
-        PostFilter::AfterDate(target) => envelope
-            .date
-            .map(|d| d.date_naive() > *target)
-            .unwrap_or(false),
+    post_filters.iter().all(|post_filter| {
+        let Some(sent) = envelope.date.map(|date| date.date_naive()) else {
+            return false;
+        };
+
+        match post_filter {
+            PostFilter::Date(target) => sent == *target,
+            PostFilter::AfterDate(target) => sent > *target,
+            PostFilter::BeforeDate(target) => sent < *target,
+        }
     })
 }
 
@@ -760,4 +827,43 @@ fn utc_midnight(date: NaiveDate) -> String {
         date.month(),
         date.day()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+
+    use crate::{
+        email::{envelope::Envelope, search::query::SearchEmailsQuery},
+        jmap::backend::*,
+    };
+
+    fn sent_on(date: &str) -> Envelope {
+        Envelope {
+            id: String::from("1"),
+            message_id: None,
+            in_reply_to: Vec::new(),
+            flags: Default::default(),
+            subject: String::new(),
+            from: Vec::new(),
+            to: Vec::new(),
+            date: DateTime::parse_from_rfc3339(date).ok(),
+            size: 0,
+            has_attachment: None,
+        }
+    }
+
+    fn rechecked(query: &str, envelope: &Envelope) -> bool {
+        let query: SearchEmailsQuery = query.parse().unwrap();
+        let converted = build(Some(&query), String::from("inbox"));
+        post_match(envelope, &converted.post_filters)
+    }
+
+    #[test]
+    fn a_negated_date_clause_is_not_rechecked_as_a_positive_one() {
+        let december = sent_on("2025-12-01T10:00:00+00:00");
+
+        assert!(rechecked("not after 2026-01-01", &december));
+        assert!(rechecked("date 2026-01-01 or subject x", &december));
+    }
 }

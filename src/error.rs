@@ -34,6 +34,12 @@ pub enum ErrorCode {
     /// The command would read its input off stdin inside a session, where
     /// stdin carries the commands: pass it as an argument or a file path.
     StdinTaken,
+    /// The search query does not parse: nothing was searched.
+    SearchInvalid,
+    /// The search query holds a clause the backend cannot search:
+    /// nothing was searched, no clause dropped.
+    #[cfg(any(feature = "imap", feature = "gmail", feature = "msgraph"))]
+    SearchUnsupported,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
     #[cfg(feature = "pimdir")]

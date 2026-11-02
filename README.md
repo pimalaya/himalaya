@@ -347,7 +347,7 @@ himalaya message copy --from INBOX --to Archives 42
 himalaya attachment download 42
 ```
 
-`envelope search` uses himalaya's own cross-backend query DSL; its grammar lives in `himalaya envelope search --help`.
+`envelope search` uses himalaya's own cross-backend query DSL: `date`, `after`, `before`, `from`, `to`, `cc`, `bcc`, `address` (any of the four), `subject`, `body`, `flag` and `attachment` clauses, joined with `and`, `or` and `not`, grouped with parentheses, then `order by`. `-h` lists the clauses and `himalaya envelope search --help` gives the grammar and how each backend matches text. A clause a backend cannot search is refused with the code `search-unsupported` rather than dropped (every flag on Microsoft Graph, `flag answered` and keywords on Gmail, `attachment` on IMAP).
 
 ### Protocol-specific APIs
 

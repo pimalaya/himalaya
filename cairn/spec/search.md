@@ -6,23 +6,37 @@ status: current
 
 # Search
 
-Shared envelope search is expressed in one backend-agnostic query language, parsed once and translated per backend. The query type carries a filter tree and a sort list; the parser is built on chumsky and renders its errors through the CLI's ariadne setup.
+Shared envelope search is expressed in one backend-agnostic query language, himalaya's own, parsed once and translated per backend. The query type carries a filter tree and a sort list; the parser is built on chumsky and renders its errors through the CLI's ariadne setup. Each backend matches text its own way, and refuses a clause it cannot search rather than dropping it.
 
-A pimdir account also answers the pimdir SEARCH query language natively, from the store's search index, under `himalaya pimdir`. Before the v3 release the SEARCH language is meant to become the shared query of every backend, each translating from it and pimdir answering natively, the shared clause values read as prefix terms.
+A pimdir account also answers the pimdir SEARCH query language natively, from the store's search index, under `himalaya pimdir`; the shared language stays himalaya's.
 
 ### Requirement: One query language
-The `envelope list` filter and sort arguments SHALL parse into a single `SearchEmailsQuery` (filter plus sort), independent of the backend. The grammar covers the usual header, date and body clauses combined with boolean operators, and a sort list over the standard envelope fields.
+The `envelope search` query SHALL parse into a single `SearchEmailsQuery` (filter plus sort), independent of the backend. The grammar covers the `date`, `after` and `before` date clauses, `after` and `before` both strict, the `from`, `to`, `cc` and `bcc` address clauses and `address` over all four, the `subject` and `body` text clauses, the `flag` clause over any flag name and the valueless `attachment` clause, combined with `not`, `and` and `or`, binding in that order, grouped with parentheses, and an `order by` list over date, from, to and subject.
+
+### Requirement: The query's clauses are listed on -h
+The first paragraph of the `QUERY` argument's help, which `-h` shows, SHALL name every clause, operator and the sort, comma separated, and point at `--help`, whose remaining paragraphs give each clause's syntax, examples and the precedence. The command's long help SHALL say how each backend matches text.
+
+### Requirement: A query that does not parse is refused with a code
+A query the grammar refuses SHALL fail with the code `search-invalid`, the plain output rendering the parser's diagnostics over the query with ariadne.
+
+### Requirement: A clause a backend does not answer is refused with a code
+A query holding a clause the account's backend cannot compile SHALL be refused while it is translated, before any request, with the code `search-unsupported` and a message quoting the clause as the language writes it and saying why; nothing is searched and no clause is dropped. IMAP refuses `attachment`, Gmail `flag answered` and keyword flags, Microsoft Graph every flag clause.
 
 ### Requirement: Per-backend translation
-Each backend SHALL translate the shared query into its native surface. IMAP translates to `UID SEARCH` / `UID SORT` keys, with a client-side sort fallback when the server lacks `SORT`. JMAP translates to a `JmapFilter` and comparator list scoped to the mailbox id, over-approximating date clauses and re-checking them client-side. Maildir, m2dir and mbox list then evaluate a shared client-side matcher (`matches_filter` plus `sort_envelopes`) over the fetched envelopes, reusing the read bytes for body clauses. pimdir evaluates the same matcher over envelopes built from the stored summaries, reading a message's local body only when the filter holds a body clause; a message whose body is not local matches no body clause. Gmail translates to a `q` value. Graph translates to a KQL `$search` and sorts the page locally, Graph refusing `$skip` and `$orderby` beside it.
+Each backend SHALL translate the shared query into its native surface. IMAP translates to `UID SEARCH` / `UID SORT` keys (`SENTBEFORE` for `before`, an `OR` of `FROM`, `TO`, `CC` and `BCC` for `address`), with a client-side sort fallback when the server lacks `SORT`. JMAP translates to a `JmapFilter` and comparator list scoped to the mailbox id; on the chain of `and` from the root a date clause over-approximates on the received date and is re-checked exactly on the sent date client-side, while under `or` or `not` it reads the received date alone, a client-side residual being unable to hold across a disjunction or a negation. Maildir, m2dir and mbox list then evaluate a shared client-side matcher (`matches_filter` plus `sort_envelopes`) over the fetched envelopes, reusing the read bytes for body clauses and reading the `Cc:` and `Bcc:` headers off them only when a clause needs them. pimdir evaluates the same matcher over envelopes built from the stored summaries, the copy recipients and the attachment mark coming from the summary, reading a message's local body only when the filter holds a body clause; a message whose body is not local matches no body clause. Gmail translates to a `q` value. Graph translates to a KQL `$search` (`participants` for `address`, `hasAttachments` for `attachment`) and sorts the page locally, Graph refusing `$skip` and `$orderby` beside it.
 
 #### Scenario: A pimdir body clause
 - GIVEN a pimdir mailbox holding two local bodies, one containing `attached`, and one message whose body is not local
 - WHEN `envelope list -m imap/INBOX body attached` runs
 - THEN only the message whose local body holds `attached` is listed, and `not body attached` lists the two others
 
+#### Scenario: A negated date clause on JMAP
+- GIVEN a JMAP mailbox holding a message sent on 2025-12-01
+- WHEN `envelope search not after 2026-01-01` runs
+- THEN the message is listed
+
 ### Requirement: Graph flag clauses
-Graph SHALL refuse a filter holding a flag clause, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
+Graph SHALL refuse a filter holding a flag clause with the code `search-unsupported`, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
 
 ### Requirement: pimdir searches through the store's index
 `himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-08 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.

@@ -7,9 +7,10 @@
 //! operators (`from alice` becomes `from:alice`), conjunctions flatten
 //! into whitespace, disjunctions into brace groups, and negations expand
 //! through De Morgan so a `-` only ever prefixes a leaf, the shape Gmail
-//! matches reliably. Two conditions have no Gmail counterpart and bail
-//! rather than return wrong hits: `flag answered`, replies being
-//! tracked in no searchable way, and flags outside the set below.
+//! matches reliably. Two conditions have no Gmail counterpart and are
+//! refused with `search-unsupported` rather than return wrong hits: `flag
+//! answered`, replies being tracked in no searchable way, and flags outside
+//! the set below.
 //!
 //! The sort half has no server-side counterpart, `messages.list`
 //! ordering being fixed newest-first, so it orders the fetched page
@@ -18,7 +19,7 @@
 
 use std::cmp::Ordering;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use chrono::{Duration, NaiveDate};
 
 use crate::email::{
@@ -26,6 +27,7 @@ use crate::email::{
     envelope::Envelope,
     flag::{Flag, IanaFlag},
     search::{
+        error::unsupported,
         filter::query::SearchEmailsFilterQuery,
         sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
     },
@@ -47,11 +49,21 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             date_q(*date + Duration::days(1)),
         )),
         SearchEmailsFilterQuery::AfterDate(date) => Ok(format!("after:{}", date_q(*date))),
+        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("before:{}", date_q(*date))),
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(pattern))),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("bcc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Address(pattern) => {
+            let value = value_q(pattern);
+            Ok(format!(
+                "{{from:{value} to:{value} cc:{value} bcc:{value}}}"
+            ))
+        }
         SearchEmailsFilterQuery::Subject(pattern) => Ok(format!("subject:{}", value_q(pattern))),
         SearchEmailsFilterQuery::Body(pattern) => Ok(value_q(pattern)),
-        SearchEmailsFilterQuery::Flag(flag) => flag_q(flag),
+        SearchEmailsFilterQuery::Flag(flag) => flag_q(filter, flag),
+        SearchEmailsFilterQuery::Attachment => Ok(String::from("has:attachment")),
     }
 }
 
@@ -73,11 +85,21 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             date_q(*date + Duration::days(1)),
         )),
         SearchEmailsFilterQuery::AfterDate(date) => Ok(format!("-after:{}", date_q(*date))),
+        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("-before:{}", date_q(*date))),
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("-from:{}", value_q(pattern))),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("-bcc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Address(pattern) => {
+            let value = value_q(pattern);
+            Ok(format!(
+                "-from:{value} -to:{value} -cc:{value} -bcc:{value}"
+            ))
+        }
         SearchEmailsFilterQuery::Subject(pattern) => Ok(format!("-subject:{}", value_q(pattern))),
         SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(flag)?)),
+        SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(filter, flag)?)),
+        SearchEmailsFilterQuery::Attachment => Ok(String::from("-has:attachment")),
     }
 }
 
@@ -97,22 +119,20 @@ fn date_q(date: NaiveDate) -> String {
 }
 
 /// Maps a shared flag onto its Gmail operator, mirroring the
-/// [`crate::gmail::backend`] label pairs. `\Answered` has none, Gmail
-/// tracking replies in no searchable way.
-fn flag_q(flag: &Flag) -> Result<String> {
+/// [`crate::gmail::backend`] label pairs, `clause` being refused whole when
+/// there is none: `\Answered`, Gmail tracking replies in no searchable way,
+/// and the keywords.
+fn flag_q(clause: &SearchEmailsFilterQuery, flag: &Flag) -> Result<String> {
     match flag.iana() {
         Some(IanaFlag::Seen) => Ok("is:read".into()),
         Some(IanaFlag::Flagged) => Ok("is:starred".into()),
         Some(IanaFlag::Draft) => Ok("is:draft".into()),
         Some(IanaFlag::Important) => Ok("is:important".into()),
         Some(IanaFlag::Junk) => Ok("in:spam".into()),
-        Some(IanaFlag::Answered) => {
-            bail!("Gmail search offers no operator for the answered flag")
-        }
-        _ => bail!(
-            "Gmail search offers no operator for the {} flag",
-            flag.raw()
-        ),
+        _ => Err(unsupported(
+            clause,
+            "Gmail search offers no operator for this flag",
+        )),
     }
 }
 
@@ -154,8 +174,10 @@ fn compare_addresses(lhs: &[Address], rhs: &[Address]) -> Ordering {
 mod tests {
     use std::str::FromStr;
 
+    use pimalaya_cli::error::code_of;
+
     use super::*;
-    use crate::email::search::query::SearchEmailsQuery;
+    use crate::{email::search::query::SearchEmailsQuery, error::ErrorCode};
 
     fn q(query: &str) -> String {
         let query = SearchEmailsQuery::from_str(query).unwrap();
@@ -234,10 +256,30 @@ mod tests {
 
     #[test]
     fn unsupported_flags_bail() {
+        let query = SearchEmailsQuery::from_str("flag answered").unwrap();
+        let err = filter_to_q(&query.filter.unwrap()).unwrap_err();
+
         assert_eq!(
-            q_err("flag answered"),
-            "Gmail search offers no operator for the answered flag",
+            err.to_string(),
+            "Cannot search `flag answered`: Gmail search offers no operator for this flag",
         );
+        assert_eq!(
+            code_of::<ErrorCode>(&err),
+            Some(ErrorCode::SearchUnsupported),
+        );
+        assert!(q_err("flag $label").contains("flag $label"));
+    }
+
+    #[test]
+    fn copies_addresses_dates_and_attachments() {
+        assert_eq!(q("cc carol"), "cc:carol");
+        assert_eq!(q("bcc dave"), "bcc:dave");
+        assert_eq!(q("address eve"), "{from:eve to:eve cc:eve bcc:eve}");
+        assert_eq!(q("before 2026-09-08"), "before:2026/09/08");
+        assert_eq!(q("attachment"), "has:attachment");
+        assert_eq!(q("not address eve"), "-from:eve -to:eve -cc:eve -bcc:eve");
+        assert_eq!(q("not attachment"), "-has:attachment");
+        assert_eq!(q("not before 2026-09-08"), "-before:2026/09/08");
     }
 
     #[test]

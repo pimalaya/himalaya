@@ -51,7 +51,7 @@ use crate::{
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole},
         search::{
-            eval,
+            eval::{self, EnvelopeCopies},
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
@@ -407,7 +407,20 @@ impl PimdirClient {
             Some(hash) if reads_body(filter) => self.blobs.get(hash)?.unwrap_or_default(),
             _ => Vec::new(),
         };
-        Ok(eval::matches_filter(envelope, &body, filter))
+
+        // NOTE: the summary holds the copy recipients whether or not the
+        // body is local, so they are never read off the body.
+        let mail = mail_summary(item.summary.as_ref());
+        let copies = EnvelopeCopies {
+            cc: mail
+                .map(|mail| mail.cc.iter().cloned().map(address).collect())
+                .unwrap_or_default(),
+            bcc: mail
+                .map(|mail| mail.bcc.iter().cloned().map(address).collect())
+                .unwrap_or_default(),
+        };
+
+        Ok(eval::matches_filter(envelope, Some(&copies), &body, filter))
     }
 
     /// The mailbox's queued creations and sends, rendered as mail.
@@ -1288,6 +1301,7 @@ impl PimdirPushdown {
                 self.lower(next_day_key(*day));
             }
             Q::AfterDate(day) => self.raise(next_day_key(*day)),
+            Q::BeforeDate(day) => self.lower(day_key(*day)),
             Q::Not(inner) => match inner.as_ref() {
                 // NOTE: an undated row is not after any day, so it matches
                 // and the bound is an upper one only.
