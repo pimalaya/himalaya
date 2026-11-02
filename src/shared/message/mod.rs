@@ -4,10 +4,11 @@
 //! moving one between mailboxes.
 //!
 //! The `arg` input resolver is compiled unconditionally, the
-//! protocol-specific send and save commands taking it too. Composing and
-//! sending work over SMTP alone, where the rest needs a mailbox backend.
+//! protocol-specific send and save commands taking it too. The rest is
+//! compiled with any mail transport, SMTP alone included, a verb needing
+//! a mailbox being refused by the resolver there.
 
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod add;
 pub mod arg;
 #[cfg(any(backend, feature = "smtp"))]
@@ -16,25 +17,25 @@ pub mod builder;
 pub mod cli;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod compose;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod copy;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod delete;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod forward;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod handler;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod header;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod mv;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod parse;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod part;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod read;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod reply;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod send;

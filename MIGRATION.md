@@ -1,5 +1,30 @@
 # Migration guide
 
+## From v2 to v3
+
+v3 changes no configuration key: a v2 configuration loads as it is. What changes is what a script or a frontend reads off `--json`, and a few commands that used to report a success they did not achieve. The CHANGELOG lists every change; these are the ones to act on.
+
+### JSON output
+
+- **Keys are camelCase.** `messages-total` is `messagesTotal`, `next_page` is `nextPage`, `thread-id` is `threadId`. Values keep their spelling: error codes, flags and mailbox roles stay kebab-case or lowercase, provider passthrough keeps the provider's keys.
+- **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message. `message parse` prints the same view.
+- **Piped `--json` prints one value per line**, and every schema `json-schema` writes carries an `$id` naming the contract version.
+- **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, the pimdir store codes), described by the `himalaya-error` schema. Match on the code, never on the message, which may be reworded.
+
+### Commands that now fail instead of pretending
+
+- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the shared API; `--help` ends with the table. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
+- **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
+- **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
+
+### Search results that change
+
+- **Gmail dates are UTC days.** `after 2026-09-08` used to keep that day's mail and `date 2026-09-08` two days, Gmail reading a bare date as midnight in PST.
+- **JMAP date clauses under `not` or `or`** read the server's received date; `not after 2026-01-01` used to list nothing.
+
+### New
+
+- `himalaya repl` runs commands over connections kept for the session, and `himalaya mcp` serves the shared API to MCP clients, read-only unless `--allow-write` or `--allow-send` is given.
 ## From v1 to v2
 
 ### v1 issues

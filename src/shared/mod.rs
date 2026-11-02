@@ -3,20 +3,21 @@
 //! The cross-protocol commands, behaving the same whatever backend serves
 //! the active account, and the client dispatching them onto it.
 //!
-//! The `backend` cfg build.rs sets is on when a mailbox backend is
-//! compiled in. Most commands need one, but composing and sending also
-//! work over SMTP alone, so those carry `any(backend, feature = "smtp")`.
+//! The command tree is the same in every build carrying a mail transport,
+//! `any(backend, feature = "smtp")`, whichever backends it compiles: a
+//! verb no compiled backend serves still parses, and the resolver of
+//! [`crate::capability`] refuses it under `capability-missing`.
 
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod attachment;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod client;
 pub mod crlf;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod envelope;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod flag;
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 pub mod mailbox;
 pub mod message;
 #[cfg(any(feature = "gmail", feature = "msgraph"))]

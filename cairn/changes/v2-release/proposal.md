@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: v2-release
-status: active
+status: landed
 created: 2026-07-25
 ---
 

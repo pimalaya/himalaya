@@ -1,11 +1,11 @@
 ---
 cairn: change
 id: capability-shared-api
-status: active
+status: landed
 created: 2026-08-24
 ---
 
-# Capability-based shared API (union surface, no major bump)
+# Capability-based shared API (union surface)
 
 ## Why
 
@@ -130,9 +130,23 @@ Cells say what himalaya's code does, not what the protocol could: **F** full, **
 
 No second backend gives the same result, or the operation is the protocol itself: IMAP `id`, `select`, `unselect`, `close`, `status`, `fetch`, `expunge` (removing what `\Deleted` marks is IMAP's own model, every other backend removing at once), `subscribe`, `unsubscribe`, `raw`; SMTP `raw`; every Sieve script verb (one protocol, so nothing to unify; a shared filter verb would need Gmail filters and Sieve to mean one thing, which they do not); JMAP `query`, `email parse`, `email export`, identity writes, submission reads; Gmail `profile`, `history`, the settings (IMAP and POP access, language, auto-forwarding, filters, forwarding addresses, delegates, send-as writes), `untrash`, batch verbs; Graph `profile`, `mail-folders copy`, `messages update`, attachment writes; pimdir `queue`, `performer`, `attachment search`, `tag`; the local backends' `flag list`.
 
+## Decided while implementing (2026-11-02)
+
+- **It ships in v3**, not a minor: master already breaks the JSON shapes, so the "minor release" constraint below no longer binds. It still held where it mattered, every verb a backend serves keeping its output.
+- **The registry holds the shared verbs only.** A capability enters the tables when a shared command reaches it; the inventory's protocol-only rows (`mailbox.create`, `thread`, `vacation`) wait for their shared verb, so the registry is the surface, no more. The shared flag arguments name `seen`, `answered`, `flagged` and `draft` alone, so `flags.keywords`, `flags.important` and `flags.junk` are not in it either.
+- **`message.copy` on JMAP and Gmail is `partial`**, not a name of its own: from the user's side the message does reach the target mailbox, and the detail says both share flags and deletion. Splitting the name would have removed `message copy` from two backends that serve it today.
+- **A fourth level, `server`**, for pimdir's levels plus the dynamic tier: served when the server advertises what the detail names, refused once connected otherwise.
+- **The tables live in src/capability.rs**, one per backend, rather than beside each adapter: the adapters are compiled per feature, and the tables must be in every build for `--help` to read the same everywhere.
+- **The dynamic tier has two cases on the shared surface.** JMAP's `submit` needs `urn:ietf:params:jmap:submission`, checked before the upload; IMAP's removal without UIDPLUS already flags `\Deleted` and says so. IMAP MOVE and SORT have fallbacks giving the same result (`full`), PERMANENTFLAGS decides only keywords, which the shared flags are not, and no shared verb runs on ManageSieve.
+- **pimdir keeps its own codes for its dynamic tier.** The store's declared capabilities already refuse a write no source performs (`unsupported`, `no-performer`) before it is staged; those codes are pimdir's vocabulary across its apps, so the pimdir table is `full` and the store answers the rest.
+- **Search options fail as searches.** An `envelope.search.<option>` a backend declares `none` fails before connecting with `search-unsupported`, the code one-search-language gave clause refusals, not `capability-missing`.
+- **The feature-independent tree is the shared tree.** It is compiled in every build carrying a mail transport (`any(backend, feature = "smtp")`); a build with SMTP alone now parses every shared command and refuses the storage ones. The protocol namespaces stay gated with their module, their types living there. The SMTP-only build did not compile at HEAD (158ee79, unreleased) and does now. The error codes are declared in every build too, so `himalaya-error` no longer varies.
+- **The help footer reaches `--help`, not the manual pages**, which pimalaya-cli generates per command group, listing leaves by summary.
+- **Gmail's date zone** (one-search-language): Gmail reads a bare date as midnight PST (developers.google.com/workspace/gmail/api/guides/filtering), so the translator sends Unix seconds of the UTC day; the old one kept the day of `after` and two days for `date`.
+
 ## Compatibility
 
-This is the hard part, and the constraint the design has to satisfy: the refactor is a minor release, not a 3.0.
+This was the constraint the design had to satisfy before v3 was decided: the refactor as a minor release, not a 3.0.
 
 - **Purely additive.** No existing shared command changes name, arguments, defaults, resolution order or output shape. The `EmailClient` rule (first configured storage backend the `--backend` flag allows, local preferred over network, plus an optional SMTP transport) becomes the registered capability of the storage verbs, expressed differently, decided identically.
 - **Success paths stay byte-identical**, table and JSON alike. Existing `*Output` types are untouched; a new verb brings its own type and its own `json_schema.rs` entry.

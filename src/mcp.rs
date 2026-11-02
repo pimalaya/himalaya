@@ -24,6 +24,7 @@ use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
+    capability::{self, Capability, Resolution, Support},
     cli::{Cli, Command, resolve_account},
     error::ErrorCode,
     json_schema, repl,
@@ -103,15 +104,18 @@ impl McpCommand {
         let account = session.account;
 
         // NOTE: resolved once up front, so a missing configuration or
-        // account fails the server rather than its first call.
-        resolve_account(printer, account.config_paths, account.name)?;
+        // account fails the server rather than its first call, and the
+        // tools listed are the ones the account's backends serve.
+        let (_, name, account_config) =
+            resolve_account(printer, account.config_paths, account.name)?;
+        let resolution = Resolution::of(&name, &account_config, account.backend);
 
         repl::claim_stdin();
         PATHS_CLOSED.store(true, Ordering::Relaxed);
 
         let mut server = McpServer {
             session,
-            tools: McpToolSpec::all(self.allow_write, self.allow_send),
+            tools: McpToolSpec::all(self.allow_write, self.allow_send, Some(&resolution)),
         };
 
         let mut stdout = io::stdout();
@@ -218,7 +222,12 @@ struct McpToolArg {
 
 impl McpToolSpec {
     /// The tools the gates allow, from the commands this build carries.
-    fn all(allow_write: bool, allow_send: bool) -> Vec<Self> {
+    ///
+    /// With a resolution, a tool the account's backends cannot serve at
+    /// all is left out, as the static capability tier knows without
+    /// connecting; one only the server decides stays listed and fails
+    /// with `capability-missing` when called.
+    fn all(allow_write: bool, allow_send: bool, resolution: Option<&Resolution>) -> Vec<Self> {
         let mut cli = Cli::command();
         cli.build();
 
@@ -233,6 +242,14 @@ impl McpToolSpec {
             };
 
             if !listed {
+                continue;
+            }
+
+            let served = capability::leaf(tool.group, tool.leaf)
+                .zip(resolution)
+                .is_none_or(|(leaf, resolution)| leaf.is_served(resolution));
+
+            if !served {
                 continue;
             }
 
@@ -298,11 +315,17 @@ impl McpToolSpec {
                     .iter()
                     .any(|arg| SEND_ARGS.contains(&arg.name.as_str()));
 
-            let description = cmd
+            let mut description = cmd
                 .get_long_about()
                 .or(cmd.get_about())
                 .map(ToString::to_string)
                 .unwrap_or_default();
+
+            if (tool.group, tool.leaf) == ("envelope", "search")
+                && let Some(resolution) = resolution
+            {
+                description.push_str(&search_options(resolution));
+            }
 
             let mut definition = json!({
                 "name": format!("{}_{}", tool.group, tool.leaf),
@@ -603,6 +626,56 @@ fn scalar(value: &Value) -> Option<String> {
         Value::Bool(value) => Some(value.to_string()),
         _ => None,
     }
+}
+
+/// What the account's backend answers of the query language, appended to
+/// the `envelope_search` description so an agent writes a query it can
+/// run: the clauses and sort keys answered fully, in part and why, and
+/// not at all.
+fn search_options(resolution: &Resolution) -> String {
+    let Some(backend) = resolution.storage else {
+        return String::new();
+    };
+
+    let mut full = Vec::new();
+    let mut partial = Vec::new();
+    let mut refused = Vec::new();
+
+    let options = capability::leaf("envelope", "search")
+        .map(|leaf| leaf.capabilities)
+        .unwrap_or_default();
+
+    for capability in options {
+        let Capability::Search(option) = capability else {
+            continue;
+        };
+
+        let word = option.word();
+        match resolution.support(*capability) {
+            Support::Full => full.push(word.to_string()),
+            Support::Partial(detail) | Support::Server(detail) => {
+                partial.push(format!("{word} ({detail})"))
+            }
+            Support::None(_) => refused.push(word.to_string()),
+        }
+    }
+
+    let mut text = format!("\n\nThe account's backend ({backend}) answers");
+    if !full.is_empty() {
+        text.push_str(&format!(" fully: {}", full.join(", ")));
+    }
+    if !partial.is_empty() {
+        text.push_str(&format!("; in part: {}", partial.join("; ")));
+    }
+    if !refused.is_empty() {
+        text.push_str(&format!(
+            "; not at all, refused as `search-unsupported`: {}",
+            refused.join(", ")
+        ));
+    }
+    text.push('.');
+
+    text
 }
 
 /// A JSON-RPC error response.

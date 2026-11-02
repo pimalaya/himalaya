@@ -9,7 +9,13 @@ status: current
 Each backend is a `<Proto>Client` wrapper that derefs onto the io-* `*Std` client, paired with a `src/<proto>/backend.rs` adapter implementing the shared operations over the client's high-level methods and converting io-* results into the CLI's own `email` shared types (`Address`, `Envelope`, `Flag`, `Mailbox`, and the search query). The CLI owns these types; no aggregator library sits between it and the io-* crates.
 
 ### Requirement: Shared operation set
-The shared adapters SHALL cover, per backend: `list_mailboxes`, `list_envelopes`, `search_envelopes`, `store_flags`, `get_message`, `add_message`, `copy_messages`, `move_messages`, and `send_message`. A backend that cannot model an operation opts out of it rather than emulating it.
+The shared adapters SHALL cover, per backend: `list_mailboxes`, `list_envelopes`, `search_envelopes`, `store_flags`, `get_message`, `add_message`, `copy_messages`, `move_messages`, and `send_message`. A backend that cannot model an operation opts out of it rather than emulating it, declaring the capability `none` in its table (cairn/spec/commands.md), so the resolver refuses it before connecting.
+
+### Requirement: A copy on JMAP and Gmail is one message in two mailboxes
+`message copy` on JMAP (a mailbox added to `mailboxIds`) and Gmail (a label added) SHALL keep one message in both mailboxes, sharing flags and deletion, where IMAP, Graph and the local backends make an independent copy; both declare `message.copy` `partial` with that detail. `jmap email copy` (`Email/copy`, across accounts) stays protocol-specific.
+
+### Requirement: Gmail and Graph declare no answered or draft flag
+Gmail and Graph SHALL declare `flags.answered` and `flags.draft` `none`: Gmail has no label for `\Answered` and refuses `DRAFT` from a client, Graph has no answered field and its `isDraft` is read-only. A shared flag command naming either SHALL be refused before any request, never reported done.
 
 ### Requirement: Shared outputs carry no backend details
 The output of a shared command SHALL NOT carry a field that only one backend fills. A backend detail worth showing SHALL be logged by that backend's adapter or shown by its own namespace.
@@ -341,7 +347,7 @@ The command SHALL NOT report the queue row id in its output; the pimdir backend 
 `himalaya pimdir queue list` SHALL render a queued `submit` as a message, derived from the body it pins as a create is, marked as a send, beside the queued creates of the same mailbox.
 
 ### Requirement: Append gap
-Graph SHALL NOT implement `add_message`: a MIME message it creates stays a draft. Gmail SHALL implement it through `messages.insert`, the mailbox and the flags becoming labels and the `Date:` header dating the message, without sending it or running filters. Every backend implements `search_envelopes` (see the search capability).
+Graph SHALL NOT implement `add_message`: a MIME message it creates stays a draft, so it declares `message.add` `none`, and a `message add`, or a save asked of a composer or of `message send`, is refused before connecting. Gmail SHALL implement it through `messages.insert`, the mailbox and the flags becoming labels and the `Date:` header dating the message, without sending it or running filters. Every backend implements `search_envelopes` (see the search capability).
 
 The shared `add_message` result SHALL carry an optional id, absent only when an IMAP or JMAP server acknowledges the write without reporting one. An IMAP `APPEND` acknowledged by the server SHALL stay a success when neither `APPENDUID` (RFC 4315) nor the fallback `Message-ID` search yields a UID, and a requested send SHALL go on. An `APPEND` rejected by the server SHALL stay an error.
 

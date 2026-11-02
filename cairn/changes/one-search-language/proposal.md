@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: one-search-language
-status: active
+status: landed
 created: 2026-11-02
 ---
 
@@ -64,6 +64,7 @@ Read from the current translators and adapters; the implementation confirms each
 - **The any-address clause is `address`**, a plain word that reads as a CLI argument; `with` was pimdir's, `participant` Graph's.
 - **The attachment clause is a bare `attachment`**, valueless, ending where its word does; `has attachment` would have read as a two-word value.
 - **`before` is strict**, as `after` is (the evaluator's `date > target`, IMAP's `SENTSINCE` bumped a day), so `after d and before e` is the days strictly between; IMAP's `SENTBEFORE` is strict already.
+- **Gmail dates are UTC days in seconds** (decided with the registry): Gmail reads a bare `yyyy/mm/dd` as midnight PST, so `after d` kept day d and the widened `date d` two days; each bound is Unix seconds of the UTC day, `after:` one second early so a message on the boundary is kept whether Gmail compares strictly or not. Gmail still compares its received date, hence `partial`.
 
 ## Found while implementing
 

@@ -190,10 +190,11 @@ impl GmailClient {
     ) -> Result<usize> {
         let (add, remove) = label_patch(flags, op);
 
-        // NOTE: an IANA flag without a label (`\Answered`, `$Forwarded`)
-        // leaves nothing to patch, and an empty `messages.modify` is a
-        // wasted request that could still fail. The ids are then
-        // not checked and all count as found.
+        // NOTE: an IANA flag without a label (`$Forwarded`) leaves nothing
+        // to patch, and an empty `messages.modify` is a wasted request that
+        // could still fail. The ids are then not checked and all count as
+        // found. `\Answered` and `\Draft` never get here: the shared API
+        // refuses them up front (`flags.answered`, `flags.draft`).
         if add.is_empty() && remove.is_empty() {
             return Ok(ids.len());
         }

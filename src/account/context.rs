@@ -18,7 +18,7 @@ use crossterm::style::Color;
 use dirs::download_dir;
 use pimalaya_cli::table::{Color as TableColor, ContentArrangement};
 
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 use crate::email::mailbox::Mailbox;
 use crate::{
     config::{
@@ -268,7 +268,7 @@ impl Account {
     /// An alias naming a listed mailbox id gives it the role and takes it
     /// from any other mailbox, so the configuration corrects a server
     /// that mislabels.
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     pub fn apply_role_aliases(&self, mailboxes: &mut [Mailbox]) {
         for (key, id) in &self.mailbox_alias {
             let Some(role) = MailboxRole::known(key) else {
@@ -579,7 +579,7 @@ mod tests {
         Account::from(config)
     }
 
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     #[test]
     fn role_aliases_override_the_backend_roles() {
         let mailbox = |id: &str, role: Option<MailboxRole>| Mailbox {

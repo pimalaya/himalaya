@@ -25,6 +25,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    capability::Capability,
     email::flag::{Flag, IanaFlag},
     shared::client::EmailClient,
 };
@@ -66,6 +67,12 @@ pub fn apply(
     }
 
     let mailbox = save.map(|name| account.resolve_mailbox(name));
+
+    // NOTE: checked before the send, so a backend that cannot hold the
+    // copy refuses the whole command rather than send and then fail.
+    if mailbox.is_some() {
+        client.require(&[Capability::MessageAdd])?;
+    }
 
     let carried = match send {
         true => {

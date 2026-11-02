@@ -6,10 +6,32 @@ status: current
 
 # Commands
 
-The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment) is the cross-protocol least-common-denominator surface, behaving the same whatever backend serves the active account. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, repl, mcp, completion, manual, json-schema) cover account configuration, a session running many commands (cairn/spec/repl.md), an MCP server (cairn/spec/mcp.md), shell completions, man pages and JSON Schemas.
+The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment) is the cross-protocol surface: the union of what the backends serve, held coherent by one meaning per verb, a backend that cannot give a verb's result declaring it unserved rather than giving another. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, repl, mcp, completion, manual, json-schema) cover account configuration, a session running many commands (cairn/spec/repl.md), an MCP server (cairn/spec/mcp.md), shell completions, man pages and JSON Schemas.
 
-### Requirement: Shared commands over a selected backend
-The shared commands SHALL run over an `EmailClient` that owns one backend-client variant per compiled-in backend. It selects the first configured storage backend the global `--backend` flag allows, preferring local backends over network ones, plus an optional SMTP transport for storage backends that cannot send (IMAP, Maildir, m2dir, mbox). The SMTP transport SHALL connect for each send and close after it. Each shared method matches the active backend and calls its per-protocol adapter.
+### Requirement: Shared commands over a resolved transport
+The shared commands SHALL run over an `EmailClient` owning one backend-client variant per compiled-in backend, each verb resolved to a configured transport. The verbs exchanging ids resolve to the storage backend: the first configured one the global `--backend` flag allows, local before network (Maildir, m2dir, mbox, pimdir, JMAP, Gmail, Graph, IMAP). Sending resolves to the storage backend when it sends (JMAP, Gmail, Graph, pimdir), else to the SMTP transport, which SHALL connect for each send and close after it. `--backend` SHALL filter the resolution. Each shared method matches the resolved backend and calls its per-protocol adapter.
+
+### Requirement: Capability registry
+Each backend SHALL declare, in one table per backend (src/capability.rs), the shared capabilities it serves, named in pimdir STORAGE Annex B's grammar without the domain word (`message.move`, `flags.answered`, `submit`, and `envelope.search.<option>` for each clause and sort key of the query), at a level: `full`; `partial`, with a detail saying what differs; `server`, with a detail saying what the server must advertise; or `none`, with a detail saying why and what serves it instead. A backend SHALL declare a capability served only when its result is the one every other declarer gives, and declare `none` otherwise. The tables SHALL be compiled into every build, compiled-out backends included.
+
+### Requirement: An unserved verb is refused before connecting
+A shared command SHALL be checked against the capabilities its arguments reach (each flag it names, each clause and sort key of its query, `--save`, `--send`, `--seen`) before any connection, on the resolution of the account's blocks or of the kept session client, so a refusal resolves no credential, opens no TLS and drops no kept client. A capability no configured transport answers, or one its transport declares `none`, SHALL fail with the code `capability-missing` and a message naming the account, the capability, the backend or the `--backend` filter, and the detail; a query option SHALL fail with `search-unsupported` instead. A copy `message.send.save-copy` configures SHALL be checked once the account is read, still before the send. An account configuring no transport at all SHALL keep the error naming its blocks.
+
+#### Scenario: Answered on Gmail
+- WHEN `himalaya flag add 42 --flag answered` runs on a Gmail account
+- THEN it fails with `capability-missing` naming `flags.answered`, before the token command runs, where it used to report the message flagged and change nothing
+
+### Requirement: A server-decided capability is refused once connected
+A capability declared `server` SHALL be checked by the adapter once connected, before any write. A JMAP send whose session lacks `urn:ietf:params:jmap:submission` (RFC 8621 section 7) SHALL fail with `capability-missing` before the upload, leaving no draft. An IMAP removal without UIDPLUS SHALL flag the messages `\Deleted` and say so.
+
+### Requirement: Verbs exchanging ids share one transport
+The shared verbs that take or return message, envelope or mailbox ids (mailbox, envelope, message, flag, attachment) SHALL resolve to the same storage transport for a given account and `--backend`, so an id one of them returns is valid in the others. A verb exchanging no such id, sending, SHALL resolve on its own.
+
+### Requirement: The shared command tree is the same in every build
+The shared command tree SHALL be compiled in every build carrying a mail transport (any storage backend, or SMTP alone), whichever backends it compiles, dispatch alone being gated; a verb no compiled backend serves parses and fails with `capability-missing`. The shared commands' `json-schema` output and the error code vocabulary SHALL be identical across such builds. Each shared leaf's `--help` SHALL end with a `Backends:` footer generated from the tables, listing per capability it reaches the backends at each level and the details. A protocol namespace exists with its feature.
+
+### Requirement: Resolution changes no served verb
+Resolving through the registry SHALL leave the output of every verb a backend serves unchanged. Only a verb a backend declares `none` changes: from a silent no-op (`flag add answered` and `draft` on Gmail and Graph), an uncoded error (`message add` on Graph) or a failure after the send (`message send --save` on Graph) to `capability-missing` up front.
 
 ### Requirement: Protocol commands ignore backend selection
 Each protocol command SHALL build its own `<Proto>Client` via a `build_<proto>_client` helper and run against that backend directly, ignoring `--backend`. The imap command mirrors IMAP's flat command list; gmail and msgraph track their REST resource domains; the filesystem backends expose only operations that map to their on-disk layout, leaving MIME rendering to the shared commands.
@@ -45,6 +67,7 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | `stdin-taken` | a command inside a `repl` session would read its input from stdin, which carries the session's commands; pass it as an argument or a file path |
 | `search-invalid` | an `envelope search` query does not parse; nothing is searched |
 | `search-unsupported` | an `envelope search` clause the account's backend cannot search, quoted as written; nothing is searched, no clause dropped |
+| `capability-missing` | the account's backend does not serve the verb, or the option of it asked for, as its capability table declares or its server advertises; nothing is done, the message naming the capability and what serves it instead |
 | `store-version` | a pimdir store is of another draft of the format; upgrade Himalaya, or reinstall the store as neverest's MIGRATION.md says |
 | `store-uncreated` | a pimdir store has no schema yet; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |

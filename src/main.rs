@@ -31,8 +31,9 @@
 //!
 //! The command tree ([`cli`], `Command`) splits in three. The shared API
 //! (mailbox, envelope, flag, message, attachment) is the cross-protocol
-//! least-common-denominator surface, behaving the same whatever backend
-//! serves the active account.
+//! surface: the union of what the backends serve, each verb meaning one
+//! thing wherever it runs, a backend that cannot give that result
+//! declaring it unserved ([`capability`]).
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
 //! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend,
@@ -45,6 +46,10 @@
 //! one `BackendClient` variant per compiled-in backend: the first
 //! configured storage backend the global `--backend` flag allows, local
 //! before network, plus an SMTP transport for those that cannot send.
+//! The [`capability`] resolver picks them from the account's blocks and
+//! refuses, before connecting, a verb the resolved backend does not
+//! serve, under `capability-missing`; its tables also write each shared
+//! command's `--help` footer and filter the MCP tool list.
 //!
 //! Each shared method matches the active backend and calls its
 //! per-protocol adapter, which converts io-* results into the CLI's own
@@ -91,6 +96,7 @@
 
 mod account;
 mod backend;
+mod capability;
 mod cli;
 mod config;
 mod email;

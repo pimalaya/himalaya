@@ -12,6 +12,7 @@ use pimalaya_cli::{error::CodedError, printer::Printer};
 
 use crate::{
     account::context::Account,
+    capability::Capability,
     email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
     error::ErrorCode,
     shared::{
@@ -87,6 +88,18 @@ pub struct EnvelopeSearchCommand {
 }
 
 impl EnvelopeSearchCommand {
+    /// What the search reaches: `envelope.search` and the options its
+    /// query uses, a query that does not parse failing here already.
+    pub fn capabilities(&self) -> Result<Vec<Capability>> {
+        let mut capabilities = vec![Capability::EnvelopeSearch];
+
+        if let Some(query) = parse_query(self.query.as_deref())? {
+            capabilities.extend(query.options().into_iter().map(Capability::Search));
+        }
+
+        Ok(capabilities)
+    }
+
     /// Searches the mailbox and prints one page of hits as a table.
     pub fn execute(
         self,

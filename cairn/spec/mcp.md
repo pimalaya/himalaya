@@ -12,7 +12,14 @@ status: current
 `himalaya mcp` SHALL run an MCP server (revision 2025-06-18) over stdio for one account and one `--backend`, answering `initialize`, `ping`, `tools/list` and `tools/call`, one JSON-RPC message per line, with stdout carrying protocol messages only. Its commands SHALL run over a session kept for the server's lifetime, as the REPL's do, and SHALL never read their input from stdin.
 
 ### Requirement: Tools are the classified shared API
-The server SHALL expose one tool per leaf command of the shared API that is classified as reading, writing or sending, named `<group>_<leaf>`, and no protocol-specific or raw passthrough command.
+The server SHALL expose one tool per leaf command of the shared API that is classified as reading, writing or sending and that the account's transports serve at least one capability of, as the static tier knows without connecting, named `<group>_<leaf>`, and no protocol-specific or raw passthrough command. A tool whose capability only the server decides SHALL stay listed and answer `capability-missing` as a tool error when the server lacks it.
+
+#### Scenario: A send-only account
+- WHEN `himalaya mcp --allow-write --allow-send` serves an account configuring SMTP alone
+- THEN `tools/list` holds `message_send` and `message_compose`, and no `envelope_list` or `flag_add`
+
+### Requirement: The search tool says what the backend answers
+The `envelope_search` description SHALL end with the clauses and sort keys of the query language the account's storage backend answers fully, in part with each detail, and not at all, from the capability tables.
 
 ### Requirement: A tool's input is the command's grammar
 A tool's `inputSchema` SHALL be generated from its clap command, each property named as the CLI spells the argument, with `additionalProperties: false`, and a call SHALL be parsed back by that same command. An unknown argument SHALL be refused naming the known ones.

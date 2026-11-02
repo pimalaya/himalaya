@@ -35,7 +35,7 @@ fn account(dir: &Path) -> PathBuf {
     fs::write(
         &config,
         format!(
-            "[accounts.a]\ndefault = true\nemail = \"a@example.org\"\nmaildir.root = \"{}\"\n",
+            "[accounts.a]\ndefault = true\nemail = \"a@example.org\"\nmaildir.root = \"{}\"\nsmtp.server = \"127.0.0.1:1\"\n",
             root.display(),
         ),
     )
@@ -250,4 +250,53 @@ fn a_path_given_as_a_message_is_not_read_from_disk() {
     let stored = fs::read_to_string(stored).unwrap();
 
     assert_eq!(stored, path, "the configuration file was stored instead");
+}
+
+/// A configuration whose one account holds `blocks` alone.
+fn account_with(dir: &Path, blocks: &str) -> PathBuf {
+    let config = dir.join("config.toml");
+    let account = format!("[accounts.a]\ndefault = true\nemail = \"a@example.org\"\n{blocks}");
+    fs::write(&config, account).unwrap();
+    config
+}
+
+#[test]
+fn a_tool_the_account_cannot_serve_is_not_listed() {
+    let flags = ["--allow-write", "--allow-send"];
+
+    let dir = TempDir::new().unwrap();
+    let config = account_with(dir.path(), "smtp.server = \"127.0.0.1:1\"\n");
+    let tools = &serve(&config, &flags, &[list(1)])[0];
+
+    assert!(tool(tools, "message_send").is_some());
+    assert!(tool(tools, "message_compose").is_some());
+    assert!(tool(tools, "envelope_list").is_none());
+    assert!(tool(tools, "flag_add").is_none());
+
+    #[cfg(feature = "msgraph")]
+    {
+        let dir = TempDir::new().unwrap();
+        let config = account_with(dir.path(), "msgraph.auth.token.command = [\"false\"]\n");
+        let tools = &serve(&config, &flags, &[list(1)])[0];
+
+        assert!(tool(tools, "message_add").is_none());
+        assert!(tool(tools, "message_copy").is_some());
+        assert!(tool(tools, "flag_add").is_some());
+    }
+}
+
+#[test]
+fn the_search_tool_says_what_the_backend_answers() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let tools = &serve(&config, &[], &[list(1)])[0];
+    let description = tool(tools, "envelope_search").unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert!(
+        description.contains("(maildir) answers fully: date, after, before"),
+        "{description}"
+    );
 }

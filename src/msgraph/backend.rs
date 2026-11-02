@@ -193,10 +193,11 @@ impl MsgraphClient {
     ) -> Result<usize> {
         let patch = flag_patch(flags, op);
 
-        // NOTE: `\Answered` and `$Forwarded` have no Graph field, so
-        // adding or removing only those leaves an empty PATCH, a wasted
-        // request that could still fail. The ids are then
-        // not checked and all count as found.
+        // NOTE: `$Forwarded` has no Graph field, so adding or removing it
+        // alone leaves an empty PATCH, a wasted request that could still
+        // fail. The ids are then not checked and all count as found.
+        // `\Answered` and `\Draft` never get here: the shared API refuses
+        // them up front (`flags.answered`, `flags.draft`).
         if patch == MsgraphMessage::default() {
             return Ok(ids.len());
         }

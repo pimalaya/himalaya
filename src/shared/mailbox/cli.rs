@@ -8,6 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
+    capability,
     shared::{client::EmailClient, mailbox::list::MailboxListCommand},
 };
 
@@ -16,7 +17,7 @@ use crate::{
 /// A mailbox is a message container.
 #[derive(Debug, Subcommand)]
 pub enum MailboxCommand {
-    #[command(visible_alias = "ls")]
+    #[command(visible_alias = "ls", after_long_help = capability::help("mailbox", "list"))]
     List(MailboxListCommand),
 }
 

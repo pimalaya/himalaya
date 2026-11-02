@@ -20,12 +20,16 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 /// The stable codes, each serialised in kebab-case.
+///
+/// Declared in every build, the pimdir ones included, so the
+/// `himalaya-error` schema a caller reads does not change with the
+/// backends compiled in.
+#[cfg_attr(not(feature = "pimdir"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ErrorCode {
     /// The message is listed but its body is not local yet: a sync will
     /// bring it, so the caller waits rather than reports a loss.
-    #[cfg(feature = "pimdir")]
     BodyPending,
     /// The message is nested too deep or holds too many parts or header
     /// lines to be read whole, so it is refused rather than read in
@@ -38,107 +42,83 @@ pub enum ErrorCode {
     SearchInvalid,
     /// The search query holds a clause the backend cannot search:
     /// nothing was searched, no clause dropped.
-    #[cfg(any(feature = "imap", feature = "gmail", feature = "msgraph"))]
     SearchUnsupported,
+    /// The account's backend does not serve the verb, or the option of
+    /// it asked for: nothing was done. The message names the capability
+    /// and what serves it instead.
+    CapabilityMissing,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
-    #[cfg(feature = "pimdir")]
     StoreVersion,
     /// The pimdir store has no schema yet: its sync engine creates it.
-    #[cfg(feature = "pimdir")]
     StoreUncreated,
     /// The database at the pimdir root is not a pimdir store: another
     /// program wrote it.
-    #[cfg(feature = "pimdir")]
     StoreForeign,
     /// The pimdir store's version records disagree, or its schema is not
     /// the one its draft declares.
-    #[cfg(feature = "pimdir")]
     StoreCorrupt,
     /// The pimdir store holds no schema yet, and the verb creates none:
     /// its sync engine creates it.
-    #[cfg(feature = "pimdir")]
     StoreNotCurrent,
     /// The pimdir store names its bodies with a hash Himalaya does not
     /// compute.
-    #[cfg(feature = "pimdir")]
     StoreHashAlgo,
     /// The pimdir store's sync state was written by another version of
     /// its sync engine.
-    #[cfg(feature = "pimdir")]
     SyncVersion,
     /// Another writer holds the pimdir store's write lock: retry.
-    #[cfg(feature = "pimdir")]
     StoreBusy,
     /// A sync owns the pimdir store: retry once it ends.
-    #[cfg(feature = "pimdir")]
     StoreOwned,
     /// A producer is staging a body in the pimdir store: retry.
-    #[cfg(feature = "pimdir")]
     StoreStaging,
     /// A pimdir store verb is between two of its chunks: retry.
-    #[cfg(feature = "pimdir")]
     StoreInFlight,
     /// The pimdir store is a link, or another user can read or write it:
     /// restrict it to its user.
-    #[cfg(feature = "pimdir")]
     StoreExposed,
     /// The mailbox already holds the message, or has its creation
     /// queued: nothing was staged.
-    #[cfg(feature = "pimdir")]
     ItemDuplicate,
     /// The pimdir store cannot hold the flag: empty, or holding a space, a
     /// control or a non-ASCII character. Nothing was staged.
-    #[cfg(feature = "pimdir")]
     FlagInvalid,
     /// The pimdir action's payload is malformed: nothing was staged.
-    #[cfg(feature = "pimdir")]
     ActionMalformed,
     /// The pimdir conflict holds a body nobody has read: fetch it first.
-    #[cfg(feature = "pimdir")]
     ConflictUnread,
     /// A source of the pimdir store does not support the write: nothing
     /// was staged.
-    #[cfg(feature = "pimdir")]
     Unsupported,
     /// No source of the pimdir store can perform the intent.
-    #[cfg(feature = "pimdir")]
     NoPerformer,
     /// Several sources of the pimdir store can perform the intent and
     /// none is chosen.
-    #[cfg(feature = "pimdir")]
     AmbiguousPerformer,
     /// The pimdir store has no search index yet: its sync engine builds
     /// it.
-    #[cfg(feature = "pimdir")]
     IndexMissing,
     /// The pimdir search index was built by another version: its sync
     /// engine rebuilds it.
-    #[cfg(feature = "pimdir")]
     IndexOutdated,
     /// The pimdir search index is of another draft or shape: its sync
     /// engine rebuilds one of an earlier draft, and leaves any other.
-    #[cfg(feature = "pimdir")]
     IndexVersion,
     /// The zone the pimdir search index reads floating times in is not
     /// an IANA zone.
-    #[cfg(feature = "pimdir")]
     IndexZoneUnknown,
     /// The SQLite Himalaya links lacks what the pimdir search index
     /// needs (FTS5, 3.43 or later).
-    #[cfg(feature = "pimdir")]
     IndexFts5Missing,
     /// The pimdir search query is malformed or names an unknown field or
     /// value: nothing was searched.
-    #[cfg(feature = "pimdir")]
     QueryRefused,
     /// The pimdir search index could not answer an accepted query, an
     /// implementation fault.
-    #[cfg(feature = "pimdir")]
     QueryUnanswerable,
     /// The pimdir tag names no flag, or adds and removes one flag:
     /// nothing was staged.
-    #[cfg(feature = "pimdir")]
     TagRefused,
 }
 

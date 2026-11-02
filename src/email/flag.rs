@@ -17,6 +17,8 @@ use std::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::capability::Capability;
+
 /// A flag attached to an envelope, keeping its wire spelling and IANA tag.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +65,18 @@ pub enum IanaFlag {
 }
 
 impl Flag {
+    /// The shared capability adding and removing the flag, `None` for one
+    /// the shared flag arguments cannot name.
+    pub fn capability(&self) -> Option<Capability> {
+        match self.iana? {
+            IanaFlag::Seen => Some(Capability::FlagsSeen),
+            IanaFlag::Answered => Some(Capability::FlagsAnswered),
+            IanaFlag::Flagged => Some(Capability::FlagsFlagged),
+            IanaFlag::Draft => Some(Capability::FlagsDraft),
+            _ => None,
+        }
+    }
+
     /// Builds a [`Flag`] from a wire spelling kept verbatim, deriving its
     /// IANA classification with [`classify_iana`].
     pub fn from_raw(raw: impl Into<String>) -> Self {

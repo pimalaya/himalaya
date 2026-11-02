@@ -35,7 +35,7 @@ pub fn registry() -> JsonSchemaRegistry {
         };
     }
 
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     {
         insert!(
             "himalaya-mailbox-list",

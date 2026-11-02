@@ -42,6 +42,20 @@ pub enum Backend {
 
 #[allow(unused)]
 impl Backend {
+    /// Every backend, compiled in or not, `auto` aside.
+    pub const ALL: &[Self] = &[
+        Self::Imap,
+        Self::Jmap,
+        Self::Gmail,
+        Self::Msgraph,
+        Self::Maildir,
+        Self::M2dir,
+        Self::Mbox,
+        Self::Pimdir,
+        Self::Smtp,
+        Self::Sieve,
+    ];
+
     /// Every backend this build compiles in, `auto` aside.
     pub const COMPILED: &[Self] = &[
         #[cfg(feature = "imap")]

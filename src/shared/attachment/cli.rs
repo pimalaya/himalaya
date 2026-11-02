@@ -8,6 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
+    capability,
     shared::{
         attachment::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
         client::EmailClient,
@@ -19,9 +20,9 @@ use crate::{
 /// An attachment is a binary part of a message.
 #[derive(Debug, Subcommand)]
 pub enum AttachmentCommand {
-    #[command(visible_alias = "ls")]
+    #[command(visible_alias = "ls", after_long_help = capability::help("attachment", "list"))]
     List(AttachmentListCommand),
-    #[command(visible_alias = "dl")]
+    #[command(visible_alias = "dl", after_long_help = capability::help("attachment", "download"))]
     Download(AttachmentDownloadCommand),
 }
 

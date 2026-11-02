@@ -12,6 +12,11 @@
 //! answered`, replies being tracked in no searchable way, and flags outside
 //! the set below.
 //!
+//! A date clause is sent as Unix seconds bounding the UTC day, Gmail
+//! reading a bare date as midnight in PST. It compares them with the
+//! message's internal date, when Gmail received it, where IMAP and the
+//! local evaluator read the day written in `Date:`.
+//!
 //! The sort half has no server-side counterpart, `messages.list`
 //! ordering being fixed newest-first, so it orders the fetched page
 //! client-side. The caveat: sorting a page is not sorting the result
@@ -20,7 +25,7 @@
 use std::cmp::Ordering;
 
 use anyhow::Result;
-use chrono::{Duration, NaiveDate};
+use chrono::{Duration, NaiveDate, NaiveTime};
 
 use crate::email::{
     address::Address,
@@ -45,11 +50,13 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Not(inner) => not_to_q(inner),
         SearchEmailsFilterQuery::Date(date) => Ok(format!(
             "after:{} before:{}",
-            date_q(*date - Duration::days(1)),
-            date_q(*date + Duration::days(1)),
+            since_q(*date),
+            day_start(next_day(*date)),
         )),
-        SearchEmailsFilterQuery::AfterDate(date) => Ok(format!("after:{}", date_q(*date))),
-        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("before:{}", date_q(*date))),
+        SearchEmailsFilterQuery::AfterDate(date) => {
+            Ok(format!("after:{}", since_q(next_day(*date))))
+        }
+        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("before:{}", day_start(*date))),
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(pattern))),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(pattern))),
         SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(pattern))),
@@ -81,11 +88,13 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         }
         SearchEmailsFilterQuery::Date(date) => Ok(format!(
             "{{-after:{} -before:{}}}",
-            date_q(*date - Duration::days(1)),
-            date_q(*date + Duration::days(1)),
+            since_q(*date),
+            day_start(next_day(*date)),
         )),
-        SearchEmailsFilterQuery::AfterDate(date) => Ok(format!("-after:{}", date_q(*date))),
-        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("-before:{}", date_q(*date))),
+        SearchEmailsFilterQuery::AfterDate(date) => {
+            Ok(format!("-after:{}", since_q(next_day(*date))))
+        }
+        SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("-before:{}", day_start(*date))),
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("-from:{}", value_q(pattern))),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(pattern))),
         SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", value_q(pattern))),
@@ -113,9 +122,27 @@ fn value_q(pattern: &str) -> String {
     }
 }
 
-/// Renders a date the way Gmail reads them, `yyyy/mm/dd`.
-fn date_q(date: NaiveDate) -> String {
-    date.format("%Y/%m/%d").to_string()
+/// The first second of `day` in UTC, as Unix seconds.
+///
+/// Gmail reads a bare `yyyy/mm/dd` as midnight in the PST timezone, and
+/// takes Unix seconds as an exact instant instead
+/// (<https://developers.google.com/workspace/gmail/api/guides/filtering>),
+/// so every day boundary is sent in seconds, UTC.
+fn day_start(day: NaiveDate) -> i64 {
+    day.and_time(NaiveTime::MIN).and_utc().timestamp()
+}
+
+/// The `after:` value keeping the mail from the start of `day` on.
+///
+/// One second before the boundary, so a message dated on it is kept
+/// whether Gmail compares `after:` strictly or not.
+fn since_q(day: NaiveDate) -> i64 {
+    day_start(day) - 1
+}
+
+/// The day after `day`.
+fn next_day(day: NaiveDate) -> NaiveDate {
+    day + Duration::days(1)
 }
 
 /// Maps a shared flag onto its Gmail operator, mirroring the
@@ -222,7 +249,7 @@ mod tests {
         assert_eq!(q("not flag seen"), "-is:read");
         assert_eq!(q("not flag flagged"), "-is:starred");
         assert_eq!(q("not flag draft"), "-is:draft");
-        assert_eq!(q("not after 2026-09-08"), "-after:2026/09/08");
+        assert_eq!(q("not after 2026-09-08"), "-after:1788911999");
     }
 
     #[test]
@@ -239,12 +266,19 @@ mod tests {
     }
 
     #[test]
-    fn exact_dates_bracket_the_day() {
-        assert_eq!(q("date 2026-09-08"), "after:2026/09/07 before:2026/09/09",);
+    fn exact_dates_bracket_the_utc_day() {
+        assert_eq!(q("date 2026-09-08"), "after:1788825599 before:1788912000");
         assert_eq!(
             q("not date 2026-09-08"),
-            "{-after:2026/09/07 -before:2026/09/09}",
+            "{-after:1788825599 -before:1788912000}",
         );
+    }
+
+    #[test]
+    fn after_starts_on_the_next_utc_day() {
+        // NOTE: `after` is strict, and Gmail's bare `after:2026/09/08`
+        // kept that day's mail too, from its midnight in PST.
+        assert_eq!(q("after 2026-09-08"), "after:1788911999");
     }
 
     #[test]
@@ -275,11 +309,11 @@ mod tests {
         assert_eq!(q("cc carol"), "cc:carol");
         assert_eq!(q("bcc dave"), "bcc:dave");
         assert_eq!(q("address eve"), "{from:eve to:eve cc:eve bcc:eve}");
-        assert_eq!(q("before 2026-09-08"), "before:2026/09/08");
+        assert_eq!(q("before 2026-09-08"), "before:1788825600");
         assert_eq!(q("attachment"), "has:attachment");
         assert_eq!(q("not address eve"), "-from:eve -to:eve -cc:eve -bcc:eve");
         assert_eq!(q("not attachment"), "-has:attachment");
-        assert_eq!(q("not before 2026-09-08"), "-before:2026/09/08");
+        assert_eq!(q("not before 2026-09-08"), "-before:1788825600");
     }
 
     #[test]

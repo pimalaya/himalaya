@@ -3,7 +3,7 @@ cairn: delta
 change: one-search-language
 ---
 
-The clauses, the `-h` listing, both refusal codes, the translation and the Graph flag refusal were folded into cairn/spec/search.md on 2026-11-02. What remains waits for the capability registry.
+The clauses, the `-h` listing, both refusal codes, the translation and the Graph flag refusal were folded into cairn/spec/search.md on 2026-11-02. The capability options, the MCP description and the Gmail date zone were folded on 2026-11-02 with the capability registry.
 
 ## ADDED Requirements
 

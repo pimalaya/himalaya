@@ -5,9 +5,14 @@
 
 use std::str::FromStr;
 
-use crate::email::search::{
-    error::Error, filter::query::SearchEmailsFilterQuery, parser,
-    sort::query::SearchEmailsSortQuery,
+use crate::{
+    capability::SearchOption,
+    email::search::{
+        error::Error,
+        filter::query::SearchEmailsFilterQuery,
+        parser,
+        sort::query::{SearchEmailsSortQuery, SearchEmailsSorter, SearchEmailsSorterKind},
+    },
 };
 
 /// A search query, a valid one carrying at least one of its two halves.
@@ -17,6 +22,65 @@ pub struct SearchEmailsQuery {
     pub filter: Option<SearchEmailsFilterQuery>,
     /// In which order it returns them.
     pub sort: Option<SearchEmailsSortQuery>,
+}
+
+impl SearchEmailsQuery {
+    /// The clauses and sort keys the query uses, each once, as the
+    /// options of `envelope.search` a backend declares.
+    pub fn options(&self) -> Vec<SearchOption> {
+        let mut options = Vec::new();
+
+        if let Some(filter) = &self.filter {
+            filter_options(filter, &mut options);
+        }
+
+        for SearchEmailsSorter(kind, _) in self.sort.iter().flatten() {
+            let option = match kind {
+                SearchEmailsSorterKind::Date => SearchOption::SortDate,
+                SearchEmailsSorterKind::From => SearchOption::SortFrom,
+                SearchEmailsSorterKind::To => SearchOption::SortTo,
+                SearchEmailsSorterKind::Subject => SearchOption::SortSubject,
+            };
+            push_once(&mut options, option);
+        }
+
+        options
+    }
+}
+
+/// Collects the clauses of a filter into `options`.
+fn filter_options(filter: &SearchEmailsFilterQuery, options: &mut Vec<SearchOption>) {
+    use SearchEmailsFilterQuery as Q;
+
+    let option = match filter {
+        Q::And(left, right) | Q::Or(left, right) => {
+            filter_options(left, options);
+            filter_options(right, options);
+            return;
+        }
+        Q::Not(inner) => return filter_options(inner, options),
+        Q::Date(_) => SearchOption::Date,
+        Q::AfterDate(_) => SearchOption::After,
+        Q::BeforeDate(_) => SearchOption::Before,
+        Q::From(_) => SearchOption::From,
+        Q::To(_) => SearchOption::To,
+        Q::Cc(_) => SearchOption::Cc,
+        Q::Bcc(_) => SearchOption::Bcc,
+        Q::Address(_) => SearchOption::Address,
+        Q::Subject(_) => SearchOption::Subject,
+        Q::Body(_) => SearchOption::Body,
+        Q::Flag(_) => SearchOption::Flag,
+        Q::Attachment => SearchOption::Attachment,
+    };
+
+    push_once(options, option);
+}
+
+/// Pushes `option` unless `options` holds it already.
+fn push_once(options: &mut Vec<SearchOption>, option: SearchOption) {
+    if !options.contains(&option) {
+        options.push(option);
+    }
 }
 
 impl FromStr for SearchEmailsQuery {
@@ -83,6 +147,27 @@ mod tests {
                 )),
                 sort: Some(vec![From.into(), (To, Descending).into()]),
             },
+        );
+    }
+}
+
+#[cfg(test)]
+mod options_tests {
+    use crate::{capability::SearchOption, email::search::query::SearchEmailsQuery};
+
+    #[test]
+    fn a_query_names_each_option_it_uses_once() {
+        let query: SearchEmailsQuery = "not (from a or attachment) and from b order by date"
+            .parse()
+            .unwrap();
+
+        assert_eq!(
+            query.options(),
+            [
+                SearchOption::From,
+                SearchOption::Attachment,
+                SearchOption::SortDate
+            ],
         );
     }
 }

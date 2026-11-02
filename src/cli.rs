@@ -39,7 +39,7 @@ use crate::mbox::{cli::MboxCommand, client::build_mbox_client};
 use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
 #[cfg(feature = "pimdir")]
 use crate::pimdir::{cli::PimdirCommand, client::build_pimdir_client};
-#[cfg(backend)]
+#[cfg(any(backend, feature = "smtp"))]
 use crate::shared::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
     mailbox::cli::MailboxCommand,
@@ -62,6 +62,11 @@ use crate::{
     mcp::McpCommand,
     repl::ReplCommand,
     session::Session,
+};
+#[cfg(any(backend, feature = "smtp"))]
+use crate::{
+    account::context::Account,
+    capability::{Capability, Resolution},
 };
 
 /// Top-level command-line interface parser.
@@ -109,19 +114,19 @@ pub struct Cli {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "mailboxes")]
     Mailbox(MailboxCommand),
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "envelopes")]
     Envelope(EnvelopeCommand),
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "flags")]
     Flag(FlagCommand),
     #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, visible_alias = "msg", alias = "messages")]
     Message(MessageCommand),
-    #[cfg(backend)]
+    #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "attachments")]
     Attachment(AttachmentCommand),
     #[cfg(feature = "imap")]
@@ -288,56 +293,83 @@ pub fn resolve_account(
     Ok((config, name, account_config))
 }
 
+/// Runs a shared command over the session's email client, refusing it
+/// first when the account does not serve what it reaches.
+///
+/// Checked against the kept client's resolution, or against the
+/// account's blocks before a new client connects, so a refusal costs no
+/// connection and drops no kept client. An account configuring no
+/// transport at all is left to the client's own error, which names the
+/// v1 configuration when that is the cause.
+#[cfg(any(backend, feature = "smtp"))]
+fn run_shared<P: Printer>(
+    printer: &mut P,
+    session: &mut Session,
+    capabilities: Vec<Capability>,
+    command: impl FnOnce(&mut P, &mut Account, &mut EmailClient) -> Result<()>,
+) -> Result<()> {
+    let account = session.account;
+    let backend = account.backend;
+
+    if let Some((_, client)) = &session.email {
+        client.require(&capabilities)?;
+    }
+
+    let build = |config, name: String, account_config| {
+        let resolution = Resolution::of(&name, &account_config, backend);
+        if resolution.storage.is_some() || resolution.sender.is_some() {
+            resolution.require(&capabilities)?;
+        }
+        EmailClient::new(config, &name, account_config, backend)
+    };
+
+    account.run(printer, &mut session.email, build, command)
+}
+
 impl Command {
     /// Runs the subcommand over the session's client for it, built on
     /// first use against the account `-a` names, or the default one.
     pub fn execute(self, printer: &mut impl Printer, session: &mut Session) -> Result<()> {
         let account = session.account;
-        #[cfg(any(backend, feature = "smtp"))]
-        let backend = account.backend;
-        #[cfg(any(backend, feature = "smtp"))]
-        let build_email_client = move |config, name: String, account_config| {
-            EmailClient::new(config, &name, account_config, backend)
-        };
 
         match self {
-            #[cfg(backend)]
-            Self::Mailbox(cmd) => account.run(
+            #[cfg(any(backend, feature = "smtp"))]
+            Self::Mailbox(cmd) => run_shared(
                 printer,
-                &mut session.email,
-                build_email_client,
+                session,
+                vec![Capability::MailboxList],
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
-            #[cfg(backend)]
-            Self::Envelope(cmd) => account.run(
+            #[cfg(any(backend, feature = "smtp"))]
+            Self::Envelope(cmd) => run_shared(
                 printer,
-                &mut session.email,
-                build_email_client,
+                session,
+                cmd.capabilities()?,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
-            #[cfg(backend)]
-            Self::Flag(cmd) => account.run(
+            #[cfg(any(backend, feature = "smtp"))]
+            Self::Flag(cmd) => run_shared(
                 printer,
-                &mut session.email,
-                build_email_client,
+                session,
+                cmd.capabilities(),
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             // NOTE: `message parse` reads a raw message it is given, so it
             // resolves no account and reads no configuration at all.
-            #[cfg(backend)]
+            #[cfg(any(backend, feature = "smtp"))]
             Self::Message(MessageCommand::Parse(cmd)) => cmd.execute(printer),
             #[cfg(any(backend, feature = "smtp"))]
-            Self::Message(cmd) => account.run(
+            Self::Message(cmd) => run_shared(
                 printer,
-                &mut session.email,
-                build_email_client,
+                session,
+                cmd.capabilities(),
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
-            #[cfg(backend)]
-            Self::Attachment(cmd) => account.run(
+            #[cfg(any(backend, feature = "smtp"))]
+            Self::Attachment(cmd) => run_shared(
                 printer,
-                &mut session.email,
-                build_email_client,
+                session,
+                vec![Capability::AttachmentList],
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
 

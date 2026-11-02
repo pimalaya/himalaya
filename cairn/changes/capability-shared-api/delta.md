@@ -1,9 +1,11 @@
 ---
-cairn: change
+cairn: delta
 change: capability-shared-api
 ---
 
 # Delta
+
+Folded into cairn/spec/commands.md, cairn/spec/backends.md and cairn/spec/mcp.md on 2026-11-02, as "Decided while implementing" in the proposal adjusts it: the command tree feature-independent for the shared commands, the backward-compatibility requirement stated as "Resolution changes no served verb".
 
 ## ADDED Requirements
 

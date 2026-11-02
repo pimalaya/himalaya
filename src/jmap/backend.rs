@@ -24,7 +24,10 @@ use io_jmap::{
             },
             set::{JmapEmailPatch, JmapEmailSetArgs},
         },
-        email_submission::set::{JmapEmailSubmissionCreate, JmapEmailSubmissionSetArgs},
+        email_submission::{
+            JMAP_SUBMISSION_CAPABILITY,
+            set::{JmapEmailSubmissionCreate, JmapEmailSubmissionSetArgs},
+        },
         identity::get::JmapIdentityGetOptions,
         mailbox::{JmapMailbox, JmapMailboxRole, get::JmapMailboxGetOptions},
     },
@@ -32,6 +35,7 @@ use io_jmap::{
 use url::Url;
 
 use crate::{
+    capability,
     email::{
         address::Address,
         envelope::{Envelope, normalize_message_id},
@@ -312,7 +316,25 @@ impl JmapClient {
     /// server moves the email to the sent mailbox, unsets `$draft` and sets
     /// `$seen` (RFC 8621 section 7.5 `onSuccessUpdateEmail`), so it does
     /// not stay behind as a draft.
+    ///
+    /// A server whose session lacks `urn:ietf:params:jmap:submission`
+    /// (RFC 8621 section 7) is refused under `capability-missing` before
+    /// the upload, so no draft is left behind: the dynamic tier of
+    /// `submit`.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
+        let submits = self.session().is_some_and(|session| {
+            session
+                .capabilities
+                .contains_key(JMAP_SUBMISSION_CAPABILITY)
+        });
+
+        if !submits {
+            return Err(capability::missing(
+                "Cannot `submit` over jmap: the server does not advertise \
+                 `urn:ietf:params:jmap:submission`; send over SMTP with `--backend smtp`",
+            ));
+        }
+
         let identity_id = self.resolve_identity_id()?;
         let (drafts_id, sent_id) = self.resolve_send_mailbox_ids()?;
 
