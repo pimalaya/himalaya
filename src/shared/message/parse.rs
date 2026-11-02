@@ -16,9 +16,12 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::shared::{
-    attachment::download::PartBytes,
-    message::{part, read::MessageReadOutput},
+use crate::{
+    repl,
+    shared::{
+        attachment::download::PartBytes,
+        message::{part, read::MessageReadOutput},
+    },
 };
 
 /// Read a raw message without an account.
@@ -98,6 +101,8 @@ impl MessageParseCommand {
                 (raw, source)
             }
             path => {
+                repl::check_stdin()?;
+
                 // NOTE: a bare `message parse` at a prompt would wait for
                 // a message nobody announced, where `-` asks for it.
                 if path.is_none() && stdin().is_terminal() {

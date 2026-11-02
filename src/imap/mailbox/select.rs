@@ -13,8 +13,8 @@ use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 /// Select the given mailbox (SELECT, RFC 3501).
 ///
 /// Opens it for read-write access and returns its status. The selection
-/// only outlives the command over a stateful IMAP session such as a Sirup
-/// proxy.
+/// only outlives the command over a stateful IMAP session such as
+/// `himalaya repl` or a Sirup proxy.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxSelectCommand {
     #[command(flatten)]

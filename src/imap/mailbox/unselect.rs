@@ -12,7 +12,8 @@ use crate::imap::client::ImapClient;
 /// Unselect the selected mailbox (UNSELECT, RFC 3691).
 ///
 /// `CLOSE` without the expunge. A mailbox has to be selected, so this
-/// wants a stateful IMAP session such as a Sirup proxy.
+/// wants a stateful IMAP session such as `himalaya repl` or a Sirup
+/// proxy.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxUnselectCommand;
 

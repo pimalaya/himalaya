@@ -63,6 +63,14 @@
 //! backends expose only what maps to their on-disk layout, leaving MIME
 //! rendering to the shared commands.
 //!
+//! ## Sessions
+//!
+//! Every command runs over a [`session`] `Session`, which builds the client
+//! the command needs on first use and keeps it, dropping it when a command
+//! fails on it. A one-shot run uses a fresh session for its single command;
+//! the [`repl`] keeps one across the lines of its stdin, so each client
+//! connects once for the whole session.
+//!
 //! ## Configuration and output
 //!
 //! Config is loaded by pimalaya-config from the first existing canonical
@@ -103,6 +111,8 @@ mod mbox;
 mod msgraph;
 #[cfg(feature = "pimdir")]
 mod pimdir;
+mod repl;
+mod session;
 mod shared;
 #[cfg(feature = "sieve")]
 mod sieve;
@@ -121,7 +131,12 @@ use clap::{CommandFactory, Parser};
 use pimalaya_cli::{error::ErrorReport, log::Logger, printer::Printer, printer::StdoutPrinter};
 use pimalaya_config::toml::TomlConfig;
 
-use crate::{cli::Cli, config::Config, error::ErrorCode};
+use crate::{
+    cli::Cli,
+    config::Config,
+    error::ErrorCode,
+    session::{Session, SessionAccount},
+};
 
 fn main() {
     let cli = Cli::parse();
@@ -140,7 +155,16 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
         return meet_bare_invocation(printer, config, account.is_some());
     };
 
-    cmd.execute(printer, config, account, backend)
+    let mut session = Session {
+        account: SessionAccount {
+            config_paths: config,
+            name: account,
+            backend,
+        },
+        ..Default::default()
+    };
+
+    cmd.execute(printer, &mut session)
 }
 
 /// Meets a bare `himalaya`, which is where a newcomer lands.

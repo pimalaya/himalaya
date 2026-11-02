@@ -31,6 +31,9 @@ pub enum ErrorCode {
     /// lines to be read whole, so it is refused rather than read in
     /// part.
     MessageTooComplex,
+    /// The command would read its input off stdin inside a session, where
+    /// stdin carries the commands: pass it as an argument or a file path.
+    StdinTaken,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
     #[cfg(feature = "pimdir")]

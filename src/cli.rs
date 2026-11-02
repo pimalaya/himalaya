@@ -1,7 +1,7 @@
 //! # Parser
 //!
-//! Top-level clap parser and subcommand dispatcher, resolving the account
-//! a command runs against before handing it a ready client.
+//! Top-level clap parser and subcommand dispatcher, running each command
+//! over the [`Session`] client it needs.
 
 use std::{
     io::{IsTerminal, stdin},
@@ -59,6 +59,8 @@ use crate::{
     backend::Backend,
     config::{AccountConfig, Config, NO_CONFIG_HINT},
     json_schema,
+    repl::ReplCommand,
+    session::Session,
 };
 
 /// Top-level command-line interface parser.
@@ -151,6 +153,7 @@ pub enum Command {
     #[cfg(feature = "sieve")]
     #[command(subcommand)]
     Sieve(SieveCommand),
+    Repl(ReplCommand),
     /// Configure an account interactively.
     #[cfg(feature = "wizard")]
     #[command(visible_alias = "wizard")]
@@ -230,7 +233,7 @@ pub fn offer_configuration(
 /// A missing configuration is met with the wizard rather than an error, and
 /// the command carries on either way: accepting gives it a chance to work,
 /// declining leaves it to fail on the configuration it still has not got.
-fn resolve_account(
+pub fn resolve_account(
     printer: &mut impl Printer,
     config_paths: &[PathBuf],
     account_name: Option<&str>,
@@ -284,135 +287,135 @@ fn resolve_account(
 }
 
 impl Command {
-    /// Opens the client the subcommand needs, then runs it against the
-    /// account `-a` names, or the default one.
-    pub fn execute(
-        self,
-        printer: &mut impl Printer,
-        config_paths: &[PathBuf],
-        account_name: Option<&str>,
-        backend: Backend,
-    ) -> Result<()> {
+    /// Runs the subcommand over the session's client for it, built on
+    /// first use against the account `-a` names, or the default one.
+    pub fn execute(self, printer: &mut impl Printer, session: &mut Session) -> Result<()> {
+        let account = session.account;
+        #[cfg(any(backend, feature = "smtp"))]
+        let backend = account.backend;
+        #[cfg(any(backend, feature = "smtp"))]
+        let build_email_client = move |config, name: String, account_config| {
+            EmailClient::new(config, &name, account_config, backend)
+        };
+
         match self {
             #[cfg(backend)]
-            Self::Mailbox(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) =
-                    EmailClient::new(config, &name, account_config, backend)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Mailbox(cmd) => account.run(
+                printer,
+                &mut session.email,
+                build_email_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(backend)]
-            Self::Envelope(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) =
-                    EmailClient::new(config, &name, account_config, backend)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Envelope(cmd) => account.run(
+                printer,
+                &mut session.email,
+                build_email_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(backend)]
-            Self::Flag(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) =
-                    EmailClient::new(config, &name, account_config, backend)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Flag(cmd) => account.run(
+                printer,
+                &mut session.email,
+                build_email_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             // NOTE: `message parse` reads a raw message it is given, so it
             // resolves no account and reads no configuration at all.
             #[cfg(backend)]
             Self::Message(MessageCommand::Parse(cmd)) => cmd.execute(printer),
             #[cfg(any(backend, feature = "smtp"))]
-            Self::Message(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) =
-                    EmailClient::new(config, &name, account_config, backend)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Message(cmd) => account.run(
+                printer,
+                &mut session.email,
+                build_email_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(backend)]
-            Self::Attachment(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) =
-                    EmailClient::new(config, &name, account_config, backend)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Attachment(cmd) => account.run(
+                printer,
+                &mut session.email,
+                build_email_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
 
             #[cfg(feature = "imap")]
-            Self::Imap(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_imap_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Imap(cmd) => account.run(
+                printer,
+                &mut session.imap,
+                build_imap_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "jmap")]
-            Self::Jmap(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_jmap_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Jmap(cmd) => account.run(
+                printer,
+                &mut session.jmap,
+                build_jmap_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "gmail")]
-            Self::Gmail(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_gmail_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Gmail(cmd) => account.run(
+                printer,
+                &mut session.gmail,
+                build_gmail_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "msgraph")]
-            Self::Msgraph(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_msgraph_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Msgraph(cmd) => account.run(
+                printer,
+                &mut session.msgraph,
+                build_msgraph_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "maildir")]
-            Self::Maildir(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_maildir_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Maildir(cmd) => account.run(
+                printer,
+                &mut session.maildir,
+                build_maildir_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "m2dir")]
-            Self::M2dir(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_m2dir_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::M2dir(cmd) => account.run(
+                printer,
+                &mut session.m2dir,
+                build_m2dir_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "mbox")]
-            Self::Mbox(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_mbox_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Mbox(cmd) => account.run(
+                printer,
+                &mut session.mbox,
+                build_mbox_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "pimdir")]
-            Self::Pimdir(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_pimdir_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Pimdir(cmd) => account.run(
+                printer,
+                &mut session.pimdir,
+                build_pimdir_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
             #[cfg(feature = "smtp")]
-            Self::Smtp(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (_account, mut client) = build_smtp_client(config, name, account_config)?;
-                cmd.execute(printer, &mut client)
-            }
+            Self::Smtp(cmd) => account.run(
+                printer,
+                &mut session.smtp,
+                build_smtp_client,
+                |printer, _account, client| cmd.execute(printer, client),
+            ),
             #[cfg(feature = "sieve")]
-            Self::Sieve(cmd) => {
-                let (config, name, account_config) =
-                    resolve_account(printer, config_paths, account_name)?;
-                let (mut account, mut client) = build_sieve_client(config, name, account_config)?;
-                cmd.execute(printer, &mut account, &mut client)
-            }
+            Self::Sieve(cmd) => account.run(
+                printer,
+                &mut session.sieve,
+                build_sieve_client,
+                |printer, account, client| cmd.execute(printer, account, client),
+            ),
 
+            Self::Repl(cmd) => cmd.execute(printer, session),
             #[cfg(feature = "wizard")]
-            Self::Configure(cmd) => cmd.execute(printer, config_paths),
-            Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
+            Self::Configure(cmd) => cmd.execute(printer, account.config_paths),
+            Self::Account(cmd) => {
+                cmd.execute(printer, account.config_paths, account.name, account.backend)
+            }
             Self::Completion(cmd) => cmd.execute(printer, Cli::command()),
             Self::Manual(cmd) => cmd.execute(printer, Cli::command()),
             Self::JsonSchema(cmd) => cmd.execute(printer, json_schema::registry()),

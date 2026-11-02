@@ -12,9 +12,6 @@
 //! The active [`Account`] is threaded as a sibling argument through every
 //! `execute` chain rather than bundled into the client.
 
-#[cfg(feature = "smtp")]
-use std::mem;
-
 use anyhow::{Result, anyhow, bail};
 
 #[cfg(feature = "gmail")]
@@ -54,20 +51,14 @@ use crate::{config::SmtpConfig, smtp::client::SmtpClient};
 /// The client every shared subcommand runs over.
 pub struct EmailClient {
     storage: Option<BackendClient>,
+    /// The SMTP transport, `None` when none is configured or `--backend`
+    /// excludes it.
+    ///
+    /// Connected for each send and closed after it, so a read-only command
+    /// opens no SMTP connection, and a session never sends over one a
+    /// server dropped while idle.
     #[cfg(feature = "smtp")]
-    smtp: SmtpTransport,
-}
-
-/// The SMTP transport, connected on the first send so a read-only command
-/// opens no SMTP connection.
-#[cfg(feature = "smtp")]
-enum SmtpTransport {
-    /// No SMTP configured, or `--backend` excluded it.
-    Absent,
-    /// Configured but not connected yet.
-    Pending(Box<SmtpConfig>),
-    /// Connected.
-    Ready(SmtpClient),
+    smtp: Option<Box<SmtpConfig>>,
 }
 
 /// The active storage backend, one of the compiled-in per-protocol
@@ -106,12 +97,12 @@ impl EmailClient {
         // connection and a single-session proxy serves storage alone.
         #[cfg(feature = "smtp")]
         let smtp = match (backend.allows_smtp(), account_config.smtp.take()) {
-            (true, Some(config)) => SmtpTransport::Pending(Box::new(config)),
-            _ => SmtpTransport::Absent,
+            (true, Some(config)) => Some(Box::new(config)),
+            _ => None,
         };
 
         #[cfg(feature = "smtp")]
-        let has_transport = storage.is_some() || !matches!(smtp, SmtpTransport::Absent);
+        let has_transport = storage.is_some() || smtp.is_some();
         #[cfg(not(feature = "smtp"))]
         let has_transport = storage.is_some();
         if !has_transport {
@@ -537,32 +528,14 @@ impl EmailClient {
         }
 
         #[cfg(feature = "smtp")]
-        if let Some(smtp) = self.smtp_client_mut()? {
+        if let Some(config) = &self.smtp {
+            let mut smtp = SmtpClient::new(config.as_ref().clone())?;
             return smtp.send_message(raw).map(|()| false);
         }
 
         bail!(
             "No send-capable backend (JMAP/Gmail/Graph/pimdir) or SMTP is configured for this account"
         )
-    }
-
-    /// Connects the SMTP transport on first use, `None` when none is
-    /// configured.
-    #[cfg(feature = "smtp")]
-    fn smtp_client_mut(&mut self) -> Result<Option<&mut SmtpClient>> {
-        if let SmtpTransport::Pending(_) = &self.smtp {
-            let SmtpTransport::Pending(config) =
-                mem::replace(&mut self.smtp, SmtpTransport::Absent)
-            else {
-                unreachable!()
-            };
-            self.smtp = SmtpTransport::Ready(SmtpClient::new(*config)?);
-        }
-
-        Ok(match &mut self.smtp {
-            SmtpTransport::Ready(client) => Some(client),
-            _ => None,
-        })
     }
 
     /// Maps a human mailbox name onto the backend-native id every

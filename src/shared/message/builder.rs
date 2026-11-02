@@ -19,7 +19,7 @@ use mail_builder::{
 };
 use mail_parser::{HeaderValue, MessageParser, PartType, parsers::MessageStream};
 
-use crate::{config::PostingStyle, shared::message::part};
+use crate::{config::PostingStyle, repl, shared::message::part};
 
 /// Everything the MIME assembler needs, which each command fills in from
 /// its own clap struct.
@@ -376,7 +376,9 @@ fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
             .map_err(|err| anyhow!("read body file {}: {err}", path.display()));
     }
 
-    if !stdin().is_terminal() {
+    // NOTE: inside a session stdin carries the commands, so a body given
+    // nowhere is empty, as it is at a terminal.
+    if !stdin().is_terminal() && !repl::in_session() {
         let mut buf = String::new();
         stdin().read_to_string(&mut buf)?;
         return Ok(buf);

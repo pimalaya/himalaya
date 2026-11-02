@@ -81,6 +81,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 sha2 = { version = "0.11", optional = true }
 shellexpand = "3.1"
+shlex = "2"
 toml = "1.1"
 url = { version = "2.2", features = ["serde"] }
 

@@ -11,6 +11,8 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
+use crate::repl;
+
 /// Sieve source shared by `put` and `check`.
 #[derive(Debug, Parser)]
 pub struct SieveScriptArg {
@@ -34,6 +36,8 @@ impl SieveScriptArg {
         if !self.script.is_empty() {
             return Ok(self.script.join(" ").into_bytes());
         }
+
+        repl::check_stdin()?;
 
         if !stdin().is_terminal() {
             let mut script = Vec::new();

@@ -16,7 +16,7 @@ use std::io::{IsTerminal, Read, stdin};
 use anyhow::{Context, bail};
 use clap::Parser;
 
-use crate::shared::crlf;
+use crate::{repl, shared::crlf};
 
 /// Trailing positional resolving to a raw protocol command.
 ///
@@ -52,6 +52,8 @@ impl RawCommandArg {
             let command = self.raw.join(" ").replace("\\r", "").replace("\\n", "\r\n");
             return Ok(crlf::normalize(command.as_bytes()));
         }
+
+        repl::check_stdin()?;
 
         if !stdin().is_terminal() {
             let mut contents = Vec::new();

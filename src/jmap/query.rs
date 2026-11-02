@@ -19,7 +19,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::jmap::client::JmapClient;
+use crate::{jmap::client::JmapClient, repl};
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
@@ -46,6 +46,8 @@ impl JmapQueryCommand {
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")
         {
+            repl::check_stdin()?;
+
             stdin()
                 .lock()
                 .lines()

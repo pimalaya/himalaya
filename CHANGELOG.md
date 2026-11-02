@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `himalaya repl`, a session over stdin and stdout for one account: each line is a command without the binary name, split as a shell splits it and run over clients built the first time a command needs them and kept for the session, so a client connects once rather than once per command. `quit`, `exit` or EOF ends it; the account, `--backend` and `--json` are the session's. Piped, every line gets exactly one answer on stdout, a failure printed as the error object, and the loop goes on after a parse or command error. A command that fails drops the client it ran on, which the next command builds again. A command that would read its input from stdin inside a session is refused with the new error code `stdin-taken`, and `message compose`, `reply` and `forward` read no body from it. `repl` and `configure` are refused inside a session.
 - Added `pimdir search <QUERY>...`, searching the account's mail in the pimdir query language (pimdir SEARCH.md §8: words, phrases, `field:value` terms, `and`, `or`, `not`, parentheses) from the store's search index, which the sync engine builds and refreshes; Himalaya only reads it. `--sort date|name|relevance`, `--page`, `--page-size` and `--threads`; each hit carries its envelope, `mailboxes`, what `matched` (`body` or `summary`) and a `snippet`, and every answer a `coverage` (`bodiless`, `unindexed`, `behind`, `since`, `until`, `filling`, `complete`), printed as a line under the table when incomplete. A queued write shows in no answer.
 - Added `pimdir count <QUERY>...`, counting the account's mail a query matches, with its coverage.
 - Added `pimdir thread <ID>`, listing the thread of a message from the search index, oldest first.
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed the shared send over SMTP to connect for each send and close after it, rather than keep the connection for the rest of the process.
 - Changed `hasAttachment` on a pimdir account, and the files `pimdir attachment list` lists, to follow the store's new attachment mark (io-pimdir 925b8a1, pimdir STORAGE Annex A.1): a part with no `Content-Disposition` counts when it is neither text nor multipart and no `Content-ID` names it (a lone PDF, a forwarded message), an unknown disposition counts, and the parts of an encrypted message and the signature of a signed one never do. A message stored before keeps the mark it was stored with.
 - Changed the confirmations of `message send`, `message add`, `message delete`, `message move`, `message copy`, `flag add|set|remove` and the composers' save and send to say the write is queued on a pimdir account (*Message queued for sending*), where the sync engine applies it later. The JSON outputs are unchanged.
 - Changed `message add`, `pimdir message add` and the composers' save on a pimdir account to refuse a message whose `Message-ID` the mailbox holds or has a creation queued under, with the code `item-duplicate`, staging nothing. The row used to be queued, reported as saved, then parked by the sync engine.
