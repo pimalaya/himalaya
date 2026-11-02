@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed `hasAttachment` on a pimdir account, and the files `pimdir attachment list` lists, to follow the store's new attachment mark (io-pimdir 925b8a1, pimdir STORAGE Annex A.1): a part with no `Content-Disposition` counts when it is neither text nor multipart and no `Content-ID` names it (a lone PDF, a forwarded message), an unknown disposition counts, and the parts of an encrypted message and the signature of a signed one never do. A message stored before keeps the mark it was stored with.
 - Changed the confirmations of `message send`, `message add`, `message delete`, `message move`, `message copy`, `flag add|set|remove` and the composers' save and send to say the write is queued on a pimdir account (*Message queued for sending*), where the sync engine applies it later. The JSON outputs are unchanged.
 - Changed `message add`, `pimdir message add` and the composers' save on a pimdir account to refuse a message whose `Message-ID` the mailbox holds or has a creation queued under, with the code `item-duplicate`, staging nothing. The row used to be queued, reported as saved, then parked by the sync engine.
 - Changed the pimdir store refusals: a store of another draft is refused with `store-version`, saying to upgrade Himalaya when the store's sync engine is newer, else to reinstall the store as neverest's MIGRATION.md says, never to delete the store and let it resync, which loses the queued writes.
