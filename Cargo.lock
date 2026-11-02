@@ -234,9 +234,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cc"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+checksum = "375989decec1a0fa424442bed520fa12ede43a48475ce8c7417d2c69b32b5f6b"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1241,7 +1241,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.7.1"
-source = "git+https://github.com/pimalaya/io-imap?rev=5d83c49a832310cf83b2432ed57fc8093647fbe3#5d83c49a832310cf83b2432ed57fc8093647fbe3"
+source = "git+https://github.com/pimalaya/io-imap?rev=2f17d6a2d898fa0bca91da35af9cb8023dc8f150#2f17d6a2d898fa0bca91da35af9cb8023dc8f150"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1249,6 +1249,7 @@ dependencies = [
  "imap-codec",
  "io-sasl",
  "log",
+ "nom",
  "pimalaya-stream",
  "secrecy",
  "thiserror",
@@ -1347,9 +1348,9 @@ dependencies = [
 
 [[package]]
 name = "io-pim-discovery"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "091245d7c51eee2b93a613f95e3615b164377364819e7506f61f62bf1e5643cc"
+checksum = "b08ef2b077a5c79fe34a110869fadbac76314785f0856caaecbd00ec0867a634"
 dependencies = [
  "anyhow",
  "base64 0.23.1",

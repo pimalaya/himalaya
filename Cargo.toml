@@ -61,7 +61,7 @@ io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.6", default-features = false, optional = true }
-io-pim-discovery = { version = "0.8", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
+io-pim-discovery = { version = "0.9", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
 io-pimdir = { version = "0.8", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
@@ -87,11 +87,10 @@ url = { version = "2.2", features = ["serde"] }
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
 
-# NOTE: unreleased fixes, to be replaced by released versions.
 [patch.crates-io]
 ical-rs = { git = "https://github.com/pimalaya/ical", rev = "99b92736a6a076c72936fac29c9b85a5168e4c2f" }
 io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
-io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "5d83c49a832310cf83b2432ed57fc8093647fbe3" }
+io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "2f17d6a2d898fa0bca91da35af9cb8023dc8f150" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "925b8a13bdae2e14cbb22c9e052142a1e7a03d82" }
