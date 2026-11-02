@@ -27,7 +27,7 @@ use io_imap::{
     rfc5256::sort::ImapMessageSortOptions,
     rfc6851::r#move::ImapMessageMoveOptions,
     types::{
-        body::BodyStructure,
+        body::{BodyStructure, SpecificFields},
         core::{AString, Atom, Vec1},
         datetime::NaiveDate as ImapNaiveDate,
         envelope::Address as ImapAddress,
@@ -59,7 +59,7 @@ use crate::{
         },
     },
     imap::client::ImapClient,
-    shared::message::header,
+    shared::message::{header, part},
 };
 
 impl ImapClient {
@@ -709,18 +709,43 @@ fn address_from(addr: &ImapAddress<'_>) -> Address {
     Address { name, email }
 }
 
-/// Whether a body structure holds a part disposed as an attachment.
+/// Whether a body structure holds an attachment, see
+/// [`part::marks_attachment`].
 fn body_structure_has_attachment(structure: &BodyStructure<'_>) -> bool {
+    part_has_attachment(structure, false)
+}
+
+/// Whether a part of a body structure, or one under it, marks the message.
+fn part_has_attachment(structure: &BodyStructure<'_>, is_protocol_part: bool) -> bool {
     match structure {
-        BodyStructure::Single { extension_data, .. } => extension_data
-            .as_ref()
-            .and_then(|ext| ext.tail.as_ref())
-            .and_then(|disposition| disposition.disposition.as_ref())
-            .map(|(kind, _)| kind.as_ref().eq_ignore_ascii_case(b"attachment"))
-            .unwrap_or(false),
-        BodyStructure::Multi { bodies, .. } => {
-            bodies.as_ref().iter().any(body_structure_has_attachment)
+        BodyStructure::Single {
+            body,
+            extension_data,
+        } => {
+            let mime = match &body.specific {
+                SpecificFields::Basic { r#type, subtype } => {
+                    part::media_type(r#type.as_ref(), subtype.as_ref())
+                }
+                SpecificFields::Message { .. } => "message/rfc822".to_string(),
+                SpecificFields::Text { .. } => "text/plain".to_string(),
+            };
+            let disposition = extension_data
+                .as_ref()
+                .and_then(|ext| ext.tail.as_ref())
+                .and_then(|disposition| disposition.disposition.as_ref())
+                .map(|(kind, _)| kind.as_ref());
+            part::marks_attachment(
+                &mime,
+                disposition,
+                body.basic.id.0.is_some(),
+                is_protocol_part,
+            )
         }
+        BodyStructure::Multi {
+            bodies, subtype, ..
+        } => bodies.as_ref().iter().enumerate().any(|(index, body)| {
+            part_has_attachment(body, part::is_protocol_part(subtype.as_ref(), index + 1))
+        }),
     }
 }
 
@@ -1043,12 +1068,20 @@ mod tests {
     use chrono::NaiveDate;
     use pimalaya_cli::error::code_of;
 
-    use io_imap::types::{
-        core::Atom,
-        flag::{Flag as ImapFlag, FlagPerm},
+    use io_imap::{
+        codec::{ResponseCodec, decode::Decoder},
+        types::{
+            core::Atom,
+            fetch::MessageDataItem,
+            flag::{Flag as ImapFlag, FlagPerm},
+            response::{Data, Response},
+        },
     };
 
-    use super::{SearchKey, convert_filter, parse_rfc2822_date, refuse_impermanent};
+    use super::{
+        SearchKey, body_structure_has_attachment, convert_filter, parse_rfc2822_date,
+        refuse_impermanent,
+    };
     use crate::{
         email::{
             flag::{Flag, IanaFlag},
@@ -1097,6 +1130,177 @@ mod tests {
             Some(ErrorCode::SearchUnsupported)
         );
         assert!(err.to_string().contains("`attachment`"), "{err}");
+    }
+
+    /// What `hasAttachment` reads off an untagged `FETCH` answer.
+    fn has_attachment(body_structure: &str) -> bool {
+        let line = format!("* 1 FETCH (BODYSTRUCTURE {body_structure})\r\n");
+        let (_, response) = ResponseCodec::new().decode(line.as_bytes()).unwrap();
+        let Response::Data(Data::Fetch { items, .. }) = response else {
+            panic!("not a FETCH answer: {line}");
+        };
+        let structure = items
+            .as_ref()
+            .iter()
+            .find_map(|item| match item {
+                MessageDataItem::BodyStructure(structure) => Some(structure),
+                _ => None,
+            })
+            .unwrap();
+        body_structure_has_attachment(structure)
+    }
+
+    /// The `BODYSTRUCTURE` answers of Dovecot 2.4.5 for the shared
+    /// attachment rows.
+    mod attachment_rows {
+        use super::has_attachment;
+
+        const TEXT: &str =
+            r#"("text" "plain" ("charset" "utf-8") NIL NIL "7bit" 5 0 NIL NIL NIL NIL)"#;
+
+        #[test]
+        fn a_part_disposed_as_attachment_counts() {
+            assert!(has_attachment(&format!(
+                r#"({TEXT}("application" "pdf" ("name" "a.pdf") NIL NIL "base64" 12 NIL ("attachment" ("filename" "a.pdf")) NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn a_single_binary_part_without_disposition_counts() {
+            assert!(has_attachment(
+                r#"("application" "pdf" ("name" "a.pdf") NIL NIL "base64" 14 NIL NIL NIL NIL)"#
+            ));
+        }
+
+        #[test]
+        fn an_attached_message_without_disposition_counts() {
+            assert!(has_attachment(&format!(
+                r#"({TEXT}("message" "rfc822" NIL NIL NIL "7bit" 44 (NIL "inner" ((NIL NIL "c" "example.org")) ((NIL NIL "c" "example.org")) ((NIL NIL "c" "example.org")) NIL NIL NIL NIL NIL) ("text" "plain" ("charset" "us-ascii") NIL NIL "7bit" 5 0 NIL NIL NIL NIL) 3 NIL NIL NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn a_binary_part_disposed_inline_does_not_count() {
+            assert!(!has_attachment(&format!(
+                r#"({TEXT}("application" "pdf" ("name" "a.pdf") NIL NIL "base64" 12 NIL ("inline" ("filename" "a.pdf")) NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn an_image_disposed_inline_does_not_count() {
+            assert!(!has_attachment(
+                r#"(("text" "html" ("charset" "utf-8") NIL NIL "7bit" 17 0 NIL NIL NIL NIL)("image" "png" NIL "<i>" NIL "base64" 12 NIL ("inline" NIL) NIL NIL) "related" ("boundary" "b") NIL NIL NIL)"#
+            ));
+        }
+
+        #[test]
+        fn a_text_part_disposed_as_attachment_counts() {
+            assert!(has_attachment(&format!(
+                r#"({TEXT}("text" "csv" ("name" "a.csv" "charset" "us-ascii") NIL NIL "7bit" 3 0 NIL ("attachment" ("filename" "a.csv")) NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn a_text_body_does_not_count() {
+            assert!(!has_attachment(
+                r#"("text" "plain" ("charset" "utf-8") NIL NIL "7bit" 7 1 NIL NIL NIL NIL)"#
+            ));
+        }
+
+        #[test]
+        fn the_bodies_of_an_alternative_do_not_count() {
+            assert!(!has_attachment(&format!(
+                r#"({TEXT}("text" "html" ("charset" "utf-8") NIL NIL "7bit" 12 0 NIL NIL NIL NIL) "alternative" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn an_image_named_by_a_content_id_does_not_count() {
+            assert!(!has_attachment(
+                r#"(("text" "html" ("charset" "utf-8") NIL NIL "7bit" 17 0 NIL NIL NIL NIL)("image" "png" NIL "<i>" NIL "base64" 12 NIL NIL NIL NIL) "related" ("boundary" "b") NIL NIL NIL)"#
+            ));
+        }
+
+        #[test]
+        fn a_bare_image_counts() {
+            assert!(has_attachment(&format!(
+                r#"({TEXT}("image" "png" ("name" "a.png") NIL NIL "base64" 12 NIL NIL NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn a_bare_signature_does_not_count() {
+            assert!(!has_attachment(&format!(
+                r#"({TEXT}("application" "pgp-signature" ("name" "signature.asc") NIL NIL "7bit" 29 NIL NIL NIL NIL) "signed" ("protocol" "application/pgp-signature" "micalg" "pgp-sha256" "boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn a_signature_disposed_as_attachment_does_not_count() {
+            assert!(!has_attachment(&format!(
+                r#"({TEXT}("application" "pkcs7-signature" ("name" "smime.p7s") NIL NIL "base64" 12 NIL ("attachment" ("filename" "smime.p7s")) NIL NIL) "signed" ("protocol" "application/pkcs7-signature" "micalg" "sha-256" "boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn an_attachment_under_a_signature_counts() {
+            assert!(has_attachment(&format!(
+                r#"(({TEXT}("application" "pdf" ("name" "a.pdf") NIL NIL "base64" 12 NIL ("attachment" ("filename" "a.pdf")) NIL NIL) "mixed" ("boundary" "c") NIL NIL NIL)("application" "pgp-signature" ("name" "signature.asc") NIL NIL "7bit" 29 NIL NIL NIL NIL) "signed" ("protocol" "application/pgp-signature" "micalg" "pgp-sha256" "boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        #[test]
+        fn the_parts_of_an_encrypted_message_do_not_count() {
+            assert!(!has_attachment(
+                r#"(("application" "pgp-encrypted" NIL NIL NIL "7bit" 10 NIL NIL NIL NIL)("application" "octet-stream" NIL NIL NIL "7bit" 27 NIL NIL NIL NIL) "encrypted" ("protocol" "application/pgp-encrypted" "boundary" "b") NIL NIL NIL)"#
+            ));
+        }
+
+        #[test]
+        fn an_unknown_disposition_counts() {
+            assert!(has_attachment(&format!(
+                r#"({TEXT}("text" "plain" ("charset" "us-ascii") NIL NIL "7bit" 3 0 NIL ("x-foo" NIL) NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        /// Dovecot answers an empty type for a `Content-Type` it cannot read.
+        #[test]
+        fn an_invalid_content_type_reads_as_text() {
+            assert!(!has_attachment(&format!(
+                r#"({TEXT}("" "" NIL NIL NIL "base64" 12 NIL NIL NIL NIL) "mixed" ("boundary" "b") NIL NIL NIL)"#
+            )));
+        }
+
+        /// RFC 3501 lets a server omit the extension data; a part then
+        /// has no disposition to read.
+        #[test]
+        fn a_part_without_extension_data_reads_as_having_no_disposition() {
+            assert!(has_attachment(
+                r#"("application" "pdf" NIL NIL NIL "base64" 14)"#
+            ));
+            assert!(!has_attachment(r#"("text" "csv" NIL NIL NIL "7bit" 3 0)"#));
+        }
+
+        #[test]
+        fn a_multipart_sent_as_a_single_part_does_not_count() {
+            assert!(!has_attachment(
+                r#"("multipart" "mixed" NIL NIL NIL "7bit" 3)"#
+            ));
+        }
+
+        /// RFC 3501 leaves the case of the media type to the server.
+        #[test]
+        fn the_case_of_the_media_type_does_not_matter() {
+            assert!(!has_attachment(
+                r#"("TEXT" "PLAIN" ("CHARSET" "UTF-8") NIL NIL "7BIT" 7 1 NIL NIL NIL NIL)"#
+            ));
+            assert!(has_attachment(
+                r#"("APPLICATION" "PDF" NIL NIL NIL "BASE64" 14 NIL NIL NIL NIL)"#
+            ));
+            assert!(!has_attachment(
+                r#"("APPLICATION" "PDF" NIL NIL NIL "BASE64" 14 NIL ("INLINE" NIL) NIL NIL)"#
+            ));
+        }
     }
 
     #[test]

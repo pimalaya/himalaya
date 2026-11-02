@@ -24,9 +24,16 @@ use sha2::{Digest, Sha256};
 
 use crate::email::envelope::Envelope;
 
+/// The version of what a cached envelope holds, raised when a message
+/// would now read differently, so an older cache is rebuilt.
+const VERSION: u32 = 1;
+
 /// The cached state of one mbox file.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct MboxCache {
+    /// The [`VERSION`] the cache was saved under, 0 before there was one.
+    #[serde(default)]
+    pub version: u32,
     /// The scan index, `None` until the file was scanned once.
     pub index: Option<MboxIndex>,
     /// Envelopes keyed by content id, their flags left empty since the
@@ -42,12 +49,20 @@ impl MboxCache {
             return Self::default();
         };
 
-        let cache = fs::read(&file)
+        let cache: Result<Self, String> = fs::read(&file)
             .map_err(|err| err.to_string())
             .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|err| err.to_string()));
 
         match cache {
-            Ok(cache) => cache,
+            Ok(cache) if cache.version == VERSION => cache,
+            Ok(cache) => {
+                debug!(
+                    "dropping mbox cache {}: version {}",
+                    file.display(),
+                    cache.version
+                );
+                Self::default()
+            }
             Err(err) => {
                 debug!("cannot load mbox cache {}: {err}", file.display());
                 Self::default()
@@ -66,6 +81,8 @@ impl MboxCache {
             let ids: Vec<&str> = index.entries.iter().map(|e| e.id.as_str()).collect();
             self.envelopes.retain(|id, _| ids.contains(&id.as_str()));
         }
+
+        self.version = VERSION;
 
         let file = cache_file(dir, path);
         let tmp = file.with_extension("json.tmp");
@@ -120,6 +137,26 @@ mod tests {
     }
 
     #[test]
+    fn a_cache_of_an_older_version_is_rebuilt() {
+        let dir = tempdir("older");
+        let path = MboxFsPath::new("/nowhere/mbox");
+
+        let mut cache = MboxCache {
+            envelopes: BTreeMap::from([("kept".to_string(), envelope("kept"))]),
+            ..Default::default()
+        };
+        cache.save(Some(&dir), &path);
+
+        let file = cache_file(&dir, &path);
+        let mut older: serde_json::Value =
+            serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        older.as_object_mut().unwrap().remove("version");
+        fs::write(&file, serde_json::to_vec(&older).unwrap()).unwrap();
+
+        assert!(MboxCache::load(Some(&dir), &path).envelopes.is_empty());
+    }
+
+    #[test]
     fn round_trips_and_prunes_gone_messages() {
         let dir = tempdir("round-trip");
         let path = MboxFsPath::new("/nowhere/mbox");
@@ -136,6 +173,7 @@ mod tests {
                 ("kept".into(), envelope("kept")),
                 ("gone".into(), envelope("gone")),
             ]),
+            ..Default::default()
         };
         cache.save(Some(dir.as_path()), &path);
 

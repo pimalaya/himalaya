@@ -240,6 +240,105 @@ pub fn role(part: &MimeEntity) -> PartRole {
     PartRole::Attachment
 }
 
+/// Whether a leaf part marks its message as having an attachment.
+///
+/// The pimdir mark rule (STORAGE Annex A.1): a disposition other than
+/// `inline` marks (RFC 2183 §2.8); with none, a part marks unless text,
+/// multipart or named by a `Content-ID`. Protocol parts never mark.
+#[cfg(any(
+    feature = "imap",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox",
+    feature = "pimdir",
+    feature = "msgraph"
+))]
+pub fn marks_attachment(
+    mime: &str,
+    disposition: Option<&[u8]>,
+    has_content_id: bool,
+    is_protocol_part: bool,
+) -> bool {
+    if is_protocol_part {
+        return false;
+    }
+
+    match disposition {
+        Some(kind) if !kind.is_empty() => !kind.eq_ignore_ascii_case(b"inline"),
+        _ => !mime.starts_with("text/") && !mime.starts_with("multipart/") && !has_content_id,
+    }
+}
+
+/// Whether the child at 1-based `position` of a multipart of `subtype` is
+/// an RFC 1847 protocol part: the signature of a signed message, or any
+/// child of an encrypted one.
+#[cfg(any(
+    feature = "imap",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox",
+    feature = "pimdir",
+    feature = "msgraph"
+))]
+pub fn is_protocol_part(subtype: &[u8], position: usize) -> bool {
+    subtype.eq_ignore_ascii_case(b"encrypted")
+        || (subtype.eq_ignore_ascii_case(b"signed") && position > 1)
+}
+
+/// A media type read off the wire, lowercased, `text/plain` when either
+/// half is no RFC 2045 token, as [`mime()`] reads a parsed part.
+#[cfg(feature = "imap")]
+pub fn media_type(kind: &[u8], subtype: &[u8]) -> String {
+    if !is_token(kind) || !is_token(subtype) {
+        return "text/plain".to_string();
+    }
+
+    let kind = String::from_utf8_lossy(kind);
+    let subtype = String::from_utf8_lossy(subtype);
+    format!("{kind}/{subtype}").to_ascii_lowercase()
+}
+
+/// Whether a parsed message has an attachment, see [`marks_attachment`].
+///
+/// The leaves are the ones [`leaves`] walks, a `message/rfc822` part
+/// being one, so the parts of an attached message are not read.
+#[cfg(any(
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox",
+    feature = "pimdir",
+    feature = "msgraph"
+))]
+pub fn has_attachment(message: &MimeCst) -> bool {
+    part_has_attachment(&message.root, false)
+}
+
+/// Whether a part, or a leaf under it, marks its message.
+#[cfg(any(
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox",
+    feature = "pimdir",
+    feature = "msgraph"
+))]
+fn part_has_attachment(part: &MimeEntity, is_protocol: bool) -> bool {
+    let MimeBodyNode::Multipart(multipart) = &part.body else {
+        return marks_attachment(
+            &mime(part),
+            disposition(part).as_deref().map(str::as_bytes),
+            content_id(part).is_some(),
+            is_protocol,
+        );
+    };
+
+    let mime = mime(part);
+    let subtype = mime.strip_prefix("multipart/").unwrap_or_default();
+    multipart.parts.iter().enumerate().any(|(index, child)| {
+        let is_protocol = is_protocol_part(subtype.as_bytes(), index + 1);
+        part_has_attachment(&child.entity, is_protocol)
+    })
+}
+
 /// The part's MIME type, lowercased, defaulting as RFC 2045 does when
 /// the part carries no `Content-Type` (`message/rfc822` in a digest),
 /// and taken as `text/plain` when it carries an invalid one (RFC 2045
@@ -538,6 +637,14 @@ mod tests {
         raw.into_bytes()
     }
 
+    #[cfg(any(feature = "maildir", feature = "m2dir", feature = "mbox"))]
+    #[test]
+    fn a_multipart_without_a_boundary_does_not_count() {
+        let raw = b"Content-Type: multipart/mixed\r\n\r\nno parts here\r\n";
+        let message = MimeCst::parse(raw);
+        assert!(!has_attachment(&message));
+    }
+
     /// A `multipart/mixed` message holding `count` text parts.
     fn wide(count: usize) -> Vec<u8> {
         let mut raw = String::from("Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n");
@@ -706,5 +813,113 @@ mod tests {
                 "{charset}"
             );
         }
+    }
+}
+
+/// The `hasAttachment` rows, read through the envelope reader the
+/// Maildir, m2dir and mbox backends share.
+#[cfg(all(test, any(feature = "maildir", feature = "m2dir", feature = "mbox")))]
+mod attachment_rows {
+    use crate::email::envelope;
+
+    const PDF_ATTACHMENT: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: application/pdf; name=\"a.pdf\"\r\nContent-Disposition: attachment; filename=\"a.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const PDF_ALONE: &[u8] = b"Content-Type: application/pdf; name=\"a.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n";
+    const RFC822: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: message/rfc822\r\n\r\nFrom: c@example.org\r\nSubject: inner\r\n\r\ninner\r\n--b--\r\n";
+    const PDF_INLINE: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: application/pdf; name=\"a.pdf\"\r\nContent-Disposition: inline; filename=\"a.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const PNG_INLINE: &[u8] = b"Content-Type: multipart/related; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/html\r\n\r\n<img src=\"cid:i\">\r\n--b\r\nContent-Type: image/png\r\nContent-ID: <i>\r\nContent-Disposition: inline\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const CSV_ATTACHMENT: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: text/csv; name=\"a.csv\"\r\nContent-Disposition: attachment; filename=\"a.csv\"\r\n\r\na,b\r\n--b--\r\n";
+    const PLAIN: &[u8] = b"Content-Type: text/plain\r\n\r\nhello\r\n";
+    const ALTERNATIVE: &[u8] = b"Content-Type: multipart/alternative; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: text/html\r\n\r\n<p>hello</p>\r\n--b--\r\n";
+    const PNG_BARE: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: image/png; name=\"a.png\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const SIGNED_BARE: &[u8] = b"Content-Type: multipart/signed; protocol=\"application/pgp-signature\"; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: application/pgp-signature; name=\"signature.asc\"\r\n\r\nsig\r\n--b--\r\n";
+    const SIGNED_DISPOSED: &[u8] = b"Content-Type: multipart/signed; protocol=\"application/pkcs7-signature\"; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: application/pkcs7-signature; name=\"smime.p7s\"\r\nContent-Disposition: attachment; filename=\"smime.p7s\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const SIGNED_WITH_PDF: &[u8] = b"Content-Type: multipart/signed; protocol=\"application/pgp-signature\"; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: multipart/mixed; boundary=\"c\"\r\n\r\n--c\r\nContent-Type: text/plain\r\n\r\nhello\r\n--c\r\nContent-Type: application/pdf; name=\"a.pdf\"\r\nContent-Disposition: attachment; filename=\"a.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--c--\r\n--b\r\nContent-Type: application/pgp-signature; name=\"signature.asc\"\r\n\r\nsig\r\n--b--\r\n";
+    const ENCRYPTED: &[u8] = b"Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: application/pgp-encrypted\r\n\r\nVersion: 1\r\n--b\r\nContent-Type: application/octet-stream\r\n\r\ncipher\r\n--b--\r\n";
+    const TEXT_UNKNOWN_DISPOSITION: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: text/plain\r\nContent-Disposition: x-foo\r\n\r\nbye\r\n--b--\r\n";
+    const INVALID_TYPE: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Type: application/x foo\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+    const PNG_WITH_CONTENT_ID: &[u8] = b"Content-Type: multipart/related; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/html\r\n\r\n<img src=\"cid:i\">\r\n--b\r\nContent-Type: image/png\r\nContent-ID: <i>\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
+
+    fn row(raw: &[u8]) -> Option<bool> {
+        envelope::from_raw(raw, true).has_attachment
+    }
+
+    #[test]
+    fn a_part_disposed_as_attachment_counts() {
+        assert_eq!(row(PDF_ATTACHMENT), Some(true));
+    }
+
+    #[test]
+    fn a_single_binary_part_without_disposition_counts() {
+        assert_eq!(row(PDF_ALONE), Some(true));
+    }
+
+    #[test]
+    fn an_attached_message_without_disposition_counts() {
+        assert_eq!(row(RFC822), Some(true));
+    }
+
+    #[test]
+    fn a_binary_part_disposed_inline_does_not_count() {
+        assert_eq!(row(PDF_INLINE), Some(false));
+    }
+
+    #[test]
+    fn an_image_disposed_inline_does_not_count() {
+        assert_eq!(row(PNG_INLINE), Some(false));
+    }
+
+    #[test]
+    fn a_text_part_disposed_as_attachment_counts() {
+        assert_eq!(row(CSV_ATTACHMENT), Some(true));
+    }
+
+    #[test]
+    fn a_text_body_does_not_count() {
+        assert_eq!(row(PLAIN), Some(false));
+    }
+
+    #[test]
+    fn the_bodies_of_an_alternative_do_not_count() {
+        assert_eq!(row(ALTERNATIVE), Some(false));
+    }
+
+    #[test]
+    fn an_image_named_by_a_content_id_does_not_count() {
+        assert_eq!(row(PNG_WITH_CONTENT_ID), Some(false));
+    }
+
+    #[test]
+    fn a_bare_image_counts() {
+        assert_eq!(row(PNG_BARE), Some(true));
+    }
+
+    #[test]
+    fn a_bare_signature_does_not_count() {
+        assert_eq!(row(SIGNED_BARE), Some(false));
+    }
+
+    #[test]
+    fn a_signature_disposed_as_attachment_does_not_count() {
+        assert_eq!(row(SIGNED_DISPOSED), Some(false));
+    }
+
+    #[test]
+    fn an_attachment_under_a_signature_counts() {
+        assert_eq!(row(SIGNED_WITH_PDF), Some(true));
+    }
+
+    #[test]
+    fn the_parts_of_an_encrypted_message_do_not_count() {
+        assert_eq!(row(ENCRYPTED), Some(false));
+    }
+
+    #[test]
+    fn an_unknown_disposition_counts() {
+        assert_eq!(row(TEXT_UNKNOWN_DISPOSITION), Some(true));
+    }
+
+    #[test]
+    fn an_invalid_content_type_reads_as_text() {
+        assert_eq!(row(INVALID_TYPE), Some(false));
     }
 }

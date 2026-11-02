@@ -82,7 +82,7 @@ impl M2dirClient {
         query: Option<&SearchEmailsQuery>,
         page: Option<u32>,
         page_size: Option<u32>,
-        _with_attachment: bool,
+        with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         let m2dir = self.resolve_m2dir(mailbox)?;
         let entries = self.list_entries(m2dir.clone())?;
@@ -92,7 +92,7 @@ impl M2dirClient {
         for entry in &entries {
             let bytes = self.read_entry(entry)?;
             let flags = self.read_flags(&m2dir, entry.id())?;
-            let envelope = envelope_from(entry, &flags, &bytes, false);
+            let envelope = envelope_from(entry, &flags, &bytes, with_attachment);
             let keep = match filter {
                 Some(filter) => eval::matches_filter(&envelope, None, &bytes, filter),
                 None => true,
