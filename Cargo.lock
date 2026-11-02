@@ -1380,7 +1380,7 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.8.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=925b8a13bdae2e14cbb22c9e052142a1e7a03d82#925b8a13bdae2e14cbb22c9e052142a1e7a03d82"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=908db2ba74e40cccb89281e797d1807dbf0b7d9b#908db2ba74e40cccb89281e797d1807dbf0b7d9b"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1388,7 +1388,7 @@ dependencies = [
  "ical-rs",
  "jiff",
  "log",
- "mail-parser",
+ "mime-rs",
  "rusqlite",
  "rustix",
  "serde",
@@ -1697,7 +1697,6 @@ version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ec00bda90c6e645a54506c630c2820cd6b1890cfd2b0a169b50f74b2b8c7c86"
 dependencies = [
- "encoding_rs",
  "hashify",
  "serde",
 ]

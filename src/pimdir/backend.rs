@@ -751,7 +751,11 @@ impl PimdirClient {
     /// The performer is named as for a send. A store whose sources declare
     /// nothing has an owner predating the intent, which would never perform
     /// it, so the creation is refused there rather than left to wait.
-    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<PimdirCreated> {
+    pub fn create_mailbox(
+        &mut self,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<PimdirQueuedIntent> {
         // NOTE: a name the server already holds is its to refuse: the row
         // parks, and `pimdir queue show` says why.
         let parent = parent.map(|parent| self.hub_id(parent)).transpose()?;
@@ -780,7 +784,67 @@ impl PimdirClient {
             .enqueue_collection_create(&anchor, name, parent.as_deref(), Some(&source))
             .map_err(pimdir_error)
             .with_context(|| format!("Queue the creation of `{name}`"))?;
-        Ok(PimdirCreated { queue_id, source })
+        Ok(PimdirQueuedIntent { queue_id, source })
+    }
+
+    /// Queues the renaming of `mailbox` to `name` for the store's owner,
+    /// returning the queue row and the source that performs it.
+    ///
+    /// The intent is anchored on the mailbox itself, which the payload does
+    /// not restate. The mailbox keeps its parent: `name` is one level of the
+    /// hierarchy. The new name arrives with the sync that performs it.
+    ///
+    /// The performer is named as for a creation, and a store whose sources
+    /// declare nothing is refused the same way.
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<PimdirQueuedIntent> {
+        // NOTE: the store records no hierarchy separator, so a name holding
+        // the server's is the performer's to refuse: the row parks, as it
+        // does on a sibling already named so.
+        let collection = self.hub_id(mailbox)?;
+        let mut producer = self.producer()?;
+        let Some(source) = self.performer(&producer, &collection, capability::COLLECTION_RENAME)?
+        else {
+            bail!(
+                "The sources of this store declare no capabilities, so its sync engine \
+                 cannot rename a mailbox"
+            );
+        };
+
+        let queue_id = producer
+            .enqueue_collection_rename(&collection, name, Some(&source))
+            .map_err(pimdir_error)
+            .with_context(|| format!("Queue the renaming of `{collection}` to `{name}`"))?;
+        Ok(PimdirQueuedIntent { queue_id, source })
+    }
+
+    /// Queues the deletion of `mailbox` and the messages it holds for the
+    /// store's owner, returning the queue row and the source that performs
+    /// it.
+    ///
+    /// The intent is anchored on the mailbox itself and never takes another
+    /// one. The deletion arrives with the sync that performs it.
+    ///
+    /// The performer is named as for a creation, and a store whose sources
+    /// declare nothing is refused the same way.
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<PimdirQueuedIntent> {
+        // NOTE: no sync engine records a mailbox's parent in the store, so
+        // a mailbox holding others is the performer's to refuse: the row
+        // parks naming them, and `pimdir queue show` says so.
+        let collection = self.hub_id(mailbox)?;
+        let mut producer = self.producer()?;
+        let Some(source) = self.performer(&producer, &collection, capability::COLLECTION_DELETE)?
+        else {
+            bail!(
+                "The sources of this store declare no capabilities, so its sync engine \
+                 cannot delete a mailbox"
+            );
+        };
+
+        let queue_id = producer
+            .enqueue_collection_delete(&collection, Some(&source))
+            .map_err(pimdir_error)
+            .with_context(|| format!("Queue the deletion of `{collection}`"))?;
+        Ok(PimdirQueuedIntent { queue_id, source })
     }
 
     /// Deletes each id `mailbox` holds, staged as `Remove` (the next sync
@@ -1108,12 +1172,13 @@ pub struct PimdirSubmitted {
     pub carried: bool,
 }
 
-/// A mailbox creation queued for the owner.
+/// A mailbox creation, renaming or deletion queued for the owner.
 #[derive(Clone, Debug)]
-pub struct PimdirCreated {
-    /// The `collection-create` row.
+pub struct PimdirQueuedIntent {
+    /// The `collection-create`, `collection-rename` or `collection-delete`
+    /// row.
     pub queue_id: i64,
-    /// The source that creates the mailbox on its server.
+    /// The source that performs it on its server.
     pub source: String,
 }
 
@@ -2593,6 +2658,125 @@ mod tests {
         );
     }
 
+    /// The one pending intent of `imap/Sent`: its row id, kind and payload.
+    fn intent(client: &PimdirClient) -> (i64, String, serde_json::Value) {
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 1);
+        let PimdirAction::Unknown { kind, payload, .. } = &pending[0].action else {
+            panic!("expected an intent, got {:?}", pending[0].action);
+        };
+        let payload = serde_json::from_str(payload).unwrap();
+        (pending[0].id, kind.clone(), payload)
+    }
+
+    #[test]
+    fn a_mailbox_renaming_is_one_intent_on_the_mailbox() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_RENAME]);
+
+        let renamed = client.rename_mailbox("imap/Sent", "Envoyés").unwrap();
+
+        assert_eq!(renamed.source, "imap");
+        let (id, kind, payload) = intent(&client);
+        assert_eq!(id, renamed.queue_id);
+        assert_eq!(kind, "collection-rename");
+        assert_eq!(
+            payload,
+            serde_json::json!({ "v": 1, "source": "imap", "name": "Envoyés" })
+        );
+    }
+
+    #[test]
+    fn a_mailbox_deletion_is_one_intent_on_the_mailbox() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_DELETE]);
+
+        let deleted = client.delete_mailbox("imap/Sent").unwrap();
+
+        assert_eq!(deleted.source, "imap");
+        let (id, kind, payload) = intent(&client);
+        assert_eq!(id, deleted.queue_id);
+        assert_eq!(kind, "collection-delete");
+        assert_eq!(payload, serde_json::json!({ "v": 1, "source": "imap" }));
+    }
+
+    /// What the sync engine does once the server renamed the mailbox, its
+    /// id deriving from its name (pimdir STORAGE Annex B.2): the receipt
+    /// follows the collection to its new id.
+    #[test]
+    fn a_performed_renaming_reads_applied_under_the_new_id() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_RENAME]);
+        let renamed = client.rename_mailbox("imap/Sent", "Envoyés").unwrap();
+
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        assert!(owner.acknowledge_action(renamed.queue_id, None).unwrap());
+        owner
+            .rename_collection("imap/Sent", "imap/Envoyés")
+            .unwrap();
+        drop(owner);
+
+        let PimdirActionStatus::Applied {
+            collection, seq, ..
+        } = client.queue_row(renamed.queue_id).unwrap()
+        else {
+            panic!("expected a performed renaming to read applied");
+        };
+        assert_eq!(collection, "imap/Envoyés");
+        assert_eq!(seq, None);
+    }
+
+    /// What the sync engine does once the server deleted the mailbox: the
+    /// receipt leaves the store with the collection, so the row reads as
+    /// one never known.
+    #[test]
+    fn a_performed_deletion_reads_unknown_once_the_mailbox_left() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_DELETE]);
+        let deleted = client.delete_mailbox("imap/Sent").unwrap();
+
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        assert!(owner.acknowledge_action(deleted.queue_id, None).unwrap());
+        assert!(matches!(
+            client.queue_row(deleted.queue_id).unwrap(),
+            PimdirActionStatus::Applied { .. }
+        ));
+        assert!(owner.delete_collection("imap/Sent").unwrap());
+        drop(owner);
+
+        assert!(matches!(
+            client.queue_row(deleted.queue_id).unwrap(),
+            PimdirActionStatus::Unknown
+        ));
+    }
+
+    #[test]
+    fn a_mailbox_renaming_or_deletion_no_source_performs_stages_nothing() {
+        let (dir, mut client) = sent_store();
+
+        // NOTE: an undeclared owner predates the intents.
+        assert!(client.rename_mailbox("imap/Sent", "Envoyés").is_err());
+        assert!(client.delete_mailbox("imap/Sent").is_err());
+
+        // NOTE: each capability gates its own intent alone.
+        declare(dir.path(), &[capability::COLLECTION_CREATE]);
+        assert!(client.rename_mailbox("imap/Sent", "Envoyés").is_err());
+        assert!(client.delete_mailbox("imap/Sent").is_err());
+
+        declare(dir.path(), &[capability::COLLECTION_RENAME]);
+        assert!(client.rename_mailbox("imap/Sent", "").is_err());
+        assert!(client.rename_mailbox("imap/Sent", "a\tb").is_err());
+        assert!(client.rename_mailbox("imap/Nowhere", "Envoyés").is_err());
+        assert!(client.delete_mailbox("imap/Nowhere").is_err());
+        assert!(
+            client
+                .store
+                .pending_actions("imap/Sent")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
     /// One mail a seeded mailbox holds: its handle, its flags, and its
     /// summary, `None` for a row whose summary was never read.
     struct Seeded {
@@ -3495,6 +3679,44 @@ mod tests {
 
         assert_eq!(staged.len(), 1);
         assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
+    }
+
+    /// A source stating `mail.flags.junk` gates `$Junk` by that row, not by
+    /// `mail.flags.keywords` (pimdir STORAGE Annex B.1).
+    #[test]
+    fn a_junk_mark_is_gated_by_its_own_row() {
+        use io_pimdir::capability::{MAIL_FLAGS_JUNK, MAIL_FLAGS_KEYWORDS, PimdirSupport};
+
+        let (_dir, mut client) = flag_store(Some(&[
+            (MAIL_FLAGS_KEYWORDS, PimdirSupport::None),
+            (MAIL_FLAGS_JUNK, PimdirSupport::Full),
+        ]));
+        let id = id_of(&mut client, 0);
+        let junk = Flag::from_iana(IanaFlag::Junk);
+
+        let staged = client
+            .stage_flags("imap/INBOX", &[id.as_str()], &[junk], FlagOp::Add)
+            .unwrap();
+        assert_eq!(staged.len(), 1);
+
+        let (_dir, mut client) = flag_store(Some(&[
+            (MAIL_FLAGS_KEYWORDS, PimdirSupport::Full),
+            (MAIL_FLAGS_JUNK, PimdirSupport::None),
+        ]));
+        let id = id_of(&mut client, 0);
+        let junk = Flag::from_iana(IanaFlag::Junk);
+
+        let err = client
+            .stage_flags("imap/INBOX", &[id.as_str()], &[junk], FlagOp::Add)
+            .unwrap_err();
+        assert!(format!("{err:#}").contains(MAIL_FLAGS_JUNK), "{err:#}");
+        assert!(
+            client
+                .store
+                .pending_actions("imap/INBOX")
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// The shared `flag set -f seen` on three mails, which drops `act` from

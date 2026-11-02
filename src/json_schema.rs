@@ -433,6 +433,14 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::pimdir::mailbox::create::PimdirMailboxCreateOutput
         );
         insert!(
+            "himalaya-pimdir-mailbox-rename",
+            crate::pimdir::mailbox::rename::PimdirMailboxRenameOutput
+        );
+        insert!(
+            "himalaya-pimdir-mailbox-delete",
+            crate::pimdir::mailbox::delete::PimdirMailboxDeleteOutput
+        );
+        insert!(
             "himalaya-pimdir-mailbox-list",
             crate::pimdir::mailbox::list::PimdirMailboxListOutput
         );

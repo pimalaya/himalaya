@@ -14,13 +14,17 @@ use serde::Serialize;
 use crate::pimdir::client::PimdirClient;
 
 /// Show where one queue row stands, by the id `pimdir message add`,
-/// `pimdir message send` or `pimdir mailbox create` printed.
+/// `pimdir message send` or `pimdir mailbox create`, `rename` or `delete`
+/// printed.
 ///
 /// A row is `pending` until the sync engine applies it, `parked` when the
 /// engine gave up on it (with why), and `applied` once done, a message
-/// sent or a mailbox created included, with the id of the message an add
-/// created. The store keeps what became of an applied row for seven days;
-/// past that, and for a cancelled row, the state is `unknown`.
+/// sent or a mailbox created, renamed or deleted included, with the id of
+/// the message an add created. The store keeps what became of an applied
+/// row for seven days, under the mailbox it was queued on; past that, for
+/// a cancelled row, and once a deleted mailbox has left the store, taking
+/// that record with it, the state is `unknown`: `pimdir mailbox list` no
+/// longer listing the mailbox is what says it was deleted.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueShowCommand {
     /// The queue row id.
@@ -45,9 +49,11 @@ pub enum PimdirQueueState {
     /// Given up on by the sync engine; `error` says why.
     Parked,
     /// Applied or performed by the sync engine (a message sent, a mailbox
-    /// created); `seq` is the message an add created.
+    /// created, renamed or deleted); `seq` is the message an add created.
     Applied,
-    /// Neither queued nor known applied: cancelled, or applied long ago.
+    /// Neither queued nor known applied: cancelled, applied long ago, or a
+    /// mailbox deletion the store has followed, the record leaving with the
+    /// mailbox.
     Unknown,
 }
 
@@ -157,7 +163,8 @@ impl fmt::Display for PimdirQueueShowOutput {
             }
             PimdirQueueState::Unknown => writeln!(
                 f,
-                "Row {id} is neither queued nor known applied: cancelled, or applied long ago"
+                "Row {id} is neither queued nor known applied: cancelled, applied long ago, \
+                 or a deleted mailbox's row, gone with the mailbox"
             ),
         }
     }
