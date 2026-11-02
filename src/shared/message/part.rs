@@ -5,20 +5,19 @@
 //! names the same part in all of them, plus what each command reads
 //! off a part: its type, role, name, `Content-ID` and decoded bytes.
 //!
-//! A message is parsed once through [`parse`], which also refuses a
-//! message too complex to be read whole.
+//! A message is parsed once through [`parse`] into a mime-rs tree, which
+//! also refuses a message too complex to be read whole.
 
 use std::borrow::Cow;
 
-use anyhow::{Result, bail};
-use mail_parser::{
-    Encoding, HeaderValue, Message, MessageParser, MessagePart, MimeHeaders, PartType,
-    parsers::MessageStream,
+use anyhow::Result;
+use mime::{
+    codec::flowed,
+    tree::{body::MimeBodyNode, cst::MimeCst, entity::MimeEntity},
 };
+use pimalaya_cli::error::CodedError;
 use schemars::JsonSchema;
 use serde::Serialize;
-
-use pimalaya_cli::error::CodedError;
 
 use crate::{error::ErrorCode, shared::message::header};
 
@@ -35,79 +34,58 @@ pub const MAX_HEADER_LINES: usize = 500;
 
 /// Parses a raw message, refusing it whole with `message-too-complex`
 /// when it is nested too deep or holds too many parts or header lines.
-pub fn parse(raw: &[u8]) -> Result<Message<'_>> {
-    let Some(message) = MessageParser::new().parse(raw) else {
-        bail!("Failed to parse RFC 5322 message");
-    };
-
-    check_bounds(&message)?;
-
+///
+/// Any bytes parse: mime-rs recovers from malformed mail rather than
+/// failing on it.
+pub fn parse(raw: &[u8]) -> Result<MimeCst<'_>> {
+    let message = MimeCst::parse(raw);
+    measure(&message.root, 1, &mut Tally::default())?;
     Ok(message)
 }
 
-/// The running totals [`check_bounds`] holds a message to.
+/// The running totals [`measure`] holds a message to.
 #[derive(Default)]
 struct Tally {
     parts: usize,
     header_lines: usize,
 }
 
-/// Refuses a message past [`MAX_DEPTH`], [`MAX_PARTS`] or
-/// [`MAX_HEADER_LINES`].
-fn check_bounds(message: &Message) -> Result<()> {
-    measure(message, 1, &mut Tally::default())
-}
+/// Measures one part sitting at `depth`, then what it holds: the parts
+/// of a multipart one level deeper, and an attached message's top-level
+/// part one level deeper too, encoded or not.
+fn measure(part: &MimeEntity, depth: usize, tally: &mut Tally) -> Result<()> {
+    if depth > MAX_DEPTH {
+        return Err(too_complex(format!(
+            "parts nested deeper than {MAX_DEPTH} levels"
+        )));
+    }
 
-/// Measures one message whose top-level part sits at `depth`, then the
-/// messages attached to it, one level deeper than their part.
-///
-/// NOTE: a part's depth comes from the byte ranges of the containers
-/// still open around it rather than from their lists of sub-parts,
-/// which a truncated message leaves empty while its parts still parse.
-fn measure(message: &Message, depth: usize, tally: &mut Tally) -> Result<()> {
-    let mut open: Vec<u32> = Vec::new();
+    tally.parts += 1;
+    if tally.parts > MAX_PARTS {
+        return Err(too_complex(format!("more than {MAX_PARTS} parts")));
+    }
 
-    for part in &message.parts {
-        while open.last().is_some_and(|&end| part.offset_header >= end) {
-            open.pop();
-        }
+    for field in part.header.fields() {
+        let lines = field.line().iter().filter(|&&b| b == b'\n').count();
+        tally.header_lines += lines.max(1);
+    }
+    if tally.header_lines > MAX_HEADER_LINES {
+        return Err(too_complex(format!(
+            "more than {MAX_HEADER_LINES} header lines"
+        )));
+    }
 
-        let depth = depth + open.len();
-        if depth > MAX_DEPTH {
-            return Err(too_complex(format!(
-                "parts nested deeper than {MAX_DEPTH} levels"
-            )));
-        }
-
-        tally.parts += 1;
-        if tally.parts > MAX_PARTS {
-            return Err(too_complex(format!("more than {MAX_PARTS} parts")));
-        }
-
-        for header in &part.headers {
-            let span = message
-                .raw_message
-                .get(header.offset_field as usize..header.offset_end as usize)
-                .unwrap_or_default();
-            let lines = span.iter().filter(|&&b| b == b'\n').count().max(1);
-            tally.header_lines += lines;
-        }
-        if tally.header_lines > MAX_HEADER_LINES {
-            return Err(too_complex(format!(
-                "more than {MAX_HEADER_LINES} header lines"
-            )));
-        }
-
-        match &part.body {
-            PartType::Multipart(_) => {
-                let end = match part.offset_end {
-                    0 => u32::MAX,
-                    end => end,
-                };
-                open.push(end);
+    match &part.body {
+        MimeBodyNode::Multipart(multipart) => {
+            for child in &multipart.parts {
+                measure(&child.entity, depth + 1, tally)?;
             }
-            PartType::Message(inner) => measure(inner, depth + 1, tally)?,
-            _ => (),
+        }
+        MimeBodyNode::Message(inner) => measure(inner, depth + 1, tally)?,
+        MimeBodyNode::Leaf(_) | MimeBodyNode::Unparsed(_) => {
+            if let Some(inner) = part.nested() {
+                measure(&inner.root, depth + 1, tally)?;
+            }
         }
     }
 
@@ -122,36 +100,88 @@ fn too_complex(why: String) -> anyhow::Error {
     .into()
 }
 
+/// One part of a message as the walk meets it.
+struct Node<'t, 'a> {
+    part: &'t MimeEntity<'a>,
+    /// Its IMAP section, `None` for the message's own multipart and past
+    /// [`MAX_DEPTH`].
+    section: Option<String>,
+}
+
+/// Every part of a message, depth first: the root, then the parts of
+/// each multipart in order. An attached message is one part, its own
+/// parts being its own, not the message's.
+fn nodes<'t, 'a>(message: &'t MimeCst<'a>) -> Vec<Node<'t, 'a>> {
+    let root = &message.root;
+    let mut nodes = Vec::new();
+
+    match is_multipart(root) {
+        true => push(root, None, Some(String::new()), 1, &mut nodes),
+        false => push(root, Some(String::from("1")), None, 1, &mut nodes),
+    }
+
+    nodes
+}
+
+/// Pushes `part`, then its parts when it is a multipart, numbered under
+/// `prefix` when it has one.
+fn push<'t, 'a>(
+    part: &'t MimeEntity<'a>,
+    section: Option<String>,
+    prefix: Option<String>,
+    depth: usize,
+    nodes: &mut Vec<Node<'t, 'a>>,
+) {
+    nodes.push(Node { part, section });
+
+    let MimeBodyNode::Multipart(multipart) = &part.body else {
+        return;
+    };
+
+    let prefix = prefix.filter(|_| depth <= MAX_DEPTH);
+
+    for (position, child) in multipart.parts.iter().enumerate() {
+        let section = prefix
+            .as_ref()
+            .map(|prefix| format!("{prefix}{}", position + 1));
+        let next = section.as_ref().map(|section| format!("{section}."));
+        push(&child.entity, section, next, depth + 1, nodes);
+    }
+}
+
+/// Whether a part is a multipart container.
+fn is_multipart(part: &MimeEntity) -> bool {
+    matches!(part.body, MimeBodyNode::Multipart(_))
+}
+
 /// One leaf part of a message, a `multipart/*` container being none.
-pub struct Leaf<'a, 'x> {
+pub struct Leaf<'t, 'a> {
     /// The id the `message read` and `attachment` commands share: the
-    /// 1-based position of the part in the whole part list, so the ids
-    /// gap where a container sits.
+    /// 1-based position of the part among all of the message's parts,
+    /// depth first, so the ids gap where a container sits.
     pub id: String,
-    /// The index of the part in [`Message::parts`].
-    pub index: usize,
-    pub part: &'a MessagePart<'x>,
+    pub part: &'t MimeEntity<'a>,
+    section: Option<String>,
 }
 
 /// The leaf parts of a message, depth first.
 ///
 /// A `message/rfc822` part is a leaf: the parts of the attached message
 /// are its own, not the message's.
-pub fn leaves<'a, 'x>(message: &'a Message<'x>) -> impl Iterator<Item = Leaf<'a, 'x>> {
-    message
-        .parts
-        .iter()
+pub fn leaves<'t, 'a>(message: &'t MimeCst<'a>) -> impl Iterator<Item = Leaf<'t, 'a>> {
+    nodes(message)
+        .into_iter()
         .enumerate()
-        .filter(|(_, part)| !part.is_multipart())
-        .map(|(index, part)| Leaf {
+        .filter(|(_, node)| !is_multipart(node.part))
+        .map(|(index, node)| Leaf {
             id: (index + 1).to_string(),
-            index,
-            part,
+            part: node.part,
+            section: node.section,
         })
 }
 
 /// The leaf part carrying the given id.
-pub fn find<'a, 'x>(message: &'a Message<'x>, id: &str) -> Option<Leaf<'a, 'x>> {
+pub fn find<'t, 'a>(message: &'t MimeCst<'a>, id: &str) -> Option<Leaf<'t, 'a>> {
     leaves(message).find(|leaf| leaf.id == id)
 }
 
@@ -162,54 +192,8 @@ pub fn find<'a, 'x>(message: &'a Message<'x>, id: &str) -> Option<Leaf<'a, 'x>> 
 ///
 /// A part of an attached message has no section here, as it is no leaf
 /// of the message.
-pub fn find_section<'a, 'x>(message: &'a Message<'x>, section: &str) -> Option<Leaf<'a, 'x>> {
-    let sections = sections(message);
-    leaves(message)
-        .find(|leaf| sections.get(leaf.index).and_then(Option::as_deref) == Some(section))
-}
-
-/// The IMAP section of each part, by its index in [`Message::parts`];
-/// `None` for the message's own multipart and for a part no multipart
-/// lists.
-fn sections(message: &Message) -> Vec<Option<String>> {
-    let mut sections = vec![None; message.parts.len()];
-    match message.parts.first().map(|root| &root.body) {
-        Some(PartType::Multipart(children)) => number(message, children, "", 1, &mut sections),
-        Some(_) => sections[0] = Some(String::from("1")),
-        None => (),
-    }
-    sections
-}
-
-/// Numbers the `children` of a multipart under `prefix`, then their own
-/// children, `depth` deep at most [`MAX_DEPTH`].
-fn number(
-    message: &Message,
-    children: &[u32],
-    prefix: &str,
-    depth: usize,
-    sections: &mut [Option<String>],
-) {
-    if depth > MAX_DEPTH {
-        return;
-    }
-    for (position, &child) in children.iter().enumerate() {
-        let child = child as usize;
-        let Some(part) = message.parts.get(child) else {
-            continue;
-        };
-        let section = format!("{prefix}{}", position + 1);
-        if let PartType::Multipart(grandchildren) = &part.body {
-            number(
-                message,
-                grandchildren,
-                &format!("{section}."),
-                depth + 1,
-                sections,
-            );
-        }
-        sections[child] = Some(section);
-    }
+pub fn find_section<'t, 'a>(message: &'t MimeCst<'a>, section: &str) -> Option<Leaf<'t, 'a>> {
+    leaves(message).find(|leaf| leaf.section.as_deref() == Some(section))
 }
 
 /// What a part is to a reader.
@@ -232,16 +216,18 @@ pub enum PartRole {
 /// attachment` is an attachment; a `text/plain` or `text/html` part
 /// naming no file is a body; an `image/*` part marked inline or carrying
 /// a `Content-ID` is inline; anything else is an attachment.
-pub fn role(message: &Message, part: &MessagePart) -> PartRole {
+pub fn role(part: &MimeEntity) -> PartRole {
     let mime = mime(part);
     let disposition = disposition(part);
 
-    if part.is_message() || mime == "message/rfc822" || disposition.as_deref() == Some("attachment")
+    if matches!(part.body, MimeBodyNode::Message(_))
+        || mime == "message/rfc822"
+        || disposition.as_deref() == Some("attachment")
     {
         return PartRole::Attachment;
     }
 
-    if (mime == "text/plain" || mime == "text/html") && filename(message, part).is_none() {
+    if (mime == "text/plain" || mime == "text/html") && filename(part).is_none() {
         return PartRole::Body;
     }
 
@@ -255,23 +241,25 @@ pub fn role(message: &Message, part: &MessagePart) -> PartRole {
 }
 
 /// The part's MIME type, lowercased, defaulting as RFC 2045 does when
-/// the part carries no `Content-Type`, and taken as `text/plain` when it
-/// carries an invalid one (RFC 2045 §5.2).
-pub fn mime(part: &MessagePart) -> String {
+/// the part carries no `Content-Type` (`message/rfc822` in a digest),
+/// and taken as `text/plain` when it carries an invalid one (RFC 2045
+/// §5.2).
+pub fn mime(part: &MimeEntity) -> String {
     if invalid_content_type(part) {
-        return "text/plain".to_string();
+        return String::from("text/plain");
     }
 
-    if let Some(ctype) = part.content_type() {
-        let subtype = ctype.c_subtype.as_deref().unwrap_or_default();
-        return format!("{}/{subtype}", ctype.c_type).to_ascii_lowercase();
+    if part.header.get("Content-Type").is_some() {
+        let ctype = part.content_type();
+        let top = String::from_utf8_lossy(ctype.top);
+        let sub = String::from_utf8_lossy(ctype.sub);
+        return format!("{top}/{sub}").to_ascii_lowercase();
     }
 
-    match part.body {
-        PartType::Message(_) => "message/rfc822",
-        PartType::Html(_) => "text/html",
-        PartType::Text(_) => "text/plain",
-        _ => "application/octet-stream",
+    match &part.body {
+        MimeBodyNode::Message(_) => "message/rfc822",
+        MimeBodyNode::Unparsed(unparsed) if unparsed.digest => "message/rfc822",
+        _ => "text/plain",
     }
     .to_string()
 }
@@ -279,142 +267,246 @@ pub fn mime(part: &MessagePart) -> String {
 /// Whether the part's `Content-Type` is present but invalid: a type or
 /// subtype missing, empty or not an RFC 2045 token. RFC 2045 §5.2 reads
 /// it as `text/plain; charset=us-ascii`.
-fn invalid_content_type(part: &MessagePart) -> bool {
-    part.content_type()
-        .is_some_and(|ctype| match ctype.c_subtype.as_deref() {
-            Some(subtype) => !is_token(&ctype.c_type) || !is_token(subtype),
-            None => true,
-        })
+fn invalid_content_type(part: &MimeEntity) -> bool {
+    let Some(value) = header::raw_text(part, "Content-Type") else {
+        return false;
+    };
+
+    // NOTE: read off the raw value, mime-rs stopping at the first byte
+    // past a token, so `text/pl ain` would read as `text/pl`.
+    let media = value.split(';').next().unwrap_or_default();
+    match media.split_once('/') {
+        Some((top, sub)) => !is_token(top.trim().as_bytes()) || !is_token(sub.trim().as_bytes()),
+        None => true,
+    }
 }
 
 /// Whether a value is an RFC 2045 token.
-fn is_token(value: &str) -> bool {
+fn is_token(value: &[u8]) -> bool {
     const TSPECIALS: &[u8] = b"()<>@,;:\\\"/[]?=";
     !value.is_empty()
         && value
-            .bytes()
-            .all(|b| b.is_ascii_graphic() && !TSPECIALS.contains(&b))
+            .iter()
+            .all(|b| b.is_ascii_graphic() && !TSPECIALS.contains(b))
 }
 
 /// The `Content-Disposition` type, lowercased.
-fn disposition(part: &MessagePart) -> Option<String> {
-    part.content_disposition()
-        .map(|disposition| disposition.c_type.to_ascii_lowercase())
+fn disposition(part: &MimeEntity) -> Option<String> {
+    part.disposition()
+        .map(|disposition| disposition.kind.to_ascii_lowercase())
 }
 
 /// The file name the part carries, from `Content-Disposition` then
 /// `Content-Type`, RFC 2231 and RFC 2047 decoded, `None` when empty.
 ///
-/// NOTE: the header is parsed again from its raw bytes, read as
-/// [`header::eight_bit`] does, so a raw 8-bit name reads right and
-/// adjacent encoded words rebuild a character split between them.
-pub fn filename(message: &Message, part: &MessagePart) -> Option<String> {
-    let param = |header: &str, param: &str| {
-        let value = header::raw_text(message, &part.headers, header)?;
-
-        // NOTE: mail-parser decodes the encoded words of a quoted
-        // parameter one by one, so a plain one is read here; the RFC 2231
-        // forms are left to mail-parser.
-        if let Some(plain) = header::plain_param(&value, param) {
+/// NOTE: a plain parameter is read off the raw header, as
+/// [`header::eight_bit`] reads it, so a raw 8-bit name reads right and
+/// adjacent encoded words rebuild a character split between them; the
+/// RFC 2231 forms are left to mime-rs.
+pub fn filename(part: &MimeEntity) -> Option<String> {
+    let disposition = || {
+        let value = header::raw_text(part, "Content-Disposition")?;
+        if let Some(plain) = header::plain_param(&value, "filename") {
             return Some(header::decode_words(&plain));
         }
-
-        let line = format!("{value}\n");
-        match MessageStream::new(line.as_bytes()).parse_content_type() {
-            HeaderValue::ContentType(ctype) => ctype.attribute(param).map(str::to_owned),
-            _ => None,
-        }
+        part.disposition()?.param("filename").map(str::to_owned)
     };
 
-    let name = param("Content-Disposition", "filename")
-        .or_else(|| param("Content-Type", "name"))
-        .or_else(|| part.attachment_name().map(str::to_owned))?;
+    let content_type = || {
+        let value = header::raw_text(part, "Content-Type")?;
+        if let Some(plain) = header::plain_param(&value, "name") {
+            return Some(header::decode_words(&plain));
+        }
+        part.content_type().param("name")
+    };
+
+    let name = disposition()
+        .or_else(content_type)
+        .or_else(|| part.attachment_name())?;
     let name = name.trim();
     (!name.is_empty()).then(|| name.to_owned())
 }
 
 /// The `Content-ID` without its angle brackets, `None` when empty.
-pub fn content_id(part: &MessagePart) -> Option<String> {
-    let id = bare_id(part.content_id()?);
+pub fn content_id(part: &MimeEntity) -> Option<String> {
+    let id = header::raw_text(part, "Content-ID")?;
+    let id = bare_id(&id);
     (!id.is_empty()).then(|| id.to_owned())
 }
 
 /// The `charset` parameter of the `Content-Type`, as found; `us-ascii`
 /// for an invalid `Content-Type`.
-pub fn charset(part: &MessagePart) -> Option<String> {
+pub fn charset(part: &MimeEntity) -> Option<String> {
     if invalid_content_type(part) {
-        return Some("us-ascii".to_string());
+        return Some(String::from("us-ascii"));
     }
-    let charset = part.content_type()?.attribute("charset")?.trim();
-    (!charset.is_empty()).then(|| charset.to_owned())
+    param(part, "charset")
 }
 
 /// The `method` parameter of a `text/calendar` part, uppercased.
-pub fn method(part: &MessagePart) -> Option<String> {
+pub fn method(part: &MimeEntity) -> Option<String> {
     if mime(part) != "text/calendar" {
         return None;
     }
-    let method = part.content_type()?.attribute("method")?.trim();
-    (!method.is_empty()).then(|| method.to_ascii_uppercase())
+    param(part, "method").map(|method| method.to_ascii_uppercase())
+}
+
+/// A `Content-Type` parameter, trimmed, `None` when absent or empty.
+fn param(part: &MimeEntity, name: &str) -> Option<String> {
+    part.header.get("Content-Type")?;
+    let value = part.content_type().param(name)?;
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 /// The part's bytes once its transfer encoding is undone, in its own
-/// charset: what a file attached to the message holds.
-///
-/// NOTE: mail-parser converts a text part to UTF-8 and keeps the whole
-/// enclosing message as the raw bytes of an attached one, so both are
-/// read back from the part's own byte range instead.
-pub fn bytes<'a>(message: &'a Message, part: &'a MessagePart) -> Cow<'a, [u8]> {
-    let range = || {
-        message
-            .raw_message
-            .get(part.offset_body as usize..part.offset_end as usize)
-            .unwrap_or_default()
-    };
-
+/// charset: what a file attached to the message holds, the attached
+/// message itself for a `message/rfc822` part.
+pub fn bytes<'t>(part: &'t MimeEntity) -> Cow<'t, [u8]> {
     match &part.body {
-        PartType::Binary(bytes) | PartType::InlineBinary(bytes) => Cow::Borrowed(bytes.as_ref()),
-        PartType::Message(inner) => match part.encoding {
-            Encoding::None => Cow::Borrowed(range()),
-            _ => Cow::Borrowed(inner.raw_message.as_ref()),
-        },
-        PartType::Text(_) | PartType::Html(_) => {
-            let range = range();
-            let (end, bytes) = match part.encoding {
-                Encoding::None => return Cow::Borrowed(range),
-                Encoding::Base64 => MessageStream::new(range).decode_base64_mime(b""),
-                Encoding::QuotedPrintable => {
-                    MessageStream::new(range).decode_quoted_printable_mime(b"")
-                }
-            };
-            if end == usize::MAX {
-                Cow::Borrowed(part.contents())
-            } else {
-                bytes
-            }
-        }
-        PartType::Multipart(_) => Cow::Borrowed(&[]),
+        MimeBodyNode::Multipart(_) => Cow::Borrowed(&[]),
+        MimeBodyNode::Message(inner) => Cow::Owned(inner.to_bytes()),
+        MimeBodyNode::Unparsed(unparsed) => Cow::Borrowed(unparsed.bytes.as_ref()),
+        MimeBodyNode::Leaf(raw) => part.decoded().unwrap_or(Cow::Borrowed(raw.as_ref())),
     }
 }
 
-/// The part decoded to UTF-8 by its charset, lossily.
+/// The part decoded to UTF-8 by its charset, lossily, a `format=flowed`
+/// text unwrapped (RFC 3676 §4.2).
 ///
 /// A part labelled US-ASCII, or naming no charset, whose bytes are valid
 /// UTF-8 is read as UTF-8, which is what such mail holds in practice.
-pub fn text(message: &Message, part: &MessagePart) -> String {
+pub fn text(part: &MimeEntity) -> String {
     let ascii = charset(part).is_none_or(|charset| {
         let charset = charset.trim_matches('"').to_ascii_lowercase();
         charset == "us-ascii" || charset == "ascii"
     });
 
-    if ascii && let Ok(text) = String::from_utf8(bytes(message, part).into_owned()) {
+    // NOTE: mime-rs reads US-ASCII as UTF-8, so bytes past ASCII that are
+    // no UTF-8 would come back replaced; Windows-1252 is what such mail
+    // holds in practice, as for raw 8-bit header bytes.
+    if ascii {
+        let text = header::eight_bit(&bytes(part));
+        return unflow(part, text);
+    }
+
+    match part.text() {
+        Some(text) => text.into_owned(),
+        None => String::from_utf8_lossy(&bytes(part)).into_owned(),
+    }
+}
+
+/// Unwraps a `text/plain; format=flowed` text, as mime-rs's own text
+/// reading does, any other text going through unchanged.
+fn unflow(part: &MimeEntity, text: String) -> String {
+    let flowed = mime(part) == "text/plain"
+        && param(part, "format").is_some_and(|format| format.eq_ignore_ascii_case("flowed"));
+
+    if !flowed {
         return text;
     }
 
-    match part.text_contents() {
-        Some(text) => text.to_owned(),
-        None => String::from_utf8_lossy(part.contents()).into_owned(),
+    let delsp = param(part, "delsp").is_some_and(|delsp| delsp.eq_ignore_ascii_case("yes"));
+    flowed::decode(&text, delsp)
+}
+
+/// The text body of a message, what a reply quotes: its first text body
+/// (RFC 8621 §4.1.4), an HTML one turned into text when the message has
+/// no plain text; empty without any.
+pub fn body_text(message: &MimeCst) -> String {
+    let lists = message.root.body_lists();
+    let Some(first) = lists.text.first() else {
+        return String::new();
+    };
+
+    match mime(first).as_str() {
+        "text/html" => html_to_text(&text(first)),
+        _ => text(first),
     }
+}
+
+/// Reads HTML as plain text: markup dropped with the content of `head`,
+/// `style` and `script`, a line break for each break, paragraph, row,
+/// list item and heading, the common entities decoded and runs of blank
+/// lines collapsed.
+fn html_to_text(html: &str) -> String {
+    const BREAKS: &[&str] = &[
+        "br",
+        "p",
+        "div",
+        "tr",
+        "li",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "blockquote",
+        "table",
+    ];
+    const HIDDEN: &[&str] = &["head", "style", "script", "title"];
+
+    let mut out = String::new();
+    let mut rest = html;
+    let mut hidden: Option<&str> = None;
+
+    while let Some(open) = rest.find('<') {
+        if hidden.is_none() {
+            out.push_str(&rest[..open]);
+        }
+
+        let Some(close) = rest[open..].find('>') else {
+            rest = "";
+            break;
+        };
+
+        let tag = &rest[open + 1..open + close];
+        rest = &rest[open + close + 1..];
+
+        let closing = tag.starts_with('/');
+        let name: String = tag
+            .trim_start_matches('/')
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect::<String>()
+            .to_ascii_lowercase();
+
+        match hidden {
+            Some(open) if closing && name == open => hidden = None,
+            Some(_) => (),
+            None => match HIDDEN.iter().find(|hidden| **hidden == name) {
+                Some(found) if !closing => hidden = Some(found),
+                _ if BREAKS.contains(&name.as_str()) => out.push('\n'),
+                _ => (),
+            },
+        }
+    }
+
+    if hidden.is_none() {
+        out.push_str(rest);
+    }
+
+    let out = out
+        .replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&");
+
+    let mut text = String::new();
+    let mut blank = 0;
+    for line in out.lines().map(str::trim_end) {
+        blank = if line.trim().is_empty() { blank + 1 } else { 0 };
+        if blank < 2 {
+            text.push_str(line);
+            text.push('\n');
+        }
+    }
+
+    text.trim().to_owned()
 }
 
 /// An id without the angle brackets around it.
@@ -554,7 +646,7 @@ mod tests {
             --b--\r\n";
         let message = parse(raw).unwrap();
         let bytes: Vec<Vec<u8>> = leaves(&message)
-            .map(|leaf| bytes(&message, leaf.part).into_owned())
+            .map(|leaf| bytes(leaf.part).into_owned())
             .collect();
 
         assert_eq!(bytes[0], b"caf\xe9 au lait");
@@ -582,11 +674,37 @@ mod tests {
         let message = parse(&raw).unwrap();
 
         let bytes: Vec<Vec<u8>> = leaves(&message)
-            .map(|leaf| bytes(&message, leaf.part).into_owned())
+            .map(|leaf| bytes(leaf.part).into_owned())
             .collect();
 
         assert_eq!(bytes.len(), 2);
         assert_eq!(bytes[0], inner);
         assert_eq!(bytes[1], inner);
+    }
+    #[test]
+    fn an_html_only_body_is_quoted_as_text() {
+        let raw = b"Content-Type: text/html; charset=utf-8\r\n\r\n\
+            <html><head><style>p { color: red }</style></head>\
+            <body><p>Caf\xc3\xa9 &amp; tea</p><p>at <b>noon</b><br>sharp</p></body></html>\r\n";
+        let message = parse(raw).unwrap();
+
+        assert_eq!(body_text(&message), "Café & tea\n\nat noon\nsharp");
+    }
+
+    #[test]
+    fn a_flowed_text_is_unwrapped_whatever_its_charset() {
+        let flowed = "Content-Transfer-Encoding: 8bit\r\n\r\nA line that \r\ngoes on.\r\n";
+        for charset in ["us-ascii", "utf-8"] {
+            let raw =
+                format!("Content-Type: text/plain; charset={charset}; format=flowed\r\n{flowed}");
+            let message = parse(raw.as_bytes()).unwrap();
+            let leaf = leaves(&message).next().unwrap();
+
+            assert_eq!(
+                text(leaf.part).trim_end(),
+                "A line that goes on.",
+                "{charset}"
+            );
+        }
     }
 }

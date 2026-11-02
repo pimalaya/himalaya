@@ -16,16 +16,16 @@ default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "maildir",
 native-tls = ["pimalaya-stream/native-tls", "io-pim-discovery?/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-gmail?/native-tls", "io-msgraph?/native-tls", "io-smtp?/native-tls", "io-managesieve?/native-tls"]
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-pim-discovery?/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-gmail?/rustls-aws", "io-msgraph?/rustls-aws", "io-smtp?/rustls-aws", "io-managesieve?/rustls-aws"]
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-pim-discovery?/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-gmail?/rustls-ring", "io-msgraph?/rustls-ring", "io-smtp?/rustls-ring", "io-managesieve?/rustls-ring"]
-imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
-smtp = ["dep:io-smtp", "dep:mail-parser"]
-jmap = ["dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
-gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
-msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client", "io-msgraph/schemars"]
-maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "io-maildir/client", "io-maildir/parser"]
-mbox = ["dep:io-mbox", "dep:mail-parser", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
-m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "io-m2dir/client"]
+imap = ["dep:io-imap", "dep:mime-rs", "dep:rfc2047-decoder", "io-imap/client"]
+smtp = ["dep:io-smtp", "dep:mime-rs"]
+jmap = ["dep:io-jmap", "dep:mime-rs", "io-jmap/client", "io-jmap/schemars"]
+gmail = ["dep:io-gmail", "dep:mime-rs", "io-gmail/client", "io-gmail/schemars"]
+msgraph = ["dep:io-msgraph", "dep:mime-rs", "io-msgraph/client", "io-msgraph/schemars"]
+maildir = ["dep:convert_case", "dep:io-maildir", "dep:mime-rs", "io-maildir/client"]
+mbox = ["dep:io-mbox", "dep:mime-rs", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
+m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mime-rs", "io-m2dir/client"]
 sieve = ["dep:io-managesieve", "io-managesieve/client", "io-managesieve/scram"]
-pimdir = ["dep:io-pimdir", "dep:mail-parser", "io-pimdir/search"]
+pimdir = ["dep:io-pimdir", "dep:mime-rs", "io-pimdir/search"]
 vendored = ["pimalaya-stream/vendored", "io-pimdir?/vendored"]
 wizard = ["dep:io-pim-discovery", "pimalaya-cli/wizard", "pimalaya-cli/imap", "pimalaya-cli/smtp", "pimalaya-cli/jmap", "pimalaya-cli/spinner"]
 
@@ -52,6 +52,7 @@ clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "7"
+gethostname = "1"
 humansize = "2"
 io-gmail = { version = "0.5", default-features = false, optional = true }
 io-imap = { version = "0.7.1", default-features = false, optional = true }
@@ -66,8 +67,7 @@ io-pimdir = { version = "0.8", default-features = false, features = ["client"], 
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
 log = "0.4"
-mail-builder = "1"
-mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
+mime-rs = { version = "0.0.1", git = "https://github.com/pimalaya/mime-rs", rev = "d7ea03296a197647a6effeb593a8528b47bdb0ed", optional = true }
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"

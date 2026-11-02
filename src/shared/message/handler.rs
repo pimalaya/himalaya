@@ -17,8 +17,12 @@ use std::{
     io::{Write, stdout},
 };
 
-use anyhow::{Context, Result, bail};
-use mail_parser::{Addr, Address, MessageParser};
+use anyhow::{Context, Result};
+use mime::{
+    header::marker::{BCC, CC, FROM, SUBJECT, TO},
+    tree::cst::MimeCst,
+    value::address::{MimeAddressList, MimeMailbox},
+};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -27,7 +31,7 @@ use crate::{
     account::context::Account,
     capability::Capability,
     email::flag::{Flag, IanaFlag},
-    shared::client::EmailClient,
+    shared::{client::EmailClient, message::part},
 };
 
 /// What [`apply`] did with the bytes.
@@ -171,30 +175,35 @@ pub struct MessageTemplateOutput {
 impl MessageTemplateOutput {
     /// Decodes the headers and the text body of raw RFC 5322 bytes.
     fn parse(raw: &[u8]) -> Result<Self> {
-        let Some(message) = MessageParser::new().parse(raw) else {
-            bail!("Failed to parse composed message");
-        };
+        let message = MimeCst::parse(raw);
+        let root = &message.root;
 
-        let mailboxes = |address: Option<&Address>| -> Vec<String> {
+        let mailboxes = |address: Option<MimeAddressList>| -> Vec<String> {
             address
-                .map(|address| address.iter().map(mailbox).collect())
+                .map(|address| address.mailboxes().map(mailbox).collect())
                 .unwrap_or_default()
         };
 
+        let body = part::body_text(&message);
+
         Ok(Self {
-            from: message.from().and_then(Address::first).map(mailbox),
-            to: mailboxes(message.to()),
-            cc: mailboxes(message.cc()),
-            bcc: mailboxes(message.bcc()),
-            subject: message.subject().map(str::to_owned),
-            body: message.body_text(0).unwrap_or_default().into_owned(),
+            from: root
+                .header::<FROM>()
+                .as_ref()
+                .and_then(MimeAddressList::first)
+                .map(mailbox),
+            to: mailboxes(root.header::<TO>()),
+            cc: mailboxes(root.header::<CC>()),
+            bcc: mailboxes(root.header::<BCC>()),
+            subject: root.header::<SUBJECT>(),
+            body,
         })
     }
 }
 
 /// Formats one mailbox as the composer flags parse it back, quoting a
 /// display name that holds an RFC 5322 special such as a comma.
-fn mailbox(addr: &Addr) -> String {
+fn mailbox(addr: &MimeMailbox) -> String {
     let email = addr.address.as_deref().unwrap_or_default();
     let Some(name) = addr.name.as_deref().filter(|name| !name.is_empty()) else {
         return email.to_owned();

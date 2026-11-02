@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use mail_parser::{Message, MessagePart, MimeHeaders};
+use mime::tree::{cst::MimeCst, entity::MimeEntity};
 use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
 use schemars::JsonSchema;
@@ -89,12 +89,14 @@ pub(crate) struct AttachmentColors {
 }
 
 /// The attachment parts of a message, in part order, inline ones
-/// included: mail-parser's attachments, under the ids of the shared part
-/// walk.
-pub(crate) fn attachments<'a>(message: &'a Message) -> impl Iterator<Item = Attachment> + 'a {
+/// included: the attachment list of RFC 8621 §4.1.4 mime-rs computes,
+/// under the ids of the shared part walk.
+pub(crate) fn attachments<'a>(message: &'a MimeCst) -> impl Iterator<Item = Attachment> + 'a {
+    let listed = message.root.body_lists().attachments;
+
     part::leaves(message)
-        .filter(|leaf| message.attachments.contains(&(leaf.index as u32)))
-        .map(|leaf| Attachment::new(message, leaf, None))
+        .filter(move |leaf| listed.iter().any(|part| std::ptr::eq(*part, leaf.part)))
+        .map(|leaf| Attachment::new(leaf, None))
 }
 
 /// One row of the `attachment list` and `attachment download` output.
@@ -124,16 +126,16 @@ pub struct Attachment {
 
 impl Attachment {
     /// The row of one leaf part, `path` being where it was written.
-    pub(crate) fn new(message: &Message, leaf: part::Leaf, path: Option<String>) -> Self {
+    pub(crate) fn new(leaf: part::Leaf, path: Option<String>) -> Self {
         let part = leaf.part;
         Self {
             id: leaf.id,
-            filename: part::filename(message, part),
+            filename: part::filename(part),
             mime: mime_string(part),
-            size: part::bytes(message, part).len() as u64,
+            size: part::bytes(part).len() as u64,
             inline: part
-                .content_disposition()
-                .is_some_and(|cd| cd.c_type.eq_ignore_ascii_case("inline")),
+                .disposition()
+                .is_some_and(|disposition| disposition.is("inline")),
             content_id: part::content_id(part),
             path,
         }
@@ -214,12 +216,14 @@ impl fmt::Display for AttachmentListOutput {
 }
 
 /// Renders a part's `Content-Type` as `type/subtype`.
-pub(super) fn mime_string(part: &MessagePart<'_>) -> Option<String> {
-    let ct = part.content_type()?;
+pub(super) fn mime_string(part: &MimeEntity) -> Option<String> {
+    part.header.get("Content-Type")?;
+    let ctype = part.content_type();
+    let top = String::from_utf8_lossy(ctype.top);
 
-    Some(match ct.c_subtype.as_deref() {
-        Some(sub) => format!("{}/{}", ct.c_type, sub),
-        None => ct.c_type.to_string(),
+    Some(match ctype.sub {
+        [] => top.into_owned(),
+        sub => format!("{top}/{}", String::from_utf8_lossy(sub)),
     })
 }
 

@@ -14,7 +14,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
-use mail_parser::Message;
+use mime::tree::cst::MimeCst;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -117,7 +117,7 @@ impl AttachmentDownloadCommand {
                 continue;
             };
             let (path, mut file) = create_unique_file(&dir, &safe)?;
-            file.write_all(&part::bytes(&message, leaf.part))
+            file.write_all(&part::bytes(leaf.part))
                 .with_context(|| format!("Write attachment to {}", path.display()))?;
 
             attachment.path = Some(path.display().to_string());
@@ -194,13 +194,13 @@ pub struct PartBytes {
 impl PartBytes {
     /// The leaf part of a message carrying the given id, with its bytes;
     /// `None` for an unknown id or a container's.
-    pub fn new(message: &Message, id: &str) -> Option<Self> {
+    pub fn new(message: &MimeCst, id: &str) -> Option<Self> {
         let leaf = part::find(message, id)?;
-        let bytes = part::bytes(message, leaf.part).into_owned();
+        let bytes = part::bytes(leaf.part).into_owned();
         Some(Self {
             id: leaf.id,
             mime: part::mime(leaf.part),
-            filename: part::filename(message, leaf.part),
+            filename: part::filename(leaf.part),
             size: bytes.len() as u64,
             data: BASE64_STANDARD.encode(&bytes),
             bytes,
@@ -406,7 +406,7 @@ mod tests {
         let message = part::parse(MIXED).unwrap();
         for leaf in part::leaves(&message) {
             let read = PartBytes::new(&message, &leaf.id).unwrap();
-            assert_eq!(read.size, part::bytes(&message, leaf.part).len() as u64);
+            assert_eq!(read.size, part::bytes(leaf.part).len() as u64);
         }
     }
 

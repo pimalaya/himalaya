@@ -10,10 +10,17 @@ use std::{
 };
 
 use anyhow::Result;
-use chrono::{FixedOffset, NaiveDate, TimeZone};
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use mail_parser::{Addr, Address, ContentType, HeaderValue, Message, MessagePart, MimeHeaders};
+use mime::{
+    header::marker::{CC, DATE, FROM, IN_REPLY_TO, MESSAGE_ID, REFERENCES, TO},
+    tree::{cst::MimeCst, entity::MimeEntity},
+    value::{
+        address::{MimeAddressList, MimeMailbox},
+        content_type::MimeParam,
+        datetime::MimeDateTime,
+    },
+};
 use pimalaya_cli::{
     printer::{Message as PrinterMessage, Printer},
     table::sanitize,
@@ -126,28 +133,28 @@ impl MessageReadOutput {
     }
 
     /// Builds the view of a parsed message.
-    pub fn new(message: Message<'_>) -> Self {
+    pub fn new(message: MimeCst<'_>) -> Self {
         let mut texts = Vec::new();
         let mut html = None;
         let mut parts = Vec::new();
 
         for leaf in part::leaves(&message) {
-            let role = part::role(&message, leaf.part);
+            let role = part::role(leaf.part);
             let mime = part::mime(leaf.part);
 
             if role == PartRole::Body {
                 if mime == "text/plain" {
-                    texts.push(part::text(&message, leaf.part));
+                    texts.push(part::text(leaf.part));
                 } else if mime == "text/html" && html.is_none() {
-                    html = Some(part::text(&message, leaf.part));
+                    html = Some(part::text(leaf.part));
                 }
             }
 
             parts.push(MessagePartView {
                 id: leaf.id,
                 role,
-                filename: part::filename(&message, leaf.part),
-                size: part::bytes(&message, leaf.part).len() as u64,
+                filename: part::filename(leaf.part),
+                size: part::bytes(leaf.part).len() as u64,
                 content_id: part::content_id(leaf.part),
                 charset: part::charset(leaf.part),
                 method: part::method(leaf.part),
@@ -220,17 +227,17 @@ pub struct InvalidAddresses {
 }
 
 impl MessageHeaders {
-    fn new(message: &Message) -> Self {
-        let headers = &message.root_part().headers;
-        let text = |name| header::unstructured(message, headers, name);
+    fn new(message: &MimeCst) -> Self {
+        let root = &message.root;
+        let text = |name| header::unstructured(root, name);
 
         let mut invalid = InvalidAddresses::default();
-        let (from, from_invalid) = addresses(message, "From");
-        let (to, to_invalid) = addresses(message, "To");
-        let (cc, cc_invalid) = addresses(message, "Cc");
-        let (bcc, bcc_invalid) = addresses(message, "Bcc");
-        let (reply_to, reply_to_invalid) = addresses(message, "Reply-To");
-        let (sender, sender_invalid) = addresses(message, "Sender");
+        let (from, from_invalid) = addresses(root, "From");
+        let (to, to_invalid) = addresses(root, "To");
+        let (cc, cc_invalid) = addresses(root, "Cc");
+        let (bcc, bcc_invalid) = addresses(root, "Bcc");
+        let (reply_to, reply_to_invalid) = addresses(root, "Reply-To");
+        let (sender, sender_invalid) = addresses(root, "Sender");
         invalid.from = from_invalid;
         invalid.to = to_invalid;
         invalid.cc = cc_invalid;
@@ -247,10 +254,13 @@ impl MessageHeaders {
             sender,
             invalid,
             subject: text("Subject"),
-            date: message.date().and_then(rfc3339),
-            message_id: message.message_id().and_then(id),
-            in_reply_to: ids(message.in_reply_to()).into_iter().next(),
-            references: ids(message.references()),
+            date: root
+                .header::<DATE>()
+                .filter(MimeDateTime::is_valid)
+                .map(|date| date.to_rfc3339()),
+            message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
+            in_reply_to: ids(root.header::<IN_REPLY_TO>()).into_iter().next(),
+            references: ids(root.header::<REFERENCES>()),
             list_id: text("List-ID"),
             list_unsubscribe: text("List-Unsubscribe"),
             precedence: text("Precedence"),
@@ -294,11 +304,11 @@ pub struct MessagePartView {
 /// An address header as a list, read from its raw bytes: groups
 /// flattened, names unquoted and RFC 2047 decoded, entries without a
 /// valid email dropped and returned beside the list as decoded text.
-fn addresses(message: &Message, name: &str) -> (Vec<MailAddress>, Vec<String>) {
+fn addresses(entity: &MimeEntity, name: &str) -> (Vec<MailAddress>, Vec<String>) {
     let mut valid = Vec::new();
     let mut invalid = Vec::new();
 
-    let Some(value) = header::raw_text(message, &message.root_part().headers, name) else {
+    let Some(value) = header::raw_text(entity, name) else {
         return (valid, invalid);
     };
 
@@ -500,57 +510,39 @@ fn is_utf8_text(c: char) -> bool {
     !c.is_ascii() && !c.is_control() && !c.is_whitespace()
 }
 
-/// A parsed date as RFC 3339 with its own offset, `None` when it names
-/// no real instant.
-fn rfc3339(date: &mail_parser::DateTime) -> Option<String> {
-    let seconds = i32::from(date.tz_hour) * 3600 + i32::from(date.tz_minute) * 60;
-    let offset = if date.tz_before_gmt {
-        FixedOffset::west_opt(seconds)?
-    } else {
-        FixedOffset::east_opt(seconds)?
-    };
-    let naive = NaiveDate::from_ymd_opt(date.year.into(), date.month.into(), date.day.into())?
-        .and_hms_opt(date.hour.into(), date.minute.into(), date.second.into())?;
-    let date = offset.from_local_datetime(&naive).single()?;
-    Some(date.to_rfc3339())
-}
-
-/// A message id without angle brackets, `None` when empty.
-fn id(value: &str) -> Option<String> {
-    let id = part::bare_id(value);
-    (!id.is_empty()).then(|| id.to_owned())
-}
-
-/// The ids an `In-Reply-To` or `References` header holds.
-fn ids(value: &HeaderValue) -> Vec<String> {
-    match value {
-        HeaderValue::Text(text) => id(text).into_iter().collect(),
-        HeaderValue::TextList(list) => list.iter().filter_map(|text| id(text)).collect(),
-        _ => Vec::new(),
-    }
+/// The ids a `Message-ID`, `In-Reply-To` or `References` header holds,
+/// mime-rs having dropped their angle brackets, the empty ones left out.
+fn ids(value: Option<Vec<String>>) -> Vec<String> {
+    value
+        .unwrap_or_default()
+        .into_iter()
+        .map(|id| part::bare_id(&id).to_owned())
+        .filter(|id| !id.is_empty())
+        .collect()
 }
 
 /// The text rendering of a read message.
-struct MessageView(Message<'static>);
+struct MessageView(MimeCst<'static>);
 
 impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = &self.0;
+        let root = &message.root;
 
-        if let Some(date) = message.date() {
-            writeln!(f, "Date: {}", date.to_rfc822())?;
+        if let Some(date) = root.header::<DATE>() {
+            writeln!(f, "Date: {date}")?;
         }
-        if let Some(from) = message.from() {
-            writeln!(f, "From: {}", sanitize(&format_address(from)))?;
+        if let Some(from) = root.header::<FROM>() {
+            writeln!(f, "From: {}", sanitize(&format_address(&from)))?;
         }
-        if let Some(to) = message.to() {
-            writeln!(f, "To: {}", sanitize(&format_address(to)))?;
+        if let Some(to) = root.header::<TO>() {
+            writeln!(f, "To: {}", sanitize(&format_address(&to)))?;
         }
-        if let Some(cc) = message.cc() {
-            writeln!(f, "Cc: {}", sanitize(&format_address(cc)))?;
+        if let Some(cc) = root.header::<CC>() {
+            writeln!(f, "Cc: {}", sanitize(&format_address(&cc)))?;
         }
-        if let Some(subject) = message.subject() {
-            writeln!(f, "Subject: {}", sanitize(subject))?;
+        if let Some(subject) = header::unstructured(root, "Subject") {
+            writeln!(f, "Subject: {}", sanitize(&subject))?;
         }
 
         // NOTE: HTML markup is verbose and `--raw` covers it, so a part
@@ -560,29 +552,31 @@ impl fmt::Display for MessageView {
         // NOTE: the ids are the leaves' own, the ones the `attachment`
         // commands and the JSON view take.
         for part::Leaf { id, part, .. } in part::leaves(message) {
-            let mime = part_mime(part);
-            let mime = sanitize(&mime);
-            let size = format_size(part.len() as u64, BINARY);
+            let mime = part::mime(part);
+            let size = format_size(part::bytes(part).len() as u64, BINARY);
             writeln!(f)?;
-            match part.attachment_name() {
-                Some(name) => writeln!(f, "[{id}] {mime} — {} ({size})", sanitize(name))?,
-                None => writeln!(f, "[{id}] {mime} ({size})")?,
+            match part::filename(part) {
+                Some(name) => writeln!(
+                    f,
+                    "[{id}] {} — {} ({size})",
+                    sanitize(&mime),
+                    sanitize(&name)
+                )?,
+                None => writeln!(f, "[{id}] {} ({size})", sanitize(&mime))?,
             }
             render_part_headers(f, part)?;
 
-            let render_body = if part.is_text_html() {
-                html_only
-            } else {
-                part.is_text()
+            let render_body = match mime.as_str() {
+                "text/html" => html_only,
+                mime => mime.starts_with("text/"),
             };
-            if render_body
-                && let Some(text) = part
-                    .text_contents()
-                    .map(str::trim)
-                    .filter(|t| !t.is_empty())
-            {
-                writeln!(f)?;
-                writeln!(f, "{}", sanitize_body(text))?;
+            if render_body {
+                let text = part::text(part);
+                let text = text.trim();
+                if !text.is_empty() {
+                    writeln!(f)?;
+                    writeln!(f, "{}", sanitize_body(text))?;
+                }
             }
         }
 
@@ -608,14 +602,14 @@ fn sanitize_body(text: &str) -> String {
 
 /// Whether the sole text part of the message is a single HTML one, which
 /// is what makes printing its markup worth it.
-fn is_html_only(message: &Message) -> bool {
+fn is_html_only(message: &MimeCst) -> bool {
     let mut html = 0;
     let mut plain = 0;
-    for part in &message.parts {
-        if part.is_text_html() {
-            html += 1;
-        } else if part.is_text() {
-            plain += 1;
+    for leaf in part::leaves(message) {
+        match part::mime(leaf.part).as_str() {
+            "text/html" => html += 1,
+            mime if mime.starts_with("text/") => plain += 1,
+            _ => (),
         }
     }
     html == 1 && plain == 0
@@ -623,87 +617,55 @@ fn is_html_only(message: &Message) -> bool {
 
 /// Renders a part's own `Content-*` headers, indented under its summary
 /// line, each shown only when it is present.
-fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MessagePart) -> fmt::Result {
-    if let Some(ctype) = part.content_type() {
-        writeln!(
-            f,
-            "    Content-Type: {}",
-            sanitize(&format_content_type(ctype))
-        )?;
+fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MimeEntity) -> fmt::Result {
+    if part.header.get("Content-Type").is_some() {
+        let ctype = part.content_type().to_content_type();
+        let media = format!("{}/{}", ctype.top, ctype.sub).to_ascii_lowercase();
+        let rendered = format_params(&media, &ctype.params);
+        writeln!(f, "    Content-Type: {}", sanitize(&rendered))?;
     }
-    if let Some(encoding) = part.content_transfer_encoding() {
-        writeln!(f, "    Content-Transfer-Encoding: {}", sanitize(encoding))?;
+    if let Some(encoding) = header::raw_text(part, "Content-Transfer-Encoding")
+        .map(|encoding| encoding.trim().to_ascii_lowercase())
+        .filter(|encoding| !encoding.is_empty())
+    {
+        writeln!(f, "    Content-Transfer-Encoding: {}", sanitize(&encoding))?;
     }
-    if let Some(disposition) = part.content_disposition() {
-        writeln!(
-            f,
-            "    Content-Disposition: {}",
-            sanitize(&format_content_type(disposition))
-        )?;
+    if let Some(disposition) = part.disposition() {
+        let rendered = format_params(&disposition.kind.to_ascii_lowercase(), &disposition.params);
+        writeln!(f, "    Content-Disposition: {}", sanitize(&rendered))?;
     }
-    if let Some(id) = part.content_id() {
-        writeln!(f, "    Content-ID: {}", sanitize(id))?;
+    if let Some(id) = part::content_id(part) {
+        writeln!(f, "    Content-ID: {}", sanitize(&id))?;
     }
-    if let Some(description) = part.content_description() {
-        writeln!(f, "    Content-Description: {}", sanitize(description))?;
+    if let Some(description) = header::unstructured(part, "Content-Description") {
+        writeln!(f, "    Content-Description: {}", sanitize(&description))?;
     }
     Ok(())
 }
 
 /// Formats a `Content-Type` or `Content-Disposition` value, parameters
 /// included.
-fn format_content_type(ctype: &ContentType) -> String {
-    let mut rendered = match ctype.c_subtype.as_deref() {
-        Some(subtype) => format!("{}/{subtype}", ctype.c_type),
-        None => ctype.c_type.to_string(),
-    };
+fn format_params(value: &str, params: &[MimeParam]) -> String {
+    let mut rendered = value.to_owned();
 
-    if let Some(attributes) = ctype.attributes() {
-        for attribute in attributes {
-            rendered.push_str(&format!("; {}={}", attribute.name, attribute.value));
-        }
+    for param in params {
+        rendered.push_str(&format!("; {}={}", param.name, param.value));
     }
 
     rendered
 }
 
-/// The part's MIME type, falling back to its decoded kind when it carries
-/// no `Content-Type` header.
-fn part_mime(part: &MessagePart) -> String {
-    if let Some(ctype) = part.content_type() {
-        return match ctype.c_subtype.as_deref() {
-            Some(subtype) => format!("{}/{subtype}", ctype.c_type),
-            None => ctype.c_type.to_string(),
-        };
-    }
-
-    if part.is_text_html() {
-        "text/html".to_string()
-    } else if part.is_text() {
-        "text/plain".to_string()
-    } else {
-        "application/octet-stream".to_string()
-    }
-}
-
 /// Renders an address header as a comma-separated list, flattening any
 /// address group.
-fn format_address(address: &Address) -> String {
-    let addrs: Vec<String> = match address {
-        Address::List(list) => list.iter().map(format_addr).collect(),
-        Address::Group(groups) => groups
-            .iter()
-            .flat_map(|group| group.addresses.iter())
-            .map(format_addr)
-            .collect(),
-    };
+fn format_address(address: &MimeAddressList) -> String {
+    let addrs: Vec<String> = address.mailboxes().map(format_addr).collect();
     addrs.join(", ")
 }
 
 /// Formats one address as `Name <addr>`, or bare when it has no name.
-fn format_addr(addr: &Addr) -> String {
-    let email = addr.address.as_deref().unwrap_or_default();
-    match addr.name.as_deref() {
+fn format_addr(mailbox: &MimeMailbox) -> String {
+    let email = mailbox.address.as_deref().unwrap_or_default();
+    match mailbox.name.as_deref() {
         Some(name) if !name.is_empty() => format!("{name} <{email}>"),
         _ => email.to_owned(),
     }

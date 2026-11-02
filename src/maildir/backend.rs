@@ -9,18 +9,15 @@
 use std::path::Path;
 
 use anyhow::Result;
-use chrono::DateTime;
 use io_maildir::{
     entry::MaildirFullEntry,
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
 };
-use mail_parser::{Address as MailParserAddress, HeaderValue};
 
 use crate::{
     email::{
-        address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
@@ -189,93 +186,14 @@ fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
     }
 }
 
-/// Folds a fully-read Maildir entry into a shared [`Envelope`], parsing
+/// Folds a fully-read Maildir entry into a shared [`Envelope`], reading
 /// the RFC 5322 headers and mapping the flags io-maildir resolved.
 fn envelope_from_entry(entry: &MaildirFullEntry) -> Envelope {
-    let id = entry.id().unwrap_or_default().to_string();
-    let flags = entry.flags().iter().map(flag_from_maildir).collect();
-    let size = entry.contents().len() as u64;
-    let parsed = entry.parsed();
-
-    let subject = parsed
-        .as_ref()
-        .and_then(|m| m.subject())
-        .unwrap_or_default()
-        .to_string();
-
-    let from = parsed
-        .as_ref()
-        .and_then(|m| m.from())
-        .map(addresses_from)
-        .unwrap_or_default();
-
-    let to = parsed
-        .as_ref()
-        .and_then(|m| m.to())
-        .map(addresses_from)
-        .unwrap_or_default();
-
-    let date = parsed
-        .as_ref()
-        .and_then(|m| m.date())
-        .and_then(|d| DateTime::parse_from_rfc3339(&d.to_rfc3339()).ok());
-
-    let has_attachment = parsed.as_ref().map(|m| m.attachment_count() > 0);
-
-    let message_id = parsed
-        .as_ref()
-        .and_then(|m| m.message_id())
-        .and_then(normalize_message_id);
-
-    let in_reply_to = parsed
-        .as_ref()
-        .map(|m| ids_from_header(m.in_reply_to()))
-        .unwrap_or_default();
-
     Envelope {
-        id,
-        message_id,
-        in_reply_to,
-        flags,
-        subject,
-        from,
-        to,
-        date,
-        size,
-        has_attachment,
+        id: entry.id().unwrap_or_default().to_string(),
+        flags: entry.flags().iter().map(flag_from_maildir).collect(),
+        ..envelope::from_raw(entry.contents(), true)
     }
-}
-
-/// Reads a mail-parser msg-id header into the bare ids it names.
-///
-/// mail-parser usually yields the list `In-Reply-To` holds, but a single
-/// id comes back as text, so both shapes are read.
-fn ids_from_header(value: &HeaderValue<'_>) -> Vec<String> {
-    match value {
-        HeaderValue::TextList(ids) => ids
-            .iter()
-            .filter_map(|id| normalize_message_id(id))
-            .collect(),
-        HeaderValue::Text(id) => parse_message_ids(id),
-        _ => Vec::new(),
-    }
-}
-
-/// mail-parser address group to a shared [`Address`] list.
-fn addresses_from(addrs: &MailParserAddress<'_>) -> Vec<Address> {
-    addrs
-        .clone()
-        .into_list()
-        .into_iter()
-        .filter_map(|a| {
-            let email = a.address?.into_owned();
-            if email.is_empty() {
-                return None;
-            }
-            let name = a.name.map(|s| s.into_owned());
-            Some(Address { name, email })
-        })
-        .collect()
 }
 
 /// Maps a shared [`Flag`] to a [`MaildirFlag`]; non-IANA keywords go

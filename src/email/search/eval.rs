@@ -13,10 +13,13 @@
 use std::cmp::Ordering;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
-use mail_parser::{Address as MailParserAddress, MessageParser};
+use mime::{
+    header::marker::{BCC, CC},
+    tree::{cst::MimeCst, parse::MimeParseOptions},
+};
 
 use crate::email::{
-    address::Address,
+    address::{self, Address},
     envelope::Envelope,
     search::{
         filter::query::SearchEmailsFilterQuery,
@@ -37,13 +40,22 @@ impl EnvelopeCopies {
     /// Reads the copy recipients off a raw message's headers, none when it
     /// does not parse.
     pub fn from_raw(raw: &[u8]) -> Self {
-        let Some(message) = MessageParser::new().parse_headers(raw) else {
-            return Self::default();
+        let opts = MimeParseOptions {
+            structure_depth: Some(0),
+            ..Default::default()
         };
+        let message = MimeCst::parse_with(raw, opts);
+        let root = &message.root;
 
         Self {
-            cc: message.cc().map(addresses_from).unwrap_or_default(),
-            bcc: message.bcc().map(addresses_from).unwrap_or_default(),
+            cc: root
+                .header::<CC>()
+                .map(|list| address::from_mime(&list))
+                .unwrap_or_default(),
+            bcc: root
+                .header::<BCC>()
+                .map(|list| address::from_mime(&list))
+                .unwrap_or_default(),
         }
     }
 }
@@ -133,43 +145,18 @@ fn has_attachment(envelope: &Envelope, raw: &[u8]) -> bool {
         return has_attachment;
     }
 
-    MessageParser::new()
-        .parse(raw)
-        .is_some_and(|message| message.attachment_count() > 0)
-}
-
-fn addresses_from(addrs: &MailParserAddress<'_>) -> Vec<Address> {
-    addrs
-        .clone()
-        .into_list()
-        .into_iter()
-        .filter_map(|addr| {
-            let email = addr.address?.into_owned();
-            if email.is_empty() {
-                return None;
-            }
-            let name = addr.name.map(|name| name.into_owned());
-            Some(Address { name, email })
-        })
-        .collect()
+    !raw.is_empty() && MimeCst::parse(raw).root.body_lists().has_attachment()
 }
 
 fn body_contains(raw: &[u8], pattern: &str) -> bool {
-    let Some(msg) = MessageParser::new().parse(raw) else {
-        return false;
-    };
+    let message = MimeCst::parse(raw);
+    let lists = message.root.body_lists();
     let needle = pattern.as_bytes();
-    for part in msg.text_bodies() {
-        if contains_ignore_ascii_case(part.contents(), needle) {
-            return true;
-        }
-    }
-    for part in msg.html_bodies() {
-        if contains_ignore_ascii_case(part.contents(), needle) {
-            return true;
-        }
-    }
-    false
+
+    lists.text.iter().chain(&lists.html).any(|part| {
+        part.text()
+            .is_some_and(|text| contains_ignore_ascii_case(text.as_bytes(), needle))
+    })
 }
 
 /// Case-insensitive substring search on raw bytes, ASCII semantics.

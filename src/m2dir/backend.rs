@@ -9,16 +9,11 @@
 use std::path::Path;
 
 use anyhow::Result;
-use chrono::DateTime;
 use io_m2dir::{entry::M2dirEntry, flag::M2dirFlags, m2dir::M2dir};
-use mail_parser::{
-    Address as MailParserAddress, HeaderValue, Message as ParsedMessage, MessageParser,
-};
 
 use crate::{
     email::{
-        address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
@@ -69,14 +64,8 @@ impl M2dirClient {
         let mut envelopes = Vec::with_capacity(entries.len());
         for entry in &entries {
             let bytes = self.read_entry(entry)?;
-            let Some(parsed) = MessageParser::default().parse(&bytes) else {
-                continue;
-            };
             let flags = self.read_flags(&m2dir, entry.id())?;
-            let mut envelope = envelope_from(entry, &flags, &parsed);
-            if with_attachment {
-                envelope.has_attachment = Some(parsed.attachment_count() > 0);
-            }
+            let envelope = envelope_from(entry, &flags, &bytes, with_attachment);
             envelopes.push(envelope);
         }
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
@@ -102,11 +91,8 @@ impl M2dirClient {
         let mut hits = Vec::new();
         for entry in &entries {
             let bytes = self.read_entry(entry)?;
-            let Some(parsed) = MessageParser::default().parse(&bytes) else {
-                continue;
-            };
             let flags = self.read_flags(&m2dir, entry.id())?;
-            let envelope = envelope_from(entry, &flags, &parsed);
+            let envelope = envelope_from(entry, &flags, &bytes, false);
             let keep = match filter {
                 Some(filter) => eval::matches_filter(&envelope, None, &bytes, filter),
                 None => true,
@@ -224,38 +210,17 @@ fn mailbox_from(m2dir: M2dir) -> Mailbox {
     }
 }
 
-/// Folds an entry + its meta flags + parsed message into an [`Envelope`].
-fn envelope_from(entry: &M2dirEntry, meta: &M2dirFlags, parsed: &ParsedMessage<'_>) -> Envelope {
-    let id = entry.id().to_string();
-    let flags = meta.iter().map(flag_from_meta_line).collect();
-    let subject = parsed.subject().unwrap_or_default().to_string();
-    let from = parsed.from().map(addresses_from).unwrap_or_default();
-    let to = parsed.to().map(addresses_from).unwrap_or_default();
-    let date = parsed
-        .date()
-        .and_then(|d| DateTime::parse_from_rfc3339(&d.to_rfc3339()).ok());
-    let size = parsed.raw_message().len() as u64;
-    let message_id = parsed.message_id().and_then(normalize_message_id);
-    let in_reply_to = match parsed.in_reply_to() {
-        HeaderValue::TextList(ids) => ids
-            .iter()
-            .filter_map(|id| normalize_message_id(id))
-            .collect(),
-        HeaderValue::Text(id) => parse_message_ids(id),
-        _ => Vec::new(),
-    };
-
+/// Folds an entry, its meta flags and its bytes into an [`Envelope`].
+fn envelope_from(
+    entry: &M2dirEntry,
+    meta: &M2dirFlags,
+    raw: &[u8],
+    with_attachment: bool,
+) -> Envelope {
     Envelope {
-        id,
-        message_id,
-        in_reply_to,
-        flags,
-        subject,
-        from,
-        to,
-        date,
-        size,
-        has_attachment: None,
+        id: entry.id().to_string(),
+        flags: meta.iter().map(flag_from_meta_line).collect(),
+        ..envelope::from_raw(raw, with_attachment)
     }
 }
 
@@ -267,23 +232,6 @@ fn flag_from_meta_line(line: &str) -> Flag {
 /// Shared flag slice to [`M2dirFlags`], one canonical line per flag.
 fn flags_to_m2dir(flags: &[Flag]) -> M2dirFlags {
     flags.iter().map(|flag| flag.raw().to_string()).collect()
-}
-
-/// mail-parser address group to a shared [`Address`] list.
-fn addresses_from(addrs: &MailParserAddress<'_>) -> Vec<Address> {
-    addrs
-        .clone()
-        .into_list()
-        .into_iter()
-        .filter_map(|a| {
-            let email = a.address?.into_owned();
-            if email.is_empty() {
-                return None;
-            }
-            let name = a.name.map(|s| s.into_owned());
-            Some(Address { name, email })
-        })
-        .collect()
 }
 
 /// 1-indexed in-memory pagination; `page_size = None` returns the full

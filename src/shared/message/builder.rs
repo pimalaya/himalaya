@@ -4,22 +4,38 @@
 //! commands, which collapse into one set of fields once the source
 //! message, if there is one, has been fetched.
 //!
-//! An RFC 5322 message comes out, headers derived from the source with
-//! mail-parser and the whole assembled with mail-builder.
+//! An RFC 5322 message comes out, headers derived from the source and the
+//! whole assembled with mime-rs's strict builder, which writes the
+//! `Date` and `Message-ID` given here and nothing it was not told.
 
 use std::{
     io::{IsTerminal, Read as _, stdin},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU32, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{Result, anyhow, bail};
-use mail_builder::{
-    MessageBuilder,
-    headers::{address::Address, message_id::generate_message_id_header, raw::Raw},
+use anyhow::{Context, Result, anyhow, bail};
+use mime::{
+    build::MimeBuildOptions,
+    builder::{MimeAttachment, MimeBuilder},
+    header::marker::{
+        BCC, CC, DATE, FROM, IN_REPLY_TO, MESSAGE_ID, REFERENCES, REPLY_TO, SUBJECT, TO,
+    },
+    tree::{cst::MimeCst, entity::MimeEntity, field::address::parse_addresses},
+    value::{
+        address::{MimeAddress, MimeAddressList, MimeMailbox},
+        content_type::MimeContentType,
+        datetime::MimeDateTime,
+        message_id::MimeMessageId,
+    },
 };
-use mail_parser::{HeaderValue, MessageParser, PartType, parsers::MessageStream};
 
-use crate::{config::PostingStyle, repl, shared::message::part};
+use crate::{
+    config::PostingStyle,
+    repl,
+    shared::message::{header, part},
+};
 
 /// Everything the MIME assembler needs, which each command fills in from
 /// its own clap struct.
@@ -29,7 +45,7 @@ pub struct BuilderArgs<'a> {
     /// A value spelling out a display name is split back apart rather
     /// than taken for one long address.
     pub from: Option<&'a str>,
-    /// Name that address goes by, kept apart from it so mail-builder
+    /// Name that address goes by, kept apart from it so the builder
     /// encodes it: a name holding a comma or a quote wants no rule here.
     pub from_name: Option<&'a str>,
     /// Addresses the `To` header carries.
@@ -89,42 +105,36 @@ pub enum SourceMode {
 /// Assembles the raw RFC 5322 bytes of a message, deriving the reply or
 /// forward headers when a source is given.
 pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Vec<u8>> {
-    let mut builder = MessageBuilder::new();
+    let mut builder = MimeBuilder::default();
+    let mut sender = None;
 
     if let Some(from) = args.from {
         let (parsed_name, address) = parse_mailboxes(from)?.remove(0);
         let name = args.from_name.map(str::to_owned).or(parsed_name);
-        if let Some(id) = message_id(&address) {
-            builder = builder.message_id(id);
-        }
-        builder = builder.from(Address::new_address(name, address));
-    }
-    if !args.to.is_empty() {
-        builder = builder.to(addresses(args.to)?);
-    }
-    if !args.cc.is_empty() {
-        builder = builder.cc(addresses(args.cc)?);
-    }
-    if !args.bcc.is_empty() {
-        builder = builder.bcc(addresses(args.bcc)?);
+        builder.header::<FROM>(address_list(&[(name, address.clone())]))?;
+        sender = Some(address);
     }
 
-    let parsed_source = source
-        .as_ref()
-        .and_then(|s| MessageParser::new().parse(s.raw));
+    builder.header::<DATE>(now())?;
+    builder.header::<MESSAGE_ID>(vec![new_message_id(sender.as_deref())])?;
+
+    let parsed_source = source.as_ref().map(|source| MimeCst::parse(source.raw));
 
     let mut subject = args.subject.map(str::to_owned);
+    let mut to = addresses(args.to)?;
+    let mut cc = addresses(args.cc)?;
     let mut source_text = String::new();
 
     if let (Some(source), Some(parsed)) = (source.as_ref(), parsed_source.as_ref()) {
+        let root = &parsed.root;
         let prefix = match source.mode {
             SourceMode::Reply => "Re: ",
             SourceMode::Forward => "Fwd: ",
         };
-        let src_subject = parsed.subject().unwrap_or("");
+        let src_subject = header::unstructured(root, "Subject").unwrap_or_default();
         if subject.is_none() {
-            subject = Some(if has_prefix(src_subject, prefix) {
-                src_subject.to_string()
+            subject = Some(if has_prefix(&src_subject, prefix) {
+                src_subject
             } else {
                 format!("{prefix}{src_subject}")
             });
@@ -132,11 +142,11 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
 
         if source.mode == SourceMode::Reply {
             let derived = match args.to.is_empty() {
-                true => reply_recipients(parsed),
+                true => reply_recipients(root),
                 false => Vec::new(),
             };
             if !derived.is_empty() {
-                builder = builder.to(address_list(&derived));
+                to = derived.clone();
             }
 
             if source.reply_all && args.cc.is_empty() {
@@ -145,31 +155,34 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
                     to.extend(parse_mailboxes(value)?.into_iter().map(|(_, email)| email));
                 }
 
-                let cc = reply_all_cc(parsed, &to, source.own_email);
-                if !cc.is_empty() {
-                    builder = builder.cc(address_list(&cc));
-                }
+                cc = reply_all_cc(root, &to, source.own_email);
             }
         }
 
-        if let Some(message_id) = parsed.message_id() {
+        if let Some(message_id) = root
+            .header::<MESSAGE_ID>()
+            .and_then(|ids| ids.into_iter().next())
+        {
             if source.mode == SourceMode::Reply {
-                builder = builder.in_reply_to(vec![message_id.to_string()]);
+                builder.header::<IN_REPLY_TO>(vec![message_id.clone()])?;
             }
-            let refs = compute_references(parsed, message_id);
-            if !refs.is_empty() {
-                builder = builder.header("References", Raw::new(refs));
-            }
+            builder.header::<REFERENCES>(compute_references(root, &message_id))?;
         }
 
-        source_text = parsed
-            .body_text(0)
-            .map(|c| c.into_owned())
-            .unwrap_or_default();
+        source_text = part::body_text(parsed);
     }
 
-    if let Some(s) = subject {
-        builder = builder.subject(s);
+    if !to.is_empty() {
+        builder.header::<TO>(address_list(&to))?;
+    }
+    if !cc.is_empty() {
+        builder.header::<CC>(address_list(&cc))?;
+    }
+    if !args.bcc.is_empty() {
+        builder.header::<BCC>(address_list(&addresses(args.bcc)?))?;
+    }
+    if let Some(subject) = subject {
+        builder.header::<SUBJECT>(subject)?;
     }
 
     let user_body = read_body(args.body, args.body_file)?;
@@ -186,7 +199,7 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
         args.signature_delim,
         style,
     );
-    builder = builder.text_body(body);
+    builder.text(body);
 
     for path in args.attach {
         let bytes = std::fs::read(path)
@@ -195,59 +208,72 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "attachment".to_string());
-        let mime = mime_for(path);
-        builder = builder.attachment(mime, file_name, bytes);
+        builder.attachment(attachment(&mime_for(path), file_name, bytes))?;
     }
 
     if let (Some(source), Some(parsed)) = (source.as_ref(), parsed_source.as_ref())
         && source.mode == SourceMode::Forward
         && !source.no_attachments
     {
-        builder = carry_source_attachments(builder, parsed);
+        carry_source_attachments(&mut builder, parsed)?;
     }
 
     builder
-        .write_to_vec()
-        .map_err(|err| anyhow!("serialize composed message: {err}"))
+        .write(&MimeBuildOptions::default())
+        .context("Cannot serialize the composed message")
+}
+
+/// An attachment of `mime` named `filename`, its bytes written as given.
+fn attachment(mime: &str, filename: String, content: Vec<u8>) -> MimeAttachment {
+    let (top, sub) = mime
+        .split_once('/')
+        .unwrap_or(("application", "octet-stream"));
+
+    MimeAttachment {
+        content_type: MimeContentType {
+            top: top.to_owned(),
+            sub: sub.to_owned(),
+            params: Vec::new(),
+        },
+        filename: Some(filename),
+        content,
+        ..Default::default()
+    }
 }
 
 /// Carries the attachments of the source into the forward, each under
 /// its original or derived file name, leaving bodies and inline
 /// resources to the quoting.
-fn carry_source_attachments<'a>(
-    builder: MessageBuilder<'a>,
-    parsed: &mail_parser::Message<'_>,
-) -> MessageBuilder<'a> {
-    let mut builder = builder;
-
-    for part in &parsed.parts {
-        // NOTE: a multipart container is not a leaf part: it holds no
-        // bytes of its own, and a `name` attribute on it would pass the
-        // attachment role fallthrough, so skip containers before the
-        // role check.
-        if matches!(&part.body, PartType::Multipart(_)) {
+fn carry_source_attachments(builder: &mut MimeBuilder, parsed: &MimeCst) -> Result<()> {
+    // NOTE: the leaves alone: a multipart container holds no bytes of its
+    // own, and a `name` attribute on it would pass the attachment role
+    // fallthrough.
+    for leaf in part::leaves(parsed) {
+        if part::role(leaf.part) != part::PartRole::Attachment {
             continue;
         }
-        if part::role(parsed, part) != part::PartRole::Attachment {
-            continue;
-        }
-        let mime = part::mime(part);
+        let mime = part::mime(leaf.part);
         let file_name =
-            part::filename(parsed, part).unwrap_or_else(|| fallback_attachment_name(part, &mime));
-        let bytes = part::bytes(parsed, part).into_owned();
-        builder = builder.attachment(mime, file_name, bytes);
+            part::filename(leaf.part).unwrap_or_else(|| fallback_attachment_name(leaf.part, &mime));
+        let bytes = part::bytes(leaf.part).into_owned();
+        builder.attachment(attachment(&mime, file_name, bytes))?;
     }
 
-    builder
+    Ok(())
 }
 
 /// Names an attached email from its subject, or a file from its MIME type.
-fn fallback_attachment_name(part: &mail_parser::MessagePart<'_>, mime: &str) -> String {
-    if mime == "message/rfc822" || part.is_message() {
-        let subject = match &part.body {
-            PartType::Message(message) => message.subject().unwrap_or_default(),
-            _ => "",
+fn fallback_attachment_name(part: &MimeEntity, mime: &str) -> String {
+    if mime == "message/rfc822" {
+        let nested = part.nested();
+        let inner = match (&part.body, &nested) {
+            (mime::tree::body::MimeBodyNode::Message(inner), _) => Some(inner.as_ref()),
+            (_, Some(nested)) => Some(&nested.root),
+            _ => None,
         };
+        let subject = inner
+            .and_then(|inner| header::unstructured(inner, "Subject"))
+            .unwrap_or_default();
         let subject: String = subject
             .chars()
             .map(|c| {
@@ -280,12 +306,33 @@ fn fallback_attachment_name(part: &mail_parser::MessagePart<'_>, mime: &str) -> 
     }
 }
 
+/// The current time, at the local offset.
+fn now() -> MimeDateTime {
+    let now = chrono::Local::now();
+    let offset = now.offset().local_minus_utc() / 60;
+    MimeDateTime::from_unix_seconds(now.timestamp(), offset as i16)
+}
+
+/// The `Message-ID` of a new message: on the domain of the sender's
+/// address, else on the machine's hostname, else on `localhost`.
+fn new_message_id(sender: Option<&str>) -> String {
+    sender
+        .and_then(message_id)
+        .or_else(|| {
+            let host = gethostname::gethostname();
+            MimeMessageId::new(&unique_id(), &host.to_string_lossy())
+                .ok()
+                .map(String::from)
+        })
+        .unwrap_or_else(|| format!("{}@localhost", unique_id()))
+}
+
 /// Generates a `Message-ID` on the domain of the sender's address.
 ///
-/// Left alone, mail-builder puts the machine's hostname on the right
-/// of the `@`, which tells every recipient the name of the machine and
-/// is rarely a domain at all. `None` when the address carries no
-/// plain domain, mail-builder then falling back to the hostname.
+/// The machine's hostname on the right of the `@` would tell every
+/// recipient the name of the machine and is rarely a domain at all.
+/// `None` when the address carries no plain domain, the hostname then
+/// being the fallback.
 fn message_id(address: &str) -> Option<String> {
     let (_, domain) = address.rsplit_once('@')?;
 
@@ -300,68 +347,53 @@ fn message_id(address: &str) -> Option<String> {
         return None;
     }
 
-    let mut id = Vec::new();
-    generate_message_id_header(&mut id, domain);
-    let id = String::from_utf8(id).ok()?;
+    MimeMessageId::new(&unique_id(), domain)
+        .ok()
+        .map(String::from)
+}
 
-    Some(id.trim_matches(['<', '>']).to_owned())
+/// The left part of a new `Message-ID`, unique on this machine: the time
+/// in nanoseconds, the process id and a per-process counter.
+fn unique_id() -> String {
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+    format!("{nanos:x}.{:x}.{count}", std::process::id())
 }
 
 /// Splits an address list into its mailboxes, each with its display
 /// name, when it carries one, and its address.
 ///
-/// Handing mail-builder the whole `Alice <alice@example.org>` as an
+/// Handing the builder the whole `Alice <alice@example.org>` as an
 /// address would emit a `To: <Alice <alice@example.org>>` no SMTP
 /// server accepts. A comma inside a quoted display name does not split
 /// the list. The returned list is never empty.
-fn parse_mailboxes(value: &str) -> Result<Vec<(Option<String>, String)>> {
-    use mail_parser::Address as ParserAddress;
+fn parse_mailboxes(value: &str) -> Result<Vec<Mailbox>> {
+    let mailboxes = header_mailboxes(&parse_addresses(value.as_bytes()));
 
-    // NOTE: the header parser flushes its last token on the
-    // terminating newline, which a bare address, unlike one closed by
-    // a `>`, does not otherwise carry.
-    let header = format!("{value}\n");
-    let parsed = MessageStream::new(header.as_bytes()).parse_address();
-
-    let mailboxes: Vec<_> = match &parsed {
-        HeaderValue::Address(ParserAddress::List(list)) => list.iter().collect(),
-        HeaderValue::Address(ParserAddress::Group(groups)) => groups
-            .iter()
-            .flat_map(|group| group.addresses.iter())
-            .collect(),
-        _ => Vec::new(),
-    };
-
-    if mailboxes.is_empty() {
+    // NOTE: a bare word reads as an address with no domain, which no
+    // transport delivers.
+    if mailboxes.is_empty() || mailboxes.iter().any(|(_, email)| !email.contains('@')) {
         bail!("Could not parse address `{value}`");
     }
 
-    mailboxes
-        .into_iter()
-        .map(|mailbox| {
-            let address = mailbox
-                .address
-                .as_ref()
-                .ok_or_else(|| anyhow!("Address `{value}` has no email"))?
-                .to_string();
-            let name = mailbox.name.as_ref().map(|name| name.to_string());
-
-            Ok((name, address))
-        })
-        .collect()
+    Ok(mailboxes)
 }
 
-/// Builds one address list out of every mailbox the values carry.
-fn addresses(values: &[String]) -> Result<Address<'static>> {
+/// Every mailbox the values carry, in order.
+fn addresses(values: &[String]) -> Result<Vec<Mailbox>> {
     let mut list = Vec::new();
 
     for value in values {
-        for (name, address) in parse_mailboxes(value)? {
-            list.push(Address::new_address(name, address));
-        }
+        list.extend(parse_mailboxes(value)?);
     }
 
-    Ok(Address::new_list(list))
+    Ok(list)
 }
 
 /// Reads the text body from the flag, the file it names, or piped
@@ -479,17 +511,19 @@ fn has_prefix(subject: &str, prefix: &str) -> bool {
 
 /// Derives the recipients of a reply from the source's `Reply-To`, or
 /// from its `From` when it names none.
-fn reply_recipients(msg: &mail_parser::Message<'_>) -> Vec<Mailbox> {
-    msg.header("Reply-To")
-        .or_else(|| msg.header("From"))
-        .map(header_mailboxes)
+fn reply_recipients(source: &MimeEntity) -> Vec<Mailbox> {
+    source
+        .header::<REPLY_TO>()
+        .filter(|list| !list.is_empty())
+        .or_else(|| source.header::<FROM>())
+        .map(|list| header_mailboxes(&list))
         .unwrap_or_default()
 }
 
 /// Derives the carbon-copy recipients of a reply to all: the `To` and
 /// `Cc` of the source, without the account's own address nor anyone
 /// already in `to`, and without duplicates, compared ignoring case.
-fn reply_all_cc(msg: &mail_parser::Message<'_>, to: &[String], own: Option<&str>) -> Vec<Mailbox> {
+fn reply_all_cc(source: &MimeEntity, to: &[String], own: Option<&str>) -> Vec<Mailbox> {
     let mut seen: Vec<String> = to
         .iter()
         .map(String::as_str)
@@ -498,8 +532,8 @@ fn reply_all_cc(msg: &mail_parser::Message<'_>, to: &[String], own: Option<&str>
         .collect();
     let mut cc = Vec::new();
 
-    for name in ["To", "Cc"] {
-        for (display, email) in msg.header(name).map(header_mailboxes).unwrap_or_default() {
+    for list in [source.header::<TO>(), source.header::<CC>()] {
+        for (display, email) in list.map(|list| header_mailboxes(&list)).unwrap_or_default() {
             let key = email.trim().to_ascii_lowercase();
             if !seen.contains(&key) {
                 seen.push(key);
@@ -511,91 +545,44 @@ fn reply_all_cc(msg: &mail_parser::Message<'_>, to: &[String], own: Option<&str>
     cc
 }
 
-/// Collects the mailboxes of an address header, groups flattened and
+/// Collects the mailboxes of an address list, groups flattened and
 /// entries without an address dropped.
-fn header_mailboxes(value: &HeaderValue<'_>) -> Vec<Mailbox> {
-    use mail_parser::Address as ParserAddress;
-
-    let HeaderValue::Address(addr) = value else {
-        return Vec::new();
-    };
-
-    let entries: Vec<_> = match addr {
-        ParserAddress::List(list) => list.iter().collect(),
-        ParserAddress::Group(groups) => groups
-            .iter()
-            .flat_map(|group| group.addresses.iter())
-            .collect(),
-    };
-
-    entries
-        .into_iter()
-        .filter_map(|entry| {
-            let email = entry.address.as_ref()?.to_string();
-            let name = entry.name.as_ref().map(|name| name.to_string());
-            Some((name, email))
+fn header_mailboxes(list: &MimeAddressList) -> Vec<Mailbox> {
+    list.mailboxes()
+        .filter_map(|mailbox| {
+            let email = mailbox.address.clone().filter(|email| !email.is_empty())?;
+            Some((mailbox.name.clone(), email))
         })
         .collect()
 }
 
 /// Turns mailboxes into the address list a header carries.
-fn address_list(mailboxes: &[Mailbox]) -> Address<'static> {
-    Address::new_list(
-        mailboxes
+fn address_list(mailboxes: &[Mailbox]) -> MimeAddressList {
+    MimeAddressList {
+        items: mailboxes
             .iter()
-            .map(|(name, email)| Address::new_address(name.clone(), email.clone()))
+            .map(|(name, email)| {
+                MimeAddress::Mailbox(match name {
+                    Some(name) => MimeMailbox::named(name.clone(), email.clone()),
+                    None => MimeMailbox::address(email.clone()),
+                })
+            })
             .collect(),
-    )
+    }
 }
 
-/// Builds the `References` header of a reply: the source's own chain,
-/// or its `In-Reply-To`, with the source id appended.
-fn compute_references(msg: &mail_parser::Message<'_>, source_message_id: &str) -> String {
-    let mut out = String::new();
+/// The `References` of a reply or forward: the source's own chain, or
+/// its `In-Reply-To`, then the source id, each without angle brackets.
+fn compute_references(source: &MimeEntity, source_message_id: &str) -> Vec<String> {
+    let mut references = source
+        .header::<REFERENCES>()
+        .filter(|ids| !ids.is_empty())
+        .or_else(|| source.header::<IN_REPLY_TO>())
+        .unwrap_or_default();
 
-    if let Some(header) = msg.header("References") {
-        if let HeaderValue::TextList(items) = header {
-            for r in items {
-                push_msg_id(&mut out, r);
-            }
-        } else if let HeaderValue::Text(s) = header {
-            for r in s.split_whitespace() {
-                push_msg_id(&mut out, r);
-            }
-        }
-    } else if let Some(header) = msg.header("In-Reply-To") {
-        if let HeaderValue::TextList(items) = header {
-            for r in items {
-                push_msg_id(&mut out, r);
-            }
-        } else if let HeaderValue::Text(s) = header {
-            for r in s.split_whitespace() {
-                push_msg_id(&mut out, r);
-            }
-        }
-    }
-
-    push_msg_id(&mut out, source_message_id);
-    out
-}
-
-/// Appends one message id to a `References` chain, wrapped in angle
-/// brackets.
-fn push_msg_id(out: &mut String, id: &str) {
-    let id = id.trim();
-    if id.is_empty() {
-        return;
-    }
-    if !out.is_empty() {
-        out.push(' ');
-    }
-    if id.starts_with('<') {
-        out.push_str(id);
-    } else {
-        out.push('<');
-        out.push_str(id);
-        out.push('>');
-    }
+    references.push(source_message_id.to_owned());
+    references.retain(|id| !id.trim().is_empty());
+    references
 }
 
 /// Guesses the MIME type of an attachment from its path.
@@ -620,10 +607,43 @@ References: <orig-0@example.com> <orig-1@example.com>\r\n\
 \r\n\
 Original body line.\r\n";
 
-    fn parse(raw: &[u8]) -> mail_parser::Message<'_> {
-        MessageParser::new()
-            .parse(raw)
-            .expect("parse built message")
+    /// A message read back, through the readers the tests assert on, its
+    /// root header block reachable as an entity.
+    struct Built(MimeCst<'static>);
+
+    impl std::ops::Deref for Built {
+        type Target = MimeEntity<'static>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0.root
+        }
+    }
+
+    impl Built {
+        fn subject(&self) -> Option<String> {
+            header::unstructured(&self.0.root, "Subject")
+        }
+
+        fn body_text(&self) -> String {
+            part::body_text(&self.0)
+        }
+
+        fn message_id(&self) -> Option<String> {
+            self.0.root.header::<MESSAGE_ID>()?.into_iter().next()
+        }
+
+        fn mailboxes(&self, name: &str) -> Vec<Mailbox> {
+            self.0
+                .root
+                .header
+                .get(name)
+                .map(|field| header_mailboxes(&parse_addresses(field.value())))
+                .unwrap_or_default()
+        }
+    }
+
+    fn parse(raw: &[u8]) -> Built {
+        Built(MimeCst::parse(raw).into_owned())
     }
 
     fn source(mode: SourceMode) -> SourceArgs<'static> {
@@ -671,8 +691,8 @@ Original body line.\r\n";
         let msg = parse(&raw);
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        assert_eq!(msg.subject(), Some("Hello"));
-        assert!(msg.body_text(0).unwrap().contains("Hi Bob"));
+        assert_eq!(msg.subject().as_deref(), Some("Hello"));
+        assert!(msg.body_text().contains("Hi Bob"));
         assert!(text.contains("alice@example.com"));
         assert!(text.contains("bob@example.com"));
         assert!(text.contains("carol@example.com"));
@@ -736,11 +756,11 @@ Original body line.\r\n";
         let msg = parse(&raw);
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        assert_eq!(msg.subject(), Some("Re: Project update"));
+        assert_eq!(msg.subject().as_deref(), Some("Re: Project update"));
         assert!(text.contains("alice@example.com"));
         assert!(text.contains("In-Reply-To:"));
         assert!(text.contains("orig-2@example.com"));
-        let body = msg.body_text(0).unwrap();
+        let body = msg.body_text();
         assert!(body.contains("My reply"));
         assert!(body.contains("On a day, Alice wrote:"));
         assert!(body.contains("> Original body line."));
@@ -760,7 +780,10 @@ Original body line.\r\n";
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
-        assert_eq!(parse(&built).subject(), Some("Re: Already replied"));
+        assert_eq!(
+            parse(&built).subject().as_deref(),
+            Some("Re: Already replied")
+        );
     }
 
     #[test]
@@ -777,7 +800,10 @@ Original body line.\r\n";
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
-        assert_eq!(parse(&built).subject(), Some("Re: Ready to ship"));
+        assert_eq!(
+            parse(&built).subject().as_deref(),
+            Some("Re: Ready to ship")
+        );
     }
 
     #[test]
@@ -822,9 +848,7 @@ Body.\r\n";
         let raw = build(a, Some(source)).unwrap();
         let msg = parse(&raw);
         let emails = |name: &str| {
-            msg.header(name)
-                .map(header_mailboxes)
-                .unwrap_or_default()
+            msg.mailboxes(name)
                 .into_iter()
                 .map(|(_, email)| email)
                 .collect()
@@ -872,7 +896,7 @@ Body.\r\n";
 
     #[test]
     fn reply_all_leaves_out_who_is_already_in_to() {
-        let msg = MessageParser::new().parse(GROUP_SOURCE).unwrap();
+        let msg = parse(GROUP_SOURCE);
         let to = vec!["bob@example.com".to_string()];
 
         let cc: Vec<_> = reply_all_cc(&msg, &to, Some("me@example.com"))
@@ -901,7 +925,7 @@ Body.\r\n";
 
     #[test]
     fn reply_all_without_own_email_keeps_every_recipient() {
-        let msg = MessageParser::new().parse(GROUP_SOURCE).unwrap();
+        let msg = parse(GROUP_SOURCE);
         let cc = reply_all_cc(&msg, &[], None);
         assert_eq!(cc.len(), 4);
     }
@@ -917,9 +941,9 @@ Body.\r\n";
         let msg = parse(&raw);
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        assert_eq!(msg.subject(), Some("Fwd: Project update"));
+        assert_eq!(msg.subject().as_deref(), Some("Fwd: Project update"));
         assert!(!text.contains("In-Reply-To"));
-        assert!(msg.body_text(0).unwrap().contains("> Original body line."));
+        assert!(msg.body_text().contains("> Original body line."));
     }
 
     #[test]
@@ -938,26 +962,20 @@ Body.\r\n";
         let msg = parse(SOURCE);
         assert_eq!(
             compute_references(&msg, "orig-2@example.com"),
-            "<orig-0@example.com> <orig-1@example.com> <orig-2@example.com>",
+            [
+                "orig-0@example.com",
+                "orig-1@example.com",
+                "orig-2@example.com"
+            ],
         );
 
         let raw = b"In-Reply-To: <a@e>\r\nMessage-ID: <b@e>\r\n\r\nx";
         let msg = parse(raw);
-        assert_eq!(compute_references(&msg, "b@e"), "<a@e> <b@e>");
+        assert_eq!(compute_references(&msg, "b@e"), ["a@e", "b@e"]);
 
         let raw = b"Message-ID: <b@e>\r\n\r\nx";
         let msg = parse(raw);
-        assert_eq!(compute_references(&msg, "b@e"), "<b@e>");
-    }
-
-    #[test]
-    fn push_msg_id_wraps_and_separates() {
-        let mut out = String::new();
-        push_msg_id(&mut out, "a@e");
-        push_msg_id(&mut out, "<b@e>");
-        push_msg_id(&mut out, "  ");
-        push_msg_id(&mut out, "c@e");
-        assert_eq!(out, "<a@e> <b@e> <c@e>");
+        assert_eq!(compute_references(&msg, "b@e"), ["b@e"]);
     }
 
     #[test]
@@ -994,9 +1012,8 @@ Body.\r\n";
         assert!(!text.contains("<Alice <alice@example.org>>"));
 
         let msg = parse(&raw);
-        let from = msg.from().unwrap().first().unwrap();
-        assert_eq!(from.name(), Some("Alice"));
-        assert_eq!(from.address(), Some("alice@example.org"));
+        let from = msg.mailboxes("From");
+        assert_eq!(from, [(Some("Alice".into()), "alice@example.org".into())]);
     }
 
     #[test]
@@ -1009,9 +1026,8 @@ Body.\r\n";
         assert!(!text.contains("<Alice <alice@example.org>>"));
 
         let msg = parse(&raw);
-        let to_addr = msg.to().unwrap().first().unwrap();
-        assert_eq!(to_addr.name(), Some("Alice"));
-        assert_eq!(to_addr.address(), Some("alice@example.org"));
+        let to = msg.mailboxes("To");
+        assert_eq!(to, [(Some("Alice".into()), "alice@example.org".into())]);
     }
 
     #[test]
@@ -1023,12 +1039,15 @@ Body.\r\n";
         let raw = build(args("sender@example.org", &to, None, "hi"), None).unwrap();
 
         let msg = parse(&raw);
-        let to: Vec<_> = msg.to().unwrap().iter().collect();
-        assert_eq!(to.len(), 3);
-        assert_eq!(to[0].name(), Some("Doe, Alice"));
-        assert_eq!(to[0].address(), Some("alice@example.org"));
-        assert_eq!(to[1].address(), Some("bob@example.org"));
-        assert_eq!(to[2].address(), Some("carol@example.org"));
+        let to = msg.mailboxes("To");
+        assert_eq!(
+            to,
+            [
+                (Some("Doe, Alice".into()), "alice@example.org".into()),
+                (None, "bob@example.org".into()),
+                (None, "carol@example.org".into()),
+            ],
+        );
     }
 
     #[test]

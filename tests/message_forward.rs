@@ -14,7 +14,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use mail_parser::{MessageParser, MimeHeaders, PartType};
+use mime::tree::{body::MimeBodyNode, cst::MimeCst};
 use tempfile::TempDir;
 
 /// A source with a text body and one attachment, `résumé.bin`, carried
@@ -150,7 +150,10 @@ fn forward_carries_the_attachment_of_the_source() {
     let composed = forward(&config, dir.path(), &[]);
 
     assert!(
-        composed.contains("Content-Disposition: attachment; filename*=UTF-8''r%C3%A9sum%C3%A9.bin"),
+        // NOTE: a charset name is case-insensitive (RFC 2231 §4).
+        composed
+            .to_ascii_lowercase()
+            .contains("content-disposition: attachment; filename*=utf-8''r%c3%a9sum%c3%a9.bin"),
         "the carried attachment lost its file name: {composed}"
     );
     assert!(
@@ -257,25 +260,25 @@ fn forward_names_an_attached_message_from_its_subject() {
 
 /// Checks the carried MIME part after decoding, including all its bytes.
 fn assert_carried(composed: &str, name: &str, mime: &str, bytes: &[u8]) {
-    let parsed = MessageParser::new().parse(composed.as_bytes()).unwrap();
-    let mut attachments = parsed.attachments();
+    let parsed = MimeCst::parse(composed.as_bytes());
+    let lists = parsed.root.body_lists();
+    let mut attachments = lists.attachments.iter();
     let attachment = attachments.next().expect("nameless attachment was dropped");
     assert!(attachments.next().is_none(), "unexpected extra attachment");
-    assert_eq!(attachment.attachment_name(), Some(name));
-    let content_type = attachment.content_type().unwrap();
+    assert_eq!(attachment.attachment_name().as_deref(), Some(name));
+    let content_type = attachment.content_type();
     assert_eq!(
         format!(
             "{}/{}",
-            content_type.c_type,
-            content_type.c_subtype.as_deref().unwrap()
+            String::from_utf8_lossy(content_type.top),
+            String::from_utf8_lossy(content_type.sub),
         ),
         mime
     );
     let carried = match &attachment.body {
-        PartType::Binary(bytes) | PartType::InlineBinary(bytes) => bytes.as_ref(),
-        PartType::Text(text) | PartType::Html(text) => text.as_bytes(),
-        PartType::Message(message) => message.raw_message.as_ref(),
-        PartType::Multipart(_) => panic!("carried a multipart container"),
+        MimeBodyNode::Message(message) => message.to_bytes(),
+        MimeBodyNode::Multipart(_) => panic!("carried a multipart container"),
+        _ => attachment.decoded().expect("a leaf").into_owned(),
     };
     assert_eq!(carried, bytes);
 }

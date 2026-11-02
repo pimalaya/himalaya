@@ -41,7 +41,7 @@ use io_imap::{
     },
 };
 use log::debug;
-use mail_parser::MessageParser;
+use mime::header::marker::MESSAGE_ID;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 
 use crate::{
@@ -58,6 +58,7 @@ use crate::{
         },
     },
     imap::client::ImapClient,
+    shared::message::header,
 };
 
 impl ImapClient {
@@ -294,9 +295,10 @@ impl ImapClient {
         // NOTE: without `APPENDUID`, which a server may omit even with
         // UIDPLUS, the UID is recovered by searching the message's own
         // `Message-ID`, which it therefore has to carry.
-        let message_id = MessageParser::default()
-            .parse_headers(&raw)
-            .and_then(|parsed| parsed.message_id().map(str::to_string))
+        let message_id = header::parse_headers(&raw)
+            .root
+            .header::<MESSAGE_ID>()
+            .and_then(|ids| ids.into_iter().next())
             .filter(|id| !id.is_empty());
         let Some(message_id) = message_id else {
             debug!("no APPENDUID and no Message-ID to search, appended UID unknown");

@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed the MIME parsing and composing to mime-rs (github.com/pimalaya/mime-rs, pinned by git revision until its first release), replacing mail-parser and mail-builder: `message read`, `message parse`, `attachment list|download`, the search evaluator, the Maildir, m2dir and mbox envelopes and the composers. On well-formed mail the part ids and the `--json` views stay as they were. The `text` of a `format=flowed` part, and the quote of a reply to one, is now unwrapped (RFC 3676). The plain `message read` view shows the same part types, sizes and names as the JSON view.
+- Changed the composed messages to mime-rs's layout: the same headers and parts, a `Date` and `Message-ID` written by Himalaya, charset names lowercased (`utf-8''` in an RFC 2231 file name).
+- Changed UTF-7 (RFC 2152) text to be shown as written: mime-rs reads the WHATWG charsets, which leave UTF-7 out.
 - Changed `himalaya mcp` to list only the tools the account's transports can serve (an SMTP-only account lists `message_send`, not `envelope_list`), and to end the `envelope_search` description with the clauses and sort keys the account's backend answers fully, in part and not at all.
 - Changed `message add` on Microsoft Graph, and a save asked of a composer or of `message send --save` there, to fail before connecting with `capability-missing`, where `message add` failed with an uncoded error and a send with `--save` failed after sending.
 - Changed a JMAP send to fail with `capability-missing` before uploading anything when the server's session lacks `urn:ietf:params:jmap:submission`, rather than leave the message in the drafts mailbox.
@@ -78,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed malformed multiparts reading with the wrong structure: a part an outer delimiter closes is no longer swallowed by a nested multipart (three attached messages read as one), a line opening with a boundary followed by text is no longer taken for a delimiter (the text after it was hidden), and parts mail-parser dropped (a delimiter with no blank line after it) are listed. Part ids follow the corrected structure on such mail.
+- Fixed a field whose name holds a blank (`Sub ject: x`) being read as the field it spells, and a body line being read as `From:` after an unusual `Date` zone.
 - Fixed `flag add|set|remove` with `answered` or `draft` on Gmail and Microsoft Graph reporting every message flagged while changing nothing: neither has a field for them, so the command fails with `capability-missing`.
 - Fixed Gmail date clauses being off by a day: Gmail reads a bare date as midnight in PST, so `after 2026-09-08` kept that day's mail and `date 2026-09-08` spanned two days. Each bound is now sent as Unix seconds of the UTC day.
 - Fixed a JMAP search whose date clause sits under `not` or `or` checking the date as if it stood alone: `not after 2026-01-01` listed nothing, and `date 2026-01-01 or subject x` only that day's mail. Such a clause now reads the server's received date; a date clause joined to the rest by `and` alone keeps its exact sent-date check.

@@ -1,36 +1,50 @@
 //! # Header decoding
 //!
-//! Reads a header value from the raw bytes of a message rather than from
-//! mail-parser's decoded string, so that what mail goes out with in
-//! practice reads right:
+//! Reads a header value from the raw bytes mime-rs keeps of each field
+//! rather than from its decoded readers, so that what mail goes out with
+//! in practice reads right:
 //!
 //! - raw 8-bit bytes are UTF-8 when they are valid UTF-8 (RFC 6532) and
-//!   Windows-1252 otherwise;
+//!   Windows-1252 otherwise, where mime-rs reads them as lossy UTF-8;
 //! - adjacent encoded words of one charset are joined as bytes before
 //!   their charset is decoded, so a character split across two words is
 //!   rebuilt, and the space between adjacent encoded words is dropped
 //!   (RFC 2047 §6.2).
 
-use mail_parser::{
-    Header, Message, decoders::base64::base64_decode, decoders::charsets::map::charset_decoder,
+use mime::{
+    codec::{base64::decode_b, charset::transcode},
+    tree::entity::MimeEntity,
 };
 
-/// The raw value of the first header of that name among `headers`, its
-/// folding and trailing line break removed, raw 8-bit bytes decoded.
-pub fn raw_text(message: &Message, headers: &[Header], name: &str) -> Option<String> {
-    let header = headers
-        .iter()
-        .find(|header| header.name.as_str().eq_ignore_ascii_case(name))?;
-    let bytes = message
-        .raw_message
-        .get(header.offset_start as usize..header.offset_end as usize)?;
-    Some(eight_bit(bytes).replace(['\r', '\n'], ""))
+/// Parses the header block of a raw message alone, its body left
+/// unsplit: what reading a field costs.
+#[cfg(any(
+    feature = "imap",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox"
+))]
+pub fn parse_headers(raw: &[u8]) -> mime::tree::cst::MimeCst<'_> {
+    use mime::tree::{cst::MimeCst, parse::MimeParseOptions};
+
+    let opts = MimeParseOptions {
+        structure_depth: Some(0),
+        ..Default::default()
+    };
+    MimeCst::parse_with(raw, opts)
+}
+
+/// The raw value of the entity's first header of that name, its folding
+/// and trailing line break removed, raw 8-bit bytes decoded.
+pub fn raw_text(entity: &MimeEntity, name: &str) -> Option<String> {
+    let field = entity.header.get(name)?;
+    Some(eight_bit(field.value()).replace(['\r', '\n'], ""))
 }
 
 /// The value of an unstructured header, encoded words decoded and
 /// trimmed; `None` when absent or empty.
-pub fn unstructured(message: &Message, headers: &[Header], name: &str) -> Option<String> {
-    let text = decode_words(&raw_text(message, headers, name)?);
+pub fn unstructured(entity: &MimeEntity, name: &str) -> Option<String> {
+    let text = decode_words(&raw_text(entity, name)?);
     let text = text.trim();
     (!text.is_empty()).then(|| text.to_owned())
 }
@@ -47,16 +61,8 @@ pub fn eight_bit(bytes: &[u8]) -> String {
 /// Bytes decoded by a charset label, lossily, UTF-8 when the label is
 /// unknown.
 pub fn decode_charset(label: &str, bytes: &[u8]) -> String {
-    let label = label.trim().trim_matches('"').to_ascii_lowercase();
-
-    // NOTE: mail-parser has no UTF-8 entry in its table, its own reading
-    // being the fallback.
-    if label == "utf-8" || label == "utf8" {
-        return String::from_utf8_lossy(bytes).into_owned();
-    }
-
-    match charset_decoder(label.as_bytes()) {
-        Some(decode) => decode(bytes),
+    match transcode(label, bytes) {
+        Some(decoded) => decoded.text.into_owned(),
         None => String::from_utf8_lossy(bytes).into_owned(),
     }
 }
@@ -212,7 +218,10 @@ fn encoded_word(input: &str) -> Option<(String, Vec<u8>, usize)> {
     }
 
     let bytes = match encoding {
-        "B" | "b" => base64_decode(text.as_bytes())?,
+        "B" | "b" => {
+            let mut bytes = Vec::new();
+            decode_b(text.as_bytes(), &mut bytes).then_some(bytes)?
+        }
         "Q" | "q" => q_decode(text),
         _ => return None,
     };

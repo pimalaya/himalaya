@@ -63,13 +63,7 @@ pub struct Envelope {
 /// A backend hands the whole `1*msg-id` value over as one string, so the
 /// ids are read off the angle brackets. A value carrying none is split on
 /// whitespace, a bare id being commoner than nothing at all.
-#[cfg(any(
-    feature = "imap",
-    feature = "gmail",
-    feature = "maildir",
-    feature = "m2dir",
-    feature = "mbox"
-))]
+#[cfg(any(feature = "imap", feature = "gmail"))]
 pub fn parse_message_ids(raw: &str) -> Vec<String> {
     if raw.contains('<') {
         return raw
@@ -113,16 +107,63 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
     }
 }
 
-#[cfg(all(
-    test,
-    any(
-        feature = "imap",
-        feature = "gmail",
-        feature = "maildir",
-        feature = "m2dir",
-        feature = "mbox"
-    )
-))]
+/// The envelope of a raw message, read from its header block, its id and
+/// flags left empty for the backend to fill.
+///
+/// `with_attachment` also splits the body, to say whether it holds an
+/// attachment (RFC 8621 §4.1.4); left `None` otherwise. The subject is
+/// read as the read view reads it, raw 8-bit bytes included.
+#[cfg(any(feature = "maildir", feature = "m2dir", feature = "mbox"))]
+pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
+    use chrono::TimeZone;
+    use mime::{
+        header::marker::{DATE, FROM, IN_REPLY_TO, MESSAGE_ID, TO},
+        tree::cst::MimeCst,
+    };
+
+    use crate::{email::address, shared::message::header};
+
+    let message = match with_attachment {
+        true => MimeCst::parse(raw),
+        false => header::parse_headers(raw),
+    };
+    let root = &message.root;
+
+    let addresses = |list: Option<mime::value::address::MimeAddressList>| {
+        list.map(|list| address::from_mime(&list))
+            .unwrap_or_default()
+    };
+
+    let date = root
+        .header::<DATE>()
+        .filter(|date| date.is_valid())
+        .and_then(|date| {
+            let offset = FixedOffset::east_opt(i32::from(date.offset) * 60)?;
+            offset.timestamp_opt(date.to_unix_seconds(), 0).single()
+        });
+
+    let ids = |ids: Option<Vec<String>>| -> Vec<String> {
+        ids.unwrap_or_default()
+            .iter()
+            .filter_map(|id| normalize_message_id(id))
+            .collect()
+    };
+
+    Envelope {
+        id: String::new(),
+        message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
+        in_reply_to: ids(root.header::<IN_REPLY_TO>()),
+        flags: Default::default(),
+        subject: header::unstructured(root, "Subject").unwrap_or_default(),
+        from: addresses(root.header::<FROM>()),
+        to: addresses(root.header::<TO>()),
+        date,
+        size: raw.len() as u64,
+        has_attachment: with_attachment.then(|| root.body_lists().has_attachment()),
+    }
+}
+
+#[cfg(all(test, any(feature = "imap", feature = "gmail")))]
 mod tests {
     use super::*;
 

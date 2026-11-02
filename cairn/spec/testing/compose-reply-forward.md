@@ -19,7 +19,7 @@ All three subcommands collapse into one pure assembler,
 - `SourceArgs.raw` — the message being replied to / forwarded — is just
   `&[u8]`. Production *fetches* those bytes from a backend, but the
   assembler only reads them, so any raw RFC 5322 fixture drives it.
-- The output is raw RFC 5322 bytes, re-parsable with `mail_parser` to
+- The output is raw RFC 5322 bytes, re-parsable with mime-rs to
   assert on.
 
 The only provider-dependent parts are *outside* the builder — fetching

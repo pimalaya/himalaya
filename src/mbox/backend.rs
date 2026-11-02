@@ -12,7 +12,6 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow};
-use chrono::DateTime;
 use io_mbox::{
     client::MboxClientError,
     entry::{
@@ -28,12 +27,10 @@ use io_mbox::{
     path::MboxFsPath,
     store::INBOX,
 };
-use mail_parser::{Address as MailParserAddress, HeaderValue, MessageParser};
 
 use crate::{
     email::{
-        address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
         search::{eval, query::SearchEmailsQuery},
@@ -408,84 +405,7 @@ fn find<'a>(index: &'a MboxIndex, id: &str, path: &MboxFsPath) -> Result<&'a Mbo
 /// Parses a message into a shared [`Envelope`], its id and flags left
 /// empty for the caller to fill from the index.
 fn envelope_from(contents: &[u8]) -> Envelope {
-    let parsed = MessageParser::new().parse(contents);
-
-    let subject = parsed
-        .as_ref()
-        .and_then(|m| m.subject())
-        .unwrap_or_default()
-        .to_string();
-
-    let from = parsed
-        .as_ref()
-        .and_then(|m| m.from())
-        .map(addresses_from)
-        .unwrap_or_default();
-
-    let to = parsed
-        .as_ref()
-        .and_then(|m| m.to())
-        .map(addresses_from)
-        .unwrap_or_default();
-
-    let date = parsed
-        .as_ref()
-        .and_then(|m| m.date())
-        .and_then(|d| DateTime::parse_from_rfc3339(&d.to_rfc3339()).ok());
-
-    let has_attachment = parsed.as_ref().map(|m| m.attachment_count() > 0);
-
-    let message_id = parsed
-        .as_ref()
-        .and_then(|m| m.message_id())
-        .and_then(normalize_message_id);
-
-    let in_reply_to = parsed
-        .as_ref()
-        .map(|m| ids_from_header(m.in_reply_to()))
-        .unwrap_or_default();
-
-    Envelope {
-        id: String::new(),
-        message_id,
-        in_reply_to,
-        flags: Default::default(),
-        subject,
-        from,
-        to,
-        date,
-        size: contents.len() as u64,
-        has_attachment,
-    }
-}
-
-/// Reads a mail-parser msg-id header into the bare ids it names.
-fn ids_from_header(value: &HeaderValue<'_>) -> Vec<String> {
-    match value {
-        HeaderValue::TextList(ids) => ids
-            .iter()
-            .filter_map(|id| normalize_message_id(id))
-            .collect(),
-        HeaderValue::Text(id) => parse_message_ids(id),
-        _ => Vec::new(),
-    }
-}
-
-/// mail-parser address group to a shared [`Address`] list.
-fn addresses_from(addrs: &MailParserAddress<'_>) -> Vec<Address> {
-    addrs
-        .clone()
-        .into_list()
-        .into_iter()
-        .filter_map(|a| {
-            let email = a.address?.into_owned();
-            if email.is_empty() {
-                return None;
-            }
-            let name = a.name.map(|s| s.into_owned());
-            Some(Address { name, email })
-        })
-        .collect()
+    envelope::from_raw(contents, true)
 }
 
 /// Maps a shared [`Flag`] to an [`MboxFlag`]; a flag with no `Status`
