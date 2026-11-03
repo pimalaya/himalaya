@@ -36,7 +36,7 @@ strip = "symbols"
 panic = "abort"
 
 [build-dependencies]
-pimalaya-cli = { version = "0.2.6", default-features = false, features = ["build"] }
+pimalaya-cli = { version = "0.3", default-features = false, features = ["build"] }
 
 [dev-dependencies]
 rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
@@ -71,8 +71,8 @@ mime-rs = { version = "0.0.1", git = "https://github.com/pimalaya/mime-rs", rev 
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"
-pimalaya-cli = { version = "0.2.6", default-features = false, features = ["terminal", "table", "prompt"] }
-pimalaya-config = { version = "0.2.1", default-features = false, features = ["toml", "secret"] }
+pimalaya-cli = { version = "0.3", default-features = false, features = ["terminal", "table", "prompt"] }
+pimalaya-config = { version = "0.3", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }
 schemars = { version = "1", features = ["chrono04"] }
@@ -93,6 +93,4 @@ ical-rs = { git = "https://github.com/pimalaya/ical", rev = "99b92736a6a076c7293
 io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "908db2ba74e40cccb89281e797d1807dbf0b7d9b" }
-pimalaya-cli = { path = "../cli" }
-pimalaya-config = { git = "https://github.com/pimalaya/config", rev = "5fc629b28e3c7afa7ec8de59e4f2f571bfabbc8d" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "0c701447473a03e5cf9effcd0039a49a78419c4d" }
