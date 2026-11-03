@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `mailbox create <NAME> [--parent <MAILBOX>]`, `mailbox rename <MAILBOX> <NAME>` and `mailbox delete <MAILBOX>` to the shared API, on every backend: a name is one level of the hierarchy, a rename keeps the parent, a delete takes the messages the mailbox holds. IMAP joins the levels with the delimiter its `LIST` reports, Gmail and the local stores with `/`. On pimdir each is queued, its `id` `null`. m2dir has no rename and refuses `--parent`, its folders being flat; Graph creates under a parent in two requests; what a delete leaves behind on JMAP, Gmail and Graph is in the `--help` footer.
+- Added the `important` and `junk` flags to `flag add|set|remove` (RFC 8457 `$Important`, `$Junk`). Graph has no junk mark and refuses it; on Gmail `junk` is the `SPAM` label, which moves the message to Spam.
+- Added `vacation get` and `vacation set`, reading and changing the auto-reply (`{enabled, from, to, subject, text, html}`, dates in RFC 3339 UTC) on JMAP and Gmail. It resolves to the first configured backend keeping one, so an account syncing a Maildir from JMAP reaches JMAP. IMAP refuses it naming `himalaya sieve`; the MCP server lists `vacation_set` under `--allow-send` only, an auto-reply answering mail.
 - Added a capability table per backend, naming each shared capability in pimdir's grammar (`message.copy`, `flags.answered`, `submit`, `envelope.search.attachment`) at a level, `full`, `partial`, `server` or `none`, with a detail saying what differs or why. A shared command reaching a capability its backend declares `none`, or one no configured transport answers, is refused before connecting, under the new error code `capability-missing`, naming the account, the capability, the backend and what serves it instead.
 - Added a generated `Backends:` footer to the `--help` of every shared command, listing per capability it reaches the backends at each level and the details.
 
@@ -48,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed IMAP flag writes to refuse, under `capability-missing`, a keyword the mailbox's `PERMANENTFLAGS` lists neither by name nor by `\*`, which the server would keep for the session only.
 - Changed the MIME parsing and composing to mime-rs (github.com/pimalaya/mime-rs, pinned by git revision until its first release), replacing mail-parser and mail-builder: `message read`, `message parse`, `attachment list|download`, the search evaluator, the Maildir, m2dir and mbox envelopes and the composers. On well-formed mail the part ids and the `--json` views stay as they were. The `text` of a `format=flowed` part, and the quote of a reply to one, is now unwrapped (RFC 3676). The plain `message read` view shows the same part types, sizes and names as the JSON view.
 - Changed the composed messages to mime-rs's layout: the same headers and parts, a `Date` and `Message-ID` written by Himalaya, charset names lowercased (`utf-8''` in an RFC 2231 file name).
 - Changed UTF-7 (RFC 2152) text to be shown as written: mime-rs reads the WHATWG charsets, which leave UTF-7 out.

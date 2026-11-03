@@ -33,7 +33,7 @@ use io_imap::{
         envelope::Address as ImapAddress,
         extensions::sort::{SortCriterion, SortKey},
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-        flag::{Flag as ImapFlag, FlagFetch, FlagNameAttribute, StoreType},
+        flag::{Flag as ImapFlag, FlagFetch, FlagNameAttribute, FlagPerm, StoreType},
         mailbox::{ListMailbox, Mailbox as ImapMailbox},
         search::SearchKey,
         sequence::SequenceSet,
@@ -45,11 +45,12 @@ use mime::header::marker::MESSAGE_ID;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 
 use crate::{
+    capability,
     email::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         search::{
             error::unsupported,
             filter::query::SearchEmailsFilterQuery,
@@ -215,7 +216,14 @@ impl ImapClient {
             FlagOp::Remove => StoreType::Remove,
         };
 
-        self.select(mbox, ImapMailboxSelectOptions::default())?;
+        let selected = self.select(mbox, ImapMailboxSelectOptions::default())?;
+
+        // NOTE: a server sending no PERMANENTFLAGS lets every flag be
+        // changed permanently (RFC 3501 section 7.1).
+        if let Some(permanent) = &selected.permanent_flags {
+            refuse_impermanent(mailbox, flags, permanent)?;
+        }
+
         let echoes = self.store(
             sequence_set.clone(),
             kind,
@@ -404,6 +412,60 @@ impl ImapClient {
         }
 
         Ok(moved)
+    }
+
+    /// Creates `name` at the top, or under `parent` joined by the
+    /// delimiter its `LIST` row reports, returning the new mailbox's id,
+    /// its full name.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        let path = match parent {
+            None => name.to_string(),
+            Some(parent) => {
+                let Some(delimiter) = self.delimiter(parent)? else {
+                    bail!("IMAP mailbox `{parent}` holds no other: the server keeps no hierarchy");
+                };
+                child_path(parent, delimiter, name)
+            }
+        };
+
+        self.create(parse_mailbox(&path)?)?;
+        Ok(path)
+    }
+
+    /// Renames the last level of `mailbox` to `name`, its parent kept,
+    /// returning the mailbox's new id, its full name.
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
+        let path = match self.delimiter(mailbox)? {
+            Some(delimiter) => renamed_path(mailbox, delimiter, name),
+            None => name.to_string(),
+        };
+
+        self.rename(parse_mailbox(mailbox)?, parse_mailbox(&path)?)?;
+        Ok(path)
+    }
+
+    /// Deletes `mailbox` and the messages it holds (RFC 3501 section
+    /// 6.3.4).
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
+        self.delete(parse_mailbox(mailbox)?)?;
+        Ok(())
+    }
+
+    /// The hierarchy delimiter of `mailbox` as its `LIST` row reports it,
+    /// `None` for a server keeping a flat namespace.
+    fn delimiter(&mut self, mailbox: &str) -> Result<Option<char>> {
+        let reference: ImapMailbox<'static> = ""
+            .try_into()
+            .map_err(|_| anyhow!("Invalid IMAP list reference"))?;
+        let pattern: ListMailbox<'static> = String::from(mailbox)
+            .try_into()
+            .map_err(|_| anyhow!("Invalid IMAP mailbox `{mailbox}`"))?;
+
+        let Some((_, delimiter, _)) = self.list(reference, pattern)?.into_iter().next() else {
+            bail!("IMAP mailbox `{mailbox}` not found");
+        };
+
+        Ok(delimiter.map(|delimiter| delimiter.inner()))
     }
 
     /// Permanently deletes a UID set from the trash, returning whether
@@ -687,6 +749,41 @@ fn flag_from(flag: &Flag) -> ImapFlag<'static> {
     }
 }
 
+/// Refuses a keyword the mailbox would keep for the session only, its
+/// `PERMANENTFLAGS` listing neither it nor `\*` (RFC 3501 section 7.1), so
+/// a flag never seems set and then vanishes. The system flags are left
+/// to the server.
+fn refuse_impermanent(mailbox: &str, flags: &[Flag], permanent: &[FlagPerm<'_>]) -> Result<()> {
+    if permanent.contains(&FlagPerm::Asterisk) {
+        return Ok(());
+    }
+
+    for flag in flags {
+        let ImapFlag::Keyword(keyword) = flag_from(flag) else {
+            continue;
+        };
+
+        let kept = permanent.iter().any(|perm| match perm {
+            FlagPerm::Flag(ImapFlag::Keyword(other)) => {
+                other.as_ref().eq_ignore_ascii_case(keyword.as_ref())
+            }
+            _ => false,
+        });
+
+        if !kept {
+            let name = match flag.capability() {
+                Some(capability) => format!("`{capability}` (`{keyword}`)"),
+                None => format!("`{keyword}`"),
+            };
+            return Err(capability::missing(format!(
+                "Mailbox `{mailbox}` cannot keep {name}: its PERMANENTFLAGS list neither it nor `\\*`"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 /// Replaces every non-atom-safe byte with `_`, so a keyword carrying
 /// spaces, controls or brackets survives a `STORE`.
 fn sanitise_atom(raw: &str) -> String {
@@ -946,8 +1043,36 @@ mod tests {
     use chrono::NaiveDate;
     use pimalaya_cli::error::code_of;
 
-    use super::{SearchKey, convert_filter, parse_rfc2822_date};
-    use crate::{email::search::filter::query::SearchEmailsFilterQuery, error::ErrorCode};
+    use io_imap::types::{
+        core::Atom,
+        flag::{Flag as ImapFlag, FlagPerm},
+    };
+
+    use super::{SearchKey, convert_filter, parse_rfc2822_date, refuse_impermanent};
+    use crate::{
+        email::{
+            flag::{Flag, IanaFlag},
+            search::filter::query::SearchEmailsFilterQuery,
+        },
+        error::ErrorCode,
+    };
+
+    #[test]
+    fn a_keyword_the_mailbox_keeps_for_the_session_only_is_refused() {
+        let junk = [Flag::from_iana(IanaFlag::Junk)];
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+        let listed = FlagPerm::Flag(ImapFlag::keyword(Atom::try_from("$junk").unwrap()));
+
+        let refused = refuse_impermanent("INBOX", &junk, &[FlagPerm::Flag(ImapFlag::Seen)]);
+        assert_eq!(
+            code_of::<ErrorCode>(&refused.unwrap_err()),
+            Some(ErrorCode::CapabilityMissing)
+        );
+
+        assert!(refuse_impermanent("INBOX", &junk, &[listed]).is_ok());
+        assert!(refuse_impermanent("INBOX", &junk, &[FlagPerm::Asterisk]).is_ok());
+        assert!(refuse_impermanent("INBOX", &seen, &[]).is_ok());
+    }
 
     #[test]
     fn copies_addresses_and_before_become_search_keys() {

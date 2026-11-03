@@ -585,7 +585,7 @@ impl fmt::Display for MessageView {
 }
 
 /// Replaces unsafe body characters while retaining its text layout.
-fn sanitize_body(text: &str) -> String {
+pub fn sanitize_body(text: &str) -> String {
     text.replace("\r\n", "\n")
         .chars()
         .map(|c| {

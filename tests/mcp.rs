@@ -148,12 +148,17 @@ fn write_and_send_tools_under_their_flags() {
 
     assert!(tool(&responses[0], "flag_add").is_some());
     assert!(tool(&responses[0], "message_send").is_none());
+    assert!(tool(&responses[0], "mailbox_create").is_some());
+    assert!(tool(&responses[0], "mailbox_delete").is_some());
 
     let responses = serve(&config, &["--allow-send"], &[list(1)]);
     let compose = tool(&responses[0], "message_compose").unwrap();
 
     assert!(tool(&responses[0], "message_send").is_some());
     assert!(tool(&responses[0], "flag_add").is_none());
+    // NOTE: a Maildir keeps no auto-reply, so neither tool is listed.
+    assert!(tool(&responses[0], "vacation_set").is_none());
+    assert!(tool(&responses[0], "vacation_get").is_none());
     assert!(compose["inputSchema"]["properties"].get("send").is_some());
     assert!(compose["inputSchema"]["properties"].get("save").is_none());
 }

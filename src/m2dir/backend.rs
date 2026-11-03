@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use io_m2dir::{entry::M2dirEntry, flag::M2dirFlags, m2dir::M2dir};
 
 use crate::{
@@ -183,6 +183,27 @@ impl M2dirClient {
         }
 
         Ok(ids.len())
+    }
+
+    /// Creates the folder `name`, the store initialised first when it does
+    /// not exist yet, returning its id, its path on disk.
+    ///
+    /// m2dir folders are flat, so a parent is refused rather than dropped.
+    pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
+        if let Some(parent) = parent {
+            bail!("Cannot create `{name}` under `{parent}`: m2dir folders are flat");
+        }
+
+        self.init_store()?;
+        let m2dir = self.create_m2dir(name)?;
+        Ok(m2dir.path().as_str().to_string())
+    }
+
+    /// Deletes the folder `mailbox` and every message in it.
+    pub fn delete_mailbox(&self, mailbox: &str) -> Result<()> {
+        let m2dir = self.resolve_m2dir(mailbox)?;
+        self.delete_m2dir(m2dir.path().clone())?;
+        Ok(())
     }
 
     /// Permanently deletes `ids` from `mailbox` by unlinking their files.

@@ -1,7 +1,7 @@
 //! # Email
 //!
-//! The cross-protocol email domain types, the least-common-denominator
-//! shapes the shared subcommands render.
+//! The cross-protocol email domain types, the shapes the shared
+//! subcommands render.
 //!
 //! They were inlined from the retired io-email crate, the CLI owning its
 //! shared types and a per-backend dispatching client instead. The adapters
@@ -14,3 +14,5 @@ pub mod mailbox;
 pub mod search;
 #[cfg(any(feature = "smtp", feature = "pimdir"))]
 pub mod submission;
+#[cfg(any(backend, feature = "smtp"))]
+pub mod vacation;

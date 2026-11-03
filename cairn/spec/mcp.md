@@ -28,7 +28,7 @@ A tool's `inputSchema` SHALL be generated from its clap command, each property n
 A successful call SHALL return the command's JSON value as `structuredContent` and as text, described as `outputSchema` by its registered schema when that schema's root is an object and the tool has one output shape. A refused or failed call SHALL return `isError: true` with the `himalaya-error` object; an unknown tool SHALL be a JSON-RPC error.
 
 ### Requirement: Writing and sending are opt-in
-Without flags the server SHALL list reading tools only, without the arguments that write. `--allow-write` SHALL add the tools and arguments that change the store, and `--allow-send` those that send mail.
+Without flags the server SHALL list reading tools only, without the arguments that write. `--allow-write` SHALL add the tools and arguments that change the store, `mailbox_create`, `mailbox_rename` and `mailbox_delete` among them, and `--allow-send` those that send mail, `vacation_set` among them, an auto-reply once on answering mail.
 
 ### Requirement: A tool reads and writes no local file
 No tool SHALL take a local path: `attachment download` and `message parse` SHALL NOT be exposed, path arguments SHALL NOT be properties, and a message argument SHALL be taken as the message itself even when it spells an existing path.

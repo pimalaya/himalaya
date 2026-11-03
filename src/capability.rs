@@ -37,6 +37,12 @@ use Support::{Full, None as Not, Partial, Server};
 pub enum Capability {
     /// Listing the mailboxes.
     MailboxList,
+    /// Creating a mailbox, at the top or under another.
+    MailboxCreate,
+    /// Renaming a mailbox, its parent kept.
+    MailboxRename,
+    /// Deleting a mailbox and the messages it holds.
+    MailboxDelete,
     /// Listing a mailbox's envelopes.
     EnvelopeList,
     /// Searching a mailbox with the shared query.
@@ -65,10 +71,16 @@ pub enum Capability {
     FlagsFlagged,
     /// Adding and removing `\Draft`.
     FlagsDraft,
+    /// Adding and removing `$Important` (RFC 8457).
+    FlagsImportant,
+    /// Adding and removing `$Junk`.
+    FlagsJunk,
     /// Sending a message.
     Submit,
     /// Filing a copy of a sent message.
     SubmitCopy,
+    /// Reading and setting the auto-reply.
+    Vacation,
 }
 
 /// A clause or sort key of the shared search query, an option of
@@ -124,6 +136,9 @@ impl Capability {
         match self {
             Self::Search(option) => format!("envelope.search.{}", option.word()),
             Self::MailboxList => "mailbox.list".into(),
+            Self::MailboxCreate => "mailbox.create".into(),
+            Self::MailboxRename => "mailbox.rename".into(),
+            Self::MailboxDelete => "mailbox.delete".into(),
             Self::EnvelopeList => "envelope.list".into(),
             Self::EnvelopeSearch => "envelope.search".into(),
             Self::MessageRead => "message.read".into(),
@@ -137,8 +152,11 @@ impl Capability {
             Self::FlagsAnswered => "flags.answered".into(),
             Self::FlagsFlagged => "flags.flagged".into(),
             Self::FlagsDraft => "flags.draft".into(),
+            Self::FlagsImportant => "flags.important".into(),
+            Self::FlagsJunk => "flags.junk".into(),
             Self::Submit => "submit".into(),
             Self::SubmitCopy => "submit.copy".into(),
+            Self::Vacation => "vacation".into(),
         }
     }
 
@@ -146,6 +164,13 @@ impl Capability {
     /// backend.
     fn sends(self) -> bool {
         matches!(self, Self::Submit | Self::SubmitCopy)
+    }
+
+    /// Whether it is a feature of the account rather than of a message,
+    /// which the first configured backend serving it answers, whatever the
+    /// storage backend.
+    fn is_account_feature(self) -> bool {
+        matches!(self, Self::Vacation)
     }
 }
 
@@ -206,7 +231,7 @@ pub fn declared(backend: Backend) -> &'static [Row] {
         Backend::Gmail => GMAIL,
         Backend::Msgraph => MSGRAPH,
         Backend::Maildir => MAILDIR,
-        Backend::M2dir => MAILDIR,
+        Backend::M2dir => M2DIR,
         Backend::Mbox => MBOX,
         Backend::Pimdir => PIMDIR,
         Backend::Smtp => SMTP,
@@ -263,6 +288,10 @@ pub struct Resolution {
     /// The sending transport: the storage backend when it sends, else
     /// SMTP when configured and allowed.
     pub sender: Option<Backend>,
+    /// The backend answering the account's features: the first of
+    /// [`STORAGE_ORDER`] configured and allowed that serves them, else the
+    /// storage backend, whose refusal then says what serves them instead.
+    pub features: Option<Backend>,
 }
 
 impl Resolution {
@@ -282,11 +311,25 @@ impl Resolution {
             _ => None,
         };
 
+        // NOTE: an account syncing a local store from its provider keeps
+        // its auto-reply on the provider, which the storage order would
+        // never reach.
+        let features = STORAGE_ORDER
+            .iter()
+            .copied()
+            .find(|backend| {
+                allows(filter, *backend)
+                    && configures(config, *backend)
+                    && support(*backend, Capability::Vacation).is_served()
+            })
+            .or(storage);
+
         Self {
             account: account.to_string(),
             filter,
             storage,
             sender,
+            features,
         }
     }
 
@@ -295,6 +338,8 @@ impl Resolution {
     pub fn transport(&self, capability: Capability) -> Option<Backend> {
         if capability.sends() {
             self.sender
+        } else if capability.is_account_feature() {
+            self.features
         } else {
             self.storage
         }
@@ -343,6 +388,8 @@ impl Resolution {
         let account = &self.account;
         let kind = if capability.sends() {
             "sending backend (JMAP, Gmail, Graph, pimdir or SMTP)"
+        } else if capability.is_account_feature() {
+            "backend serving it"
         } else {
             "storage backend"
         };
@@ -419,6 +466,15 @@ const TRASH_ALIAS: &str = "needs `mailbox.alias.trash`, the backend marking no t
 /// What a page-local sort leaves out.
 const PAGE_SORT: &str = "orders the fetched page only, the server answering in its own order";
 
+/// What a keyword flag needs on IMAP.
+const KEYWORD_PERMANENT: &str = "a keyword, kept only when the mailbox's `PERMANENTFLAGS` lists it or `\\*` (RFC 3501 section 7.1)";
+
+/// What a keyword flag is in a local store.
+const LOCAL_KEYWORD: &str = "a keyword, kept in the dovecot-keywords file or the configured header, which other readers may not see";
+
+/// Why a mail store holds no auto-reply.
+const NO_VACATION: &str = "the auto-reply lives on the provider; configure its JMAP or Gmail block";
+
 /// The shared verbs every storage backend serves the same way.
 macro_rules! storage_rows {
     ($($row:expr),* $(,)?) => {
@@ -444,6 +500,17 @@ macro_rules! storage_rows {
 /// IMAP (RFC 3501).
 const IMAP: &[Row] = storage_rows![
     (C::EnvelopeSearch, Full),
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (C::MailboxDelete, Full),
+    (C::FlagsImportant, Server(KEYWORD_PERMANENT)),
+    (C::FlagsJunk, Server(KEYWORD_PERMANENT)),
+    (
+        C::Vacation,
+        Not(
+            "IMAP holds no auto-reply; `himalaya sieve` writes a vacation script (RFC 5230), which has no date window"
+        )
+    ),
     (C::MessageAdd, Full),
     (C::MessageCopy, Full),
     (
@@ -472,6 +539,20 @@ const IMAP: &[Row] = storage_rows![
 
 /// JMAP (RFC 8620, RFC 8621).
 const JMAP: &[Row] = storage_rows![
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (
+        C::MailboxDelete,
+        Partial(
+            "a message also in another mailbox stays there, JMAP holding one message in several"
+        )
+    ),
+    (C::FlagsImportant, Full),
+    (C::FlagsJunk, Full),
+    (
+        C::Vacation,
+        Server("needs `urn:ietf:params:jmap:vacationresponse` in the session (RFC 8621 section 8)")
+    ),
     (
         C::EnvelopeSearch,
         Partial(
@@ -506,6 +587,18 @@ const JMAP_DATE: &str = "under `or` or `not`, compared with the received date ra
 
 /// Gmail.
 const GMAIL: &[Row] = storage_rows![
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (
+        C::MailboxDelete,
+        Partial("the label goes, its messages staying under their other labels or in All Mail")
+    ),
+    (C::FlagsImportant, Full),
+    (
+        C::FlagsJunk,
+        Partial("the `SPAM` label, which moves the message to Spam")
+    ),
+    (C::Vacation, Full),
     (
         C::EnvelopeSearch,
         Partial("text matches by words, as the Gmail search box does")
@@ -550,6 +643,27 @@ const GMAIL_DATE: &str = "compared with the received date, in UTC days, rather t
 /// Microsoft Graph.
 const MSGRAPH: &[Row] = storage_rows![
     (
+        C::MailboxCreate,
+        Partial("under `--parent`, created at the top then moved under it, two requests")
+    ),
+    (C::MailboxRename, Full),
+    (
+        C::MailboxDelete,
+        Partial("the folders it holds are deleted with it")
+    ),
+    (
+        C::FlagsImportant,
+        Partial("`importance: high`, the sender's priority rather than the reader's mark")
+    ),
+    (
+        C::FlagsJunk,
+        Not("Graph has no junk mark; `message move` to the Junk Email folder")
+    ),
+    (
+        C::Vacation,
+        Not("Graph keeps it in `mailboxSettings`, which io-msgraph does not cover yet")
+    ),
+    (
         C::EnvelopeSearch,
         Partial("text matches by KQL words, and results come in relevance order")
     ),
@@ -579,35 +693,82 @@ const MSGRAPH: &[Row] = storage_rows![
     (C::SubmitCopy, Full),
 ];
 
-/// The local backends evaluating the query themselves: Maildir and
-/// m2dir.
-const MAILDIR: &[Row] = storage_rows![
-    (C::EnvelopeSearch, Full),
-    (C::MessageAdd, Full),
-    (C::MessageCopy, Full),
-    (C::MessageRemove, Full),
-    (C::MessageTrash, Partial(TRASH_ALIAS)),
-    (C::FlagsAnswered, Full),
-    (C::FlagsDraft, Full),
-    (C::Search(O::Date), Full),
-    (C::Search(O::After), Full),
-    (C::Search(O::Before), Full),
-    (C::Search(O::Body), Full),
-    (C::Search(O::Flag), Full),
-    (C::Search(O::Attachment), Full),
-    (C::Search(O::SortDate), Full),
-    (C::Search(O::SortFrom), Full),
-    (C::Search(O::SortTo), Full),
-    (C::Search(O::SortSubject), Full),
+/// The shared verbs the local backends serve alike, evaluating the query
+/// themselves.
+macro_rules! local_rows {
+    ($($row:expr),* $(,)?) => {
+        storage_rows![
+            (C::EnvelopeSearch, Full),
+            (C::MessageAdd, Full),
+            (C::MessageCopy, Full),
+            (C::MessageRemove, Full),
+            (C::MessageTrash, Partial(TRASH_ALIAS)),
+            (C::FlagsAnswered, Full),
+            (C::FlagsDraft, Full),
+            (C::Search(O::Date), Full),
+            (C::Search(O::After), Full),
+            (C::Search(O::Before), Full),
+            (C::Search(O::Body), Full),
+            (C::Search(O::Flag), Full),
+            (C::Search(O::Attachment), Full),
+            (C::Search(O::SortDate), Full),
+            (C::Search(O::SortFrom), Full),
+            (C::Search(O::SortTo), Full),
+            (C::Search(O::SortSubject), Full),
+            $($row),*
+        ]
+    };
+}
+
+/// Maildir.
+const MAILDIR: &[Row] = local_rows![
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (C::MailboxDelete, Full),
+    (C::FlagsImportant, Partial(LOCAL_KEYWORD)),
+    (C::FlagsJunk, Partial(LOCAL_KEYWORD)),
+    (C::Vacation, Not(NO_VACATION)),
+];
+
+/// m2dir, whose flags are lines of their own, keywords included.
+const M2DIR: &[Row] = local_rows![
+    (
+        C::MailboxCreate,
+        Partial("m2dir folders are flat, so a `--parent` is refused")
+    ),
+    (C::MailboxRename, Not("m2dir has no rename yet")),
+    (C::MailboxDelete, Full),
+    (C::FlagsImportant, Full),
+    (C::FlagsJunk, Full),
+    (C::Vacation, Not(NO_VACATION)),
 ];
 
 /// mbox.
-const MBOX: &[Row] = MAILDIR;
+const MBOX: &[Row] = local_rows![
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (C::MailboxDelete, Full),
+    (
+        C::FlagsImportant,
+        Partial("a keyword in `X-Keywords`, which other readers may not see")
+    ),
+    (
+        C::FlagsJunk,
+        Partial("a keyword in `X-Keywords`, which other readers may not see")
+    ),
+    (C::Vacation, Not(NO_VACATION)),
+];
 
 /// pimdir: the store answers reads locally and
 /// queues writes for its sync engine, which refuses a write no source
 /// performs with pimdir's own codes (`unsupported`, `no-performer`).
 const PIMDIR: &[Row] = storage_rows![
+    (C::MailboxCreate, Full),
+    (C::MailboxRename, Full),
+    (C::MailboxDelete, Full),
+    (C::FlagsImportant, Full),
+    (C::FlagsJunk, Full),
+    (C::Vacation, Not(NO_VACATION)),
     (C::EnvelopeSearch, Full),
     (C::MessageAdd, Full),
     (C::MessageCopy, Full),
@@ -670,6 +831,8 @@ const FLAGS: &[Capability] = &[
     C::FlagsAnswered,
     C::FlagsFlagged,
     C::FlagsDraft,
+    C::FlagsImportant,
+    C::FlagsJunk,
 ];
 
 /// `envelope search` and the options of its query.
@@ -696,6 +859,9 @@ const SEARCH: &[Capability] = &[
 /// Every shared leaf reaching a transport.
 pub const LEAVES: &[Leaf] = &[
     Leaf::new("mailbox", "list", &[C::MailboxList]),
+    Leaf::new("mailbox", "create", &[C::MailboxCreate]),
+    Leaf::new("mailbox", "rename", &[C::MailboxRename]),
+    Leaf::new("mailbox", "delete", &[C::MailboxDelete]),
     Leaf::new("envelope", "list", &[C::EnvelopeList]),
     Leaf::new("envelope", "search", SEARCH),
     Leaf::new("flag", "add", FLAGS),
@@ -716,6 +882,8 @@ pub const LEAVES: &[Leaf] = &[
     Leaf::new("message", "forward", &[C::MessageRead]),
     Leaf::new("attachment", "list", &[C::AttachmentList]),
     Leaf::new("attachment", "download", &[C::AttachmentList]),
+    Leaf::new("vacation", "get", &[C::Vacation]),
+    Leaf::new("vacation", "set", &[C::Vacation]),
 ];
 
 impl Leaf {
@@ -873,6 +1041,23 @@ mod resolution_tests {
         let pinned = Resolution::of("a", &config, Backend::Imap);
         assert_eq!(pinned.transport(C::MessageRead), Some(Backend::Imap));
         assert_eq!(pinned.transport(C::EnvelopeList), Some(Backend::Imap));
+    }
+
+    #[test]
+    fn the_auto_reply_resolves_to_the_backend_keeping_it() {
+        // NOTE: a Maildir synced from JMAP stores the mail, JMAP keeps the
+        // auto-reply.
+        let config = account(&format!("{MAILDIR_BLOCK}{JMAP_BLOCK}"));
+        let resolution = Resolution::of("a", &config, Backend::Auto);
+        assert_eq!(resolution.storage, Some(Backend::Maildir));
+        assert_eq!(resolution.transport(C::Vacation), Some(Backend::Jmap));
+
+        // NOTE: no backend keeps one, so the storage backend refuses it,
+        // naming what does.
+        let imap = Resolution::of("a", &account(IMAP_BLOCK), Backend::Auto);
+        assert_eq!(imap.transport(C::Vacation), Some(Backend::Imap));
+        let refused = imap.require(&[C::Vacation]).unwrap_err().to_string();
+        assert!(refused.contains("himalaya sieve"), "{refused}");
     }
 
     #[test]

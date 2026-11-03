@@ -25,3 +25,5 @@ pub mod output;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 pub mod raw;
 pub mod table;
+#[cfg(any(backend, feature = "smtp"))]
+pub mod vacation;

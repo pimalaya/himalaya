@@ -29,7 +29,12 @@ use io_jmap::{
             set::{JmapEmailSubmissionCreate, JmapEmailSubmissionSetArgs},
         },
         identity::get::JmapIdentityGetOptions,
-        mailbox::{JmapMailbox, JmapMailboxRole, get::JmapMailboxGetOptions},
+        mailbox::{
+            JmapMailbox, JmapMailboxRole,
+            get::JmapMailboxGetOptions,
+            set::{JmapMailboxCreate, JmapMailboxSetArgs, JmapMailboxUpdate},
+        },
+        vacation_response::{JMAP_VACATION_RESPONSE_CAPABILITY, set::JmapVacationResponseUpdate},
     },
 };
 use url::Url;
@@ -46,8 +51,9 @@ use crate::{
             query::SearchEmailsQuery,
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
         },
+        vacation::{Vacation, VacationPatch, format_date, normalize_date},
     },
-    jmap::client::JmapClient,
+    jmap::{client::JmapClient, error::format_set_error},
 };
 
 impl JmapClient {
@@ -304,6 +310,147 @@ impl JmapClient {
             let ids: Vec<String> = output.not_destroyed.into_keys().collect();
             bail!("JMAP Email/set destroy failed for: {}", ids.join(", "));
         }
+        Ok(())
+    }
+
+    /// Creates `name` at the top or under `parent` (`Mailbox/set`
+    /// create), returning the new mailbox's id.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        let mailbox = JmapMailboxCreate {
+            name: Some(name.to_string()),
+            parent_id: parent.map(ToString::to_string),
+            ..Default::default()
+        };
+
+        let args = JmapMailboxSetArgs {
+            create: Some(BTreeMap::from([(String::from(CREATED), mailbox)])),
+            ..Default::default()
+        };
+
+        let mut output = self.mailbox_set(args)?;
+        self.forget_mailboxes();
+
+        if let Some(err) = output.not_created.get(CREATED) {
+            bail!(
+                "Create JMAP mailbox `{name}` error{}",
+                format_set_error(err)
+            );
+        }
+
+        output
+            .created
+            .remove(CREATED)
+            .and_then(|mailbox| mailbox.id)
+            .ok_or_else(|| anyhow!("JMAP server created mailbox `{name}` without naming its id"))
+    }
+
+    /// Renames `mailbox` to `name`, its parent kept (`Mailbox/set`
+    /// update), returning its id, which a rename leaves as it is.
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
+        let patch = JmapMailboxUpdate {
+            name: Some(name.to_string()),
+            ..Default::default()
+        };
+
+        let args = JmapMailboxSetArgs {
+            update: Some(BTreeMap::from([(mailbox.to_string(), patch)])),
+            ..Default::default()
+        };
+
+        let output = self.mailbox_set(args)?;
+        self.forget_mailboxes();
+
+        if let Some(err) = output.not_updated.get(mailbox) {
+            bail!(
+                "Rename JMAP mailbox `{mailbox}` error{}",
+                format_set_error(err)
+            );
+        }
+
+        Ok(mailbox.to_string())
+    }
+
+    /// Deletes `mailbox` with the messages it holds (`Mailbox/set` destroy
+    /// with `onDestroyRemoveEmails`), a message also in another mailbox
+    /// staying there (RFC 8621 section 2.5).
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
+        let args = JmapMailboxSetArgs {
+            destroy: Some(vec![mailbox.to_string()]),
+            on_destroy_remove_emails: Some(true),
+            ..Default::default()
+        };
+
+        let output = self.mailbox_set(args)?;
+        self.forget_mailboxes();
+
+        if let Some(err) = output.not_destroyed.get(mailbox) {
+            bail!(
+                "Delete JMAP mailbox `{mailbox}` error{}",
+                format_set_error(err)
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Reads the auto-reply (`VacationResponse/get`), the default one
+    /// when the server holds none.
+    ///
+    /// A server whose session lacks `urn:ietf:params:jmap:vacationresponse`
+    /// (RFC 8621 section 8) is refused under `capability-missing`: the
+    /// dynamic tier of `vacation`.
+    pub fn get_vacation(&mut self) -> Result<Vacation> {
+        self.require_vacation()?;
+
+        let Some(vacation) = self.vacation_response_get()? else {
+            return Ok(Vacation::default());
+        };
+
+        Ok(Vacation {
+            enabled: vacation.is_enabled,
+            from: vacation.from_date.map(normalize_date),
+            to: vacation.to_date.map(normalize_date),
+            subject: vacation.subject,
+            text: vacation.text_body,
+            html: vacation.html_body,
+        })
+    }
+
+    /// Changes what `patch` names of the auto-reply
+    /// (`VacationResponse/set`), returning it as it then stands.
+    pub fn set_vacation(&mut self, patch: VacationPatch) -> Result<Vacation> {
+        self.require_vacation()?;
+
+        let update = JmapVacationResponseUpdate {
+            is_enabled: patch.enabled,
+            from_date: patch.from.map(format_date),
+            to_date: patch.to.map(format_date),
+            subject: patch.subject,
+            text_body: patch.text,
+            html_body: patch.html,
+        };
+
+        // NOTE: the server echoes only what changed, so the whole response
+        // is read again.
+        self.vacation_response_set(update)?;
+        self.get_vacation()
+    }
+
+    /// Refuses the auto-reply on a server not advertising it.
+    fn require_vacation(&mut self) -> Result<()> {
+        let served = self.session().is_some_and(|session| {
+            session
+                .capabilities
+                .contains_key(JMAP_VACATION_RESPONSE_CAPABILITY)
+        });
+
+        if !served {
+            return Err(capability::missing(
+                "Cannot `vacation` over jmap: the server does not advertise \
+                 `urn:ietf:params:jmap:vacationresponse`",
+            ));
+        }
+
         Ok(())
     }
 
@@ -850,6 +997,10 @@ fn utc_midnight(date: NaiveDate) -> String {
         date.day()
     )
 }
+
+/// The creation id of a mailbox `Mailbox/set` creates, which its answer
+/// is keyed by.
+const CREATED: &str = "new";
 
 #[cfg(test)]
 mod tests {

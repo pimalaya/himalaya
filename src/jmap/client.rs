@@ -65,6 +65,12 @@ impl JmapClient {
         self.mailbox_index()?.with_role(role)
     }
 
+    /// Drops the cached mailboxes, so the next lookup sees a mailbox
+    /// created, renamed or deleted since.
+    pub fn forget_mailboxes(&mut self) {
+        self.mailbox_index = None;
+    }
+
     fn mailbox_index(&mut self) -> Result<&MailboxIndex> {
         if self.mailbox_index.is_none() {
             let mailboxes = self.list_mailboxes(false)?;

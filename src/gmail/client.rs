@@ -59,6 +59,12 @@ impl GmailClient {
         self.label_index()?.with_role(role)
     }
 
+    /// Drops the cached labels, so the next lookup sees a label created,
+    /// renamed or deleted since.
+    pub fn forget_mailboxes(&mut self) {
+        self.label_index = None;
+    }
+
     fn label_index(&mut self) -> Result<&MailboxIndex> {
         if self.label_index.is_none() {
             let labels = self.list_mailboxes(false)?;

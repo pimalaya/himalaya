@@ -6,7 +6,7 @@ status: current
 
 # Commands
 
-The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment) is the cross-protocol surface: the union of what the backends serve, held coherent by one meaning per verb, a backend that cannot give a verb's result declaring it unserved rather than giving another. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, repl, mcp, completion, manual, json-schema) cover account configuration, a session running many commands (cairn/spec/repl.md), an MCP server (cairn/spec/mcp.md), shell completions, man pages and JSON Schemas.
+The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment, vacation) is the cross-protocol surface: the union of what the backends serve, held coherent by one meaning per verb, a backend that cannot give a verb's result declaring it unserved rather than giving another. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, repl, mcp, completion, manual, json-schema) cover account configuration, a session running many commands (cairn/spec/repl.md), an MCP server (cairn/spec/mcp.md), shell completions, man pages and JSON Schemas.
 
 ### Requirement: Shared commands over a resolved transport
 The shared commands SHALL run over an `EmailClient` owning one backend-client variant per compiled-in backend, each verb resolved to a configured transport. The verbs exchanging ids resolve to the storage backend: the first configured one the global `--backend` flag allows, local before network (Maildir, m2dir, mbox, pimdir, JMAP, Gmail, Graph, IMAP). Sending resolves to the storage backend when it sends (JMAP, Gmail, Graph, pimdir), else to the SMTP transport, which SHALL connect for each send and close after it. `--backend` SHALL filter the resolution. Each shared method matches the resolved backend and calls its per-protocol adapter.
@@ -22,10 +22,18 @@ A shared command SHALL be checked against the capabilities its arguments reach (
 - THEN it fails with `capability-missing` naming `flags.answered`, before the token command runs, where it used to report the message flagged and change nothing
 
 ### Requirement: A server-decided capability is refused once connected
-A capability declared `server` SHALL be checked by the adapter once connected, before any write. A JMAP send whose session lacks `urn:ietf:params:jmap:submission` (RFC 8621 section 7) SHALL fail with `capability-missing` before the upload, leaving no draft. An IMAP removal without UIDPLUS SHALL flag the messages `\Deleted` and say so.
+A capability declared `server` SHALL be checked by the adapter once connected, before any write. A JMAP send whose session lacks `urn:ietf:params:jmap:submission` (RFC 8621 section 7) SHALL fail with `capability-missing` before the upload, leaving no draft. An IMAP removal without UIDPLUS SHALL flag the messages `\Deleted` and say so. A JMAP `vacation` whose session lacks `urn:ietf:params:jmap:vacationresponse` SHALL fail with `capability-missing`, and an IMAP keyword the mailbox would not keep SHALL be refused as "An IMAP keyword is kept or refused" says.
 
 ### Requirement: Verbs exchanging ids share one transport
-The shared verbs that take or return message, envelope or mailbox ids (mailbox, envelope, message, flag, attachment) SHALL resolve to the same storage transport for a given account and `--backend`, so an id one of them returns is valid in the others. A verb exchanging no such id, sending, SHALL resolve on its own.
+The shared verbs that take or return message, envelope or mailbox ids (mailbox, envelope, message, flag, attachment) SHALL resolve to the same storage transport for a given account and `--backend`, so an id one of them returns is valid in the others. A verb exchanging no such id, sending or the auto-reply, SHALL resolve on its own.
+
+### Requirement: An account feature resolves on its own
+A capability of the account rather than of a message, the auto-reply, SHALL resolve to the first backend of the storage order the account configures and `--backend` allows that serves it, else to the storage backend, whose refusal names what serves it instead.
+
+#### Scenario: A Maildir synced from JMAP
+- GIVEN an account configuring a Maildir and a JMAP block
+- WHEN `vacation get` runs
+- THEN it reads JMAP's auto-reply, where `envelope list` reads the Maildir
 
 ### Requirement: The shared command tree is the same in every build
 The shared command tree SHALL be compiled in every build carrying a mail transport (any storage backend, or SMTP alone), whichever backends it compiles, dispatch alone being gated; a verb no compiled backend serves parses and fails with `capability-missing`. The shared commands' `json-schema` output and the error code vocabulary SHALL be identical across such builds. Each shared leaf's `--help` SHALL end with a `Backends:` footer generated from the tables, listing per capability it reaches the backends at each level and the details. A protocol namespace exists with its feature.
@@ -206,7 +214,7 @@ Attachment downloads SHALL atomically create a new file, refusing to follow an e
 - THEN the command exits 0 and prints `{"flags":["flagged"],"count":1}`
 
 ### Requirement: A queued write says it is queued
-On a backend that queues its writes for a sync engine to apply later (pimdir), the confirmation of a shared write SHALL say the write is queued rather than done: `message send`, `message add`, a composer's save or send, `message delete`, `message move`, `message copy` and `flag add|set|remove`. The JSON shapes SHALL NOT change, and no queue detail SHALL reach a shared output; the prose of a `message` confirmation carries the wording. Every other backend SHALL keep confirming the write as done.
+On a backend that queues its writes for a sync engine to apply later (pimdir), the confirmation of a shared write SHALL say the write is queued rather than done: `message send`, `message add`, a composer's save or send, `message delete`, `message move`, `message copy`, `flag add|set|remove` and `mailbox create|rename|delete`. The JSON shapes SHALL NOT change, beyond a mailbox write's `id` being `null`, and no queue detail SHALL reach a shared output; the prose of a `message` confirmation carries the wording. Every other backend SHALL keep confirming the write as done.
 
 #### Scenario: A send on a pimdir account
 - GIVEN a pimdir account with `mailbox.alias.sent` set
@@ -217,3 +225,17 @@ On a backend that queues its writes for a sync engine to apply later (pimdir), t
 - GIVEN a pimdir account with a trash mailbox
 - WHEN `message delete 3` runs on another mailbox
 - THEN it prints `Queued the move of 1 message(s) to the trash`
+
+### Requirement: Shared mailbox writes
+`mailbox create <NAME> [--parent <MAILBOX>]` SHALL create a mailbox named NAME, one level of the hierarchy, at the top of the account or under the parent; `mailbox rename <MAILBOX> <NAME>` SHALL replace the last level of the mailbox's name with NAME, its parent and messages kept; `mailbox delete <MAILBOX>` SHALL delete the mailbox and the messages it holds, the mailbox named with no default. Mailboxes are given by name, alias, role or id. A backend naming the hierarchy by path SHALL join the levels with its own delimiter: the one IMAP's `LIST` reports, `/` on Gmail and the local stores. The outputs SHALL be `{id, name}` for create and rename, `id` being the mailbox's id afterwards (a rename changes it where the name is the id) and `null` when the write is queued, and `{id}` for delete. A write SHALL drop the mailbox index a backend caches, so a later command of the session resolves the new name.
+
+#### Scenario: A Maildir mailbox under a parent
+- GIVEN a Maildir account holding `Archive`
+- WHEN `mailbox create 2025 --parent Archive`, then `mailbox rename Archive/2025 2026`, then `mailbox delete Archive/2026` run
+- THEN `Archive/2025` is created, renamed to `Archive/2026`, then removed
+
+### Requirement: The important and junk flags are shared
+The shared flag arguments SHALL include `important` (`$Important`, RFC 8457) and `junk` (`$Junk`), each its capability, `flags.important` and `flags.junk`.
+
+### Requirement: The auto-reply is shared
+`vacation get` SHALL print the account's auto-reply as `{enabled, from, to, subject, text, html}`, the dates RFC 3339 in UTC, and the default one, off with nothing set, when the backend holds none. `vacation set` SHALL change only what it is given (`--enable` or `--disable`, `--from`, `--to` as RFC 3339 or a `YYYY-MM-DD` read as midnight UTC, `--subject`, `--text`, `--html`) and print the auto-reply as it then stands. JMAP serves it when its session advertises `urn:ietf:params:jmap:vacationresponse` (RFC 8621 section 8), Gmail through `settings.getVacation` and `updateVacation`, its dates epoch milliseconds, the settings read first so the Gmail-only ones survive.

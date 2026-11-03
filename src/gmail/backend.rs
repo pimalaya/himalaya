@@ -3,9 +3,8 @@
 //! The Gmail adapter of the shared cross-protocol client, glue over the
 //! io-gmail client [`GmailClient`] wraps.
 //!
-//! Gmail is label-based, so a label is a mailbox and a handful of system
-//! labels back the shared flags. There is no `add_message`, Gmail having
-//! no append.
+//! Gmail is label-based, so a label is a mailbox, nested by its name, and
+//! a handful of system labels back the shared flags.
 
 use std::collections::BTreeSet;
 
@@ -17,6 +16,7 @@ use io_gmail::v1::rest::{
         GmailInternalDateSource, GmailMessage, GmailMessageFormat, decode_raw, encode_raw,
         insert::GmailMessageInsert, list::GmailMessagesListParams,
     },
+    settings::{get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate},
 };
 
 use crate::{
@@ -24,8 +24,9 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         search::query::SearchEmailsQuery,
+        vacation::{Vacation, VacationPatch, date_from_millis},
     },
     gmail::{client::GmailClient, search},
 };
@@ -278,6 +279,99 @@ impl GmailClient {
             self.message_delete(id)?;
         }
         Ok(())
+    }
+
+    /// Creates the label `name` at the top, or under `parent` as
+    /// `<parent>/<name>`, Gmail nesting labels by name, returning its id.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        let name = match parent {
+            Some(parent) => {
+                let parent = self.label_get(parent)?.response.name;
+                child_path(&parent, '/', name)
+            }
+            None => name.to_string(),
+        };
+
+        let label = GmailLabel {
+            name,
+            ..Default::default()
+        };
+
+        let label = self.label_create(&label)?.response;
+        self.forget_mailboxes();
+        Ok(label.id)
+    }
+
+    /// Renames the last level of the label `mailbox` to `name`, its parent
+    /// kept (`labels.patch`, so its colour and visibility survive),
+    /// returning its id, which a rename leaves as it is.
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
+        let current = self.label_get(mailbox)?.response.name;
+
+        let label = GmailLabel {
+            id: mailbox.to_string(),
+            name: renamed_path(&current, '/', name),
+            ..Default::default()
+        };
+
+        self.label_patch(&label)?;
+        self.forget_mailboxes();
+        Ok(mailbox.to_string())
+    }
+
+    /// Deletes the label `mailbox` (`labels.delete`), its messages staying
+    /// under their other labels or in All Mail.
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
+        self.label_delete(mailbox)?;
+        self.forget_mailboxes();
+        Ok(())
+    }
+
+    /// Reads the auto-reply (`settings.getVacation`), its window in UTC.
+    pub fn get_vacation(&mut self) -> Result<Vacation> {
+        let get = GmailVacationGet::new(&self.auth, &self.user_id)?;
+        let settings = self.run(get)?.response;
+
+        Ok(Vacation {
+            enabled: settings.enable_auto_reply,
+            from: settings.start_time.map(date_from_millis),
+            to: settings.end_time.map(date_from_millis),
+            subject: settings.response_subject,
+            text: settings.response_body_plain_text,
+            html: settings.response_body_html,
+        })
+    }
+
+    /// Changes what `patch` names of the auto-reply, the settings read
+    /// first so the rest survives `settings.updateVacation`, a
+    /// replacement, and returns it as it then stands.
+    pub fn set_vacation(&mut self, patch: VacationPatch) -> Result<Vacation> {
+        let get = GmailVacationGet::new(&self.auth, &self.user_id)?;
+        let mut settings = self.run(get)?.response;
+
+        if let Some(enabled) = patch.enabled {
+            settings.enable_auto_reply = enabled;
+        }
+        if let Some(from) = patch.from {
+            settings.start_time = Some(from.timestamp_millis().to_string());
+        }
+        if let Some(to) = patch.to {
+            settings.end_time = Some(to.timestamp_millis().to_string());
+        }
+        if let Some(subject) = patch.subject {
+            settings.response_subject = Some(subject);
+        }
+        if let Some(text) = patch.text {
+            settings.response_body_plain_text = Some(text);
+        }
+        if let Some(html) = patch.html {
+            settings.response_body_html = Some(html);
+        }
+
+        let update = GmailVacationUpdate::new(&self.auth, &self.user_id, settings)?;
+        self.run(update)?;
+
+        self.get_vacation()
     }
 
     /// Sends a raw RFC 5322 message via `messages.send` (Gmail both

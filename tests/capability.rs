@@ -135,3 +135,33 @@ fn a_backend_filter_narrows_the_resolution() {
         "`--backend smtp`",
     );
 }
+
+#[test]
+fn graph_refuses_a_junk_mark_it_does_not_have() {
+    refused(
+        MSGRAPH,
+        &["flag", "add", "m1", "--flag", "junk"],
+        "capability-missing",
+        "flags.junk",
+    );
+}
+
+#[test]
+fn imap_refuses_the_auto_reply_and_names_sieve() {
+    refused(
+        IMAP,
+        &["vacation", "get"],
+        "capability-missing",
+        "himalaya sieve",
+    );
+}
+
+#[test]
+fn a_send_only_account_refuses_a_mailbox_creation() {
+    refused(
+        SMTP,
+        &["mailbox", "create", "Archive"],
+        "capability-missing",
+        "mailbox.create",
+    );
+}

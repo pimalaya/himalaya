@@ -9,13 +9,16 @@ status: current
 Each backend is a `<Proto>Client` wrapper that derefs onto the io-* `*Std` client, paired with a `src/<proto>/backend.rs` adapter implementing the shared operations over the client's high-level methods and converting io-* results into the CLI's own `email` shared types (`Address`, `Envelope`, `Flag`, `Mailbox`, and the search query). The CLI owns these types; no aggregator library sits between it and the io-* crates.
 
 ### Requirement: Shared operation set
-The shared adapters SHALL cover, per backend: `list_mailboxes`, `list_envelopes`, `search_envelopes`, `store_flags`, `get_message`, `add_message`, `copy_messages`, `move_messages`, and `send_message`. A backend that cannot model an operation opts out of it rather than emulating it, declaring the capability `none` in its table (cairn/spec/commands.md), so the resolver refuses it before connecting.
+The shared adapters SHALL cover, per backend: `list_mailboxes`, `create_mailbox`, `rename_mailbox`, `delete_mailbox`, `list_envelopes`, `search_envelopes`, `store_flags`, `get_message`, `add_message`, `copy_messages`, `move_messages`, and `send_message`, and JMAP and Gmail `get_vacation` and `set_vacation`. A backend that cannot model an operation opts out of it rather than emulating it, declaring the capability `none` in its table (cairn/spec/commands.md), so the resolver refuses it before connecting.
 
 ### Requirement: A copy on JMAP and Gmail is one message in two mailboxes
 `message copy` on JMAP (a mailbox added to `mailboxIds`) and Gmail (a label added) SHALL keep one message in both mailboxes, sharing flags and deletion, where IMAP, Graph and the local backends make an independent copy; both declare `message.copy` `partial` with that detail. `jmap email copy` (`Email/copy`, across accounts) stays protocol-specific.
 
 ### Requirement: Gmail and Graph declare no answered or draft flag
 Gmail and Graph SHALL declare `flags.answered` and `flags.draft` `none`: Gmail has no label for `\Answered` and refuses `DRAFT` from a client, Graph has no answered field and its `isDraft` is read-only. A shared flag command naming either SHALL be refused before any request, never reported done.
+
+### Requirement: An IMAP keyword is kept or refused
+An IMAP flag write SHALL refuse, under `capability-missing` and before the `STORE`, a keyword the selected mailbox's `PERMANENTFLAGS` lists neither by name, compared ignoring ASCII case, nor by `\*` (RFC 3501 section 7.1). A server sending no `PERMANENTFLAGS` SHALL be taken to keep every flag. The system flags are left to the server.
 
 ### Requirement: Shared outputs carry no backend details
 The output of a shared command SHALL NOT carry a field that only one backend fills. A backend detail worth showing SHALL be logged by that backend's adapter or shown by its own namespace.

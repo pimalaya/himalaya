@@ -19,10 +19,10 @@ use crate::{
     email::{
         envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::Mailbox,
+        mailbox::{Mailbox, child_path, renamed_path},
         search::{eval, query::SearchEmailsQuery},
     },
-    maildir::client::MaildirClient,
+    maildir::client::{MaildirClient, validate_maildir_name},
 };
 
 impl MaildirClient {
@@ -160,6 +160,42 @@ impl MaildirClient {
         }
 
         Ok(ids.len())
+    }
+
+    /// Creates the Maildir `name` at the top of the store, or under
+    /// `parent`, returning its id, its path on disk.
+    pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
+        let path = match parent {
+            Some(parent) => {
+                let parent = self.resolve_maildir(Path::new(parent))?;
+                child_path(&self.mailbox_name(&parent), '/', name)
+            }
+            None => name.to_string(),
+        };
+
+        validate_maildir_name(Path::new(&path))?;
+        self.create_maildir(path.clone())?;
+
+        Ok(self.resolve_maildir(Path::new(&path))?.path().to_string())
+    }
+
+    /// Renames the last level of the Maildir `mailbox` to `name`, its
+    /// parent kept, returning its new id.
+    pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<String> {
+        let from = self.mailbox_name(&self.resolve_maildir(Path::new(mailbox))?);
+        let to = renamed_path(&from, '/', name);
+
+        validate_maildir_name(Path::new(&to))?;
+        self.rename_maildir(from, to.clone())?;
+
+        Ok(self.resolve_maildir(Path::new(&to))?.path().to_string())
+    }
+
+    /// Deletes the Maildir `mailbox` and every message in it.
+    pub fn delete_mailbox(&self, mailbox: &str) -> Result<()> {
+        let name = self.mailbox_name(&self.resolve_maildir(Path::new(mailbox))?);
+        self.delete_maildir(name)?;
+        Ok(())
     }
 
     /// Permanently deletes `ids` from `mailbox` by unlinking their files.

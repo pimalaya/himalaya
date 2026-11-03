@@ -111,6 +111,33 @@ impl MailboxIndex {
     }
 }
 
+/// The path of a mailbox named `name` under `parent`, for the backends
+/// naming the hierarchy by path (IMAP, Gmail, the local stores).
+#[cfg(any(
+    feature = "imap",
+    feature = "gmail",
+    feature = "maildir",
+    feature = "mbox"
+))]
+pub fn child_path(parent: &str, delimiter: char, name: &str) -> String {
+    format!("{parent}{delimiter}{name}")
+}
+
+/// The path `mailbox` takes once its last level is renamed `name`, its
+/// parent kept.
+#[cfg(any(
+    feature = "imap",
+    feature = "gmail",
+    feature = "maildir",
+    feature = "mbox"
+))]
+pub fn renamed_path(mailbox: &str, delimiter: char, name: &str) -> String {
+    match mailbox.rsplit_once(delimiter) {
+        Some((parent, _)) => child_path(parent, delimiter, name),
+        None => name.to_string(),
+    }
+}
+
 /// Special-use role of a mailbox.
 ///
 /// Mirrors the IANA IMAP Mailbox Name Attributes registry, shared by the
@@ -208,6 +235,20 @@ impl<'de> Deserialize<'de> for MailboxRole {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(
+        feature = "imap",
+        feature = "gmail",
+        feature = "maildir",
+        feature = "mbox"
+    ))]
+    #[test]
+    fn a_renamed_path_keeps_its_parent() {
+        assert_eq!(child_path("Archive", '.', "2026"), "Archive.2026");
+        assert_eq!(renamed_path("Archive/2025", '/', "2026"), "Archive/2026");
+        assert_eq!(renamed_path("A/B/Old", '/', "New"), "A/B/New");
+        assert_eq!(renamed_path("Top", '/', "Renamed"), "Renamed");
+    }
 
     #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
     fn index() -> MailboxIndex {

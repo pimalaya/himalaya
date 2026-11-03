@@ -39,10 +39,12 @@ use crate::mbox::{cli::MboxCommand, client::build_mbox_client};
 use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
 #[cfg(feature = "pimdir")]
 use crate::pimdir::{cli::PimdirCommand, client::build_pimdir_client};
+#[cfg(any(feature = "jmap", feature = "gmail"))]
+use crate::shared::vacation::cli::VacationClient;
 #[cfg(any(backend, feature = "smtp"))]
 use crate::shared::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
-    mailbox::cli::MailboxCommand,
+    mailbox::cli::MailboxCommand, vacation::cli::VacationCommand,
 };
 // NOTE: `EmailClient` and the `message` command host the send path, so
 // they exist for any backend rather than for storage ones alone.
@@ -66,7 +68,7 @@ use crate::{
 #[cfg(any(backend, feature = "smtp"))]
 use crate::{
     account::context::Account,
-    capability::{Capability, Resolution},
+    capability::{self, Capability, Resolution},
 };
 
 /// Top-level command-line interface parser.
@@ -129,6 +131,9 @@ pub enum Command {
     #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "attachments")]
     Attachment(AttachmentCommand),
+    #[cfg(any(backend, feature = "smtp"))]
+    #[command(subcommand)]
+    Vacation(VacationCommand),
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
@@ -326,6 +331,52 @@ fn run_shared<P: Printer>(
     account.run(printer, &mut session.email, build, command)
 }
 
+/// Runs a `vacation` command over the client of the backend keeping the
+/// auto-reply: the first configured one `--backend` allows that serves it,
+/// whatever backend stores the mail.
+///
+/// The account is read to resolve it, nothing connecting, so a refusal
+/// costs no connection; the client is the session's protocol one, kept
+/// for the commands after it.
+#[cfg(any(backend, feature = "smtp"))]
+#[cfg_attr(not(any(feature = "jmap", feature = "gmail")), allow(unused_variables))]
+fn run_vacation<P: Printer>(
+    printer: &mut P,
+    session: &mut Session,
+    command: VacationCommand,
+) -> Result<()> {
+    let account = session.account;
+    let (_, name, account_config) = resolve_account(printer, account.config_paths, account.name)?;
+    let resolution = Resolution::of(&name, &account_config, account.backend);
+    resolution.require(&[Capability::Vacation])?;
+
+    match resolution.transport(Capability::Vacation) {
+        #[cfg(feature = "jmap")]
+        Some(Backend::Jmap) => account.run(
+            printer,
+            &mut session.jmap,
+            build_jmap_client,
+            |printer, account, client| {
+                command.execute(printer, account, VacationClient::Jmap(client))
+            },
+        ),
+        #[cfg(feature = "gmail")]
+        Some(Backend::Gmail) => account.run(
+            printer,
+            &mut session.gmail,
+            build_gmail_client,
+            |printer, account, client| {
+                command.execute(printer, account, VacationClient::Gmail(client))
+            },
+        ),
+        // NOTE: the resolver let through a backend serving it, every one of
+        // which has its arm above.
+        _ => Err(capability::missing(format!(
+            "Account `{name}` cannot `vacation`: this build keeps no client for it"
+        ))),
+    }
+}
+
 impl Command {
     /// Runs the subcommand over the session's client for it, built on
     /// first use against the account `-a` names, or the default one.
@@ -337,7 +388,7 @@ impl Command {
             Self::Mailbox(cmd) => run_shared(
                 printer,
                 session,
-                vec![Capability::MailboxList],
+                cmd.capabilities(),
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
@@ -372,6 +423,8 @@ impl Command {
                 vec![Capability::AttachmentList],
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
+            #[cfg(any(backend, feature = "smtp"))]
+            Self::Vacation(cmd) => run_vacation(printer, session, cmd),
 
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => account.run(

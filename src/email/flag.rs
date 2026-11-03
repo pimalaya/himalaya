@@ -73,6 +73,8 @@ impl Flag {
             IanaFlag::Answered => Some(Capability::FlagsAnswered),
             IanaFlag::Flagged => Some(Capability::FlagsFlagged),
             IanaFlag::Draft => Some(Capability::FlagsDraft),
+            IanaFlag::Important => Some(Capability::FlagsImportant),
+            IanaFlag::Junk => Some(Capability::FlagsJunk),
             _ => None,
         }
     }

@@ -16,6 +16,7 @@ v3 changes no configuration key: a v2 configuration loads as it is. What changes
 - **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the shared API; `--help` ends with the table. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
 - **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
+- **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
 
 ### Search results that change
 
@@ -25,6 +26,8 @@ v3 changes no configuration key: a v2 configuration loads as it is. What changes
 ### New
 
 - `himalaya repl` runs commands over connections kept for the session, and `himalaya mcp` serves the shared API to MCP clients, read-only unless `--allow-write` or `--allow-send` is given.
+- Shared verbs that used to be protocol-only: `mailbox create|rename|delete`, the `important` and `junk` flags, and `vacation get|set`, which reads the auto-reply from JMAP or Gmail whatever backend stores the mail. `himalaya jmap`, `gmail` and the other namespaces keep their own commands.
+
 ## From v1 to v2
 
 ### v1 issues

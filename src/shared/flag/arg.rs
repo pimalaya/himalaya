@@ -9,9 +9,9 @@ use clap::{Parser, ValueEnum};
 
 /// A flag a shared command accepts.
 ///
-/// Strictly least-common-denominator: `\Deleted`, the Maildir letters and
-/// the JMAP custom keywords are reached through the protocol-specific
-/// commands instead.
+/// The flags with one meaning across the backends declaring them, each a
+/// capability of its own: `\Deleted`, the Maildir letters and the custom
+/// keywords are reached through the protocol-specific commands instead.
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FlagArg {
@@ -23,6 +23,10 @@ pub enum FlagArg {
     Flagged,
     /// The message is an unsent draft.
     Draft,
+    /// The message is marked important to its reader (RFC 8457).
+    Important,
+    /// The message is junk, spam.
+    Junk,
 }
 
 impl fmt::Display for FlagArg {
@@ -32,6 +36,8 @@ impl fmt::Display for FlagArg {
             Self::Answered => "answered",
             Self::Flagged => "flagged",
             Self::Draft => "draft",
+            Self::Important => "important",
+            Self::Junk => "junk",
         };
         f.write_str(name)
     }
@@ -47,6 +53,8 @@ impl From<&FlagArg> for io_maildir::flag::MaildirFlag {
             FlagArg::Answered => MaildirFlag::Replied,
             FlagArg::Flagged => MaildirFlag::Flagged,
             FlagArg::Draft => MaildirFlag::Draft,
+            FlagArg::Important => MaildirFlag::Keyword("$Important".into()),
+            FlagArg::Junk => MaildirFlag::Keyword("$Junk".into()),
         }
     }
 }
@@ -60,6 +68,8 @@ impl From<&FlagArg> for crate::email::flag::Flag {
             FlagArg::Answered => IanaFlag::Answered,
             FlagArg::Flagged => IanaFlag::Flagged,
             FlagArg::Draft => IanaFlag::Draft,
+            FlagArg::Important => IanaFlag::Important,
+            FlagArg::Junk => IanaFlag::Junk,
         };
 
         Flag::from_iana(iana)

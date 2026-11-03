@@ -41,6 +41,9 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 /// names) and `attachment download` (writes files on disk) are left out.
 const TOOLS: &[McpTool] = &[
     McpTool::read("mailbox", "list"),
+    McpTool::write("mailbox", "create", false),
+    McpTool::write("mailbox", "rename", true),
+    McpTool::write("mailbox", "delete", true),
     McpTool::read("envelope", "list"),
     McpTool::read("envelope", "search"),
     McpTool::write("flag", "add", false),
@@ -60,6 +63,10 @@ const TOOLS: &[McpTool] = &[
     McpTool::read("message", "reply").untyped(),
     McpTool::read("message", "forward").untyped(),
     McpTool::read("attachment", "list"),
+    McpTool::read("vacation", "get"),
+    // NOTE: an auto-reply once on answers incoming mail, so setting it
+    // is sending, listed under `--allow-send` alone.
+    McpTool::send("vacation", "set"),
 ];
 
 /// The arguments turning a tool into one that changes the store, listed
@@ -84,14 +91,15 @@ static PATHS_CLOSED: AtomicBool = AtomicBool::new(false);
 pub struct McpCommand {
     /// List the tools that change the store too.
     ///
-    /// Adds the flag, add, copy, move and delete tools, and the `save`
-    /// argument of the composers and of `message_send`.
+    /// Adds the mailbox create, rename and delete tools, the flag, add,
+    /// copy, move and delete tools, and the `save` argument of the
+    /// composers and of `message_send`.
     #[arg(long)]
     pub allow_write: bool,
     /// List the tools that send mail too.
     ///
-    /// Adds `message_send` and the `send` argument of the composers and
-    /// of `message_add`. An agent reading mail can be told by a message
+    /// Adds `message_send`, `vacation_set`, an auto-reply answering mail,
+    /// and the `send` argument of the composers and of `message_add`. An agent reading mail can be told by a message
     /// to send mail, so sending is never on by default.
     #[arg(long)]
     pub allow_send: bool,
@@ -694,7 +702,14 @@ mod tests {
     const EXCLUDED: &[(&str, &str)] = &[("message", "parse"), ("attachment", "download")];
 
     /// The command groups of the shared API.
-    const GROUPS: &[&str] = &["mailbox", "envelope", "flag", "message", "attachment"];
+    const GROUPS: &[&str] = &[
+        "mailbox",
+        "envelope",
+        "flag",
+        "message",
+        "attachment",
+        "vacation",
+    ];
 
     #[test]
     fn every_shared_leaf_is_classified() {

@@ -24,6 +24,7 @@ use io_mbox::{
     },
     flag::{MboxFlag, MboxFlags},
     index::MboxIndex,
+    mbox::{create::MboxCreate, delete::MboxDelete, rename::MboxRename},
     path::MboxFsPath,
     store::INBOX,
 };
@@ -32,10 +33,13 @@ use crate::{
     email::{
         envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         search::{eval, query::SearchEmailsQuery},
     },
-    mbox::{cache::MboxCache, client::MboxClient},
+    mbox::{
+        cache::MboxCache,
+        client::{MboxClient, validate_mbox_name},
+    },
 };
 
 impl MboxClient {
@@ -300,6 +304,45 @@ impl MboxClient {
         }
 
         self.update(&path, edits, index, &mut cache)
+    }
+
+    /// Creates the mbox `name` at the top of the store, or under `parent`,
+    /// returning its id, its name.
+    pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
+        let name = match parent {
+            Some(parent) => child_path(parent, '/', name),
+            None => name.to_string(),
+        };
+
+        validate_mbox_name(&name)?;
+        self.run(MboxCreate::new(self.resolve_mbox(&name)))?;
+        Ok(name)
+    }
+
+    /// Renames the last level of the mbox `mailbox` to `name`, its parent
+    /// kept, returning its new id. The target must not exist.
+    pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<String> {
+        let to = renamed_path(mailbox, '/', name);
+
+        validate_mbox_name(mailbox)?;
+        validate_mbox_name(&to)?;
+        self.run(MboxRename::new(
+            self.resolve_mbox(mailbox),
+            self.resolve_mbox(&to),
+        ))?;
+
+        Ok(to)
+    }
+
+    /// Deletes the mbox `mailbox` and every message in it, under lock so
+    /// no delivery lands in it meanwhile.
+    pub fn delete_mailbox(&self, mailbox: &str) -> Result<()> {
+        validate_mbox_name(mailbox)?;
+        self.run(MboxDelete::new(
+            self.resolve_mbox(mailbox),
+            self.lock.clone(),
+        ))?;
+        Ok(())
     }
 
     /// The mailbox marked with `role`: the spool is the inbox, when one is

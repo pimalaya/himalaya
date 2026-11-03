@@ -62,6 +62,12 @@ impl MsgraphClient {
         self.folder_index()?.with_role(role)
     }
 
+    /// Drops the cached folders, so the next lookup sees a folder created,
+    /// renamed or deleted since.
+    pub fn forget_mailboxes(&mut self) {
+        self.folder_index = None;
+    }
+
     fn folder_index(&mut self) -> Result<&MailboxIndex> {
         if self.folder_index.is_none() {
             let folders = self.list_mailboxes(false)?;

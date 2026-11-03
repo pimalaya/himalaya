@@ -42,6 +42,18 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::shared::mailbox::list::MailboxListOutput
         );
         insert!(
+            "himalaya-mailbox-create",
+            crate::shared::mailbox::create::MailboxCreateOutput
+        );
+        insert!(
+            "himalaya-mailbox-rename",
+            crate::shared::mailbox::rename::MailboxRenameOutput
+        );
+        insert!(
+            "himalaya-mailbox-delete",
+            crate::shared::mailbox::delete::MailboxDeleteOutput
+        );
+        insert!(
             "himalaya-envelope-list",
             crate::shared::envelope::list::EnvelopeListOutput
         );
@@ -102,6 +114,14 @@ pub fn registry() -> JsonSchemaRegistry {
         insert!(
             "himalaya-attachment-download",
             crate::shared::attachment::download::AttachmentDownloadOutput
+        );
+        insert!(
+            "himalaya-vacation-get",
+            crate::shared::vacation::get::VacationGetOutput
+        );
+        insert!(
+            "himalaya-vacation-set",
+            crate::shared::vacation::set::VacationSetOutput
         );
     }
 

@@ -157,6 +157,113 @@ impl EmailClient {
         }
     }
 
+    /// Creates the mailbox `name` at the top, or under `parent`,
+    /// returning its id, `None` when the backend queues the creation.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<Option<String>> {
+        self.require(&[Capability::MailboxCreate])?;
+
+        let parent = match parent {
+            Some(parent) => Some(self.resolve_mailbox_id(parent)?),
+            None => None,
+        };
+        let parent = parent.as_deref();
+
+        match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "m2dir")]
+            BackendClient::M2dir(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "mbox")]
+            BackendClient::Mbox(client) => client.create_mailbox(name, parent).map(Some),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.create_mailbox(name, parent).map(|_| None),
+            #[cfg(not(backend))]
+            _ => bail!("No storage backend is configured for this account"),
+        }
+    }
+
+    /// Renames the last level of `mailbox` to `name`, its parent kept,
+    /// returning the id it has afterwards, `None` when the backend queues
+    /// the rename.
+    #[cfg_attr(
+        not(any(
+            feature = "imap",
+            feature = "jmap",
+            feature = "gmail",
+            feature = "msgraph",
+            feature = "maildir",
+            feature = "mbox",
+            feature = "pimdir"
+        )),
+        allow(unused_variables)
+    )]
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<Option<String>> {
+        self.require(&[Capability::MailboxRename])?;
+
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
+        match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "m2dir")]
+            BackendClient::M2dir(_) => bail!("m2dir has no rename yet"),
+            #[cfg(feature = "mbox")]
+            BackendClient::Mbox(client) => client.rename_mailbox(mailbox, name).map(Some),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.rename_mailbox(mailbox, name).map(|_| None),
+            #[cfg(not(backend))]
+            _ => bail!("No storage backend is configured for this account"),
+        }
+    }
+
+    /// Deletes `mailbox` and the messages it holds, returning its id.
+    #[cfg_attr(not(backend), allow(unreachable_code))]
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<String> {
+        self.require(&[Capability::MailboxDelete])?;
+
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "m2dir")]
+            BackendClient::M2dir(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "mbox")]
+            BackendClient::Mbox(client) => client.delete_mailbox(&mailbox)?,
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => {
+                client.delete_mailbox(&mailbox)?;
+            }
+            #[cfg(not(backend))]
+            _ => bail!("No storage backend is configured for this account"),
+        }
+
+        Ok(mailbox)
+    }
+
     /// Lists envelopes from `mailbox`.
     pub fn list_envelopes(
         &mut self,

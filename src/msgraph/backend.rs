@@ -248,6 +248,57 @@ impl MsgraphClient {
         Ok(())
     }
 
+    /// Creates the folder `name` at the top, or under `parent`, returning
+    /// its id.
+    ///
+    /// io-msgraph creates top-level folders only, so a folder under a
+    /// parent is created at the top then moved under it, two requests: a
+    /// failed move leaves it at the top, which the error says.
+    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        let folder = MsgraphMailFolder {
+            display_name: name.to_string(),
+            ..Default::default()
+        };
+
+        let created = self.mail_folder_create(&folder)?.response;
+        self.forget_mailboxes();
+
+        let Some(parent) = parent else {
+            return Ok(created.id);
+        };
+
+        let moved = self
+            .mail_folder_move(&created.id, parent)
+            .with_context(|| {
+                format!("Folder `{name}` created at the top, not moved under `{parent}`")
+            })?
+            .response;
+
+        Ok(moved.id)
+    }
+
+    /// Renames the folder `mailbox` to `name`, its parent kept (`PATCH
+    /// /mailFolders/{id}`), returning its id, which a rename leaves as it
+    /// is.
+    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
+        let folder = MsgraphMailFolder {
+            display_name: name.to_string(),
+            ..Default::default()
+        };
+
+        self.mail_folder_update(mailbox, &folder)?;
+        self.forget_mailboxes();
+        Ok(mailbox.to_string())
+    }
+
+    /// Deletes the folder `mailbox` with the messages and the folders it
+    /// holds (`DELETE /mailFolders/{id}`).
+    pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
+        self.mail_folder_delete(mailbox)?;
+        self.forget_mailboxes();
+        Ok(())
+    }
+
     /// Sends a raw RFC 5322 message via `POST /sendMail` (MIME form);
     /// Graph saves it to Sent Items.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
