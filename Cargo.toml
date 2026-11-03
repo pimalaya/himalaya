@@ -55,7 +55,7 @@ dirs = "7"
 gethostname = "1"
 humansize = "2"
 io-gmail = { version = "0.5", default-features = false, optional = true }
-io-imap = { version = "0.7.1", default-features = false, optional = true }
+io-imap = { version = "0.8", default-features = false, optional = true }
 io-jmap = { version = "0.6", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
@@ -91,7 +91,6 @@ uds_windows = "1"
 [patch.crates-io]
 ical-rs = { git = "https://github.com/pimalaya/ical", rev = "99b92736a6a076c72936fac29c9b85a5168e4c2f" }
 io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
-io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "2f17d6a2d898fa0bca91da35af9cb8023dc8f150" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "908db2ba74e40cccb89281e797d1807dbf0b7d9b" }

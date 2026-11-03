@@ -1163,12 +1163,12 @@ dependencies = [
 
 [[package]]
 name = "imap-codec"
-version = "2.0.0-alpha.9"
+version = "2.0.0-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d97d123085ef99031a01544307235eb189ecf23df66e37c41a046e3d6614b9f"
+checksum = "46448c53bb742528ca2ad03786bb11fe0327433ebeb978f208e6b9303513558c"
 dependencies = [
  "abnf-core",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "imap-types",
  "log",
@@ -1177,11 +1177,11 @@ dependencies = [
 
 [[package]]
 name = "imap-types"
-version = "2.0.0-alpha.7"
+version = "2.0.0-alpha.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15aa08dfdb68ab0aa77bf3de6de5217bfcae4893f33573c8625be183fca621c8"
+checksum = "e481cf9ab998eeea7b4c6b0b638ca21751402340fbaa3932fca5576b4b95a819"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "bounded-static",
  "bounded-static-derive",
  "chrono",
@@ -1249,8 +1249,9 @@ dependencies = [
 
 [[package]]
 name = "io-imap"
-version = "0.7.1"
-source = "git+https://github.com/pimalaya/io-imap?rev=2f17d6a2d898fa0bca91da35af9cb8023dc8f150#2f17d6a2d898fa0bca91da35af9cb8023dc8f150"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dda12297289e689f40fc2dd288dfb6be078bac9ded42cc2a9e854e0d8e84e2b"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -1258,7 +1259,6 @@ dependencies = [
  "imap-codec",
  "io-sasl",
  "log",
- "nom",
  "pimalaya-stream",
  "secrecy",
  "thiserror",
