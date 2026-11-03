@@ -18,10 +18,17 @@ A bare authority SHALL resolve to `sieve://`, where the `imap` and `smtp` blocks
 A mechanism disclosing a reusable credential SHALL be refused over a cleartext connection unless `sieve.allow-cleartext-auth` is set, which is the configuration RFC 5804 section 5 asks for.
 
 ### Requirement: Config loading and merge
-The config SHALL load from the first existing canonical path (`$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, `$HOME/.himalayarc`), overridable with `-c/--config`. Multiple `-c` paths MAY be passed, delimited like `$PATH` (`;` on Windows, `:` elsewhere) or repeated as flags: the first is the base and the rest are deep-merged on top.
+Without `-c/--config`, the config SHALL load every existing canonical path as a layer, in this order: `$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, `$HOME/.himalayarc`. Each layer SHALL be deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides. Paths naming the same file SHALL be read once.
+
+`-c/--config` SHALL replace the canonical paths entirely. Multiple `-c` paths MAY be passed, delimited like `$PATH` (`;` on Windows, `:` elsewhere) or repeated as flags: the first is the base and the rest are deep-merged on top.
 
 ### Requirement: Missing account is an error
 When the config exists but lacks the requested account, the command SHALL fail with a hard error, not fall back to the wizard. The wizard is proposed only when no config is found at all.
+
+### Requirement: One default account
+Resolving the default account SHALL fail, naming them, when several accounts are marked `default = true` once the configuration is loaded, layers and `-c` files merged. An account named with `-a` SHALL still resolve.
+
+The wizard SHALL check the name and the default of the account it generates against the merged configuration, not only against the file it appends to.
 
 ### Requirement: Account identity
 An account MAY declare the address it sends as, `email`, and the name that address carries, `display-name`. `display-name` MAY also be declared at the top level, where it applies to every account that does not override it. Neither is required, and neither is validated as an addr-spec: an account that never composes has no use for them.

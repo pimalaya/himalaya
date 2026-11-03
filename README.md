@@ -172,15 +172,17 @@ Run `himalaya`. With no configuration file on disk, the wizard asks for an email
 
 Picking one prompts the authentication it advertises, tests the connection, then writes the account to disk.
 
-A persistent configuration is loaded from the first valid path among:
+A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
 - `$XDG_CONFIG_HOME/himalaya/config.toml`
 - `$HOME/.config/himalaya/config.toml`
 - `$HOME/.himalayarc`
 
+At most one account may be marked `default = true` across them: an rc file moving the default sets `default = false` on the account the other file marks.
+
 These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
 
-Override the path with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
+Override those paths with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
 
 To add or reconfigure an account, run the bare `himalaya` wizard again and redirect its printed TOML into (or merge it with) your config file. There is no in-place edit subcommand; `himalaya account list` and `himalaya account check` inspect and validate the accounts already declared.
 

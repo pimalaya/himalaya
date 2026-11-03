@@ -8,26 +8,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve",
-    feature = "wizard"
-))]
-use anyhow::Result;
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve"
-))]
-use anyhow::bail;
-use anyhow::{Error, anyhow};
+use anyhow::{Error, Result, anyhow, bail};
 use clap::ValueEnum;
 use crossterm::style::Color;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
@@ -206,6 +187,43 @@ impl TomlConfig for Config {
             .find_map(|(name, account)| account.default.then(|| name.clone()))?;
 
         self.take_named_account(&name)
+    }
+
+    /// Takes the account as the trait does, refusing first to pick the
+    /// default among several.
+    ///
+    /// `accounts` is a `HashMap`, so which of several defaults
+    /// [`take_default_account`] finds first changes from run to run. The
+    /// config layers make the case easy to reach, an rc file marking one
+    /// account the default while the platform file marks another.
+    ///
+    /// [`take_default_account`]: TomlConfig::take_default_account
+    fn take_account(&mut self, name: Option<&str>) -> Result<Option<(String, Self::Account)>> {
+        match name {
+            Some("default") | Some("") | None => {
+                let mut defaults: Vec<&str> = self
+                    .accounts
+                    .iter()
+                    .filter(|(_, account)| account.default)
+                    .map(|(name, _)| name.as_str())
+                    .collect();
+
+                if defaults.len() > 1 {
+                    defaults.sort_unstable();
+                    bail!(
+                        "Several accounts are marked default ({}), keep `default = true` \
+                         on one, or name one with `-a <NAME>`",
+                        defaults.join(", "),
+                    );
+                }
+
+                Ok(self.take_default_account())
+            }
+            Some(name) => match self.take_named_account(name) {
+                None => bail!("Get account `{name}` error"),
+                account => Ok(account),
+            },
+        }
     }
 }
 
@@ -1550,6 +1568,27 @@ mod tests {
         feature = "sieve"
     ))]
     const IMAP: &[&str] = &["imap", "imaps"];
+
+    /// Run after run the map order changes, so the error has to come
+    /// whichever default the iteration would have met first.
+    #[test]
+    fn several_defaults_are_refused_unless_an_account_is_named() {
+        let toml = "[accounts.work]\ndefault = true\n\
+                    [accounts.perso]\ndefault = true\n\
+                    [accounts.spare]\n";
+
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let err = config.take_account(None).unwrap_err().to_string();
+        assert!(err.contains("(perso, work)"), "{err}");
+
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let err = config.take_account(Some("default")).unwrap_err();
+        assert!(err.to_string().starts_with("Several accounts"), "{err}");
+
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let (name, _) = config.take_account(Some("spare")).unwrap().unwrap();
+        assert_eq!(name, "spare");
+    }
 
     #[test]
     fn maildir_root_alone_keeps_keywords_off() {

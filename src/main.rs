@@ -79,8 +79,9 @@
 //!
 //! ## Configuration and output
 //!
-//! Config is loaded by pimalaya-config from the first existing canonical
-//! path, or the `-c` override, later paths deep-merged on top. The schema
+//! Config is loaded by pimalaya-config from every existing canonical path
+//! (the rc file last), or the `-c` override, later paths deep-merged on
+//! top. The schema
 //! ([`config`]) is multi-account: a top-level block plus named account
 //! blocks carrying optional per-backend sub-blocks.
 //!

@@ -69,7 +69,7 @@ impl ConfigureCommand {
         }
 
         let path = Config::target_path(config_paths)?;
-        let existing = ExistingConfig::read(&path)?;
+        let existing = ExistingConfig::read(&path, config_paths)?;
 
         let (base_name, mut account) = discover::run()?;
         let name = account_name(&base_name, existing.as_ref());
@@ -97,7 +97,7 @@ impl ConfigureCommand {
     }
 }
 
-/// What a configuration file already on disk constrains in the generated
+/// What the configuration already in effect constrains in the generated
 /// account: the names it takes, and whether one of its accounts already
 /// claims the default.
 struct ExistingConfig {
@@ -106,19 +106,28 @@ struct ExistingConfig {
 }
 
 impl ExistingConfig {
-    /// Reads the configuration at the given path, `None` when there is no
-    /// file there.
+    /// Reads the configuration the target `path` belongs to, `None` when
+    /// there is no file there.
+    ///
+    /// The target is one file of possibly several, the `-c` paths or the
+    /// default layers, merged on load: a name taken in another one would
+    /// shadow the appended account or be shadowed by it, and a default
+    /// declared there is a default all the same. All of them are read.
     ///
     /// A file that fails to parse errors rather than read as absent:
     /// appending to a broken document would bury the real problem under a
     /// second one.
-    fn read(path: &Path) -> Result<Option<Self>> {
+    fn read(path: &Path, config_paths: &[PathBuf]) -> Result<Option<Self>> {
         if !path.exists() {
             return Ok(None);
         }
 
-        let config = Config::from_paths(&[path.to_path_buf()])
-            .with_context(|| format!("Read the configuration at {}", path.display()))?;
+        let paths = match config_paths {
+            [] => Config::valid_default_paths(),
+            paths => paths.to_vec(),
+        };
+
+        let config = Config::from_paths(&paths).context("Read the configuration")?;
 
         Ok(Some(Self {
             names: config.accounts.keys().cloned().collect(),
@@ -372,7 +381,7 @@ mod tests {
         )
         .expect("write the existing config");
 
-        let existing = ExistingConfig::read(&path)
+        let existing = ExistingConfig::read(&path, std::slice::from_ref(&path))
             .expect("read the existing config")
             .expect("an existing config");
 
@@ -402,6 +411,33 @@ mod tests {
         fs::remove_file(&path).expect("remove the config");
     }
 
+    /// The target is the base file, but the accounts another file layers
+    /// over it take their names and their default all the same.
+    #[test]
+    fn an_account_in_another_layer_constrains_the_generated_one() {
+        let base = config_path();
+        let over = config_path();
+        fs::write(&base, "[accounts.work]\nmaildir.root = \"/tmp/work\"\n").unwrap();
+        fs::write(
+            &over,
+            "[accounts.perso]\ndefault = true\nmaildir.root = \"/tmp/perso\"\n",
+        )
+        .unwrap();
+
+        let existing = ExistingConfig::read(&base, &[base.clone(), over.clone()])
+            .expect("read the layered config")
+            .expect("an existing config");
+
+        let mut names = existing.names.clone();
+        names.sort_unstable();
+        assert_eq!(names, ["perso", "work"]);
+        assert!(existing.has_default);
+        assert_eq!(account_name("perso", Some(&existing)), "perso-2");
+
+        fs::remove_file(base).unwrap();
+        fs::remove_file(over).unwrap();
+    }
+
     #[test]
     fn a_taken_name_gets_a_suffix() {
         let existing = ExistingConfig {
@@ -416,7 +452,9 @@ mod tests {
 
     #[test]
     fn a_missing_configuration_constrains_nothing() {
-        let existing = ExistingConfig::read(&config_path()).expect("read a missing config");
+        let path = config_path();
+        let existing = ExistingConfig::read(&path, std::slice::from_ref(&path))
+            .expect("read a missing config");
 
         assert!(existing.is_none());
     }
