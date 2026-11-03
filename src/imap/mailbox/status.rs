@@ -15,7 +15,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     account::context::Account,
-    imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
     shared::table::style_from_preset,
 };
 
@@ -45,14 +45,18 @@ impl ImapMailboxStatusCommand {
             StatusDataItemName::UidValidity,
         ];
 
-        let items = client.status(mailbox, item_names.into())?;
+        let result = (|| -> Result<_> {
+            let items = client.status(mailbox, item_names.into())?;
 
-        let table = MailboxStatusTable {
-            preset: account.table_preset().to_string(),
-            status: items.into(),
-        };
+            let table = MailboxStatusTable {
+                preset: account.table_preset().to_string(),
+                status: items.into(),
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

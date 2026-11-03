@@ -5,12 +5,15 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::set::{JmapMailboxCreate, JmapMailboxSetArgs};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdReceipt,
+};
 
 /// Create a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -53,6 +56,15 @@ impl JmapMailboxCreateCommand {
             bail!(msg)
         }
 
-        printer.out(Message::new("Mailbox successfully created"))
+        let id = output
+            .created
+            .get(&self.name)
+            .and_then(|mailbox| mailbox.id.clone())
+            .ok_or_else(|| anyhow!("JMAP mailbox created without an id"))?;
+
+        printer.out(IdReceipt {
+            id,
+            done: "JMAP mailbox successfully created",
+        })
     }
 }

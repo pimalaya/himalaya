@@ -52,6 +52,7 @@ impl PimdirMailboxDeleteCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxDeleteOutput {
     /// The `collection-delete` row.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// The mailbox deleted, as given once its alias is resolved.
     pub mailbox: String,

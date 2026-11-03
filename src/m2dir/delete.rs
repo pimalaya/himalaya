@@ -4,9 +4,12 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::m2dir::{arg::M2dirNameArg, client::M2dirClient};
+use crate::{
+    m2dir::{arg::M2dirNameArg, client::M2dirClient},
+    shared::receipt::IdReceipt,
+};
 
 /// Delete the given m2dir folder.
 #[derive(Debug, Parser)]
@@ -21,6 +24,9 @@ impl M2dirMailboxDeleteCommand {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir_name.inner)?;
         client.delete_m2dir(path)?;
-        printer.out(Message::new("m2dir folder successfully deleted"))
+        printer.out(IdReceipt {
+            id: self.m2dir_name.inner,
+            done: "m2dir folder successfully deleted",
+        })
     }
 }

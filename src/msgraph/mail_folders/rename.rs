@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::MsgraphMailFolder;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Rename a Microsoft Graph mail folder (`PATCH /me/mailFolders/{id}`).
 #[derive(Debug, Parser)]
@@ -30,9 +30,9 @@ impl MsgraphMailFolderRenameCommand {
         };
         client.mail_folder_update(&self.id, &folder)?;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph mail folder `{}` successfully renamed",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Microsoft Graph mail folder successfully renamed",
+        })
     }
 }

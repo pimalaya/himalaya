@@ -60,6 +60,7 @@ pub struct GmailSettingsFilterListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     arrangement: ContentArrangement,
+    #[serde(flatten)]
     response: GmailFiltersListResponse,
 }
 

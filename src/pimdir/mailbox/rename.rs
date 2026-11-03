@@ -56,6 +56,7 @@ impl PimdirMailboxRenameCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxRenameOutput {
     /// The `collection-rename` row.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// The mailbox renamed, as given once its alias is resolved.
     pub mailbox: String,

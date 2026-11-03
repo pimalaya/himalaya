@@ -206,16 +206,16 @@ Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); 
 - THEN the command fails saying the row is not in the account's queue, and the row stays queued
 
 ### Requirement: pimdir writes name their queue row
-`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"queueId": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyQueueId": i64` (a copy queued beside the send, when its performer declares no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"queued": [{"id": string, "queueId": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The shared commands SHALL keep printing no queue detail.
+`pimdir message add` and `pimdir message send` SHALL stage a message as the shared `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"row": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyRow": i64` (a copy queued beside the send, when its performer declares no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"messages": [{"id": string, "row": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The shared commands SHALL keep printing no queue detail. `pimdir queue list` and `queue cancel` SHALL name a row `row` as well.
 
-`pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"queueId", "state": "pending" | "parked" | "applied" | "unknown", "collection"?, "kind"?, "attempts"?, "error"?, "appliedAt"?, "seq"?}`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, renamed or deleted, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5). A receipt lives under the collection its row was queued on and follows it: a renamed mailbox's row reads `applied` under the mailbox's new id, and a deleted mailbox's row reads `unknown` once the deletion leaves the store, the receipt going with the collection, the mailbox missing from `pimdir mailbox list` being what says it was deleted.
+`pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"row", "state": "pending" | "parked" | "applied" | "unknown", "collection", "kind", "attempts", "error", "appliedAt", "seq"}`, a key the state does not carry being `null`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, renamed or deleted, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5). A receipt lives under the collection its row was queued on and follows it: a renamed mailbox's row reads `applied` under the mailbox's new id, and a deleted mailbox's row reads `unknown` once the deletion leaves the store, the receipt going with the collection, the mailbox missing from `pimdir mailbox list` being what says it was deleted.
 
 The plain output of every `pimdir` subcommand SHALL end with a newline.
 
 #### Scenario: A staged draft is followed by its row
 - GIVEN a pimdir account
 - WHEN `himalaya --json pimdir message add -m imap/Drafts` stages a message
-- THEN it prints `{"queueId":12,"messageId":"d1@x.org"}`, and `pimdir queue show 12` prints `"state":"pending"` until the sync engine applies the row, then `"state":"applied"` with the `seq` the message is read by
+- THEN it prints `{"row":12,"messageId":"d1@x.org"}`, and `pimdir queue show 12` prints `"state":"pending"` until the sync engine applies the row, then `"state":"applied"` with the `seq` the message is read by
 
 ### Requirement: A pimdir refile or delete stages the ids it found
 `copy_messages`, `move_messages` and `delete_messages` SHALL check every given id against the mailbox before staging the first row, skip an id the mailbox does not hold, stage one row per id found and report how many they found (commands, "A command given message ids says how many it found"). A call finding none SHALL stage nothing. A malformed id SHALL fail the call before anything is staged.
@@ -234,17 +234,17 @@ The plain output of every `pimdir` subcommand SHALL end with a newline.
 - THEN the row is listed as parked with its error, and `pimdir queue cancel` on its id removes it
 
 ### Requirement: pimdir creates a mailbox by queueing an intent
-`pimdir mailbox create <NAME> [--parent <MAILBOX>]` SHALL enqueue one `collection-create` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text, "parent": collection?}`, and print `{"queueId": i64, "name": text, "parent"?: collection, "source": id}`. It SHALL NOT create a collection in the store: the mailbox arrives with the sync that performs the intent.
+`pimdir mailbox create <NAME> [--parent <MAILBOX>]` SHALL enqueue one `collection-create` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text, "parent": collection?}`, and print `{"row": i64, "name": text, "parent": collection | null, "source": id}`. It SHALL NOT create a collection in the store: the mailbox arrives with the sync that performs the intent.
 
 The row SHALL be anchored on `parent`, which must be a mailbox of the account, else on the account's first mailbox by id, and queued through io-pimdir's `enqueue_collection_create`. The performer SHALL be named as for a send (capability `collection.create`): several candidates and no recorded choice are refused, naming them. A store whose sources declare no capabilities SHALL be refused, its owner predating the intent. An empty name, or one holding a control character, SHALL be refused before anything is staged. A name the server already holds is the server's to refuse: the row parks, and `pimdir queue show` says why.
 
 #### Scenario: A folder is created through the sync engine
 - GIVEN a pimdir account whose `imap` source declares `collection.create`
 - WHEN `himalaya --json pimdir mailbox create Projets` runs
-- THEN one `collection-create` row is queued with `{"v":1,"source":"imap","name":"Projets"}`, and the command prints its `queueId` and `"source":"imap"`
+- THEN one `collection-create` row is queued with `{"v":1,"source":"imap","name":"Projets"}`, and the command prints its `row` and `"source":"imap"`
 
 ### Requirement: pimdir renames or deletes a mailbox by queueing an intent
-`pimdir mailbox rename <MAILBOX> <NAME>` SHALL enqueue one `collection-rename` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text}` and print `{"queueId": i64, "mailbox": collection, "name": text, "source": id}`. `pimdir mailbox delete <MAILBOX>` SHALL enqueue one `collection-delete` intent with `{"v": 1, "source": id}` and print `{"queueId": i64, "mailbox": collection, "source": id}`. Neither SHALL rename or delete a collection in the store: the change arrives with the sync that performs the intent.
+`pimdir mailbox rename <MAILBOX> <NAME>` SHALL enqueue one `collection-rename` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text}` and print `{"row": i64, "mailbox": collection, "name": text, "source": id}`. `pimdir mailbox delete <MAILBOX>` SHALL enqueue one `collection-delete` intent with `{"v": 1, "source": id}` and print `{"row": i64, "mailbox": collection, "source": id}`. Neither SHALL rename or delete a collection in the store: the change arrives with the sync that performs the intent.
 
 The row SHALL be anchored on the mailbox, which must be a mailbox of the account (an id or a role, after the account's aliases), the payload never restating it, and queued through io-pimdir's `enqueue_collection_rename` or `enqueue_collection_delete`. The performer SHALL be named as for a creation (capability `collection.rename` or `collection.delete`, each gating its own intent): several candidates and no recorded choice are refused, naming them, and a source declaring the capability `none` on that mailbox (an IMAP `INBOX`, a system folder) refuses it. A store whose sources declare no capabilities SHALL be refused. A rename name empty or holding a control character SHALL be refused before anything is staged.
 
@@ -253,7 +253,7 @@ A rename keeps the mailbox's parent, `name` being one level of the hierarchy. Th
 #### Scenario: A folder is renamed through the sync engine
 - GIVEN a pimdir account whose `imap` source declares `collection.rename`
 - WHEN `himalaya --json pimdir mailbox rename imap/Projets Archives` runs
-- THEN one `collection-rename` row is queued on `imap/Projets` with `{"v":1,"source":"imap","name":"Archives"}`, and the command prints its `queueId`, `"mailbox":"imap/Projets"` and `"source":"imap"`
+- THEN one `collection-rename` row is queued on `imap/Projets` with `{"v":1,"source":"imap","name":"Archives"}`, and the command prints its `row`, `"mailbox":"imap/Projets"` and `"source":"imap"`
 
 #### Scenario: A folder holding another is not deleted
 - GIVEN a pimdir account whose `imap` source declares `collection.delete`, and a server mailbox `Projets` holding `Projets/2025`
@@ -270,7 +270,7 @@ An add or a remove SHALL match the flags a message carries as flags, not as spel
 #### Scenario: A keyword is staged and read back
 - GIVEN a pimdir account whose `imap` source declares `mail.flags.keywords`
 - WHEN `himalaya --json pimdir flag add -m imap/INBOX -f act 42` runs
-- THEN it prints `{"queued":[{"id":"42","queueId":7}]}`, and `pimdir flag list -m imap/INBOX 42` lists `act` before the next sync
+- THEN it prints `{"messages":[{"id":"42","row":7}]}`, and `pimdir flag list -m imap/INBOX 42` lists `act` before the next sync
 
 #### Scenario: A source without keywords refuses one
 - GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`

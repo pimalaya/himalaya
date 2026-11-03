@@ -10,15 +10,13 @@ use io_gmail::v1::rest::drafts::{
     GmailDraft,
     list::{GmailDraftsList, GmailDraftsListParams},
 };
-use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    gmail::client::GmailClient,
-    shared::{output::Paginated, table::style_from_preset},
+    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
 };
 
 /// List Gmail drafts (users.drafts.list).
@@ -67,7 +65,10 @@ impl GmailDraftsListCommand {
             drafts: response.drafts,
         };
 
-        printer.out(Paginated::new(table, next_page))
+        printer.out(Paginated {
+            inner: table,
+            next_page,
+        })
     }
 }
 

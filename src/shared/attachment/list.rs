@@ -17,7 +17,10 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     shared::{
-        client::EmailClient, mailbox::arg::MailboxArg, message::part, table::style_from_preset,
+        client::EmailClient,
+        mailbox::arg::MailboxArg,
+        message::part::{self, PartRole},
+        table::style_from_preset,
     },
 };
 
@@ -54,7 +57,7 @@ impl AttachmentListCommand {
         let message = part::parse(&raw)?;
 
         let attachments = attachments(&message)
-            .filter(|attachment| self.inline || !attachment.inline)
+            .filter(|attachment| self.inline || attachment.role != PartRole::Inline)
             .collect();
 
         let attachments = AttachmentListOutput {
@@ -112,15 +115,14 @@ pub struct Attachment {
     pub mime: Option<String>,
     /// The size of the decoded part body, in bytes.
     pub size: u64,
-    /// Whether the part carries `Content-Disposition: inline`.
-    pub inline: bool,
+    /// What the part is to a reader, the role `message read` prints.
+    pub role: PartRole,
     /// The `Content-ID`, without angle brackets, by which an HTML body
     /// shows the part.
     #[serde(rename = "contentId")]
     pub content_id: Option<String>,
     /// Where the bytes were written, which `attachment download` alone
-    /// fills in.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// fills in, `null` otherwise.
     pub path: Option<String>,
 }
 
@@ -133,9 +135,7 @@ impl Attachment {
             filename: part::filename(part),
             mime: mime_string(part),
             size: part::bytes(part).len() as u64,
-            inline: part
-                .disposition()
-                .is_some_and(|disposition| disposition.is("inline")),
+            role: part::role(part),
             content_id: part::content_id(part),
             path,
         }
@@ -199,7 +199,12 @@ impl fmt::Display for AttachmentListOutput {
                 row.add_cell(Cell::new(format_size(a.size, BINARY)).fg(self.colors.size));
                 if self.with_inline {
                     row.add_cell(
-                        Cell::new(if a.inline { "yes" } else { "no" }).fg(self.colors.inline),
+                        Cell::new(if a.role == PartRole::Inline {
+                            "yes"
+                        } else {
+                            "no"
+                        })
+                        .fg(self.colors.inline),
                     );
                 }
                 if self.with_path {
@@ -232,7 +237,10 @@ mod tests {
     use pimalaya_cli::table::{Color, ContentArrangement};
 
     use super::{Attachment, AttachmentColors, AttachmentListOutput, attachments};
-    use crate::shared::message::{part, read::MessageReadOutput};
+    use crate::shared::message::{
+        part::{self, PartRole},
+        read::MessageReadOutput,
+    };
 
     #[test]
     fn ids_are_those_of_the_read_view() {
@@ -283,7 +291,7 @@ mod tests {
 
         let json = serde_json::to_value(&listed[0]).unwrap();
         assert_eq!(json["contentId"], "logo@example.com");
-        assert_eq!(json["inline"], true);
+        assert_eq!(json["role"], "inline");
         assert_eq!(
             serde_json::to_value(&listed[1]).unwrap()["contentId"],
             serde_json::Value::Null
@@ -310,7 +318,7 @@ mod tests {
                 filename: Some(String::from("invoice\x1b]8;;https://example.org\x07.pdf")),
                 mime: Some(String::from("application/pdf\x1b[8m")),
                 size: 0,
-                inline: false,
+                role: PartRole::Attachment,
                 content_id: None,
                 path: Some(String::from("/tmp/invoice\x1b[2J.pdf")),
             }],

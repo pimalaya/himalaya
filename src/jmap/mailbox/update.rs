@@ -8,12 +8,15 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::set::{JmapMailboxSetArgs, JmapMailboxUpdate};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{
-    client::JmapClient,
-    error::format_set_error,
-    mailbox::query::{RoleArg, role_from_args},
+use crate::{
+    jmap::{
+        client::JmapClient,
+        error::format_set_error,
+        mailbox::query::{RoleArg, role_from_args},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Update a JMAP mailbox.
@@ -80,6 +83,9 @@ impl JmapMailboxUpdateCommand {
             bail!(msg);
         }
 
-        printer.out(Message::new("Mailbox successfully updated"))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "JMAP mailbox successfully updated",
+        })
     }
 }

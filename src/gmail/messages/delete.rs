@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Permanently delete a Gmail message (users.messages.delete).
 #[derive(Debug, Parser)]
@@ -20,9 +20,9 @@ impl GmailMessageDeleteCommand {
     /// Deletes the message for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         client.message_delete(&self.id)?;
-        printer.out(Message::new(format!(
-            "Gmail message `{}` permanently deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Gmail message permanently deleted",
+        })
     }
 }

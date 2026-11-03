@@ -17,7 +17,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use pimalaya_cli::{
-    error::{CodedError, ErrorReport},
+    error::{CodedError, ErrorReport, partial_outcome_of},
     printer::Printer,
 };
 
@@ -108,7 +108,11 @@ impl ReplCommand {
                 Some(Err(err)) => Err(err.into()),
             };
 
-            if let Err(err) = result {
+            // NOTE: a partial outcome printed its result already, the session
+            // goes on without a failure object.
+            if let Err(err) = result
+                && partial_outcome_of(&err).is_none()
+            {
                 printer.out(ErrorReport::<ErrorCode>::from(err))?;
             }
 

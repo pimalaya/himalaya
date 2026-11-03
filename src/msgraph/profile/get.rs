@@ -38,11 +38,8 @@ impl MsgraphProfileGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MsgraphProfileOutput {
     id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     mail: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     user_principal_name: Option<String>,
 }
 

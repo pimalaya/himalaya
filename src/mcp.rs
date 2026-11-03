@@ -19,7 +19,11 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Arg, ArgAction, CommandFactory, Parser, ValueHint};
-use pimalaya_cli::{error::ErrorReport, printer::Printer};
+use pimalaya_cli::{
+    error::{ErrorReport, partial_outcome_of},
+    output::Bytes,
+    printer::Printer,
+};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
@@ -547,15 +551,21 @@ impl McpServer<'_, '_> {
             .and_then(|argv| Ok(McpLine::try_parse_from(argv)?))
             .and_then(|line| line.cmd.execute(&mut printer, self.session));
 
-        if let Err(err) = result {
-            let report = serde_json::to_value(ErrorReport::<ErrorCode>::from(err))
-                .unwrap_or_else(|err| Value::from(err.to_string()));
+        // NOTE: a partial outcome printed its result, which stays the tool
+        // result, flagged as an error.
+        let partial = match result {
+            Err(err) if partial_outcome_of(&err).is_some() => true,
+            Err(err) => {
+                let report = serde_json::to_value(ErrorReport::<ErrorCode>::from(err))
+                    .unwrap_or_else(|err| Value::from(err.to_string()));
 
-            return Ok(json!({
-                "content": [{ "type": "text", "text": report.to_string() }],
-                "isError": true,
-            }));
-        }
+                return Ok(json!({
+                    "content": [{ "type": "text", "text": report.to_string() }],
+                    "isError": true,
+                }));
+            }
+            Ok(()) => false,
+        };
 
         let mut values = printer.values;
 
@@ -567,10 +577,23 @@ impl McpServer<'_, '_> {
             }));
         };
 
-        let mut result = json!({ "content": [{ "type": "text", "text": value.to_string() }] });
+        // NOTE: the events a command printed come first, one text content
+        // each, the result last.
+        let mut content: Vec<Value> = printer
+            .events
+            .iter()
+            .map(|event| json!({ "type": "text", "text": event.to_string() }))
+            .collect();
+        content.push(json!({ "type": "text", "text": value.to_string() }));
+
+        let mut result = json!({ "content": content });
 
         if value.is_object() {
             result["structuredContent"] = value;
+        }
+
+        if partial {
+            result["isError"] = Value::Bool(true);
         }
 
         Ok(result)
@@ -586,16 +609,26 @@ struct McpLine {
     cmd: Command,
 }
 
-/// A [`Printer`] keeping each value a command prints as JSON.
+/// A [`Printer`] keeping each value and event a command prints as JSON.
 #[derive(Default)]
 struct McpPrinter {
     values: Vec<Value>,
+    events: Vec<Value>,
 }
 
 impl Printer for McpPrinter {
     fn out<T: fmt::Display + Serialize>(&mut self, data: T) -> Result<()> {
         self.values.push(serde_json::to_value(&data)?);
         Ok(())
+    }
+
+    fn event<T: fmt::Display + Serialize>(&mut self, event: T) -> Result<()> {
+        self.events.push(serde_json::to_value(&event)?);
+        Ok(())
+    }
+
+    fn out_bytes(&mut self, bytes: Bytes) -> Result<()> {
+        self.out(bytes)
     }
 
     fn is_json(&self) -> bool {

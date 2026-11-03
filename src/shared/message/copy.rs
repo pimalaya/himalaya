@@ -3,9 +3,13 @@
 //! The `message copy` command, copying messages between two mailboxes of
 //! one account.
 
+use std::fmt;
+
 use anyhow::{Result, bail};
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
@@ -45,13 +49,35 @@ impl MessageCopyCommand {
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         let count = client.copy_messages(&from, &to, &ids)?;
-        let message = match (count, client.queues_writes()) {
-            (0, _) => bail!("No message copied: no id matched in the source mailbox"),
-            (1, false) => "1 message successfully copied".to_string(),
-            (n, false) => format!("{n} messages successfully copied"),
-            (1, true) => "1 message queued for copying".to_string(),
-            (n, true) => format!("{n} messages queued for copying"),
-        };
-        printer.out(Message::new(message))
+        if count == 0 {
+            bail!("No message copied: no id matched in the source mailbox");
+        }
+
+        printer.out(MessageCopyOutput {
+            count,
+            queued: client.queues_writes(),
+        })
+    }
+}
+
+/// The `message copy` output: how many messages were copied.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MessageCopyOutput {
+    /// How many of the given messages were found and copied.
+    count: usize,
+    /// Whether a sync engine applies the write later rather than now.
+    queued: bool,
+}
+
+impl fmt::Display for MessageCopyOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let count = self.count;
+
+        if self.queued {
+            return writeln!(f, "{count} message(s) queued for copying");
+        }
+
+        writeln!(f, "{count} message(s) successfully copied")
     }
 }

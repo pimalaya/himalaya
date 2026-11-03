@@ -93,6 +93,7 @@ pub struct PimdirQueuedMessage {
     /// The queue row id, which `pimdir queue cancel` takes. It names a
     /// pending action, not a message: the message has no id until the sync
     /// engine applies the action, and gets a different one then.
+    #[serde(rename = "row")]
     pub id: i64,
     /// When the row was appended, stamped by the store's own clock.
     pub queued_at: String,
@@ -111,6 +112,7 @@ pub struct PimdirQueuedMessage {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirParkedRow {
     /// The queue row id, which `pimdir queue cancel` takes.
+    #[serde(rename = "row")]
     pub id: i64,
     /// When the row was appended, stamped by the store's own clock.
     pub queued_at: String,

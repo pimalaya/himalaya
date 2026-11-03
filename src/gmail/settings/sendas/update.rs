@@ -8,9 +8,9 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{
     GmailSendAs, patch::GmailSendAsPatch, update::GmailSendAsUpdate,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Update a Gmail send-as alias (settings.sendAs.update/patch).
 #[derive(Debug, Parser)]
@@ -56,9 +56,9 @@ impl GmailSettingsSendAsUpdateCommand {
             client.run(c)?;
         }
 
-        printer.out(Message::new(format!(
-            "Gmail send-as `{}` successfully updated",
-            self.email
-        )))
+        printer.out(IdReceipt {
+            id: self.email,
+            done: "Gmail send-as successfully updated",
+        })
     }
 }

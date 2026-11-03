@@ -3,11 +3,15 @@
 //! The `jmap email read` command, an `Email/get` asking for the body
 //! values too.
 
+use std::fmt;
+
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::email::{JmapEmailAddress, get::JmapEmailGetOptions};
+use io_jmap::rfc8621::email::{JmapEmail, JmapEmailAddress, get::JmapEmailGetOptions};
 use log::warn;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::jmap::client::JmapClient;
 
@@ -86,7 +90,28 @@ impl JmapEmailReadCommand {
             }
         }
 
-        printer.out(Message::new(content))
+        printer.out(JmapEmailReadOutput {
+            emails: output.emails,
+            content,
+        })
+    }
+}
+
+/// The `jmap email read` output: the emails as the server sent them,
+/// their headers and bodies laid out as text.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JmapEmailReadOutput {
+    /// The emails found, with the body values asked for.
+    emails: Vec<JmapEmail>,
+    /// The text form.
+    #[serde(skip)]
+    content: String,
+}
+
+impl fmt::Display for JmapEmailReadOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.content)
     }
 }
 

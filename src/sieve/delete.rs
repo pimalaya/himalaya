@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::sieve::client::SieveClient;
+use crate::{shared::receipt::IdReceipt, sieve::client::SieveClient};
 
 /// Delete one server-side Sieve script.
 ///
@@ -23,7 +23,11 @@ pub struct SieveScriptDeleteCommand {
 impl SieveScriptDeleteCommand {
     /// Deletes the named script.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        client.delete_script(self.name)?;
-        printer.out(Message::new("Sieve script successfully deleted"))
+        client.delete_script(self.name.clone())?;
+
+        printer.out(IdReceipt {
+            id: self.name,
+            done: "Sieve script successfully deleted",
+        })
     }
 }

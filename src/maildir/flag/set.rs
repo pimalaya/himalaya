@@ -5,12 +5,15 @@
 use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::maildir::{
-    arg::{MaildirPathFlag, MessageIdsArg},
-    client::MaildirClient,
-    flag::arg::FlagArg,
+use crate::{
+    maildir::{
+        arg::{MaildirPathFlag, MessageIdsArg},
+        client::MaildirClient,
+        flag::arg::FlagArg,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Set MAILDIR flag(s) on message(s).
@@ -37,10 +40,13 @@ impl MaildirFlagSetCommand {
 
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        for id in self.ids.inner {
+        for id in self.ids.inner.clone() {
             client.set_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("Flag(s) successfully changed"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner,
+            done: "Flag(s) successfully changed",
+        })
     }
 }

@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Permanently delete a Microsoft Graph message (`DELETE
 /// /me/messages/{id}`).
@@ -21,9 +21,9 @@ impl MsgraphMessageDeleteCommand {
     /// Deletes the message for good.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.message_delete(&self.id)?;
-        printer.out(Message::new(format!(
-            "Microsoft Graph message `{}` permanently deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Microsoft Graph message permanently deleted",
+        })
     }
 }

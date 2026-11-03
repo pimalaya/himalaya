@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::sieve::{client::SieveClient, script::SieveScriptArg};
+use crate::sieve::{check::SieveScriptOutput, client::SieveClient, script::SieveScriptArg};
 
 /// Validate capacity and upload one server-side Sieve script.
 ///
@@ -29,11 +29,11 @@ impl SieveScriptPutCommand {
 
         client.have_space(self.name.clone(), script.len() as u32)?;
 
-        let message = match client.put_script(self.name, script)? {
-            Some(warnings) => format!("Sieve script successfully uploaded: {warnings}"),
-            None => String::from("Sieve script successfully uploaded"),
-        };
+        let warnings = client.put_script(self.name.clone(), script)?;
 
-        printer.out(Message::new(message))
+        printer.out(SieveScriptOutput {
+            name: Some(self.name),
+            warnings: warnings.map(|warnings| warnings.to_string()),
+        })
     }
 }

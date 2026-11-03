@@ -61,8 +61,7 @@ pub struct MailboxRenameOutput {
     /// The mailbox as it was given, for the confirmation.
     #[serde(skip)]
     pub mailbox: String,
-    /// Whether the backend queued the rename rather than made it.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
 }
 

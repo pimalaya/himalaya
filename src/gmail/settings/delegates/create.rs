@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::{GmailDelegate, create::GmailDelegateCreate};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Create a Gmail delegate (users.settings.delegates.create).
 #[derive(Debug, Parser)]
@@ -32,9 +32,9 @@ impl GmailSettingsDelegateCreateCommand {
         };
         let created = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail delegate `{}` successfully created",
-            created.delegate_email
-        )))
+        printer.out(IdReceipt {
+            id: created.delegate_email,
+            done: "Gmail delegate successfully created",
+        })
     }
 }

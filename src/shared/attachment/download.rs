@@ -25,7 +25,7 @@ use crate::{
         attachment::list::{self, AttachmentColors, AttachmentListOutput},
         client::EmailClient,
         mailbox::arg::MailboxArg,
-        message::part,
+        message::part::{self, PartRole},
     },
 };
 
@@ -136,7 +136,7 @@ impl AttachmentDownloadCommand {
         let attachments = AttachmentListOutput {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
-            with_inline: written.iter().any(|a| a.inline),
+            with_inline: written.iter().any(|a| a.role == PartRole::Inline),
             with_path: true,
             colors: AttachmentColors {
                 id: account.attachments_list_table_id_color(),

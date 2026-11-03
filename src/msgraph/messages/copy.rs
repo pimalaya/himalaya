@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Copy a Microsoft Graph message into another folder (`POST
 /// /me/messages/{id}/copy`).
@@ -25,9 +25,9 @@ impl MsgraphMessageCopyCommand {
     /// Copies the message into the destination folder.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let message = client.message_copy(&self.id, &self.destination)?.response;
-        printer.out(Message::new(format!(
-            "Microsoft Graph message copied to `{}`",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Microsoft Graph message copied to",
+        })
     }
 }

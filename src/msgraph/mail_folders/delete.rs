@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Delete a Microsoft Graph mail folder and everything in it (`DELETE
 /// /me/mailFolders/{id}`).
@@ -23,9 +23,9 @@ impl MsgraphMailFolderDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.mail_folder_delete(&self.id)?;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph mail folder `{}` successfully deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Microsoft Graph mail folder successfully deleted",
+        })
     }
 }

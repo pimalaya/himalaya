@@ -5,12 +5,15 @@
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::flag::MboxFlags;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::mbox::{
-    arg::{MboxPathFlag, MessageIdsArg},
-    client::MboxClient,
-    flag::arg::FlagArg,
+use crate::{
+    mbox::{
+        arg::{MboxPathFlag, MessageIdsArg},
+        client::MboxClient,
+        flag::arg::FlagArg,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Remove mbox flag(s) from message(s).
@@ -44,6 +47,9 @@ impl MboxFlagRemoveCommand {
                 .collect()
         })?;
 
-        printer.out(Message::new("Flag(s) successfully removed"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner.clone(),
+            done: "Flag(s) successfully removed",
+        })
     }
 }

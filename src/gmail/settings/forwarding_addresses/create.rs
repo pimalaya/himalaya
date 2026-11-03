@@ -8,9 +8,9 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::{
     GmailForwardingAddress, create::GmailForwardingAddressCreate,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Create a Gmail forwarding address
 /// (users.settings.forwardingAddresses.create).
@@ -35,9 +35,9 @@ impl GmailSettingsForwardingAddressCreateCommand {
         };
         let created = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail forwarding address `{}` successfully created",
-            created.forwarding_email
-        )))
+        printer.out(IdReceipt {
+            id: created.forwarding_email,
+            done: "Gmail forwarding address successfully created",
+        })
     }
 }

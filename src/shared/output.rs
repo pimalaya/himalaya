@@ -1,85 +1,66 @@
 //! # Output
 //!
-//! What the commands returning raw content or a paginated listing print
-//! through.
+//! What the commands returning raw content print through.
 
 use std::{
     fmt, fs,
-    io::{self, IsTerminal, Write},
+    io::{self, IsTerminal},
     path::Path,
 };
 
 use anyhow::{Context, Result, bail};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::{output::Bytes, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-/// A listing plus the cursor of its next page.
+/// Writes bytes to the given path, or prints them when there is none.
 ///
-/// The cursor is part of the output, a footer line in text and a
-/// `nextPage` field in JSON, so a script reads it. Logging it to stderr
-/// would not.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Paginated<T> {
-    #[serde(flatten)]
-    inner: T,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    next_page: Option<String>,
-}
-
-impl<T> Paginated<T> {
-    /// Wraps a listing and the cursor its backend returned.
-    pub fn new(inner: T, next_page: Option<String>) -> Self {
-        Self { inner, next_page }
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for Paginated<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.inner)?;
-
-        if let Some(cursor) = &self.next_page {
-            writeln!(f, "Next page: {cursor}")?;
-        }
-
-        Ok(())
-    }
-}
-
-/// Writes bytes to the given path, or to stdout when there is none.
-///
-/// A redirected stdout receives the bytes verbatim, so a saved file is
-/// byte-exact. Binary-looking content is refused on a terminal, where it
-/// would corrupt the display or inject escape sequences.
+/// Printed bytes go verbatim to a redirected stdout, so a saved file is
+/// byte-exact, and as a [`Bytes`] object under `--json`. Binary-looking
+/// content is refused on a terminal in text mode, where it would corrupt
+/// the display or inject escape sequences.
 pub fn write_bytes_or_save(
     printer: &mut impl Printer,
     output: Option<&Path>,
-    bytes: &[u8],
+    bytes: Vec<u8>,
+    mime: &str,
 ) -> Result<()> {
     if let Some(path) = output {
-        fs::write(path, bytes).with_context(|| format!("Write `{}` error", path.display()))?;
+        fs::write(path, &bytes).with_context(|| format!("Write `{}` error", path.display()))?;
 
-        return printer.out(Message::new(format!(
-            "Saved {} bytes to {}",
-            bytes.len(),
-            path.display()
-        )));
+        return printer.out(SavedOutput {
+            path: path.display().to_string(),
+            size: bytes.len(),
+        });
     }
 
-    let mut stdout = io::stdout();
-
-    if stdout.is_terminal() && looks_binary(bytes) {
+    if !printer.is_json() && io::stdout().is_terminal() && looks_binary(&bytes) {
         bail!(
             "Refusing to write binary content to the terminal: \
 	     redirect stdout or pass --output <PATH>"
         );
     }
 
-    stdout.write_all(bytes).context("Write to stdout error")?;
-    stdout.flush().context("Flush stdout error")?;
+    printer.out_bytes(Bytes {
+        data: bytes,
+        mime: mime.to_owned(),
+    })
+}
 
-    Ok(())
+/// What a command saving bytes to a file prints.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedOutput {
+    /// The file written.
+    pub path: String,
+    /// How many bytes were written.
+    pub size: usize,
+}
+
+impl fmt::Display for SavedOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Saved {} bytes to {}", self.size, self.path)
+    }
 }
 
 /// Whether `bytes` read as binary, which is what a terminal must be

@@ -6,12 +6,15 @@
 use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::maildir::{
-    arg::{MaildirPathFlag, MessageIdsArg},
-    client::MaildirClient,
-    flag::arg::FlagArg,
+use crate::{
+    maildir::{
+        arg::{MaildirPathFlag, MessageIdsArg},
+        client::MaildirClient,
+        flag::arg::FlagArg,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Remove MAILDIR flag(s) from message(s).
@@ -38,10 +41,13 @@ impl MaildirFlagRemoveCommand {
 
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        for id in self.ids.inner {
+        for id in self.ids.inner.clone() {
             client.remove_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("Flag(s) successfully removed"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner,
+            done: "Flag(s) successfully removed",
+        })
     }
 }

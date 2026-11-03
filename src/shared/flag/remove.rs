@@ -49,7 +49,6 @@ impl FlagRemoveCommand {
             bail!("No flag removed: no id matched in the mailbox");
         }
 
-        let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
         let queued = client.queues_writes();
         printer.out(FlagRemoveOutput {
             flags,
@@ -63,18 +62,19 @@ impl FlagRemoveCommand {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FlagRemoveOutput {
-    flags: Vec<String>,
+    /// The flags written.
+    flags: Vec<Flag>,
     /// How many of the given messages were found.
     count: usize,
-    /// Whether the backend queued the change for its sync engine rather
-    /// than made it, which only the wording says.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     queued: bool,
 }
 
 impl fmt::Display for FlagRemoveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (count, flags) = (self.count, self.flags.join(", "));
+        let count = self.count;
+        let flags: Vec<&str> = self.flags.iter().map(Flag::raw).collect();
+        let flags = flags.join(", ");
         if self.queued {
             return writeln!(
                 f,
@@ -90,23 +90,29 @@ impl fmt::Display for FlagRemoveOutput {
 
 #[cfg(test)]
 mod tests {
-    use super::FlagRemoveOutput;
+    use crate::{
+        email::flag::{Flag, IanaFlag},
+        shared::flag::remove::FlagRemoveOutput,
+    };
 
     #[test]
     fn output_counts_the_messages_and_ends_the_line() {
         let output = FlagRemoveOutput {
-            flags: vec!["seen".into(), "flagged".into()],
+            flags: vec![
+                Flag::from_iana(IanaFlag::Seen),
+                Flag::from_iana(IanaFlag::Flagged),
+            ],
             count: 2,
             queued: false,
         };
 
         assert_eq!(
             output.to_string(),
-            "Successfully removed flags from 2 message(s): seen, flagged\n"
+            "Successfully removed flags from 2 message(s): \\Seen, \\Flagged\n"
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"flags":["seen","flagged"],"count":2}"#
+            r#"{"flags":[{"raw":"\\Seen","iana":"seen"},{"raw":"\\Flagged","iana":"flagged"}],"count":2,"queued":false}"#
         );
     }
 }

@@ -5,11 +5,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::maildir::{
-    arg::{MaildirPathFlag, MaildirSubdirArg, MessageIdsArg, TargetMaildirPathFlag},
-    client::MaildirClient,
+use crate::{
+    maildir::{
+        arg::{MaildirPathFlag, MaildirSubdirArg, MessageIdsArg, TargetMaildirPathFlag},
+        client::MaildirClient,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Copy Maildir message(s) to another folder.
@@ -35,7 +38,7 @@ impl MaildirMessageCopyCommand {
         let source = client.resolve_maildir(&self.source.inner)?;
         let target = client.resolve_maildir(&self.target.inner)?;
 
-        for id in self.ids.inner {
+        for id in self.ids.inner.clone() {
             client.copy(
                 id,
                 source.clone(),
@@ -44,6 +47,9 @@ impl MaildirMessageCopyCommand {
             )?;
         }
 
-        printer.out(Message::new("Message(s) successfully copied"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner,
+            done: "Message(s) successfully copied",
+        })
     }
 }

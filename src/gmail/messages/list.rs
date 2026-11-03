@@ -7,15 +7,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessageId, list::GmailMessagesListParams};
-use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    gmail::client::GmailClient,
-    shared::{output::Paginated, table::style_from_preset},
+    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
 };
 
 /// List Gmail message ids matching the given query and labels
@@ -64,10 +62,13 @@ impl GmailMessagesListCommand {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             id_color: account.envelopes_list_table_id_color(),
-            ids: response.messages,
+            messages: response.messages,
         };
 
-        printer.out(Paginated::new(table, next_page))
+        printer.out(Paginated {
+            inner: table,
+            next_page,
+        })
     }
 }
 
@@ -84,8 +85,8 @@ pub struct GmailMessageListOutput {
     #[serde(skip)]
     /// The color of the ID column.
     pub id_color: Color,
-    /// The message ids of this page.
-    pub ids: Vec<GmailMessageId>,
+    /// The messages of this page, each named by its id and thread id.
+    pub messages: Vec<GmailMessageId>,
 }
 
 impl fmt::Display for GmailMessageListOutput {
@@ -96,7 +97,7 @@ impl fmt::Display for GmailMessageListOutput {
             .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new("ID"), Cell::new("THREAD ID")]))
-            .add_rows(self.ids.iter().map(|id| {
+            .add_rows(self.messages.iter().map(|id| {
                 let mut row = Row::new();
                 row.max_height(1)
                     .add_cell(Cell::new(&id.id).fg(self.id_color))

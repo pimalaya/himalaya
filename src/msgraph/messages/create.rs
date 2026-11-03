@@ -4,9 +4,11 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::message::arg::MessageArg};
+use crate::{
+    msgraph::client::MsgraphClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
+};
 
 /// Create a Microsoft Graph draft message from raw MIME (`POST
 /// /me/messages`).
@@ -27,9 +29,9 @@ impl MsgraphMessageCreateCommand {
         let message = client
             .message_create_mime(self.folder.as_deref(), &raw)?
             .response;
-        printer.out(Message::new(format!(
-            "Microsoft Graph draft `{}` successfully created",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Microsoft Graph draft successfully created",
+        })
     }
 }

@@ -49,7 +49,7 @@ impl GmailDraftGetCommand {
         {
             let bytes =
                 decode_raw(raw).map_err(|err| anyhow!("Decode Gmail draft error: {err}"))?;
-            return write_bytes_or_save(printer, None, &bytes);
+            return write_bytes_or_save(printer, None, bytes, "message/rfc822");
         }
 
         printer.out(GmailDraftGetOutput {
@@ -69,7 +69,6 @@ impl GmailDraftGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailDraftGetOutput {
     id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<GmailDraftMessageOutput>,
 }
 
@@ -96,8 +95,6 @@ impl fmt::Display for GmailDraftGetOutput {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailDraftMessageOutput {
     id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     thread_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     snippet: Option<String>,
 }

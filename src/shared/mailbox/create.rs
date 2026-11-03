@@ -60,8 +60,7 @@ pub struct MailboxCreateOutput {
     pub id: Option<String>,
     /// The name it was created with.
     pub name: String,
-    /// Whether the backend queued the creation rather than made it.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
 }
 
@@ -98,7 +97,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"id":null,"name":"Archive"}"#
+            r#"{"id":null,"name":"Archive","queued":true}"#
         );
     }
 }

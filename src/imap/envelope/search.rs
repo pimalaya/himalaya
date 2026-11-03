@@ -25,6 +25,7 @@ use crate::{
     imap::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+        outcome,
     },
     shared::table::style_from_preset,
 };
@@ -57,25 +58,26 @@ impl ImapEnvelopeSearchCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        let criteria = self.criteria.into_criteria()?;
-        let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
+            let criteria = self.criteria.into_criteria()?;
+            let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
 
-        let table = ImapSearchOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            id_color: account.envelopes_list_table_id_color(),
-            ids: ids
-                .into_iter()
-                .map(|id| SearchResult { id: id.get() })
-                .collect(),
-            uid_mode: !self.seq,
-        };
+            let table = ImapSearchOutput {
+                preset: account.table_preset().to_string(),
+                arrangement: account.table_arrangement(),
+                id_color: account.envelopes_list_table_id_color(),
+                ids: ids.into_iter().map(|id| id.get()).collect(),
+                uid_mode: !self.seq,
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 
@@ -264,14 +266,6 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
     NaiveDate::try_from(date).map_err(|e| format!("invalid date `{s}`: {e}"))
 }
 
-/// One row of the search results, a single message id.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchResult {
-    /// The UID, or the message number under `--seq`.
-    pub id: u32,
-}
-
 /// The `imap search` output, a table of message ids.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -283,7 +277,7 @@ pub struct ImapSearchOutput {
     #[serde(skip)]
     id_color: Color,
     uid_mode: bool,
-    ids: Vec<SearchResult>,
+    ids: Vec<u32>,
 }
 
 impl fmt::Display for ImapSearchOutput {
@@ -297,8 +291,8 @@ impl fmt::Display for ImapSearchOutput {
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new(id_header)]));
 
-        for result in &self.ids {
-            table.add_row(Row::from([Cell::new(result.id).fg(self.id_color)]));
+        for id in &self.ids {
+            table.add_row(Row::from([Cell::new(id).fg(self.id_color)]));
         }
 
         writeln!(f)?;

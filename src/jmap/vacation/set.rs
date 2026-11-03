@@ -8,9 +8,9 @@ use clap::Parser;
 use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, set::JmapVacationResponseUpdate,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::client::JmapClient;
+use crate::{jmap::client::JmapClient, shared::receipt::IdReceipt};
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]
@@ -72,6 +72,9 @@ impl JmapVacationSetCommand {
 
         client.vacation_response_set(patch)?;
 
-        printer.out(Message::new("Vacation response successfully updated"))
+        printer.out(IdReceipt {
+            id: "singleton".into(),
+            done: "JMAP vacation response successfully updated",
+        })
     }
 }

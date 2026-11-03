@@ -5,7 +5,7 @@
 //! (RFC 3461).
 
 use io_smtp::client::SmtpClient as _;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
@@ -20,7 +20,9 @@ use io_smtp::{
         SmtpReversePath,
     },
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{shared::message::arg::MessageArg, smtp::client::SmtpClient};
 
@@ -113,8 +115,34 @@ impl SmtpSendCommand {
             rcpt_parameters,
         };
 
+        let output = SmtpSendOutput {
+            mail_from: self.mail_from.to_string(),
+            rcpt_to: self.rcpt_to.iter().map(ToString::to_string).collect(),
+        };
+
         client.send(self.mail_from, self.rcpt_to, message, options)?;
-        printer.out(Message::new("Message successfully sent"))
+        printer.out(output)
+    }
+}
+
+/// The `smtp send` output: the envelope the server accepted, the
+/// transaction returning no id.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SmtpSendOutput {
+    /// The reverse path, as sent in `MAIL FROM`.
+    mail_from: String,
+    /// The forward paths, as sent in `RCPT TO`.
+    rcpt_to: Vec<String>,
+}
+
+impl fmt::Display for SmtpSendOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "Message successfully sent to {}",
+            self.rcpt_to.join(", ")
+        )
     }
 }
 

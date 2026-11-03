@@ -10,15 +10,13 @@ use io_gmail::v1::rest::threads::{
     GmailThreadSummary,
     list::{GmailThreadsList, GmailThreadsListParams},
 };
-use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
+use pimalaya_cli::{output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    gmail::client::GmailClient,
-    shared::{output::Paginated, table::style_from_preset},
+    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
 };
 
 /// List Gmail threads matching the given query and labels
@@ -73,7 +71,10 @@ impl GmailThreadsListCommand {
             threads: response.threads,
         };
 
-        printer.out(Paginated::new(table, next_page))
+        printer.out(Paginated {
+            inner: table,
+            next_page,
+        })
     }
 }
 

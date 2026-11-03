@@ -8,9 +8,12 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::{
     get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::{client::GmailClient, settings::convert::enabled_flag};
+use crate::gmail::{
+    client::GmailClient,
+    settings::{convert::enabled_flag, vacation::get::GmailSettingsVacationGetOutput},
+};
 
 /// Update the Gmail vacation responder settings.
 ///
@@ -83,11 +86,11 @@ impl GmailSettingsVacationSetCommand {
             settings.end_time = Some(end);
         }
 
-        let _out = {
+        let out = {
             let c = GmailVacationUpdate::new(&client.auth, &client.user_id, settings)?;
             client.run(c)?
         };
 
-        printer.out(Message::new("Gmail vacation settings successfully updated"))
+        printer.out(GmailSettingsVacationGetOutput::from(out.response))
     }
 }

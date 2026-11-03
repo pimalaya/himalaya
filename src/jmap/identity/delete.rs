@@ -6,12 +6,12 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::JmapIdentitySetArgs;
-use pimalaya_cli::{
-    printer::{Message, Printer},
-    table::sanitize,
-};
+use pimalaya_cli::{printer::Printer, table::sanitize};
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdsReceipt,
+};
 
 /// Delete a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
@@ -43,6 +43,9 @@ impl JmapIdentityDeleteCommand {
             bail!(msg)
         }
 
-        printer.out(Message::new("Identity successfully deleted"))
+        printer.out(IdsReceipt {
+            ids: output.destroyed,
+            done: "JMAP identities successfully deleted",
+        })
     }
 }

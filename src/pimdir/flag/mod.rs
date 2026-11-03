@@ -127,7 +127,8 @@ fn invalid(message: String) -> anyhow::Error {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirFlagStageOutput {
-    /// One row per message, in the order given.
+    /// One entry per message, in the order given.
+    #[serde(rename = "messages")]
     pub queued: Vec<PimdirFlagRow>,
 }
 
@@ -140,6 +141,7 @@ pub struct PimdirFlagRow {
     /// The `set-flags` row, which `pimdir queue show` and `cancel` take,
     /// `null` when the change left the message as it was and nothing was
     /// staged.
+    #[serde(rename = "row")]
     pub queue_id: Option<i64>,
 }
 
@@ -303,7 +305,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"queued":[{"id":"42","queueId":7},{"id":"43","queueId":null}]}"#
+            r#"{"messages":[{"id":"42","row":7},{"id":"43","row":null}]}"#
         );
     }
 }

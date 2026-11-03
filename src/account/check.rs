@@ -12,7 +12,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 #[cfg(all(feature = "imap", feature = "wizard"))]
 use io_sasl::mechanism::SaslMechanism;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{error::PartialOutcome, printer::Printer};
 use pimalaya_config::{secret::SecretResolver, toml::TomlConfig};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -24,6 +24,7 @@ use crate::config::ImapConfig;
 use crate::{
     backend::Backend,
     config::{Config, NO_CONFIG_HINT},
+    error::ErrorCode,
 };
 
 /// Validate the account configuration.
@@ -32,8 +33,9 @@ use crate::{
 /// handshake and authentication paths a real command takes. The report
 /// names each backend and whether it answered.
 ///
-/// A backend that fails fails the command, with one error naming each
-/// failed backend and why.
+/// The report is printed whole, each backend with its outcome and, when it
+/// failed, its code and why. A failed backend exits the command with
+/// status 2, the report being the output rather than a failure object.
 #[derive(Debug, Parser)]
 pub struct AccountCheckCommand;
 
@@ -196,24 +198,17 @@ impl AccountCheckCommand {
             ));
         }
 
-        let failed: Vec<String> = report
-            .backends
-            .iter()
-            .filter_map(|check| {
-                let err = check.error.as_ref()?;
-                Some(format!("{}: {err}", check.backend))
-            })
-            .collect();
+        let failed = report.backends.iter().any(|check| !check.ok);
+        printer.out(report)?;
 
-        if !failed.is_empty() {
-            bail!(
-                "Account `{}` failed its check: {}",
-                report.account,
-                failed.join("; ")
-            );
+        // NOTE: the report names every backend's outcome, so a failed one
+        // ends the command with the partial-outcome status rather than a
+        // failure object.
+        if failed {
+            return Err(PartialOutcome::default().into());
         }
 
-        printer.out(report)
+        Ok(())
     }
 }
 
@@ -559,7 +554,10 @@ pub struct BackendCheck {
     pub backend: &'static str,
     /// Whether it answered.
     pub ok: bool,
-    /// Why it did not, when it did not.
+    /// The stable code of the failure, `null` when it answered or the
+    /// failure carries none.
+    pub code: Option<ErrorCode>,
+    /// Why it did not answer, `null` when it did.
     pub error: Option<String>,
 }
 
@@ -582,11 +580,13 @@ impl BackendCheck {
             Ok(()) => Self {
                 backend,
                 ok: true,
+                code: None,
                 error: None,
             },
             Err(err) => Self {
                 backend,
                 ok: false,
+                code: pimalaya_cli::error::code_of(&err),
                 error: Some(format!("{err:#}")),
             },
         }
@@ -615,7 +615,11 @@ mod tests {
 
     use anyhow::Result;
     use io_pimdir::client::PimdirStore;
-    use pimalaya_cli::{error::code_of, printer::Printer};
+    use pimalaya_cli::{
+        error::{code_of, partial_outcome_of},
+        output::Bytes,
+        printer::Printer,
+    };
     use serde::Serialize;
 
     use crate::{
@@ -635,6 +639,16 @@ mod tests {
             Ok(())
         }
 
+        fn event<T: fmt::Display + Serialize>(&mut self, event: T) -> Result<()> {
+            self.0.push_str(&event.to_string());
+            Ok(())
+        }
+
+        fn out_bytes(&mut self, bytes: Bytes) -> Result<()> {
+            self.0.push_str(&String::from_utf8_lossy(&bytes.data));
+            Ok(())
+        }
+
         fn is_json(&self) -> bool {
             false
         }
@@ -642,8 +656,9 @@ mod tests {
 
     /// An account reading a pimdir store alone is checked rather than
     /// refused as declaring no backend, and a store that does not answer
-    /// fails the command, naming the backend and why, so a script reads
-    /// the verdict from the exit code.
+    /// prints the report naming the backend and why, then ends with the
+    /// partial-outcome status, so a script reads the verdict from the
+    /// exit code and each backend from the report.
     #[test]
     fn a_pimdir_account_is_checked() {
         let dir = tempfile::tempdir().unwrap();
@@ -669,9 +684,9 @@ mod tests {
         };
 
         let (result, out) = check();
-        let err = format!("{:#}", result.unwrap_err());
-        assert!(err.contains("pimdir: No pimdir store"), "{err}");
-        assert!(out.is_empty(), "{out}");
+        let err = result.unwrap_err();
+        assert_eq!(partial_outcome_of(&err).map(|o| o.status()), Some(2));
+        assert!(out.contains("pimdir: FAIL (No pimdir store"), "{out}");
 
         io_pimdir::client::PimdirStore::open(&store)
             .unwrap()

@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Modify the labels of a Gmail message (users.messages.modify).
 #[derive(Debug, Parser)]
@@ -28,9 +28,9 @@ impl GmailMessageModifyCommand {
         let message = client
             .message_modify(&self.id, &self.add, &self.remove)?
             .response;
-        printer.out(Message::new(format!(
-            "Gmail message `{}` successfully modified",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Gmail message successfully modified",
+        })
     }
 }

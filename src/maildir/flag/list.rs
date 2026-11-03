@@ -13,7 +13,7 @@ use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, shared::table::style_from_preset};
+use crate::{account::context::Account, email::flag::IanaFlag, shared::table::style_from_preset};
 
 /// List the standard Maildir flags.
 ///
@@ -29,12 +29,12 @@ impl MaildirFlagListCommand {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags: vec![
-                FlagRow::new(MaildirFlag::Passed),
-                FlagRow::new(MaildirFlag::Replied),
-                FlagRow::new(MaildirFlag::Seen),
-                FlagRow::new(MaildirFlag::Trashed),
-                FlagRow::new(MaildirFlag::Draft),
-                FlagRow::new(MaildirFlag::Flagged),
+                FlagRow::new(MaildirFlag::Passed, IanaFlag::Forwarded),
+                FlagRow::new(MaildirFlag::Replied, IanaFlag::Answered),
+                FlagRow::new(MaildirFlag::Seen, IanaFlag::Seen),
+                FlagRow::new(MaildirFlag::Trashed, IanaFlag::Deleted),
+                FlagRow::new(MaildirFlag::Draft, IanaFlag::Draft),
+                FlagRow::new(MaildirFlag::Flagged, IanaFlag::Flagged),
             ],
         };
 
@@ -55,18 +55,25 @@ pub struct MaildirFlagListOutput {
     flags: Vec<FlagRow>,
 }
 
-/// One row of the Maildir flags table: code and name.
+/// One row of the Maildir flags table: the flag, as the shared flags
+/// print it, its info letter as `raw`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlagRow {
-    code: String,
+    /// The info letter.
+    raw: String,
+    /// The IANA keyword the letter stands for.
+    iana: IanaFlag,
+    /// The Maildir name of the flag, for the text form.
+    #[serde(skip)]
     name: String,
 }
 
 impl FlagRow {
-    pub fn new(flag: MaildirFlag) -> Self {
+    pub fn new(flag: MaildirFlag, iana: IanaFlag) -> Self {
         Self {
-            code: flag.to_string(),
+            raw: flag.to_string(),
+            iana,
             name: format!("{flag:?}"),
         }
     }
@@ -82,7 +89,7 @@ impl fmt::Display for MaildirFlagListOutput {
             .set_header(Row::from([Cell::new("CODE"), Cell::new("NAME")]));
 
         for flag in &self.flags {
-            table.add_row(Row::from([Cell::new(&flag.code), Cell::new(&flag.name)]));
+            table.add_row(Row::from([Cell::new(&flag.raw), Cell::new(&flag.name)]));
         }
 
         writeln!(f)?;

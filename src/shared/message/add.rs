@@ -69,9 +69,7 @@ impl MessageAddCommand {
 pub(crate) struct MessageAddOutput {
     id: Option<String>,
     sent: bool,
-    /// Whether the backend queued the message for its sync engine rather
-    /// than added it, which only the wording says.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     queued: bool,
 }
 
@@ -98,7 +96,7 @@ mod tests {
     use crate::shared::message::add::MessageAddOutput;
 
     #[test]
-    fn a_queued_add_says_it_is_queued_and_keeps_its_json() {
+    fn a_queued_add_says_it_is_queued() {
         let output = |queued| MessageAddOutput {
             id: Some("d1@x.org".into()),
             sent: true,
@@ -115,7 +113,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output(true)).unwrap(),
-            r#"{"id":"d1@x.org","sent":true}"#
+            r#"{"id":"d1@x.org","sent":true,"queued":true}"#
         );
     }
 }

@@ -4,11 +4,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::mbox::{
-    arg::{MboxPathFlag, MessageIdsArg, TargetMboxPathFlag},
-    client::MboxClient,
+use crate::{
+    mbox::{
+        arg::{MboxPathFlag, MessageIdsArg, TargetMboxPathFlag},
+        client::MboxClient,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Copy mbox message(s) to another mbox.
@@ -29,6 +32,9 @@ impl MboxMessageCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         client.copy_messages(&self.source.inner, &self.target.inner, &ids)?;
-        printer.out(Message::new("Message(s) successfully copied"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner.clone(),
+            done: "Message(s) successfully copied",
+        })
     }
 }

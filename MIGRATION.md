@@ -9,7 +9,16 @@ v3 changes no configuration key: a v2 configuration loads as it is. What changes
 - **Keys are camelCase.** `messages-total` is `messagesTotal`, `next_page` is `nextPage`, `thread-id` is `threadId`. Values keep their spelling: error codes, flags and mailbox roles stay kebab-case or lowercase, provider passthrough keeps the provider's keys.
 - **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message. `message parse` prints the same view.
 - **Piped `--json` prints one value per line**, and every schema `json-schema` writes carries an `$id` naming the contract version.
-- **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, the pimdir store codes), described by the `himalaya-error` schema. Match on the code, never on the message, which may be reworded.
+- **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, the pimdir store codes), described by the `himalaya-error` schema, and `null` otherwise. Match on the code, never on the message, which may be reworded.
+- **No output is a sentence any more.** The `{"message": "..."}` confirmations are gone: every write prints what it acted on. `message copy|move` print `{count, queued}`; `message send` and a composer's `--save`/`--send` print `{id, saved, sent, queued}`; a protocol write prints `{id}` or `{ids}` (a Gmail label's id, the UIDs of an IMAP append or copy, a Sieve script's name). A shared write's `queued` is `true` when a sync engine applies it later (pimdir).
+- **Bytes never reach a JSON stdout raw.** `message read --raw`, `jmap email export`, the raw Gmail and Graph `get`s and their attachment downloads print `{data, size, mime}`, `data` in base64.
+- **Absent values are `null`**, every key printed.
+- **Shapes made one:** flags written print `{raw, iana}` like envelopes, `inReplyTo` is a list in the read view, `imap fetch` addresses are `{name, email}`, `imap search` ids are numbers, an attachment row carries `role` instead of `inline`, maildir and mbox `flag list` rows are `{raw, iana}`.
+- **Listings say whether more follow.** `envelope list` and `search` print `nextPage`, `null` on the last page, which `--page-token` takes back; `msgraph messages list` does the same with Graph's `$skip`.
+- **`account check` prints every backend and exits 2** when one fails, each row carrying the failure's `code`, rather than one joined error exiting 1.
+- **A protocol command prints its completion.** Every `imap` command prints `status` (`OK`, or `NO`/`BAD` with `text`, exiting 2). `imap raw` and `sieve raw` print the server's untagged or data responses as events, one JSON line each, then the completion; `smtp raw` prints `{code, text}`. Exit 2 means the server refused; exit 1 still means no answer.
+- **pimdir names a queue row `row`** (`queueId`, `copyQueueId` and the queue view's `id` before); `pimdir flag add|set|remove` print `{messages: [{id, row}]}`; tag statuses are kebab-case (`unknown-flags`, `ambiguous-source`).
+- **Gmail lists use the provider's key**: `messages list` prints `messages` (not `ids`), the settings lists `delegates`, `filter` and `forwardingAddresses` (not `response`); settings writes print the settings.
 
 ### Commands that now fail instead of pretending
 

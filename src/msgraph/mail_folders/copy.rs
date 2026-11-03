@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Copy a Microsoft Graph mail folder into another folder (`POST
 /// /me/mailFolders/{id}/copy`).
@@ -28,9 +28,9 @@ impl MsgraphMailFolderCopyCommand {
             .mail_folder_copy(&self.id, &self.destination)?
             .response;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph mail folder copied to `{}`",
-            folder.id
-        )))
+        printer.out(IdReceipt {
+            id: folder.id,
+            done: "Microsoft Graph mail folder copied to",
+        })
     }
 }

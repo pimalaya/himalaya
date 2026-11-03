@@ -34,6 +34,11 @@ impl MsgraphAttachmentGetCommand {
             .attachment_get_raw(&self.message_id, &self.id)?
             .response;
 
-        write_bytes_or_save(printer, self.output.as_deref(), &bytes)
+        write_bytes_or_save(
+            printer,
+            self.output.as_deref(),
+            bytes,
+            "application/octet-stream",
+        )
     }
 }

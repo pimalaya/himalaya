@@ -2,6 +2,8 @@
 //!
 //! The `imap append` command, RFC 3501 `APPEND`.
 
+use std::fmt;
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
@@ -9,10 +11,12 @@ use io_imap::{
     rfc3501::append::ImapMessageAppendOptions,
     types::{IntoStatic, flag::Flag, mailbox::Mailbox},
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
-    imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
     shared::message::arg::MessageArg,
 };
 
@@ -52,16 +56,46 @@ impl ImapMessageSaveCommand {
             .map(|f| Flag::try_from(f).map(IntoStatic::into_static))
             .collect::<Result<_, _>>()?;
 
-        client.append(
-            mailbox,
-            &message,
-            ImapMessageAppendOptions {
-                flags,
-                date: None,
-                non_sync: false,
-            },
-        )?;
+        let result = client
+            .append(
+                mailbox,
+                &message,
+                ImapMessageAppendOptions {
+                    flags,
+                    date: None,
+                    non_sync: false,
+                },
+            )
+            .map_err(Into::into)
+            .map(|(exists, append_uid)| ImapMessageAppendOutput {
+                uid_validity: append_uid.map(|(validity, _)| validity),
+                uid: append_uid.map(|(_, uid)| uid),
+                exists,
+            });
 
-        printer.out(Message::new("Message successfully saved"))
+        outcome::print(printer, result)
+    }
+}
+
+/// What `imap append` understood of the server's answer.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ImapMessageAppendOutput {
+    /// The UID validity of the mailbox, from `APPENDUID` (UIDPLUS),
+    /// `null` when the server sent none.
+    uid_validity: Option<u32>,
+    /// The UID of the appended message, from `APPENDUID` (UIDPLUS),
+    /// `null` when the server sent none.
+    uid: Option<u32>,
+    /// How many messages the mailbox holds, `null` when not sent.
+    exists: Option<u32>,
+}
+
+impl fmt::Display for ImapMessageAppendOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.uid {
+            Some(uid) => writeln!(f, "Message successfully appended: UID {uid}"),
+            None => writeln!(f, "Message successfully appended"),
+        }
     }
 }

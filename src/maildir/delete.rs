@@ -4,11 +4,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::maildir::{
-    arg::RequiredMaildirPathFlag,
-    client::{MaildirClient, validate_maildir_name},
+use crate::{
+    maildir::{
+        arg::RequiredMaildirPathFlag,
+        client::{MaildirClient, validate_maildir_name},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Delete a Maildir folder.
@@ -30,7 +33,11 @@ impl MaildirMailboxDeleteCommand {
         // the bare name goes through: pre-joining the root would look for
         // the Maildir under a second copy of it.
         let path = self.maildir_path.inner.to_string_lossy().into_owned();
-        client.delete_maildir(path)?;
-        printer.out(Message::new("Maildir successfully deleted"))
+        client.delete_maildir(path.clone())?;
+
+        printer.out(IdReceipt {
+            id: path,
+            done: "Maildir successfully deleted",
+        })
     }
 }

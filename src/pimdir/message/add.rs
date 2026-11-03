@@ -60,6 +60,7 @@ impl PimdirMessageAddCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMessageAddOutput {
     /// The queue row the message waits in.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// The bare `Message-ID` it is filed under once applied.
     pub message_id: String,

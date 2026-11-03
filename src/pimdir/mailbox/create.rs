@@ -57,6 +57,7 @@ impl PimdirMailboxCreateCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxCreateOutput {
     /// The `collection-create` row.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// The new mailbox's name.
     pub name: String,

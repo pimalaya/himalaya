@@ -4,10 +4,7 @@
 //! block and a walk of its MIME parts, or under `--json` as a designed
 //! view of its headers, bodies and parts.
 
-use std::{
-    fmt,
-    io::{Write, stdout},
-};
+use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
@@ -21,10 +18,7 @@ use mime::{
         datetime::MimeDateTime,
     },
 };
-use pimalaya_cli::{
-    printer::{Message as PrinterMessage, Printer},
-    table::sanitize,
-};
+use pimalaya_cli::{output::Bytes, printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -69,8 +63,8 @@ pub struct MessageReadCommand {
     pub mailbox: MailboxArg,
     /// Write the raw RFC 5322 bytes to stdout.
     ///
-    /// With the global `--json` flag the bytes come out as a JSON string
-    /// instead, so the output stays valid JSON.
+    /// With the global `--json` flag the bytes come out as a base64
+    /// `data` field instead, so the output stays valid JSON.
     #[arg(long)]
     pub raw: bool,
     /// Mark the message as seen, the read leaving its flags alone
@@ -91,13 +85,10 @@ impl MessageReadCommand {
         let raw = client.get_message(&mailbox, &self.id, self.seen)?;
 
         if self.raw {
-            if printer.is_json() {
-                return printer.out(PrinterMessage::new(String::from_utf8_lossy(&raw)));
-            }
-
-            let mut out = stdout().lock();
-            out.write_all(&raw)?;
-            return Ok(());
+            return printer.out_bytes(Bytes {
+                data: raw,
+                mime: "message/rfc822".into(),
+            });
         }
 
         printer.out(MessageReadOutput::from_raw(&raw)?)
@@ -195,8 +186,9 @@ pub struct MessageHeaders {
     pub date: Option<String>,
     /// The `Message-ID`, without angle brackets.
     pub message_id: Option<String>,
-    /// The first id of `In-Reply-To`, without angle brackets.
-    pub in_reply_to: Option<String>,
+    /// The ids of `In-Reply-To`, in order, without angle brackets, as
+    /// envelopes print them.
+    pub in_reply_to: Vec<String>,
     /// The ids of `References`, in order, without angle brackets.
     pub references: Vec<String>,
     /// The `List-ID` header as found, decoded.
@@ -259,7 +251,7 @@ impl MessageHeaders {
                 .filter(MimeDateTime::is_valid)
                 .map(|date| date.to_rfc3339()),
             message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
-            in_reply_to: ids(root.header::<IN_REPLY_TO>()).into_iter().next(),
+            in_reply_to: ids(root.header::<IN_REPLY_TO>()),
             references: ids(root.header::<REFERENCES>()),
             list_id: text("List-ID"),
             list_unsubscribe: text("List-Unsubscribe"),
@@ -996,7 +988,10 @@ mod tests {
         let json = view(raw);
 
         assert_eq!(json["headers"]["messageId"], "3@example.com");
-        assert_eq!(json["headers"]["inReplyTo"], "2@example.com");
+        assert_eq!(
+            json["headers"]["inReplyTo"],
+            serde_json::json!(["2@example.com", "1@example.com"])
+        );
         assert_eq!(
             json["headers"]["references"],
             serde_json::json!(["1@example.com", "2@example.com"])

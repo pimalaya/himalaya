@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::delete::GmailSendAsDelete;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Delete a Gmail send-as alias (settings.sendAs.delete).
 #[derive(Debug, Parser)]
@@ -26,9 +26,9 @@ impl GmailSettingsSendAsDeleteCommand {
             client.run(c)?;
         }
 
-        printer.out(Message::new(format!(
-            "Gmail send-as `{}` successfully deleted",
-            self.email
-        )))
+        printer.out(IdReceipt {
+            id: self.email,
+            done: "Gmail send-as successfully deleted",
+        })
     }
 }

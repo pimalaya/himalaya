@@ -21,7 +21,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, config::ImapIdConfig, imap::client::ImapClient,
+    account::context::Account,
+    config::ImapIdConfig,
+    imap::{client::ImapClient, outcome},
     shared::table::style_from_preset,
 };
 
@@ -55,28 +57,32 @@ impl ImapIdCommand {
             params.extend(more);
         }
 
-        let params = client.id(ImapServerIdOptions {
-            parameters: Some(params.into_iter().collect()),
-        })?;
+        let result = (|| -> Result<_> {
+            let params = client.id(ImapServerIdOptions {
+                parameters: Some(params.into_iter().collect()),
+            })?;
 
-        let table = ImapIdOutput {
-            preset: account.table_preset().to_string(),
-            server_id: params
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|(key, val)| {
-                    Some((
-                        String::from_utf8(key.into_inner().into_owned()).ok()?,
-                        match val.into_option() {
-                            Some(val) => Some(String::from_utf8(val.into_owned()).ok()?),
-                            None => None,
-                        },
-                    ))
-                })
-                .collect(),
-        };
+            let table = ImapIdOutput {
+                preset: account.table_preset().to_string(),
+                server_id: params
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|(key, val)| {
+                        Some((
+                            String::from_utf8(key.into_inner().into_owned()).ok()?,
+                            match val.into_option() {
+                                Some(val) => Some(String::from_utf8(val.into_owned()).ok()?),
+                                None => None,
+                            },
+                        ))
+                    })
+                    .collect(),
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

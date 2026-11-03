@@ -9,11 +9,13 @@ use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions, rfc6851::r#move::ImapMessageMoveOptions,
     types::mailbox::Mailbox,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
 use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
+    message::copy::ImapMessageCopyOutput,
+    outcome,
 };
 
 /// Move messages to the given mailbox (MOVE, RFC 6851).
@@ -40,19 +42,26 @@ impl ImapMessageMoveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
-
         let sequence_set = self.sequence_set.as_str().try_into()?;
         let destination: Mailbox<'static> = self.mailbox_dest_name.inner.try_into()?;
 
-        client.r#move(
-            sequence_set,
-            destination,
-            ImapMessageMoveOptions { uid: !self.seq },
-        )?;
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        printer.out(Message::new("Message(s) successfully moved"))
+            let copy_uid = client.r#move(
+                sequence_set,
+                destination,
+                ImapMessageMoveOptions { uid: !self.seq },
+            )?;
+
+            Ok(ImapMessageCopyOutput::new(
+                copy_uid,
+                "Messages successfully moved",
+            ))
+        })();
+
+        outcome::print(printer, result)
     }
 }

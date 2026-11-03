@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Move a Gmail message to the trash (users.messages.trash).
 #[derive(Debug, Parser)]
@@ -20,9 +20,9 @@ impl GmailMessageTrashCommand {
     /// Moves the message to the trash.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let message = client.message_trash(&self.id)?.response;
-        printer.out(Message::new(format!(
-            "Gmail message `{}` successfully trashed",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Gmail message successfully trashed",
+        })
     }
 }

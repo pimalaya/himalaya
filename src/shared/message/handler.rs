@@ -3,8 +3,8 @@
 //! Where the MIME bytes a composer produced go: stdout, a mailbox, the
 //! send path, or a mailbox then the send path.
 //!
-//! [`route`] runs one of those and prints a generic success line, which
-//! is what the composers want. A caller needing a richer line, `message
+//! [`route`] runs one of those and prints its receipt, which is what the
+//! composers want. A caller needing a richer line, `message
 //! add` naming the id it appended, calls [`apply`] and renders the
 //! [`Outcome`] itself.
 //!
@@ -23,7 +23,7 @@ use mime::{
     tree::cst::MimeCst,
     value::address::{MimeAddressList, MimeMailbox},
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{output::Bytes, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -103,8 +103,8 @@ pub fn apply(
     })
 }
 
-/// Runs [`apply`] with `\Seen` as the saved flag and prints a generic
-/// success line.
+/// Runs [`apply`] with `\Seen` as the saved flag and prints its receipt,
+/// or the message itself when neither saving nor sending.
 pub fn route(
     printer: &mut impl Printer,
     account: &Account,
@@ -113,8 +113,15 @@ pub fn route(
     save: Option<&str>,
     send: bool,
 ) -> Result<()> {
-    if printer.is_json() && !send && save.is_none() {
-        return printer.out(MessageTemplateOutput::parse(&raw)?);
+    if !send && save.is_none() {
+        if printer.is_json() {
+            return printer.out(MessageTemplateOutput::parse(&raw)?);
+        }
+
+        return printer.out_bytes(Bytes {
+            data: raw,
+            mime: "message/rfc822".into(),
+        });
     }
 
     let queued = client.queues_writes();
@@ -126,31 +133,62 @@ pub fn route(
         save,
         send,
     )?;
-    let message = match (outcome, queued) {
-        (Outcome::Stdout, _) => return Ok(()),
-        (Outcome::Saved { sent: true, .. }, false) => "Message successfully saved and sent",
-        (Outcome::Saved { sent: false, .. }, false) => "Message successfully saved",
-        (Outcome::Sent, false) => "Message successfully sent",
-        (Outcome::Saved { sent: true, .. }, true) => "Message queued for saving and sending",
-        (Outcome::Saved { sent: false, .. }, true) => "Message queued for saving",
-        (Outcome::Sent, true) => "Message queued for sending",
+    let output = match outcome {
+        Outcome::Stdout => return Ok(()),
+        Outcome::Saved { id, sent } => MessageRouteOutput {
+            id,
+            saved: true,
+            sent,
+            queued,
+        },
+        Outcome::Sent => MessageRouteOutput {
+            id: None,
+            saved: false,
+            sent: true,
+            queued,
+        },
     };
-    printer.out(MessageRouteOutput {
-        message: message.to_owned(),
-    })
+
+    printer.out(output)
 }
 
-/// The confirmation line of a saved or sent message.
+/// The receipt of a saved or sent message.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageRouteOutput {
-    /// What happened, for a human.
-    pub message: String,
+    /// The id of the saved copy, `null` when not saved, queued, or not
+    /// returned by the backend.
+    pub id: Option<String>,
+    /// Whether a copy was saved to a mailbox.
+    pub saved: bool,
+    /// Whether the message was sent.
+    pub sent: bool,
+    /// Whether a sync engine applies the write later rather than now.
+    pub queued: bool,
 }
 
 impl fmt::Display for MessageRouteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.message)
+        let what = match (self.saved, self.sent) {
+            (true, true) => "saving and sending",
+            (true, false) => "saving",
+            _ => "sending",
+        };
+
+        if self.queued {
+            return writeln!(f, "Message queued for {what}");
+        }
+
+        let done = match (self.saved, self.sent) {
+            (true, true) => "saved and sent",
+            (true, false) => "saved",
+            _ => "sent",
+        };
+
+        match &self.id {
+            Some(id) => writeln!(f, "Message {id} successfully {done}"),
+            None => writeln!(f, "Message successfully {done}"),
+        }
     }
 }
 
@@ -162,12 +200,10 @@ impl fmt::Display for MessageRouteOutput {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageTemplateOutput {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
     pub to: Vec<String>,
     pub cc: Vec<String>,
     pub bcc: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
     pub body: String,
 }

@@ -14,7 +14,7 @@ use pimalaya_cli::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, shared::table::style_from_preset};
+use crate::{account::context::Account, email::flag::IanaFlag, shared::table::style_from_preset};
 
 /// List the mbox flags.
 ///
@@ -26,8 +26,9 @@ pub struct MboxFlagListCommand;
 impl MboxFlagListCommand {
     /// Tables the six flags, their letters and headers.
     pub fn execute(self, printer: &mut impl Printer, account: &mut Account) -> Result<()> {
-        let flag = |code: &str, header: &str, name: &str| FlagRow {
-            code: code.into(),
+        let flag = |raw: &str, header: &str, name: &str, iana| FlagRow {
+            raw: raw.into(),
+            iana,
             header: header.into(),
             name: name.into(),
         };
@@ -36,12 +37,12 @@ impl MboxFlagListCommand {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             flags: vec![
-                flag("R", "Status", "Seen"),
-                flag("O", "Status", "Old"),
-                flag("A", "X-Status", "Answered"),
-                flag("F", "X-Status", "Flagged"),
-                flag("T", "X-Status", "Draft"),
-                flag("D", "X-Status", "Deleted"),
+                flag("R", "Status", "Seen", Some(IanaFlag::Seen)),
+                flag("O", "Status", "Old", None),
+                flag("A", "X-Status", "Answered", Some(IanaFlag::Answered)),
+                flag("F", "X-Status", "Flagged", Some(IanaFlag::Flagged)),
+                flag("T", "X-Status", "Draft", Some(IanaFlag::Draft)),
+                flag("D", "X-Status", "Deleted", Some(IanaFlag::Deleted)),
             ],
         };
 
@@ -62,12 +63,20 @@ pub struct MboxFlagListOutput {
     flags: Vec<FlagRow>,
 }
 
-/// One row of the mbox flags table: letter, header and name.
+/// One row of the mbox flags table: the flag, as the shared flags print
+/// it, its letter as `raw`, and the header carrying the letter.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlagRow {
-    code: String,
+    /// The letter.
+    raw: String,
+    /// The IANA keyword the letter stands for, `null` for `O`, which
+    /// has none.
+    iana: Option<IanaFlag>,
+    /// The header carrying the letter.
     header: String,
+    /// The name of the flag, for the text form.
+    #[serde(skip)]
     name: String,
 }
 
@@ -86,7 +95,7 @@ impl fmt::Display for MboxFlagListOutput {
 
         for flag in &self.flags {
             table.add_row(Row::from([
-                Cell::new(&flag.code),
+                Cell::new(&flag.raw),
                 Cell::new(&flag.header),
                 Cell::new(&flag.name),
             ]));

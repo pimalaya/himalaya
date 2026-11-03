@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::GmailLabel;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Update a Gmail label name (users.labels.update).
 #[derive(Debug, Parser)]
@@ -30,9 +30,9 @@ impl GmailLabelUpdateCommand {
         };
         client.label_update(&label)?;
 
-        printer.out(Message::new(format!(
-            "Gmail label `{}` successfully updated",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Gmail label successfully updated",
+        })
     }
 }

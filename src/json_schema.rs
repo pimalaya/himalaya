@@ -10,28 +10,45 @@
 //!
 //! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::JsonSchemaCommand
 
-use std::collections::BTreeMap;
-
-use pimalaya_cli::{clap::commands::JsonSchemaRegistry, error::ErrorReport};
-use schemars::schema_for;
+use pimalaya_cli::{
+    clap::commands::JsonSchemaRegistry,
+    error::ErrorReport,
+    output::{Bytes, Paginated},
+};
+use schemars::JsonSchema;
 
 use crate::error::ErrorCode;
+#[cfg(any(
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "jmap",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "m2dir",
+    feature = "sieve"
+))]
+use crate::shared::receipt::{IdReceipt, IdsReceipt};
 
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
 /// Each value describes the type the command hands to the printer, and
 /// `himalaya-error` the failure object every command prints instead.
 /// Paginated listings use the `Paginated<T>` wrapper, so the extra
-/// `nextPage` field is described too.
+/// `nextPage` field is described too, and a command printing one of two
+/// types is described by both, through `OneOf`.
 pub fn registry() -> JsonSchemaRegistry {
-    let mut schemas = BTreeMap::new();
+    let mut registry = JsonSchemaRegistry::new("himalaya", env!("CARGO_PKG_VERSION"));
 
     macro_rules! insert {
         ($key:expr, $ty:ty) => {
-            schemas.insert(
-                $key.to_string(),
-                serde_json::to_value(schema_for!($ty)).unwrap(),
-            );
+            registry.insert::<$ty>($key);
+        };
+    }
+
+    #[cfg(feature = "imap")]
+    macro_rules! imap {
+        ($key:expr, $ty:ty) => {
+            registry.insert::<crate::imap::outcome::ImapOutcome<$ty>>($key);
         };
     }
 
@@ -55,12 +72,12 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-envelope-list",
-            crate::shared::envelope::list::EnvelopeListOutput
+            Paginated<crate::shared::envelope::list::EnvelopeListOutput>
         );
-        // NOTE: `envelope search` renders the `EnvelopeListOutput` of `list`.
+        // NOTE: `envelope search` renders the page `list` renders.
         insert!(
             "himalaya-envelope-search",
-            crate::shared::envelope::list::EnvelopeListOutput
+            Paginated<crate::shared::envelope::list::EnvelopeListOutput>
         );
         insert!("himalaya-flag-add", crate::shared::flag::add::FlagAddOutput);
         insert!("himalaya-flag-set", crate::shared::flag::set::FlagSetOutput);
@@ -72,14 +89,22 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-message-add",
             crate::shared::message::add::MessageAddOutput
         );
-        // NOTE: `message send` prints the confirmation line only.
+        insert!(
+            "himalaya-message-copy",
+            crate::shared::message::copy::MessageCopyOutput
+        );
+        insert!(
+            "himalaya-message-move",
+            crate::shared::message::mv::MessageMoveOutput
+        );
         insert!(
             "himalaya-message-send",
             crate::shared::message::handler::MessageRouteOutput
         );
+        // NOTE: `message read --raw` prints the message as bytes.
         insert!(
             "himalaya-message-read",
-            crate::shared::message::read::MessageReadOutput
+            OneOf<crate::shared::message::read::MessageReadOutput, Bytes>
         );
         // NOTE: `message parse` prints the `message read` view, or under
         // `--part` the part `attachment download --stdout` prints.
@@ -91,19 +116,28 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-message-delete",
             crate::shared::message::delete::MessageDeleteOutput
         );
-        // NOTE: the composers print a `MessageTemplateOutput` when neither
-        // saving nor sending, and a confirmation line otherwise.
+        // NOTE: the composers print the template when neither saving nor
+        // sending, and the receipt of the save or the send otherwise.
         insert!(
             "himalaya-message-compose",
-            crate::shared::message::handler::MessageTemplateOutput
+            OneOf<
+                crate::shared::message::handler::MessageTemplateOutput,
+                crate::shared::message::handler::MessageRouteOutput,
+            >
         );
         insert!(
             "himalaya-message-reply",
-            crate::shared::message::handler::MessageTemplateOutput
+            OneOf<
+                crate::shared::message::handler::MessageTemplateOutput,
+                crate::shared::message::handler::MessageRouteOutput,
+            >
         );
         insert!(
             "himalaya-message-forward",
-            crate::shared::message::handler::MessageTemplateOutput
+            OneOf<
+                crate::shared::message::handler::MessageTemplateOutput,
+                crate::shared::message::handler::MessageRouteOutput,
+            >
         );
         insert!(
             "himalaya-attachment-list",
@@ -144,32 +178,32 @@ pub fn registry() -> JsonSchemaRegistry {
     );
     #[cfg(feature = "imap")]
     {
-        insert!("himalaya-imap-id", crate::imap::id::ImapIdOutput);
-        insert!(
+        imap!("himalaya-imap-id", crate::imap::id::ImapIdOutput);
+        imap!(
             "himalaya-imap-status",
             crate::imap::mailbox::status::ImapMailboxStatusOutput
         );
-        insert!(
+        imap!(
             "himalaya-imap-list",
             crate::imap::mailbox::list::ImapMailboxListOutput
         );
-        insert!(
+        imap!(
             "himalaya-imap-search",
             crate::imap::envelope::search::ImapSearchOutput
         );
-        insert!(
+        imap!(
             "himalaya-imap-sort",
             crate::imap::envelope::sort::ImapSortOutput
         );
-        insert!(
+        imap!(
             "himalaya-imap-thread",
             crate::imap::envelope::thread::ImapThreadOutput
         );
-        insert!(
+        imap!(
             "himalaya-imap-flag",
             crate::imap::flag::list::ImapFlagListOutput<'static>
         );
-        insert!("himalaya-imap-fetch", crate::imap::fetch::ImapFetchOutput);
+        imap!("himalaya-imap-fetch", crate::imap::fetch::ImapFetchOutput);
     }
 
     #[cfg(feature = "sieve")]
@@ -233,8 +267,6 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "gmail")]
     {
-        use crate::shared::output::Paginated;
-
         insert!(
             "himalaya-gmail-profile-get",
             crate::gmail::profile::get::GmailProfileOutput
@@ -253,7 +285,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-messages-get",
-            crate::gmail::messages::get::GmailMessageGetOutput
+            OneOf<crate::gmail::messages::get::GmailMessageGetOutput, Bytes>
         );
         insert!(
             "himalaya-gmail-drafts-list",
@@ -261,7 +293,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-drafts-get",
-            crate::gmail::drafts::get::GmailDraftGetOutput
+            OneOf<crate::gmail::drafts::get::GmailDraftGetOutput, Bytes>
         );
         insert!(
             "himalaya-gmail-drafts-create",
@@ -339,8 +371,6 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "msgraph")]
     {
-        use crate::shared::output::Paginated;
-
         insert!(
             "himalaya-msgraph-profile-get",
             crate::msgraph::profile::get::MsgraphProfileOutput
@@ -363,7 +393,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-msgraph-messages-get",
-            crate::msgraph::messages::get::MsgraphMessageGetOutput
+            OneOf<crate::msgraph::messages::get::MsgraphMessageGetOutput, Bytes>
         );
         insert!(
             "himalaya-msgraph-attachments-list",
@@ -476,13 +506,22 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-pimdir-attachment-search",
             crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
+        // NOTE: `pimdir search --threads` prints the threads instead.
         insert!(
             "himalaya-pimdir-search",
-            crate::pimdir::search::PimdirSearchOutput
+            OneOf<
+                crate::pimdir::search::PimdirSearchOutput,
+                crate::pimdir::search::PimdirSearchThreadsOutput,
+            >
         );
+        // NOTE: `pimdir performer` lists the candidates, or with a source
+        // or `--clear` prints the choice.
         insert!(
-            "himalaya-pimdir-search-threads",
-            crate::pimdir::search::PimdirSearchThreadsOutput
+            "himalaya-pimdir-performer",
+            OneOf<
+                crate::pimdir::performer::PimdirPerformers,
+                crate::pimdir::performer::PimdirPerformerChosen,
+            >
         );
         insert!(
             "himalaya-pimdir-count",
@@ -495,19 +534,282 @@ pub fn registry() -> JsonSchemaRegistry {
         insert!("himalaya-pimdir-tag", crate::pimdir::tag::PimdirTagOutput);
     }
 
+    // NOTE: the writes of the protocol namespaces with no payload of their
+    // own print a receipt naming what they acted on.
+
+    #[cfg(feature = "imap")]
+    {
+        use crate::imap::outcome::{ImapDoneOutput, ImapMailboxOutput};
+
+        imap!(
+            "himalaya-imap-select",
+            crate::imap::mailbox::select::ImapMailboxSelectOutput
+        );
+        imap!("himalaya-imap-create", ImapMailboxOutput);
+        imap!("himalaya-imap-delete", ImapMailboxOutput);
+        imap!("himalaya-imap-rename", ImapMailboxOutput);
+        imap!("himalaya-imap-subscribe", ImapMailboxOutput);
+        imap!("himalaya-imap-unsubscribe", ImapMailboxOutput);
+        imap!("himalaya-imap-close", ImapDoneOutput);
+        imap!("himalaya-imap-unselect", ImapDoneOutput);
+        imap!(
+            "himalaya-imap-expunge",
+            crate::imap::mailbox::expunge::ImapMailboxExpungeOutput
+        );
+        imap!("himalaya-imap-store", crate::imap::fetch::ImapFetchOutput);
+        imap!(
+            "himalaya-imap-append",
+            crate::imap::message::save::ImapMessageAppendOutput
+        );
+        imap!(
+            "himalaya-imap-copy",
+            crate::imap::message::copy::ImapMessageCopyOutput
+        );
+        imap!(
+            "himalaya-imap-move",
+            crate::imap::message::copy::ImapMessageCopyOutput
+        );
+        insert!("himalaya-imap-raw", crate::imap::raw::ImapRawOutput);
+        registry.insert_events::<crate::imap::raw::ImapRawEvent>("himalaya-imap-raw");
+    }
+
+    #[cfg(feature = "smtp")]
+    {
+        insert!("himalaya-smtp-send", crate::smtp::send::SmtpSendOutput);
+        insert!("himalaya-smtp-raw", crate::smtp::raw::SmtpRawOutput);
+    }
+
+    #[cfg(feature = "sieve")]
+    {
+        insert!("himalaya-sieve-activate", IdReceipt);
+        insert!("himalaya-sieve-delete", IdReceipt);
+        insert!("himalaya-sieve-rename", IdReceipt);
+        insert!(
+            "himalaya-sieve-deactivate",
+            crate::sieve::deactivate::SieveDeactivateOutput
+        );
+        insert!(
+            "himalaya-sieve-check",
+            crate::sieve::check::SieveScriptOutput
+        );
+        insert!("himalaya-sieve-put", crate::sieve::check::SieveScriptOutput);
+        insert!("himalaya-sieve-raw", crate::sieve::raw::SieveRawOutput);
+        registry.insert_events::<crate::sieve::raw::SieveRawEvent>("himalaya-sieve-raw");
+    }
+
+    #[cfg(feature = "jmap")]
+    {
+        insert!("himalaya-jmap-email-copy", IdsReceipt);
+        insert!("himalaya-jmap-email-delete", IdsReceipt);
+        insert!("himalaya-jmap-email-update", IdsReceipt);
+        insert!("himalaya-jmap-email-export", Bytes);
+        insert!(
+            "himalaya-jmap-email-import",
+            crate::jmap::email::import::JmapEmailImportOutput
+        );
+        insert!(
+            "himalaya-jmap-email-read",
+            crate::jmap::email::read::JmapEmailReadOutput
+        );
+        insert!("himalaya-jmap-identity-create", IdReceipt);
+        insert!("himalaya-jmap-identity-update", IdReceipt);
+        insert!("himalaya-jmap-identity-delete", IdsReceipt);
+        insert!("himalaya-jmap-mailbox-create", IdReceipt);
+        insert!("himalaya-jmap-mailbox-update", IdReceipt);
+        insert!("himalaya-jmap-mailbox-destroy", IdsReceipt);
+        insert!("himalaya-jmap-submission-cancel", IdsReceipt);
+        insert!("himalaya-jmap-vacation-response-set", IdReceipt);
+    }
+
+    #[cfg(feature = "gmail")]
+    {
+        use crate::{gmail::settings, shared::output::SavedOutput};
+
+        for key in [
+            "himalaya-gmail-drafts-delete",
+            "himalaya-gmail-drafts-send",
+            "himalaya-gmail-labels-create",
+            "himalaya-gmail-labels-delete",
+            "himalaya-gmail-labels-update",
+            "himalaya-gmail-messages-delete",
+            "himalaya-gmail-messages-import",
+            "himalaya-gmail-messages-insert",
+            "himalaya-gmail-messages-modify",
+            "himalaya-gmail-messages-send",
+            "himalaya-gmail-messages-trash",
+            "himalaya-gmail-messages-untrash",
+            "himalaya-gmail-settings-delegates-create",
+            "himalaya-gmail-settings-delegates-delete",
+            "himalaya-gmail-settings-filters-create",
+            "himalaya-gmail-settings-filters-delete",
+            "himalaya-gmail-settings-forwarding-addresses-create",
+            "himalaya-gmail-settings-forwarding-addresses-delete",
+            "himalaya-gmail-settings-send-as-create",
+            "himalaya-gmail-settings-send-as-delete",
+            "himalaya-gmail-settings-send-as-update",
+            "himalaya-gmail-settings-send-as-verify",
+            "himalaya-gmail-threads-delete",
+            "himalaya-gmail-threads-modify",
+            "himalaya-gmail-threads-trash",
+            "himalaya-gmail-threads-untrash",
+        ] {
+            insert!(key, IdReceipt);
+        }
+
+        insert!("himalaya-gmail-messages-batch-delete", IdsReceipt);
+        insert!("himalaya-gmail-messages-batch-modify", IdsReceipt);
+        insert!(
+            "himalaya-gmail-attachments-get",
+            OneOf<Bytes, SavedOutput>
+        );
+        // NOTE: a settings write prints the settings the server holds
+        // after it, as the matching `get` does.
+        insert!(
+            "himalaya-gmail-settings-auto-forwarding-set",
+            settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput
+        );
+        insert!(
+            "himalaya-gmail-settings-imap-set",
+            settings::imap::get::GmailSettingsImapGetOutput
+        );
+        insert!(
+            "himalaya-gmail-settings-language-set",
+            settings::language::get::GmailSettingsLanguageGetOutput
+        );
+        insert!(
+            "himalaya-gmail-settings-pop-set",
+            settings::pop::get::GmailSettingsPopGetOutput
+        );
+        insert!(
+            "himalaya-gmail-settings-vacation-set",
+            settings::vacation::get::GmailSettingsVacationGetOutput
+        );
+    }
+
+    #[cfg(feature = "msgraph")]
+    {
+        use crate::shared::output::SavedOutput;
+
+        for key in [
+            "himalaya-msgraph-attachments-create",
+            "himalaya-msgraph-attachments-delete",
+            "himalaya-msgraph-mail-folders-copy",
+            "himalaya-msgraph-mail-folders-create",
+            "himalaya-msgraph-mail-folders-delete",
+            "himalaya-msgraph-mail-folders-move",
+            "himalaya-msgraph-mail-folders-rename",
+            "himalaya-msgraph-messages-copy",
+            "himalaya-msgraph-messages-create",
+            "himalaya-msgraph-messages-delete",
+            "himalaya-msgraph-messages-move",
+            "himalaya-msgraph-messages-send-draft",
+            "himalaya-msgraph-messages-update",
+        ] {
+            insert!(key, IdReceipt);
+        }
+
+        insert!(
+            "himalaya-msgraph-messages-send",
+            crate::msgraph::messages::send::MsgraphMessageSendOutput
+        );
+        insert!(
+            "himalaya-msgraph-attachments-get",
+            OneOf<Bytes, SavedOutput>
+        );
+    }
+
+    #[cfg(feature = "maildir")]
+    {
+        for key in [
+            "himalaya-maildir-create",
+            "himalaya-maildir-delete",
+            "himalaya-maildir-rename",
+        ] {
+            insert!(key, IdReceipt);
+        }
+
+        for key in [
+            "himalaya-maildir-flag-add",
+            "himalaya-maildir-flag-remove",
+            "himalaya-maildir-flag-set",
+            "himalaya-maildir-message-copy",
+            "himalaya-maildir-message-move",
+        ] {
+            insert!(key, IdsReceipt);
+        }
+    }
+
+    #[cfg(feature = "mbox")]
+    {
+        for key in [
+            "himalaya-mbox-create",
+            "himalaya-mbox-delete",
+            "himalaya-mbox-rename",
+        ] {
+            insert!(key, IdReceipt);
+        }
+
+        for key in [
+            "himalaya-mbox-flag-add",
+            "himalaya-mbox-flag-remove",
+            "himalaya-mbox-flag-set",
+            "himalaya-mbox-message-copy",
+            "himalaya-mbox-message-move",
+        ] {
+            insert!(key, IdsReceipt);
+        }
+    }
+
+    #[cfg(feature = "m2dir")]
+    {
+        for key in ["himalaya-m2dir-create", "himalaya-m2dir-delete"] {
+            insert!(key, IdReceipt);
+        }
+
+        for key in [
+            "himalaya-m2dir-flag-add",
+            "himalaya-m2dir-flag-remove",
+            "himalaya-m2dir-flag-set",
+        ] {
+            insert!(key, IdsReceipt);
+        }
+    }
+
     insert!("himalaya-error", ErrorReport<ErrorCode>);
 
-    JsonSchemaRegistry {
-        bin: "himalaya",
-        version: env!("CARGO_PKG_VERSION"),
-        schemas,
-    }
+    registry
+}
+
+/// The schema of a command printing one of two types, told apart by their
+/// keys.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum OneOf<A, B> {
+    A(A),
+    B(B),
 }
 
 #[cfg(test)]
 mod tests {
+    use clap::CommandFactory;
+
+    use crate::{cli::Cli, json_schema::registry};
+
+    /// The commands printing nothing a schema could describe: the REPL
+    /// and the MCP server speak their own protocols, and a bare
+    /// `himalaya` shows the help, or runs the wizard `configure`
+    /// describes.
+    const SILENT: &[&str] = &["himalaya", "himalaya-repl", "himalaya-mcp"];
+
     #[test]
     fn every_payload_is_an_object() {
-        assert_eq!(super::registry().non_object_roots(), Vec::<&str>::new());
+        assert_eq!(registry().non_object_roots(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn every_command_is_described() {
+        let problems = registry().check(&Cli::command(), SILENT);
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

@@ -12,11 +12,13 @@ use io_imap::{
         flag::{Flag, StoreType},
     },
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
 use crate::imap::{
     client::ImapClient,
+    fetch::{FetchedMessage, ImapFetchOutput},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+    outcome,
 };
 
 /// Store flags on messages (STORE, RFC 3501).
@@ -75,10 +77,6 @@ impl ImapStoreCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
-
         let sequence_set = self.sequence_set.as_str().try_into()?;
         let flags: Vec<Flag<'static>> = self
             .flag
@@ -86,19 +84,26 @@ impl ImapStoreCommand {
             .map(|f| Flag::try_from(f.as_str()).map(|flag| flag.into_static()))
             .collect::<Result<_, _>>()?;
 
-        client.store(
-            sequence_set,
-            self.action.into(),
-            flags,
-            ImapMessageStoreOptions { uid: !self.seq },
-        )?;
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        let outcome = match self.action {
-            StoreActionArg::Add => "added",
-            StoreActionArg::Remove => "removed",
-            StoreActionArg::Set => "replaced",
-        };
+            let data = client.store(
+                sequence_set,
+                self.action.into(),
+                flags,
+                ImapMessageStoreOptions { uid: !self.seq },
+            )?;
 
-        printer.out(Message::new(format!("Flag(s) successfully {outcome}")))
+            let messages = data
+                .into_iter()
+                .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
+                .collect();
+
+            Ok(ImapFetchOutput { messages })
+        })();
+
+        outcome::print(printer, result)
     }
 }

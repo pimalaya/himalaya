@@ -5,9 +5,12 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::m2dir::{arg::M2dirNameArg, client::M2dirClient};
+use crate::{
+    m2dir::{arg::M2dirNameArg, client::M2dirClient},
+    shared::receipt::IdReceipt,
+};
 
 /// Create the given m2dir folder.
 ///
@@ -24,6 +27,9 @@ impl M2dirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         client.init_store()?;
         client.create_m2dir(&self.m2dir_name.inner)?;
-        printer.out(Message::new("m2dir folder successfully created"))
+        printer.out(IdReceipt {
+            id: self.m2dir_name.inner,
+            done: "m2dir folder successfully created",
+        })
     }
 }

@@ -8,9 +8,9 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::filters::{
     GmailFilter, GmailFilterAction, GmailFilterCriteria, create::GmailFilterCreate,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Create a Gmail filter (users.settings.filters.create).
 #[derive(Debug, Parser)]
@@ -74,9 +74,9 @@ impl GmailSettingsFilterCreateCommand {
         };
         let created = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail filter `{}` successfully created",
-            created.id
-        )))
+        printer.out(IdReceipt {
+            id: created.id,
+            done: "Gmail filter successfully created",
+        })
     }
 }

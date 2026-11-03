@@ -5,13 +5,16 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
 use std::path::Path;
 
-use crate::maildir::{
-    arg::{MaildirNameArg, RequiredMaildirPathFlag},
-    client::{MaildirClient, validate_maildir_name},
+use crate::{
+    maildir::{
+        arg::{MaildirNameArg, RequiredMaildirPathFlag},
+        client::{MaildirClient, validate_maildir_name},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Rename a Maildir folder.
@@ -36,7 +39,11 @@ impl MaildirMailboxRenameCommand {
         // root, so the bare names go through: pre-joining the root would
         // work under a second copy of it.
         let from = self.maildir_path.inner.to_string_lossy().into_owned();
-        client.rename_maildir(from, self.maildir_name.inner)?;
-        printer.out(Message::new("Maildir successfully renamed"))
+        client.rename_maildir(from, self.maildir_name.inner.clone())?;
+
+        printer.out(IdReceipt {
+            id: self.maildir_name.inner,
+            done: "Maildir successfully renamed",
+        })
     }
 }

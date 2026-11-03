@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Delete an attachment (`DELETE
 /// /me/messages/{id}/attachments/{aid}`).
@@ -25,9 +25,9 @@ impl MsgraphAttachmentDeleteCommand {
     /// Removes the attachment from the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.attachment_delete(&self.message_id, &self.id)?;
-        printer.out(Message::new(format!(
-            "Microsoft Graph attachment `{}` successfully deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Microsoft Graph attachment successfully deleted",
+        })
     }
 }

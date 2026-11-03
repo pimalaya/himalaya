@@ -50,8 +50,7 @@ impl MailboxDeleteCommand {
 pub struct MailboxDeleteOutput {
     /// The id of the mailbox deleted.
     pub id: String,
-    /// Whether the backend queued the deletion rather than made it.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
 }
 

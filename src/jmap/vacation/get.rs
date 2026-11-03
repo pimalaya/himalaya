@@ -10,7 +10,7 @@ use clap::Parser;
 use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Row, Table, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -43,9 +43,19 @@ impl JmapVacationGetCommand {
             bail!("Vacation response is not supported by the server");
         }
 
-        let Some(vacation) = client.vacation_response_get()? else {
-            return printer.out(Message::new("No vacation response configured"));
-        };
+        // NOTE: RFC 8621 makes the singleton always exist; a server
+        // returning none holds no response, which reads as a disabled one.
+        let vacation = client
+            .vacation_response_get()?
+            .unwrap_or_else(|| JmapVacationResponse {
+                id: "singleton".into(),
+                is_enabled: false,
+                from_date: None,
+                to_date: None,
+                subject: None,
+                text_body: None,
+                html_body: None,
+            });
 
         let table = JmapVacationResponseGetOutput {
             preset: account.table_preset().to_string(),

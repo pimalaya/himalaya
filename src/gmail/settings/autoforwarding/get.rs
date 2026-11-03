@@ -7,7 +7,9 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::get_auto_forwarding::GmailAutoForwardingGet;
+use io_gmail::v1::rest::settings::{
+    GmailAutoForwarding, get_auto_forwarding::GmailAutoForwardingGet,
+};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -28,15 +30,19 @@ impl GmailSettingsAutoForwardingGetCommand {
             let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;
             client.run(c)?
         };
-        let settings = out.response;
+        printer.out(GmailSettingsAutoForwardingGetOutput::from(out.response))
+    }
+}
 
-        printer.out(GmailSettingsAutoForwardingGetOutput {
+impl From<GmailAutoForwarding> for GmailSettingsAutoForwardingGetOutput {
+    fn from(settings: GmailAutoForwarding) -> Self {
+        Self {
             enabled: settings.enabled,
             email_address: settings.email_address,
             disposition: settings
                 .disposition
                 .map(|disposition| disposition_wire(disposition).to_string()),
-        })
+        }
     }
 }
 
@@ -48,9 +54,7 @@ impl GmailSettingsAutoForwardingGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsAutoForwardingGetOutput {
     enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     email_address: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     disposition: Option<String>,
 }
 

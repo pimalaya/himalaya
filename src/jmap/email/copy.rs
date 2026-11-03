@@ -7,9 +7,12 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email::copy::JmapEmailCopyArgs;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdsReceipt,
+};
 
 /// Copy JMAP emails from another account (Email/copy).
 #[derive(Debug, Parser)]
@@ -60,6 +63,13 @@ impl JmapEmailCopyCommand {
             bail!(msg)
         }
 
-        printer.out(Message::new("Email(s) successfully copied"))
+        printer.out(IdsReceipt {
+            ids: output
+                .created
+                .into_values()
+                .filter_map(|email| email.id)
+                .collect(),
+            done: "JMAP emails successfully copied",
+        })
     }
 }

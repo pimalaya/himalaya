@@ -424,7 +424,7 @@ pub struct PimdirMailHit {
 
 /// What a text term matched (pimdir SEARCH §8.2).
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 pub enum PimdirMailMatched {
     /// The local body.
     Body,
@@ -474,12 +474,13 @@ pub struct PimdirTagged {
     /// What the tag does there.
     pub status: PimdirTagStatus,
     /// The queue row the change waits in, `null` when none was staged.
+    #[serde(rename = "row")]
     pub queue_id: Option<i64>,
 }
 
 /// What a tag does to one placement.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 pub enum PimdirTagStatus {
     /// The change would be staged (`--dry-run`).
     Planned,

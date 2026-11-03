@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::get_language::GmailLanguageGet;
+use io_gmail::v1::rest::settings::{GmailLanguageSettings, get_language::GmailLanguageGet};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -25,11 +25,15 @@ impl GmailSettingsLanguageGetCommand {
             let c = GmailLanguageGet::new(&client.auth, &client.user_id)?;
             client.run(c)?
         };
-        let settings = out.response;
+        printer.out(GmailSettingsLanguageGetOutput::from(out.response))
+    }
+}
 
-        printer.out(GmailSettingsLanguageGetOutput {
+impl From<GmailLanguageSettings> for GmailSettingsLanguageGetOutput {
+    fn from(settings: GmailLanguageSettings) -> Self {
+        Self {
             display_language: settings.display_language,
-        })
+        }
     }
 }
 

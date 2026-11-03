@@ -5,10 +5,12 @@
 
 use std::io::{IsTerminal, stdout};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use clap::Parser;
-use pimalaya_cli::{error::CodedError, printer::Printer};
+use pimalaya_cli::{
+    clap::args::PageTokenArg, error::CodedError, output::Paginated, printer::Printer,
+};
 
 use crate::{
     account::context::Account,
@@ -46,6 +48,8 @@ pub struct EnvelopeSearchCommand {
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<u32>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// Maximum width of the rendered table, in terminal columns.
     #[arg(long = "max-width", short = 'w')]
     #[arg(value_name = "COLUMNS")]
@@ -107,7 +111,13 @@ impl EnvelopeSearchCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let page = Some(self.page).filter(|p| *p > 0);
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page,
+        };
+        let page = Some(page).filter(|p| *p > 0);
         let page_size = self
             .page_size
             .or(Some(account.envelopes_list_page_size()))
@@ -122,6 +132,15 @@ impl EnvelopeSearchCommand {
             page_size,
             self.has_attachment,
         )?;
+
+        // NOTE: the token is the next page number, given while a page comes
+        // back full; the page after a full last one comes back empty.
+        let next_page = match (page, page_size) {
+            (Some(page), Some(size)) if envelopes.len() >= size as usize => {
+                Some((page + 1).to_string())
+            }
+            _ => None,
+        };
 
         let envelopes = EnvelopeListOutput {
             preset: account.table_preset().to_string(),
@@ -151,7 +170,10 @@ impl EnvelopeSearchCommand {
             envelopes,
         };
 
-        printer.out(envelopes)
+        printer.out(Paginated {
+            inner: envelopes,
+            next_page,
+        })
     }
 }
 

@@ -1,6 +1,6 @@
 //! # IMAP utils
 //!
-//! RFC 2047 header decoding and envelope address formatting, shared by
+//! RFC 2047 header decoding and envelope address conversion, shared by
 //! the `fetch` and `thread` commands.
 
 use io_imap::types::envelope::Address;
@@ -20,19 +20,20 @@ pub fn decode_mime(s: &str) -> String {
     }
 }
 
-/// Formats an envelope address as `Name <local@host>`, or bare when it
-/// carries no personal name.
-pub fn format_address(addr: &Address<'_>) -> String {
-    let email = format_email(addr);
+/// Turns an envelope address into the shared address shape, its personal
+/// name RFC 2047 decoded, `None` when absent or empty.
+pub fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
+    let name = addr
+        .name
+        .0
+        .as_ref()
+        .map(|name| decode_mime(&String::from_utf8_lossy(name.as_ref())))
+        .filter(|name| !name.is_empty());
 
-    if let Some(name) = &addr.name.0 {
-        let name = decode_mime(&String::from_utf8_lossy(name.as_ref()));
-        if !name.is_empty() {
-            return format!("{name} <{email}>");
-        }
+    crate::email::address::Address {
+        name,
+        email: format_email(addr),
     }
-
-    email
 }
 
 /// Joins the `local@host` parts of an envelope address.

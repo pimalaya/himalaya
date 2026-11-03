@@ -6,9 +6,12 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::set::JmapMailboxSetArgs;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdsReceipt,
+};
 
 /// Delete a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -43,6 +46,9 @@ impl JmapMailboxDestroyCommand {
             bail!(msg)
         }
 
-        printer.out(Message::new("Mailbox successfully deleted"))
+        printer.out(IdsReceipt {
+            ids: output.destroyed,
+            done: "JMAP mailboxes successfully deleted",
+        })
     }
 }

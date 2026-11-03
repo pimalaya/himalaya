@@ -59,6 +59,7 @@ pub struct GmailSettingsDelegateListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     arrangement: ContentArrangement,
+    #[serde(flatten)]
     response: GmailDelegatesListResponse,
 }
 

@@ -9,7 +9,7 @@ use io_jmap::rfc8621::{
     JMAP_MAIL_CAPABILITY,
     email::{JmapEmailProperty, get::JmapEmailGetOptions},
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::{output::Bytes, printer::Printer};
 use url::Url;
 
 use crate::jmap::client::JmapClient;
@@ -61,6 +61,9 @@ impl JmapEmailExportCommand {
 
         let data = client.download_blob(&download_url)?;
 
-        printer.out(Message::new(String::from_utf8(data)?))
+        printer.out_bytes(Bytes {
+            data,
+            mime: "message/rfc822".into(),
+        })
     }
 }

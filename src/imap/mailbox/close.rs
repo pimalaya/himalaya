@@ -5,9 +5,12 @@
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::imap::client::ImapClient;
+use crate::imap::{
+    client::ImapClient,
+    outcome::{self, ImapDoneOutput},
+};
 
 /// Close the selected mailbox (CLOSE, RFC 3501).
 ///
@@ -20,7 +23,10 @@ pub struct ImapMailboxCloseCommand;
 impl ImapMailboxCloseCommand {
     /// Closes the selected mailbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
-        client.close()?;
-        printer.out(Message::new("Mailbox successfully closed"))
+        let result = client.close().map_err(Into::into).map(|()| ImapDoneOutput {
+            done: "IMAP mailbox successfully closed",
+        });
+
+        outcome::print(printer, result)
     }
 }

@@ -38,11 +38,8 @@ impl GmailProfileGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailProfileOutput {
     email: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     messages_total: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     threads_total: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     history_id: Option<String>,
 }
 

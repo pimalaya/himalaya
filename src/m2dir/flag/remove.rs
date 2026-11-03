@@ -6,11 +6,14 @@
 use anyhow::Result;
 use clap::Parser;
 use io_m2dir::flag::M2dirFlags;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::m2dir::{
-    arg::{M2dirNameFlag, MessageIdsArg},
-    client::M2dirClient,
+use crate::{
+    m2dir::{
+        arg::{M2dirNameFlag, MessageIdsArg},
+        client::M2dirClient,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Remove M2DIR flag(s) from message(s).
@@ -35,10 +38,13 @@ impl M2dirFlagRemoveCommand {
         let m2dir = client.open_m2dir(path)?;
         let flags = M2dirFlags::from_iter(self.flags.iter().map(String::as_str));
 
-        for id in self.ids.inner {
+        for id in self.ids.inner.clone() {
             client.remove_flags(&m2dir, &id, flags.clone())?;
         }
 
-        printer.out(Message::new("M2dir flag(s) successfully removed"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner,
+            done: "M2dir flag(s) successfully removed",
+        })
     }
 }

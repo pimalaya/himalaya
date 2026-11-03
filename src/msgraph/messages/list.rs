@@ -5,20 +5,18 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::{
     MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
-use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{clap::args::PageTokenArg, output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    msgraph::client::MsgraphClient,
-    shared::{output::Paginated, table::style_from_preset},
+    account::context::Account, msgraph::client::MsgraphClient, shared::table::style_from_preset,
 };
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
@@ -35,6 +33,8 @@ pub struct MsgraphMessageListCommand {
     /// Number of messages to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// OData `$filter` expression (e.g. `isRead eq false`).
     #[arg(long, value_name = "EXPR")]
     pub filter: Option<String>,
@@ -79,9 +79,18 @@ impl MsgraphMessageListCommand {
             None => self.count.then_some(true),
         };
 
+        // NOTE: the token is the `$skip` of the next link Graph returned, so
+        // a listing resumes with the same parameters.
+        let skip = match &self.page_token.token {
+            Some(token) => Some(token.parse::<u32>().map_err(|_| {
+                anyhow!("Cannot resume a Microsoft Graph listing from page token {token}")
+            })?),
+            None => self.skip,
+        };
+
         let params = MsgraphMessagesListParams {
             top: self.top,
-            skip: self.skip,
+            skip,
             select: self.select.as_deref(),
             filter: self.filter.as_deref(),
             search,
@@ -93,10 +102,17 @@ impl MsgraphMessageListCommand {
             .messages_list(self.folder.as_deref(), &params)?
             .response;
 
-        let next_page = response.next_link;
+        // NOTE: a next link without `$skip` (a `$search` page, resumed by
+        // `$skiptoken`) comes back whole, which `--page-token` refuses.
+        let next_page = response
+            .next_link
+            .map(|link| skip_of(&link).map_or(link, |skip| skip.to_string()));
         let table = messages_table(account, response.value);
 
-        printer.out(Paginated::new(table, next_page))
+        printer.out(Paginated {
+            inner: table,
+            next_page,
+        })
     }
 }
 
@@ -195,5 +211,35 @@ impl fmt::Display for MsgraphMessageListOutput {
 
         writeln!(f)?;
         writeln!(f, "{table}")
+    }
+}
+
+/// The `$skip` query parameter of a Graph next link, percent-encoded or
+/// not.
+fn skip_of(link: &str) -> Option<u32> {
+    let (_, query) = link.split_once('?')?;
+
+    query.split('&').find_map(|param| {
+        let (key, value) = param.split_once('=')?;
+        matches!(key, "$skip" | "%24skip").then(|| value.parse().ok())?
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::msgraph::messages::list::skip_of;
+
+    #[test]
+    fn the_skip_of_a_next_link_is_its_page_token() {
+        let link = "https://graph.microsoft.com/v1.0/me/messages?%24top=10&%24skip=20";
+        assert_eq!(skip_of(link), Some(20));
+        assert_eq!(
+            skip_of("https://graph.microsoft.com/v1.0/me/messages?$skip=5"),
+            Some(5)
+        );
+        assert_eq!(
+            skip_of("https://graph.microsoft.com/v1.0/me/messages?$skiptoken=x"),
+            None
+        );
     }
 }

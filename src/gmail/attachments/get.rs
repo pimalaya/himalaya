@@ -43,6 +43,11 @@ impl GmailAttachmentGetCommand {
         let bytes =
             decode_raw(&data).map_err(|err| anyhow!("Decode Gmail attachment error: {err}"))?;
 
-        write_bytes_or_save(printer, self.output.as_deref(), &bytes)
+        write_bytes_or_save(
+            printer,
+            self.output.as_deref(),
+            bytes,
+            "application/octet-stream",
+        )
     }
 }

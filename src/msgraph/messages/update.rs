@@ -6,9 +6,9 @@
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use io_msgraph::v1::rest::users::messages::{MsgraphImportance, MsgraphMessage};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Update a Microsoft Graph message (`PATCH /me/messages/{id}`): mark
 /// read/unread, set importance or replace categories.
@@ -60,10 +60,10 @@ impl MsgraphMessageUpdateCommand {
 
         let message = client.message_update(&self.id, &patch)?.response;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph message `{}` successfully updated",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Microsoft Graph message successfully updated",
+        })
     }
 }
 

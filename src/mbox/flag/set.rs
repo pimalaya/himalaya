@@ -5,12 +5,15 @@
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::flag::MboxFlags;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::mbox::{
-    arg::{MboxPathFlag, MessageIdsArg},
-    client::MboxClient,
-    flag::arg::FlagArg,
+use crate::{
+    mbox::{
+        arg::{MboxPathFlag, MessageIdsArg},
+        client::MboxClient,
+        flag::arg::FlagArg,
+    },
+    shared::receipt::IdsReceipt,
 };
 
 /// Set mbox flag(s) on message(s).
@@ -38,6 +41,9 @@ impl MboxFlagSetCommand {
 
         client.edit_flags(&path, &ids, |_| flags.clone())?;
 
-        printer.out(Message::new("Flag(s) successfully changed"))
+        printer.out(IdsReceipt {
+            ids: self.ids.inner.clone(),
+            done: "Flag(s) successfully changed",
+        })
     }
 }

@@ -2,18 +2,26 @@
 //!
 //! The `imap copy` command, RFC 3501 `COPY`.
 
+use std::fmt;
+
 use anyhow::Result;
 use clap::Parser;
 use io_imap::client::ImapClient as _;
 use io_imap::{
-    rfc3501::{copy::ImapMessageCopyOptions, select::ImapMailboxSelectOptions},
+    rfc3501::{
+        copy::{ImapCopyUid, ImapMessageCopyOptions},
+        select::ImapMailboxSelectOptions,
+    },
     types::mailbox::Mailbox,
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
+    outcome,
 };
 
 /// Copy messages to the given mailbox (COPY, RFC 3501).
@@ -38,19 +46,65 @@ impl ImapMessageCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
-
         let sequence_set = self.sequence_set.as_str().try_into()?;
         let destination: Mailbox = self.mailbox_dest_name.inner.try_into()?;
 
-        client.copy(
-            sequence_set,
-            destination,
-            ImapMessageCopyOptions { uid: !self.seq },
-        )?;
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        printer.out(Message::new("Message(s) successfully copied"))
+            let copy_uid = client.copy(
+                sequence_set,
+                destination,
+                ImapMessageCopyOptions { uid: !self.seq },
+            )?;
+
+            Ok(ImapMessageCopyOutput::new(
+                copy_uid,
+                "Messages successfully copied",
+            ))
+        })();
+
+        outcome::print(printer, result)
+    }
+}
+
+/// What `imap copy` and `imap move` understood of the server's answer:
+/// the `COPYUID` response code (UIDPLUS), `null` and empty without it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ImapMessageCopyOutput {
+    /// The UID validity of the destination mailbox.
+    uid_validity: Option<u32>,
+    /// The UIDs of the source messages, in the order of `destinationUids`.
+    source_uids: Vec<u32>,
+    /// The UIDs the messages got in the destination mailbox.
+    destination_uids: Vec<u32>,
+    /// What the text form says was done.
+    #[serde(skip)]
+    done: &'static str,
+}
+
+impl ImapMessageCopyOutput {
+    /// The output of a `COPYUID`, if the server sent one.
+    pub(crate) fn new(copy_uid: ImapCopyUid, done: &'static str) -> Self {
+        let (uid_validity, source_uids, destination_uids) = match copy_uid {
+            Some((validity, source, destination)) => (Some(validity), source, destination),
+            None => (None, Vec::new(), Vec::new()),
+        };
+
+        Self {
+            uid_validity,
+            source_uids,
+            destination_uids,
+            done,
+        }
+    }
+}
+
+impl fmt::Display for ImapMessageCopyOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.done)
     }
 }

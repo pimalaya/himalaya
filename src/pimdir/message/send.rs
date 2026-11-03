@@ -88,6 +88,7 @@ impl PimdirMessageSendCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMessageSendOutput {
     /// The `submit` row the message waits in until the owner sends it.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// The message's bare `Message-ID`.
     pub message_id: String,
@@ -95,7 +96,7 @@ pub struct PimdirMessageSendOutput {
     pub copy: bool,
     /// The row of the copy queued beside the send, for an owner that
     /// cannot carry it.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "copyRow")]
     pub copy_queue_id: Option<i64>,
 }
 

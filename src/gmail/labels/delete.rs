@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Delete a Gmail label (users.labels.delete).
 #[derive(Debug, Parser)]
@@ -21,9 +21,9 @@ impl GmailLabelDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         client.label_delete(&self.id)?;
 
-        printer.out(Message::new(format!(
-            "Gmail label `{}` successfully deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Gmail label successfully deleted",
+        })
     }
 }

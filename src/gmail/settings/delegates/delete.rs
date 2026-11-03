@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::delete::GmailDelegateDelete;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Delete a Gmail delegate (users.settings.delegates.delete).
 #[derive(Debug, Parser)]
@@ -26,9 +26,9 @@ impl GmailSettingsDelegateDeleteCommand {
             client.run(c)?;
         }
 
-        printer.out(Message::new(format!(
-            "Gmail delegate `{}` successfully deleted",
-            self.email
-        )))
+        printer.out(IdReceipt {
+            id: self.email,
+            done: "Gmail delegate successfully deleted",
+        })
     }
 }

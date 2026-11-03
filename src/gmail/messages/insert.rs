@@ -5,9 +5,11 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw, insert::GmailMessageInsert};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
+use crate::{
+    gmail::client::GmailClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
+};
 
 /// Insert a Gmail message into the mailbox without sending
 /// (users.messages.insert).
@@ -37,9 +39,9 @@ impl GmailMessageInsertCommand {
         };
         let message = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail message `{}` successfully inserted",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Gmail message successfully inserted",
+        })
     }
 }

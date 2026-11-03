@@ -6,11 +6,14 @@
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::mbox::create::MboxCreate;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::mbox::{
-    arg::MboxNameArg,
-    client::{MboxClient, validate_mbox_name},
+use crate::{
+    mbox::{
+        arg::MboxNameArg,
+        client::{MboxClient, validate_mbox_name},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Create an mbox.
@@ -29,6 +32,9 @@ impl MboxMailboxCreateCommand {
         validate_mbox_name(&self.mbox_name.inner)?;
         let path = client.resolve_mbox(&self.mbox_name.inner);
         client.run(MboxCreate::new(path))?;
-        printer.out(Message::new("Mbox successfully created"))
+        printer.out(IdReceipt {
+            id: self.mbox_name.inner,
+            done: "Mbox successfully created",
+        })
     }
 }

@@ -26,6 +26,7 @@ use crate::{
         client::ImapClient,
         envelope::search::SearchCriteriaArgs,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+        outcome,
     },
     shared::table::style_from_preset,
 };
@@ -63,35 +64,39 @@ impl ImapEnvelopeSortCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
-            reverse: self.reverse,
-            key: self.sort.into(),
-        }]);
-        let search_criteria = self.criteria.into_criteria()?;
+            let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
+                reverse: self.reverse,
+                key: self.sort.into(),
+            }]);
+            let search_criteria = self.criteria.into_criteria()?;
 
-        let fallback = client.sort_fallback();
-        let ids = client.sort(
-            sort_criteria,
-            search_criteria,
-            ImapMessageSortOptions {
-                uid: !self.seq,
-                fallback,
-            },
-        )?;
+            let fallback = client.sort_fallback();
+            let ids = client.sort(
+                sort_criteria,
+                search_criteria,
+                ImapMessageSortOptions {
+                    uid: !self.seq,
+                    fallback,
+                },
+            )?;
 
-        let table = ImapSortOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            id_color: account.envelopes_list_table_id_color(),
-            uid_mode: !self.seq,
-            ids: ids.into_iter().map(|id| id.get()).collect(),
-        };
+            let table = ImapSortOutput {
+                preset: account.table_preset().to_string(),
+                arrangement: account.table_arrangement(),
+                id_color: account.envelopes_list_table_id_color(),
+                uid_mode: !self.seq,
+                ids: ids.into_iter().map(|id| id.get()).collect(),
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

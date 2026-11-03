@@ -8,9 +8,12 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email::set::JmapEmailSetArgs;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdsReceipt,
+};
 
 /// Update JMAP emails via patch operations (Email/set).
 #[derive(Debug, Parser)]
@@ -85,6 +88,9 @@ impl JmapEmailUpdateCommand {
             bail!(msg)
         }
 
-        printer.out(Message::new("Email(s) successfully updated"))
+        printer.out(IdsReceipt {
+            ids: output.updated.into_keys().collect(),
+            done: "JMAP emails successfully updated",
+        })
     }
 }

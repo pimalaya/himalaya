@@ -7,9 +7,9 @@ use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Add a file attachment to a message.
 ///
@@ -61,9 +61,9 @@ impl MsgraphAttachmentCreateCommand {
             )?
             .response;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph attachment `{}` successfully created",
-            attachment.id
-        )))
+        printer.out(IdReceipt {
+            id: attachment.id,
+            done: "Microsoft Graph attachment successfully created",
+        })
     }
 }

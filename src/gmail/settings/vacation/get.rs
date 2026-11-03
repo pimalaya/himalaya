@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::get_vacation::GmailVacationGet;
+use io_gmail::v1::rest::settings::{GmailVacationSettings, get_vacation::GmailVacationGet};
 use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -25,9 +25,13 @@ impl GmailSettingsVacationGetCommand {
             let c = GmailVacationGet::new(&client.auth, &client.user_id)?;
             client.run(c)?
         };
-        let settings = out.response;
+        printer.out(GmailSettingsVacationGetOutput::from(out.response))
+    }
+}
 
-        printer.out(GmailSettingsVacationGetOutput {
+impl From<GmailVacationSettings> for GmailSettingsVacationGetOutput {
+    fn from(settings: GmailVacationSettings) -> Self {
+        Self {
             enable_auto_reply: settings.enable_auto_reply,
             response_subject: settings.response_subject,
             response_body_plain_text: settings.response_body_plain_text,
@@ -36,7 +40,7 @@ impl GmailSettingsVacationGetCommand {
             restrict_to_domain: settings.restrict_to_domain,
             start_time: settings.start_time,
             end_time: settings.end_time,
-        })
+        }
     }
 }
 
@@ -48,19 +52,12 @@ impl GmailSettingsVacationGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsVacationGetOutput {
     enable_auto_reply: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     response_subject: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     response_body_plain_text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     response_body_html: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     restrict_to_contacts: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     restrict_to_domain: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     start_time: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     end_time: Option<String>,
 }
 

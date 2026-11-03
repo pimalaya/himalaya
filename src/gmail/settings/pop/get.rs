@@ -6,7 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::get_pop::GmailPopGet;
+use io_gmail::v1::rest::settings::{GmailPopSettings, get_pop::GmailPopGet};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -27,16 +27,20 @@ impl GmailSettingsPopGetCommand {
             let c = GmailPopGet::new(&client.auth, &client.user_id)?;
             client.run(c)?
         };
-        let settings = out.response;
+        printer.out(GmailSettingsPopGetOutput::from(out.response))
+    }
+}
 
-        printer.out(GmailSettingsPopGetOutput {
+impl From<GmailPopSettings> for GmailSettingsPopGetOutput {
+    fn from(settings: GmailPopSettings) -> Self {
+        Self {
             access_window: settings
                 .access_window
                 .map(|window| access_window_wire(window).to_string()),
             disposition: settings
                 .disposition
                 .map(|disposition| disposition_wire(disposition).to_string()),
-        })
+        }
     }
 }
 
@@ -47,9 +51,7 @@ impl GmailSettingsPopGetCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsPopGetOutput {
-    #[serde(skip_serializing_if = "Option::is_none")]
     access_window: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     disposition: Option<String>,
 }
 

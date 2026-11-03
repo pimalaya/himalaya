@@ -12,5 +12,6 @@ pub mod flag;
 pub mod id;
 pub mod mailbox;
 pub mod message;
+pub mod outcome;
 pub mod raw;
 pub mod utils;

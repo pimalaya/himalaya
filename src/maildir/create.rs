@@ -7,11 +7,14 @@ use std::path::Path;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::maildir::{
-    arg::MaildirNameArg,
-    client::{MaildirClient, validate_maildir_name},
+use crate::{
+    maildir::{
+        arg::MaildirNameArg,
+        client::{MaildirClient, validate_maildir_name},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Create a Maildir folder.
@@ -32,7 +35,11 @@ impl MaildirMailboxCreateCommand {
         // NOTE: io-maildir resolves a name relative to the store root, so
         // the bare name goes through: pre-joining the root would land the
         // Maildir under a second copy of it.
-        client.create_maildir(self.maildir_name.inner)?;
-        printer.out(Message::new("Maildir successfully created"))
+        client.create_maildir(self.maildir_name.inner.clone())?;
+
+        printer.out(IdReceipt {
+            id: self.maildir_name.inner,
+            done: "Maildir successfully created",
+        })
     }
 }

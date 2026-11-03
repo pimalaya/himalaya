@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::threads::modify::GmailThreadModify;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Modify the labels of every message in a Gmail thread
 /// (users.threads.modify).
@@ -39,9 +39,9 @@ impl GmailThreadModifyCommand {
         };
         let thread = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail thread `{}` successfully modified",
-            thread.id
-        )))
+        printer.out(IdReceipt {
+            id: thread.id,
+            done: "Gmail thread successfully modified",
+        })
     }
 }

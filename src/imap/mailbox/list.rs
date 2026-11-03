@@ -14,7 +14,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, email::mailbox::MailboxRole, imap::client::ImapClient,
+    account::context::Account,
+    email::mailbox::MailboxRole,
+    imap::{client::ImapClient, outcome},
     shared::table::style_from_preset,
 };
 
@@ -46,19 +48,23 @@ impl ImapMailboxListCommand {
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
-        let mailboxes = if self.all {
-            client.list(reference, pattern)?
-        } else {
-            client.lsub(reference, pattern)?
-        };
+        let result = (|| -> Result<_> {
+            let mailboxes = if self.all {
+                client.list(reference, pattern)?
+            } else {
+                client.lsub(reference, pattern)?
+            };
 
-        let table = ImapMailboxListOutput {
-            preset: account.table_preset().to_string(),
-            name_color: account.mailboxes_list_table_name_color(),
-            mailboxes: mailboxes.into_iter().map(From::from).collect(),
-        };
+            let table = ImapMailboxListOutput {
+                preset: account.table_preset().to_string(),
+                name_color: account.mailboxes_list_table_name_color(),
+                mailboxes: mailboxes.into_iter().map(From::from).collect(),
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

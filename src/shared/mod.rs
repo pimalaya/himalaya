@@ -24,6 +24,16 @@ pub mod message;
 pub mod output;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 pub mod raw;
+#[cfg(any(
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "jmap",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "m2dir",
+    feature = "sieve"
+))]
+pub mod receipt;
 pub mod table;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod vacation;

@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::drafts::{GmailDraft, send::GmailDraftSend};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Send a Gmail draft (users.drafts.send).
 #[derive(Debug, Parser)]
@@ -31,9 +31,9 @@ impl GmailDraftSendCommand {
         }
         .response;
 
-        printer.out(Message::new(format!(
-            "Gmail draft sent as message `{}`",
-            message_id.id
-        )))
+        printer.out(IdReceipt {
+            id: message_id.id,
+            done: "Gmail draft sent as message",
+        })
     }
 }

@@ -110,10 +110,8 @@ impl fmt::Display for GmailThreadGetOutput {
 pub(crate) struct GmailThreadMessageOutput {
     id: String,
     label_ids: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     snippet: Option<String>,
     headers: Vec<GmailMessageHeaderOutput>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     payload: Option<GmailMessagePayload>,
 }
 

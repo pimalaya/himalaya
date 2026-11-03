@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::threads::trash::GmailThreadTrash;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Move a Gmail thread to the trash (users.threads.trash).
 #[derive(Debug, Parser)]
@@ -26,9 +26,9 @@ impl GmailThreadTrashCommand {
         };
         let thread = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail thread `{}` successfully trashed",
-            thread.id
-        )))
+        printer.out(IdReceipt {
+            id: thread.id,
+            done: "Gmail thread successfully trashed",
+        })
     }
 }

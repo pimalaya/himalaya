@@ -6,7 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::get_imap::GmailImapGet;
+use io_gmail::v1::rest::settings::{GmailImapSettings, get_imap::GmailImapGet};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -27,16 +27,20 @@ impl GmailSettingsImapGetCommand {
             let c = GmailImapGet::new(&client.auth, &client.user_id)?;
             client.run(c)?
         };
-        let settings = out.response;
+        printer.out(GmailSettingsImapGetOutput::from(out.response))
+    }
+}
 
-        printer.out(GmailSettingsImapGetOutput {
+impl From<GmailImapSettings> for GmailSettingsImapGetOutput {
+    fn from(settings: GmailImapSettings) -> Self {
+        Self {
             enabled: settings.enabled,
             auto_expunge: settings.auto_expunge,
             expunge_behavior: settings
                 .expunge_behavior
                 .map(|behavior| expunge_behavior_wire(behavior).to_string()),
             max_folder_size: settings.max_folder_size,
-        })
+        }
     }
 }
 
@@ -49,11 +53,8 @@ impl GmailSettingsImapGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailSettingsImapGetOutput {
     enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     auto_expunge: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     expunge_behavior: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     max_folder_size: Option<u32>,
 }
 

@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::sieve::client::SieveClient;
+use crate::{shared::receipt::IdReceipt, sieve::client::SieveClient};
 
 /// Make one server-side Sieve script active.
 #[derive(Debug, Parser)]
@@ -20,7 +20,11 @@ pub struct SieveScriptActivateCommand {
 impl SieveScriptActivateCommand {
     /// Makes the named script the active one.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        client.activate_script(Some(self.name))?;
-        printer.out(Message::new("Sieve script successfully activated"))
+        client.activate_script(Some(self.name.clone()))?;
+
+        printer.out(IdReceipt {
+            id: self.name,
+            done: "Sieve script successfully activated",
+        })
     }
 }

@@ -35,7 +35,7 @@ impl MsgraphMessageGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         if self.raw {
             let bytes = client.message_get_raw(&self.id)?.response;
-            return write_bytes_or_save(printer, None, &bytes);
+            return write_bytes_or_save(printer, None, bytes, "message/rfc822");
         }
 
         let msg = client.message_get(&self.id)?.response;

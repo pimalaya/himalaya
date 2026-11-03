@@ -19,7 +19,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     account::context::Account,
-    imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
     shared::table::style_from_preset,
 };
 
@@ -42,18 +42,22 @@ impl ImapFlagListCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let data = client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        let flags = data.flags.unwrap_or_default();
-        let permanent_flags = data.permanent_flags.unwrap_or_default();
+        let result = (|| -> Result<_> {
+            let data = client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            let flags = data.flags.unwrap_or_default();
+            let permanent_flags = data.permanent_flags.unwrap_or_default();
 
-        let table = ImapFlagListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            flags,
-            permanent_flags,
-        };
+            let table = ImapFlagListOutput {
+                preset: account.table_preset().to_string(),
+                arrangement: account.table_arrangement(),
+                flags,
+                permanent_flags,
+            };
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

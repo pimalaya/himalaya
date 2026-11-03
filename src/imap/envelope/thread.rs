@@ -24,6 +24,7 @@ use crate::imap::{
     client::ImapClient,
     envelope::search::SearchCriteriaArgs,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+    outcome,
     utils::decode_mime,
 };
 
@@ -58,28 +59,32 @@ impl ImapEnvelopeThreadCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        let search_criteria = self.criteria.into_criteria()?;
+            let search_criteria = self.criteria.into_criteria()?;
 
-        let threads = client.thread(
-            self.algorithm.into(),
-            search_criteria,
-            ImapMessageThreadOptions { uid: !self.seq },
-        )?;
+            let threads = client.thread(
+                self.algorithm.into(),
+                search_criteria,
+                ImapMessageThreadOptions { uid: !self.seq },
+            )?;
 
-        let all_ids = collect_thread_ids(&threads);
-        let subjects = if !all_ids.is_empty() {
-            fetch_subjects(client, &all_ids, !self.seq)?
-        } else {
-            HashMap::new()
-        };
+            let all_ids = collect_thread_ids(&threads);
+            let subjects = if !all_ids.is_empty() {
+                fetch_subjects(client, &all_ids, !self.seq)?
+            } else {
+                HashMap::new()
+            };
 
-        let table = ImapThreadOutput::new(threads, subjects);
+            let table = ImapThreadOutput::new(threads, subjects);
 
-        printer.out(table)
+            Ok(table)
+        })();
+
+        outcome::print(printer, result)
     }
 }
 

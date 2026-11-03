@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::sieve::client::SieveClient;
+use crate::{shared::receipt::IdReceipt, sieve::client::SieveClient};
 
 /// Rename one server-side Sieve script.
 ///
@@ -26,7 +26,11 @@ pub struct SieveScriptRenameCommand {
 impl SieveScriptRenameCommand {
     /// Renames the named script.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        client.rename_script(self.name, self.new_name)?;
-        printer.out(Message::new("Sieve script successfully renamed"))
+        client.rename_script(self.name, self.new_name.clone())?;
+
+        printer.out(IdReceipt {
+            id: self.new_name,
+            done: "Sieve script successfully renamed",
+        })
     }
 }

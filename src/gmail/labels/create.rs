@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::GmailLabel;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Create a Gmail label (users.labels.create).
 #[derive(Debug, Parser)]
@@ -26,9 +26,9 @@ impl GmailLabelCreateCommand {
         };
         let label = client.label_create(&label)?.response;
 
-        printer.out(Message::new(format!(
-            "Gmail label `{}` successfully created",
-            label.id
-        )))
+        printer.out(IdReceipt {
+            id: label.id,
+            done: "Gmail label successfully created",
+        })
     }
 }

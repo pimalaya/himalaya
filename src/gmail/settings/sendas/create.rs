@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, create::GmailSendAsCreate};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Create a Gmail send-as alias (settings.sendAs.create).
 #[derive(Debug, Parser)]
@@ -48,9 +48,9 @@ impl GmailSettingsSendAsCreateCommand {
         };
         let created = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail send-as `{}` successfully created",
-            created.send_as_email
-        )))
+        printer.out(IdReceipt {
+            id: created.send_as_email,
+            done: "Gmail send-as successfully created",
+        })
     }
 }

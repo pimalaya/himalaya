@@ -5,9 +5,11 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw, import::GmailMessageImport};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
+use crate::{
+    gmail::client::GmailClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
+};
 
 /// Import a Gmail message into the mailbox (users.messages.import).
 #[derive(Debug, Parser)]
@@ -44,9 +46,9 @@ impl GmailMessageImportCommand {
         };
         let message = out.response;
 
-        printer.out(Message::new(format!(
-            "Gmail message `{}` successfully imported",
-            message.id
-        )))
+        printer.out(IdReceipt {
+            id: message.id,
+            done: "Gmail message successfully imported",
+        })
     }
 }

@@ -5,9 +5,12 @@
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdsReceipt,
+};
 
 /// Cancel (undo) a pending JMAP email submission (EmailSubmission/set).
 ///
@@ -36,9 +39,9 @@ impl JmapSubmissionCancelCommand {
             bail!(msg);
         }
 
-        printer.out(Message::new(format!(
-            "{} submission(s) canceled",
-            self.ids.len()
-        )))
+        printer.out(IdsReceipt {
+            ids: self.ids,
+            done: "JMAP submissions canceled",
+        })
     }
 }

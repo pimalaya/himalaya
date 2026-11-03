@@ -5,9 +5,11 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
+use crate::{
+    gmail::client::GmailClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
+};
 
 /// Send a Gmail message (users.messages.send).
 #[derive(Debug, Parser)]
@@ -25,9 +27,9 @@ impl GmailMessageSendCommand {
             ..Default::default()
         };
         let id = client.message_send(&message)?.response;
-        printer.out(Message::new(format!(
-            "Gmail message `{}` successfully sent",
-            id.id
-        )))
+        printer.out(IdReceipt {
+            id: id.id,
+            done: "Gmail message successfully sent",
+        })
     }
 }

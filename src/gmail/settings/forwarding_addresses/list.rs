@@ -60,6 +60,7 @@ pub struct GmailSettingsForwardingAddressListOutput {
     #[serde(skip)]
     #[schemars(skip)]
     arrangement: ContentArrangement,
+    #[serde(flatten)]
     response: GmailForwardingAddressesListResponse,
 }
 

@@ -4,14 +4,14 @@
 
 use std::{collections::BTreeSet, fmt};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset, Local, NaiveDate};
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use pimalaya_cli::printer::Printer;
 use pimalaya_cli::table::{
     Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, sanitize,
 };
+use pimalaya_cli::{clap::args::PageTokenArg, output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -40,6 +40,8 @@ pub struct EnvelopeListCommand {
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<u32>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// Maximum width of the rendered table, in terminal columns.
     ///
     /// Overrides the auto-detected width, columns shrinking with an
@@ -65,7 +67,13 @@ impl EnvelopeListCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let page = Some(self.page).filter(|p| *p > 0);
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page,
+        };
+        let page = Some(page).filter(|p| *p > 0);
         let page_size = self
             .page_size
             .or(Some(account.envelopes_list_page_size()))
@@ -73,6 +81,15 @@ impl EnvelopeListCommand {
         let mailbox = self.mailbox.resolve(account);
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
+
+        // NOTE: the token is the next page number, given while a page comes
+        // back full; the page after a full last one comes back empty.
+        let next_page = match (page, page_size) {
+            (Some(page), Some(size)) if envelopes.len() >= size as usize => {
+                Some((page + 1).to_string())
+            }
+            _ => None,
+        };
 
         let envelopes = EnvelopeListOutput {
             preset: account.table_preset().to_string(),
@@ -102,7 +119,10 @@ impl EnvelopeListCommand {
             envelopes,
         };
 
-        printer.out(envelopes)
+        printer.out(Paginated {
+            inner: envelopes,
+            next_page,
+        })
     }
 }
 

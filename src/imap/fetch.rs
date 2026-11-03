@@ -22,10 +22,15 @@ use pimalaya_cli::{printer::Printer, table::sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{
-    client::ImapClient,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
-    utils::{decode_mime, format_address},
+use crate::{
+    email::address::Address,
+    imap::{
+        client::ImapClient,
+        mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+        outcome,
+        utils::{decode_mime, to_address},
+    },
+    shared::envelope::list::format_addresses,
 };
 
 /// Fetch message data items (FETCH, RFC 3501).
@@ -73,26 +78,30 @@ impl ImapFetchCommand {
         let names = self.item_names();
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
-            client.select(mailbox, ImapMailboxSelectOptions::default())?;
-        }
+        let result = (|| -> Result<_> {
+            if !self.mailbox_no_select.inner {
+                client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            }
 
-        let sequence_set = self.sequence_set.parse()?;
-        let data = client.fetch(
-            sequence_set,
-            MacroOrMessageDataItemNames::MessageDataItemNames(names),
-            ImapMessageFetchOptions {
-                uid: !self.seq,
-                modifiers: Vec::new(),
-            },
-        )?;
+            let sequence_set = self.sequence_set.parse()?;
+            let data = client.fetch(
+                sequence_set,
+                MacroOrMessageDataItemNames::MessageDataItemNames(names),
+                ImapMessageFetchOptions {
+                    uid: !self.seq,
+                    modifiers: Vec::new(),
+                },
+            )?;
 
-        let messages = data
-            .into_iter()
-            .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
-            .collect();
+            let messages = data
+                .into_iter()
+                .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
+                .collect();
 
-        printer.out(ImapFetchOutput { messages })
+            Ok(ImapFetchOutput { messages })
+        })();
+
+        outcome::print(printer, result)
     }
 
     /// The data items to request: the UID always, the envelope when
@@ -174,7 +183,10 @@ pub struct FetchedMessage {
 
 impl FetchedMessage {
     /// Folds the data items the server returned into one message.
-    fn from_items<'a>(seq: u32, items: impl Iterator<Item = MessageDataItem<'a>>) -> Self {
+    pub(crate) fn from_items<'a>(
+        seq: u32,
+        items: impl Iterator<Item = MessageDataItem<'a>>,
+    ) -> Self {
         let mut message = FetchedMessage {
             seq,
             ..Default::default()
@@ -227,17 +239,17 @@ pub struct EnvelopeView {
     /// The `In-Reply-To:` header.
     pub in_reply_to: Option<String>,
     /// The `From:` addresses.
-    pub from: Vec<String>,
+    pub from: Vec<Address>,
     /// The `Sender:` addresses.
-    pub sender: Vec<String>,
+    pub sender: Vec<Address>,
     /// The `Reply-To:` addresses.
-    pub reply_to: Vec<String>,
+    pub reply_to: Vec<Address>,
     /// The `To:` addresses.
-    pub to: Vec<String>,
+    pub to: Vec<Address>,
     /// The `Cc:` addresses.
-    pub cc: Vec<String>,
+    pub cc: Vec<Address>,
     /// The `Bcc:` addresses.
-    pub bcc: Vec<String>,
+    pub bcc: Vec<Address>,
 }
 
 impl From<&Envelope<'_>> for EnvelopeView {
@@ -247,12 +259,12 @@ impl From<&Envelope<'_>> for EnvelopeView {
             subject: nstring(&env.subject).map(|s| decode_mime(&s)),
             message_id: nstring(&env.message_id),
             in_reply_to: nstring(&env.in_reply_to),
-            from: env.from.iter().map(format_address).collect(),
-            sender: env.sender.iter().map(format_address).collect(),
-            reply_to: env.reply_to.iter().map(format_address).collect(),
-            to: env.to.iter().map(format_address).collect(),
-            cc: env.cc.iter().map(format_address).collect(),
-            bcc: env.bcc.iter().map(format_address).collect(),
+            from: env.from.iter().map(to_address).collect(),
+            sender: env.sender.iter().map(to_address).collect(),
+            reply_to: env.reply_to.iter().map(to_address).collect(),
+            to: env.to.iter().map(to_address).collect(),
+            cc: env.cc.iter().map(to_address).collect(),
+            bcc: env.bcc.iter().map(to_address).collect(),
         }
     }
 }
@@ -268,7 +280,6 @@ pub struct BodyPart {
     /// Its size, in octets.
     pub size: Option<usize>,
     /// Its children, empty for a leaf.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<BodyPart>,
 }
 
@@ -401,22 +412,26 @@ fn write_envelope(f: &mut fmt::Formatter<'_>, env: &EnvelopeView) -> fmt::Result
         writeln!(f, "  Subject: {}", sanitize(subject))?;
     }
     if !env.from.is_empty() {
-        writeln!(f, "  From: {}", sanitize(&env.from.join(", ")))?;
+        writeln!(f, "  From: {}", sanitize(&format_addresses(&env.from)))?;
     }
     if !env.sender.is_empty() {
-        writeln!(f, "  Sender: {}", sanitize(&env.sender.join(", ")))?;
+        writeln!(f, "  Sender: {}", sanitize(&format_addresses(&env.sender)))?;
     }
     if !env.reply_to.is_empty() {
-        writeln!(f, "  Reply-To: {}", sanitize(&env.reply_to.join(", ")))?;
+        writeln!(
+            f,
+            "  Reply-To: {}",
+            sanitize(&format_addresses(&env.reply_to))
+        )?;
     }
     if !env.to.is_empty() {
-        writeln!(f, "  To: {}", sanitize(&env.to.join(", ")))?;
+        writeln!(f, "  To: {}", sanitize(&format_addresses(&env.to)))?;
     }
     if !env.cc.is_empty() {
-        writeln!(f, "  Cc: {}", sanitize(&env.cc.join(", ")))?;
+        writeln!(f, "  Cc: {}", sanitize(&format_addresses(&env.cc)))?;
     }
     if !env.bcc.is_empty() {
-        writeln!(f, "  Bcc: {}", sanitize(&env.bcc.join(", ")))?;
+        writeln!(f, "  Bcc: {}", sanitize(&format_addresses(&env.bcc)))?;
     }
     if let Some(message_id) = &env.message_id {
         writeln!(f, "  Message-ID: {}", sanitize(message_id))?;

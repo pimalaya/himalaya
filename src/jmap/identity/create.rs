@@ -3,12 +3,15 @@
 //! The `jmap identity create` command, the create half of RFC 8621
 //! `Identity/set`.
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::{JmapIdentityCreate, JmapIdentitySetArgs};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, error::format_set_error};
+use crate::{
+    jmap::{client::JmapClient, error::format_set_error},
+    shared::receipt::IdReceipt,
+};
 
 /// Create a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
@@ -50,6 +53,15 @@ impl JmapIdentityCreateCommand {
             bail!(msg);
         }
 
-        printer.out(Message::new("Identity successfully created"))
+        let id = output
+            .created
+            .get(create_id)
+            .map(|identity| identity.id.clone())
+            .ok_or_else(|| anyhow!("JMAP identity created without an id"))?;
+
+        printer.out(IdReceipt {
+            id,
+            done: "JMAP identity successfully created",
+        })
     }
 }

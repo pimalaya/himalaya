@@ -49,7 +49,7 @@ impl GmailMessageGetCommand {
         {
             let bytes =
                 decode_raw(raw).map_err(|err| anyhow!("Decode Gmail message error: {err}"))?;
-            return write_bytes_or_save(printer, None, &bytes);
+            return write_bytes_or_save(printer, None, bytes, "message/rfc822");
         }
 
         printer.out(GmailMessageGetOutput {
@@ -73,14 +73,10 @@ impl GmailMessageGetCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailMessageGetOutput {
     id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     thread_id: Option<String>,
     label_ids: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     snippet: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     size_estimate: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     internal_date: Option<String>,
     headers: Vec<GmailMessageHeaderOutput>,
 }

@@ -5,11 +5,12 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{get_imap::GmailImapGet, update_imap::GmailImapUpdate};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
 use crate::gmail::{
     client::GmailClient,
     settings::convert::{ExpungeBehaviorArg, enabled_flag},
+    settings::imap::get::GmailSettingsImapGetOutput,
 };
 
 /// Update the Gmail IMAP access settings.
@@ -57,11 +58,11 @@ impl GmailSettingsImapSetCommand {
             settings.max_folder_size = Some(size);
         }
 
-        let _out = {
+        let out = {
             let c = GmailImapUpdate::new(&client.auth, &client.user_id, settings)?;
             client.run(c)?
         };
 
-        printer.out(Message::new("Gmail IMAP settings successfully updated"))
+        printer.out(GmailSettingsImapGetOutput::from(out.response))
     }
 }

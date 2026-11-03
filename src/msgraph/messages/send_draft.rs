@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Send an existing Microsoft Graph draft (`POST
 /// /me/messages/{id}/send`); Graph moves it to Sent Items.
@@ -21,9 +21,9 @@ impl MsgraphMessageSendDraftCommand {
     /// Sends the draft.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         client.message_send(&self.id)?;
-        printer.out(Message::new(format!(
-            "Microsoft Graph draft `{}` successfully sent",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Microsoft Graph draft successfully sent",
+        })
     }
 }

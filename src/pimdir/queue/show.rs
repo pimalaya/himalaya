@@ -62,26 +62,21 @@ pub enum PimdirQueueState {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueShowOutput {
     /// The queue row id.
+    #[serde(rename = "row")]
     pub queue_id: i64,
     /// Where it stands.
     pub state: PimdirQueueState,
     /// The collection it is anchored on, unless unknown.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub collection: Option<String>,
     /// The action kind (`add`, `submit`…), while queued.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     /// Apply attempts so far, while queued.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub attempts: Option<i64>,
     /// Why the row was parked.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// When the row was applied, RFC 3339.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_at: Option<String>,
     /// The id of the message an applied add created, in `collection`.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub seq: Option<i64>,
 }
 
@@ -188,9 +183,12 @@ mod tests {
         assert_eq!(
             json,
             serde_json::json!({
-                "queueId": 12,
+                "row": 12,
                 "state": "applied",
                 "collection": "imap/Drafts",
+                "kind": null,
+                "attempts": null,
+                "error": null,
                 "appliedAt": "2026-10-04T20:00:00Z",
                 "seq": 42,
             })
@@ -198,12 +196,21 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_row_prints_its_id_and_state_only() {
+    fn an_unknown_row_prints_its_id_and_state() {
         let json = serde_json::to_value(PimdirQueueShowOutput::new(7, PimdirActionStatus::Unknown))
             .unwrap();
         assert_eq!(
             json,
-            serde_json::json!({ "queueId": 7, "state": "unknown" })
+            serde_json::json!({
+                "row": 7,
+                "state": "unknown",
+                "collection": null,
+                "kind": null,
+                "attempts": null,
+                "error": null,
+                "appliedAt": null,
+                "seq": null,
+            })
         );
     }
 }

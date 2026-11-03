@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::delete::GmailFilterDelete;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Delete a Gmail filter (users.settings.filters.delete).
 #[derive(Debug, Parser)]
@@ -26,9 +26,9 @@ impl GmailSettingsFilterDeleteCommand {
             client.run(c)?;
         }
 
-        printer.out(Message::new(format!(
-            "Gmail filter `{}` successfully deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Gmail filter successfully deleted",
+        })
     }
 }

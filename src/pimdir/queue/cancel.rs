@@ -61,6 +61,7 @@ impl PimdirQueueCancelCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueCancelOutput {
     /// The row that was cancelled.
+    #[serde(rename = "row")]
     pub id: i64,
     /// The action kind it held: `add`, `submit`, `set-flags`, ...
     pub kind: String,

@@ -5,9 +5,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::drafts::delete::GmailDraftDelete;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::gmail::client::GmailClient;
+use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
 
 /// Permanently delete a Gmail draft (users.drafts.delete).
 #[derive(Debug, Parser)]
@@ -25,9 +25,9 @@ impl GmailDraftDeleteCommand {
             client.run(c)?
         };
 
-        printer.out(Message::new(format!(
-            "Gmail draft `{}` successfully deleted",
-            self.id
-        )))
+        printer.out(IdReceipt {
+            id: self.id,
+            done: "Gmail draft successfully deleted",
+        })
     }
 }

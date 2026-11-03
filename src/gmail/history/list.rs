@@ -10,11 +10,11 @@ use io_gmail::v1::rest::history::{
     GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{gmail::client::GmailClient, shared::output::Paginated};
+use crate::gmail::client::GmailClient;
 
 /// List the changes applied to the mailbox since a given history id.
 ///
@@ -72,7 +72,10 @@ impl GmailHistoryListCommand {
             history,
         };
 
-        printer.out(Paginated::new(output, resp.next_page_token))
+        printer.out(Paginated {
+            inner: output,
+            next_page: resp.next_page_token,
+        })
     }
 }
 
@@ -108,7 +111,6 @@ impl From<HistoryTypeArg> for GmailHistoryType {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryListOutput {
-    #[serde(skip_serializing_if = "Option::is_none")]
     history_id: Option<String>,
     history: Vec<GmailHistoryRecordOutput>,
 }

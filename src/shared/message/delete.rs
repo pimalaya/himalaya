@@ -84,9 +84,7 @@ impl MessageDeleteCommand {
 pub(crate) struct MessageDeleteOutput {
     action: DeleteAction,
     count: usize,
-    /// Whether the backend queued the action for its sync engine rather
-    /// than performed it, which only the wording says.
-    #[serde(skip)]
+    /// Whether a sync engine applies the write later rather than now.
     queued: bool,
 }
 
@@ -146,7 +144,7 @@ mod tests {
     use crate::shared::message::delete::{DeleteAction, MessageDeleteOutput};
 
     #[test]
-    fn a_queued_delete_says_it_is_queued_and_keeps_its_json() {
+    fn a_queued_delete_says_it_is_queued() {
         let queued = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, true);
         let done = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, false);
 
@@ -160,7 +158,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&queued).unwrap(),
-            serde_json::to_string(&done).unwrap()
+            r#"{"action":"moved-to-trash","count":2,"queued":true}"#
         );
     }
 }

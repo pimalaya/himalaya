@@ -3,7 +3,7 @@
 //! The `jmap email import` command, a blob upload then an RFC 8621
 //! `Email/import`.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -11,8 +11,10 @@ use io_jmap::{
     client::JmapClientStd,
     rfc8621::{JMAP_MAIL_CAPABILITY, email::import::JmapEmailImportArgs},
 };
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 use pimalaya_config::secret::SecretResolver;
+use schemars::JsonSchema;
+use serde::Serialize;
 use url::Url;
 
 use crate::{
@@ -79,7 +81,7 @@ impl JmapEmailImportCommand {
         };
 
         if self.upload_only {
-            return printer.out(Message::new(blob_id));
+            return printer.out(JmapEmailImportOutput { id: None, blob_id });
         }
 
         let mailbox_ids: BTreeMap<String, bool> =
@@ -109,7 +111,32 @@ impl JmapEmailImportCommand {
             bail!(msg);
         }
 
-        printer.out(Message::new("Email successfully imported"))
+        let id = output
+            .created
+            .get(&blob_id)
+            .and_then(|email| email.id.clone());
+
+        printer.out(JmapEmailImportOutput { id, blob_id })
+    }
+}
+
+/// The `jmap email import` output.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JmapEmailImportOutput {
+    /// The id of the imported email, `null` with `--upload-only` or when
+    /// the server returns none.
+    id: Option<String>,
+    /// The id of the uploaded blob.
+    blob_id: String,
+}
+
+impl fmt::Display for JmapEmailImportOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.id {
+            Some(id) => writeln!(f, "JMAP email successfully imported: {id}"),
+            None => writeln!(f, "JMAP blob successfully uploaded: {}", self.blob_id),
+        }
     }
 }
 

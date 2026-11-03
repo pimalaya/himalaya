@@ -6,11 +6,14 @@
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::mbox::rename::MboxRename;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::mbox::{
-    arg::{MboxNameArg, RequiredMboxPathFlag},
-    client::{MboxClient, validate_mbox_name},
+use crate::{
+    mbox::{
+        arg::{MboxNameArg, RequiredMboxPathFlag},
+        client::{MboxClient, validate_mbox_name},
+    },
+    shared::receipt::IdReceipt,
 };
 
 /// Rename an mbox.
@@ -33,6 +36,9 @@ impl MboxMailboxRenameCommand {
         let from = client.resolve_mbox(&self.mbox_path.inner);
         let to = client.resolve_mbox(&self.mbox_name.inner);
         client.run(MboxRename::new(from, to))?;
-        printer.out(Message::new("Mbox successfully renamed"))
+        printer.out(IdReceipt {
+            id: self.mbox_name.inner,
+            done: "Mbox successfully renamed",
+        })
     }
 }

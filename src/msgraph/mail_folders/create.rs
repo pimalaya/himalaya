@@ -6,9 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::MsgraphMailFolder;
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::msgraph::client::MsgraphClient;
+use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 
 /// Create a Microsoft Graph mail folder under the mailbox root (`POST
 /// /me/mailFolders`).
@@ -28,9 +28,9 @@ impl MsgraphMailFolderCreateCommand {
         };
         let folder = client.mail_folder_create(&folder)?.response;
 
-        printer.out(Message::new(format!(
-            "Microsoft Graph mail folder `{}` successfully created",
-            folder.id
-        )))
+        printer.out(IdReceipt {
+            id: folder.id,
+            done: "Microsoft Graph mail folder successfully created",
+        })
     }
 }
