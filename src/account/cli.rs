@@ -9,7 +9,9 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    account::{check::AccountCheckCommand, list::AccountListCommand},
+    account::{
+        capability::AccountCapabilityCommand, check::AccountCheckCommand, list::AccountListCommand,
+    },
     backend::Backend,
 };
 
@@ -23,6 +25,8 @@ pub enum AccountCommand {
     #[command(visible_alias = "ls")]
     List(AccountListCommand),
     Check(AccountCheckCommand),
+    #[command(alias = "capabilities", alias = "caps")]
+    Capability(AccountCapabilityCommand),
 }
 
 impl AccountCommand {
@@ -37,6 +41,7 @@ impl AccountCommand {
         match self {
             Self::List(cmd) => cmd.execute(printer, config_paths),
             Self::Check(cmd) => cmd.execute(printer, config_paths, account_name, backend),
+            Self::Capability(cmd) => cmd.execute(printer, config_paths, account_name, backend),
         }
     }
 }

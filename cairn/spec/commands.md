@@ -239,3 +239,11 @@ The shared flag arguments SHALL include `important` (`$Important`, RFC 8457) and
 
 ### Requirement: The auto-reply is shared
 `vacation get` SHALL print the account's auto-reply as `{enabled, from, to, subject, text, html}`, the dates RFC 3339 in UTC, and the default one, off with nothing set, when the backend holds none. `vacation set` SHALL change only what it is given (`--enable` or `--disable`, `--from`, `--to` as RFC 3339 or a `YYYY-MM-DD` read as midnight UTC, `--subject`, `--text`, `--html`) and print the auto-reply as it then stands. JMAP serves it when its session advertises `urn:ietf:params:jmap:vacationresponse` (RFC 8621 section 8), Gmail through `settings.getVacation` and `updateVacation`, its dates epoch milliseconds, the settings read first so the Gmail-only ones survive.
+
+### Requirement: An account lists what it serves
+`account capability` SHALL print one row per shared capability, `{name, backend, level, detail}` under `{account, capabilities}`: the backend the resolver picks for the account and `--backend`, `null` when none is configured, and that backend's level and detail. It SHALL read the configuration and the capability tables and connect nowhere. On a pimdir account, a write SHALL be read from what the store's sources declare: an item write through the store's gate in each of the account's mail collections (`none` refused in all, `partial` refused in some or passing in part), an intent served when a source performs it, the static row kept when no source declares anything.
+
+#### Scenario: A Maildir synced from JMAP
+- GIVEN an account configuring a Maildir and a JMAP block
+- WHEN `account capability` runs
+- THEN `mailbox.list` names `maildir`, `vacation` names `jmap` at `server`, and nothing connects

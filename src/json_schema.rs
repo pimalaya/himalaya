@@ -138,7 +138,10 @@ pub fn registry() -> JsonSchemaRegistry {
         "himalaya-account-check",
         crate::account::check::AccountCheckOutput
     );
-
+    insert!(
+        "himalaya-account-capability",
+        crate::account::capability::AccountCapabilityOutput
+    );
     #[cfg(feature = "imap")]
     {
         insert!("himalaya-imap-id", crate::imap::id::ImapIdOutput);

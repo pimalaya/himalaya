@@ -45,6 +45,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
+    capability::{Capability, StoreSupport},
     email::{
         address::Address,
         envelope::Envelope,
@@ -162,6 +163,88 @@ impl PimdirClient {
             .into_iter()
             .filter(|collection| is_mail(&collection.kind))
             .collect())
+    }
+
+    /// How the store serves a shared write, read from what its sources
+    /// declare (pimdir STORAGE §15.6), nothing staged: `None` for a read or
+    /// an account feature, and for a store whose sources declare nothing,
+    /// where the backend's static row stands.
+    ///
+    /// An intent (`collection.*`, `mail.submit`) is served when a source
+    /// performs it. An item write runs through the store's own gate in
+    /// each of the account's mail collections: refused in every one it is
+    /// `none`, in some of them or passing in part it is `partial`.
+    pub fn store_support(&self, capability: Capability) -> Result<Option<StoreSupport>> {
+        let Some(name) = capability.annex_b_name() else {
+            return Ok(None);
+        };
+
+        let collections = self.mail_collections()?;
+        let mut declared = false;
+        let mut refusals = Vec::new();
+        let mut partials = BTreeSet::new();
+
+        for collection in &collections {
+            let sources = self
+                .store
+                .capabilities(&collection.id)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Read the capabilities of `{}`", collection.id))?;
+            declared |= sources.iter().any(|source| source.declared.is_some());
+
+            match capability::check(&[name.to_string()], &sources) {
+                Ok(passed) => partials.extend(passed.into_iter().map(|partial| {
+                    let detail = partial.detail.unwrap_or_else(|| String::from("in part"));
+                    format!("{}: {detail}", partial.source)
+                })),
+                Err(refusal) => refusals.push(refusal.to_string()),
+            }
+        }
+
+        if !declared {
+            return Ok(None);
+        }
+
+        if name.starts_with("collection.") || name.starts_with("mail.submit") {
+            let (candidates, _) = self.performers(name)?;
+            let support = if candidates.is_empty() {
+                StoreSupport {
+                    level: "none",
+                    detail: Some(format!("no source of the store performs `{name}`")),
+                }
+            } else {
+                StoreSupport {
+                    level: "full",
+                    detail: None,
+                }
+            };
+            return Ok(Some(support));
+        }
+
+        let support = match refusals.first() {
+            Some(refusal) if refusals.len() == collections.len() => StoreSupport {
+                level: "none",
+                detail: Some(refusal.clone()),
+            },
+            Some(refusal) => StoreSupport {
+                level: "partial",
+                detail: Some(format!(
+                    "refused in {} of {} mailboxes: {refusal}",
+                    refusals.len(),
+                    collections.len()
+                )),
+            },
+            None if !partials.is_empty() => StoreSupport {
+                level: "partial",
+                detail: Some(partials.into_iter().collect::<Vec<_>>().join("; ")),
+            },
+            None => StoreSupport {
+                level: "full",
+                detail: None,
+            },
+        };
+
+        Ok(Some(support))
     }
 
     /// Lists the account's mail collections, each addressed by its collection
@@ -2667,6 +2750,48 @@ mod tests {
         };
         let payload = serde_json::from_str(payload).unwrap();
         (pending[0].id, kind.clone(), payload)
+    }
+
+    #[test]
+    fn the_store_says_which_writes_its_sources_serve() {
+        let (dir, client) = sent_store();
+
+        // NOTE: nothing declared yet, so the static table stands.
+        assert_eq!(client.store_support(Capability::FlagsSeen).unwrap(), None);
+
+        declare(
+            dir.path(),
+            &[capability::MAIL_FLAGS_SEEN, capability::COLLECTION_RENAME],
+        );
+
+        let full = |capability| client.store_support(capability).unwrap().unwrap().level;
+        assert_eq!(full(Capability::FlagsSeen), "full");
+        assert_eq!(full(Capability::MailboxRename), "full");
+        assert_eq!(full(Capability::FlagsAnswered), "none");
+        assert_eq!(full(Capability::MailboxDelete), "none");
+
+        // NOTE: a read is the store's own, whatever its sources declare.
+        assert_eq!(client.store_support(Capability::MessageRead).unwrap(), None);
+    }
+
+    #[test]
+    fn the_annex_b_names_are_pimdirs() {
+        assert_eq!(
+            Capability::MailboxCreate.annex_b_name(),
+            Some(capability::COLLECTION_CREATE)
+        );
+        assert_eq!(
+            Capability::MessageTrash.annex_b_name(),
+            Some(capability::MAIL_MESSAGE_MOVE)
+        );
+        assert_eq!(
+            Capability::FlagsJunk.annex_b_name(),
+            Some(capability::MAIL_FLAGS_JUNK)
+        );
+        assert_eq!(
+            Capability::SubmitCopy.annex_b_name(),
+            Some(capability::MAIL_SUBMIT_COPY)
+        );
     }
 
     #[test]

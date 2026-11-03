@@ -160,6 +160,40 @@ impl Capability {
         }
     }
 
+    /// The pimdir STORAGE Annex B name of a write, the one a pimdir store's
+    /// sources declare: the domain word back, `mailbox.` read as
+    /// `collection.`, the trash a move. `None` for a read, which a store
+    /// answers locally, and for an account feature, which it does not hold.
+    #[cfg(feature = "pimdir")]
+    pub fn annex_b_name(self) -> Option<&'static str> {
+        let name = match self {
+            Self::MailboxCreate => "collection.create",
+            Self::MailboxRename => "collection.rename",
+            Self::MailboxDelete => "collection.delete",
+            Self::MessageAdd => "mail.message.add",
+            Self::MessageCopy => "mail.message.copy",
+            Self::MessageMove | Self::MessageTrash => "mail.message.move",
+            Self::MessageRemove => "mail.message.remove",
+            Self::FlagsSeen => "mail.flags.seen",
+            Self::FlagsAnswered => "mail.flags.answered",
+            Self::FlagsFlagged => "mail.flags.flagged",
+            Self::FlagsDraft => "mail.flags.draft",
+            Self::FlagsImportant => "mail.flags.important",
+            Self::FlagsJunk => "mail.flags.junk",
+            Self::Submit => "mail.submit",
+            Self::SubmitCopy => "mail.submit.copy",
+            Self::MailboxList
+            | Self::EnvelopeList
+            | Self::EnvelopeSearch
+            | Self::Search(_)
+            | Self::MessageRead
+            | Self::AttachmentList
+            | Self::Vacation => return None,
+        };
+
+        Some(name)
+    }
+
     /// Whether the sending transport answers it rather than the storage
     /// backend.
     fn sends(self) -> bool {
@@ -217,6 +251,26 @@ impl Support {
     /// Whether the capability is served at all, maybe in part.
     pub fn is_served(self) -> bool {
         !matches!(self, Self::None(_))
+    }
+}
+
+/// How a backend serves a capability as read at run time, its detail
+/// owned: what a pimdir store's sources declare, which its static row
+/// leaves to the store.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StoreSupport {
+    /// The level, as [`Support::level`] spells it.
+    pub level: &'static str,
+    /// What the level leaves out, `None` for a full one.
+    pub detail: Option<String>,
+}
+
+impl From<Support> for StoreSupport {
+    fn from(support: Support) -> Self {
+        Self {
+            level: support.level(),
+            detail: support.detail().map(ToString::to_string),
+        }
     }
 }
 
@@ -898,6 +952,20 @@ impl Leaf {
             capabilities,
         }
     }
+}
+
+/// Every capability a shared leaf reaches, once each, in the order the
+/// leaves list them.
+pub fn all() -> Vec<Capability> {
+    let mut all = Vec::new();
+
+    for capability in LEAVES.iter().flat_map(|leaf| leaf.capabilities) {
+        if !all.contains(capability) {
+            all.push(*capability);
+        }
+    }
+
+    all
 }
 
 /// The leaf of `group leaf`, `None` for one reaching no transport.
