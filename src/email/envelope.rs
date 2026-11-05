@@ -111,8 +111,9 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
 /// flags left empty for the backend to fill.
 ///
 /// `with_attachment` also splits the body, to say whether it holds an
-/// attachment (RFC 8621 §4.1.4); left `None` otherwise. The subject is
-/// read as the read view reads it, raw 8-bit bytes included.
+/// attachment ([`crate::shared::message::part::has_attachment`]); left
+/// `None` otherwise. The subject is read as the read view reads it, raw
+/// 8-bit bytes included.
 #[cfg(any(feature = "maildir", feature = "m2dir", feature = "mbox"))]
 pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
     use chrono::TimeZone;
@@ -121,7 +122,10 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
         tree::cst::MimeCst,
     };
 
-    use crate::{email::address, shared::message::header};
+    use crate::{
+        email::address,
+        shared::message::{header, part},
+    };
 
     let message = match with_attachment {
         true => MimeCst::parse(raw),
@@ -159,7 +163,7 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
         to: addresses(root.header::<TO>()),
         date,
         size: raw.len() as u64,
-        has_attachment: with_attachment.then(|| root.body_lists().has_attachment()),
+        has_attachment: with_attachment.then(|| part::has_attachment(&message)),
     }
 }
 

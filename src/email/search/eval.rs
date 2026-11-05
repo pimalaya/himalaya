@@ -18,13 +18,16 @@ use mime::{
     tree::{cst::MimeCst, parse::MimeParseOptions},
 };
 
-use crate::email::{
-    address::{self, Address},
-    envelope::Envelope,
-    search::{
-        filter::query::SearchEmailsFilterQuery,
-        sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+use crate::{
+    email::{
+        address::{self, Address},
+        envelope::Envelope,
+        search::{
+            filter::query::SearchEmailsFilterQuery,
+            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+        },
     },
+    shared::message::part,
 };
 
 /// The copy recipients of a message, which an [`Envelope`] does not carry.
@@ -145,7 +148,7 @@ fn has_attachment(envelope: &Envelope, raw: &[u8]) -> bool {
         return has_attachment;
     }
 
-    !raw.is_empty() && MimeCst::parse(raw).root.body_lists().has_attachment()
+    !raw.is_empty() && part::has_attachment(&MimeCst::parse(raw))
 }
 
 fn body_contains(raw: &[u8], pattern: &str) -> bool {
