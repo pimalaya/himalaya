@@ -14,13 +14,15 @@ use std::{
 use anyhow::{Context, Result, bail};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
-use mime::tree::cst::MimeCst;
-use pimalaya_cli::printer::Printer;
+use mime::tree::{cst::MimeCst, entity::MimeEntity};
+use pimalaya_cli::{error::CodedError, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    error::ErrorCode,
+    mcp,
     shared::{
         attachment::list::{self, AttachmentColors, AttachmentListOutput},
         client::EmailClient,
@@ -86,7 +88,9 @@ impl AttachmentDownloadCommand {
         let message = part::parse(&raw)?;
 
         if let Some(id) = part_id {
-            let Some(part) = PartBytes::new(&message, &id) else {
+            // NOTE: inside an MCP server the part is bounded, so a large one
+            // is refused before its bytes are encoded into the result.
+            let Some(part) = PartBytes::bounded(&message, &id, mcp::max_attachment_size())? else {
                 bail!("No part with id {id} on message `{}`", self.message_id);
             };
 
@@ -197,14 +201,43 @@ impl PartBytes {
     pub fn new(message: &MimeCst, id: &str) -> Option<Self> {
         let leaf = part::find(message, id)?;
         let bytes = part::bytes(leaf.part).into_owned();
-        Some(Self {
-            id: leaf.id,
-            mime: part::mime(leaf.part),
-            filename: part::filename(leaf.part),
+        Some(Self::encode(leaf.id, leaf.part, bytes))
+    }
+
+    /// As [`Self::new`], refusing a part whose decoded bytes exceed `max`
+    /// with `attachment-too-large`, before they are encoded.
+    pub fn bounded(message: &MimeCst, id: &str, max: Option<u64>) -> Result<Option<Self>> {
+        let Some(leaf) = part::find(message, id) else {
+            return Ok(None);
+        };
+
+        let bytes = part::bytes(leaf.part);
+        let size = bytes.len() as u64;
+
+        if let Some(max) = max
+            && size > max
+        {
+            let message = format!(
+                "Part {} is {size} bytes, over the {max} bytes the server reads \
+                 (`himalaya mcp --max-attachment-size`)",
+                leaf.id,
+            );
+            return Err(CodedError::new(ErrorCode::AttachmentTooLarge, message).into());
+        }
+
+        let bytes = bytes.into_owned();
+        Ok(Some(Self::encode(leaf.id, leaf.part, bytes)))
+    }
+
+    fn encode(id: String, part: &MimeEntity, bytes: Vec<u8>) -> Self {
+        Self {
+            id,
+            mime: part::mime(part),
+            filename: part::filename(part),
             size: bytes.len() as u64,
             data: BASE64_STANDARD.encode(&bytes),
             bytes,
-        })
+        }
     }
 
     /// Writes the bytes to stdout and nothing else, or under `--json`
@@ -292,9 +325,10 @@ mod tests {
 
     use base64::{Engine, prelude::BASE64_STANDARD};
     use clap::Parser;
+    use pimalaya_cli::error::code_of;
 
     use super::{AttachmentDownloadCommand, PartBytes, create_unique_file, sanitize};
-    use crate::shared::message::part;
+    use crate::{error::ErrorCode, shared::message::part};
 
     const MIXED: &[u8] = b"Content-Type: multipart/mixed; boundary=\"b\"\r\n\
         \r\n\
@@ -408,6 +442,38 @@ mod tests {
             let read = PartBytes::new(&message, &leaf.id).unwrap();
             assert_eq!(read.size, part::bytes(leaf.part).len() as u64);
         }
+    }
+
+    #[test]
+    fn a_part_over_the_cap_is_refused_before_it_is_encoded() {
+        let message = part::parse(MIXED).unwrap();
+
+        let err = PartBytes::bounded(&message, "3", Some(6))
+            .err()
+            .expect("a 7-byte part over a 6-byte cap");
+        assert_eq!(
+            code_of::<ErrorCode>(&err),
+            Some(ErrorCode::AttachmentTooLarge)
+        );
+        assert!(err.to_string().contains("--max-attachment-size"), "{err}");
+
+        let at_cap = PartBytes::bounded(&message, "3", Some(7)).unwrap().unwrap();
+        assert_eq!(at_cap.bytes, b"\x00\x01\xff\xfe\x00\x0a\x0d");
+
+        // NOTE: an unknown id is no part rather than a refusal, and no cap
+        // bounds nothing.
+        assert!(
+            PartBytes::bounded(&message, "5", Some(0))
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            PartBytes::bounded(&message, "3", None)
+                .unwrap()
+                .unwrap()
+                .size,
+            7
+        );
     }
 
     #[test]

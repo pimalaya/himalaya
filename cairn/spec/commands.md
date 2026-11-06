@@ -79,6 +79,7 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | `search-invalid` | an `envelope search` query does not parse; nothing is searched |
 | `search-unsupported` | an `envelope search` clause the account's backend cannot search, quoted as written; nothing is searched, no clause dropped |
 | `capability-missing` | the account's backend does not serve the verb, or the option of it asked for, as its capability table declares or its server advertises; nothing is done, the message naming the capability and what serves it instead |
+| `attachment-too-large` | a part an MCP tool reads is larger than the server's `--max-attachment-size`; it is refused before being encoded, nothing of it returned |
 | `store-version` | a pimdir store is of another draft of the format; upgrade Himalaya, or reinstall the store as neverest's MIGRATION.md says |
 | `store-uncreated` | a pimdir store has no schema yet; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |

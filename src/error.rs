@@ -47,6 +47,10 @@ pub enum ErrorCode {
     /// it asked for: nothing was done. The message names the capability
     /// and what serves it instead.
     CapabilityMissing,
+    /// The attachment is larger than the MCP server's
+    /// `--max-attachment-size`: it was refused before being encoded, and
+    /// nothing of it was returned.
+    AttachmentTooLarge,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
     StoreVersion,
