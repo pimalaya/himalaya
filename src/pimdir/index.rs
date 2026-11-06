@@ -35,6 +35,8 @@ use io_pimdir::{
         tag::{PimdirSearchTagPlacement, PimdirSearchTagSource},
     },
 };
+use jiff::tz::TimeZone;
+use log::warn;
 use pimalaya_cli::{
     error::CodedError,
     table::{Cell, ColumnConstraint, ContentArrangement, Row, Table, sanitize},
@@ -103,11 +105,16 @@ impl PimdirClient {
         })
     }
 
-    /// How many messages `query` matches in the account.
-    pub fn count_mail(&self, query: PimdirQuery) -> Result<(u64, PimdirMailCoverage)> {
+    /// How many messages `query` matches in the account, its dates read
+    /// by `clock`.
+    pub fn count_mail(
+        &self,
+        query: PimdirQuery,
+        clock: &PimdirSearchClock,
+    ) -> Result<(u64, PimdirMailCoverage)> {
         let answer = self
             .index()?
-            .count(&self.scope(query), &PimdirSearchClock::default())
+            .count(&self.scope(query), clock)
             .map_err(pimdir_error)
             .context("Count in the pimdir index")?;
         Ok((answer.count, PimdirMailCoverage::from(&answer.coverage)))
@@ -143,9 +150,9 @@ impl PimdirClient {
     }
 
     /// Plans adding `add` to and removing `remove` from the flags of every
-    /// message `query` matches in the account, each placement as the one
-    /// source syncing its mailbox, and stages the plan through the queue
-    /// unless `dry_run`.
+    /// message `query` matches in the account, its dates read by `clock`,
+    /// each placement as the one source syncing its mailbox, and stages the
+    /// plan through the queue unless `dry_run`.
     ///
     /// Every action passes the capability gate before the first is
     /// appended (io-pimdir `PimdirSearchTagPlan::stage`), so a refusal
@@ -156,16 +163,11 @@ impl PimdirClient {
         add: &[String],
         remove: &[String],
         dry_run: bool,
+        clock: &PimdirSearchClock,
     ) -> Result<PimdirMailTag> {
         let plan = self
             .index()?
-            .tag(
-                &self.scope(query),
-                add,
-                remove,
-                None,
-                &PimdirSearchClock::default(),
-            )
+            .tag(&self.scope(query), add, remove, None, clock)
             .map_err(pimdir_error)
             .context("Plan the pimdir tag")?;
 
@@ -311,6 +313,19 @@ impl PimdirClient {
             hits,
         })
     }
+}
+
+/// The clock of a query: now, in the user's zone (pimdir SEARCH §8.1),
+/// `TZ` then the system's, UTC when it has no IANA name.
+pub fn local_clock() -> PimdirSearchClock {
+    let zone = TimeZone::try_system()
+        .ok()
+        .and_then(|zone| zone.iana_name().map(ToOwned::to_owned));
+    if zone.is_none() {
+        warn!("local time zone has no IANA name, reading query dates in UTC; set TZ to one");
+    }
+
+    PimdirSearchClock { now: None, zone }
 }
 
 /// Parses the words of a query, joined by spaces, as the pimdir SEARCH
@@ -911,7 +926,59 @@ mod tests {
             .unwrap();
         assert_eq!(last.hits.len(), 1);
         assert!(!last.more);
-        assert_eq!(client.count_mail(query("date:2026-05-01..")).unwrap().0, 4);
+        assert_eq!(
+            client
+                .count_mail(query("date:2026-05-01.."), &PimdirSearchClock::default())
+                .unwrap()
+                .0,
+            4
+        );
+    }
+
+    #[test]
+    fn a_day_is_read_in_the_zone_the_clock_states() {
+        let (dir, mut client) = indexed_store();
+        client
+            .add_message(
+                INBOX,
+                &[],
+                mail(
+                    "e",
+                    "From: eve@x.org\r\nDate: Sat, 07 Nov 2026 00:30:00 +0100\r\nSubject: Offsite",
+                    "Agenda inside.",
+                ),
+            )
+            .unwrap();
+        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+        refresh(dir.path());
+
+        // NOTE: now is 08:00 on 2026-11-07 in Paris
+        let clock = PimdirSearchClock {
+            now: Some(1_794_034_800),
+            zone: Some("Europe/Paris".into()),
+        };
+        let options = PimdirSearchOptions {
+            clock: clock.clone(),
+            ..Default::default()
+        };
+        let subjects = |text| {
+            client
+                .search_mail(query(text), &options)
+                .unwrap()
+                .hits
+                .into_iter()
+                .map(|hit| hit.envelope.subject)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(subjects("date:2026-11-07"), ["Offsite"]);
+        assert!(subjects("date:2026-11-06").is_empty());
+        assert_eq!(subjects("date:today"), ["Offsite"]);
+        let count = |text| client.count_mail(query(text), &clock).unwrap().0;
+        assert_eq!(count("date:2026-11-07"), 1);
+        assert_eq!(count("date:yesterday"), 0);
     }
 
     #[test]
@@ -976,7 +1043,13 @@ mod tests {
         let flagged = vec![String::from("flagged")];
 
         let planned = client
-            .tag_mail(query("quarterly or lunch"), &flagged, &[], true)
+            .tag_mail(
+                query("quarterly or lunch"),
+                &flagged,
+                &[],
+                true,
+                &PimdirSearchClock::default(),
+            )
             .unwrap();
         assert!(
             planned
@@ -987,7 +1060,13 @@ mod tests {
         assert!(client.store.pending_actions(INBOX).unwrap().is_empty());
 
         let tag = client
-            .tag_mail(query("quarterly or lunch"), &flagged, &[], false)
+            .tag_mail(
+                query("quarterly or lunch"),
+                &flagged,
+                &[],
+                false,
+                &PimdirSearchClock::default(),
+            )
             .unwrap();
         let statuses: BTreeMap<&str, PimdirTagStatus> = tag
             .tagged
@@ -1018,7 +1097,13 @@ mod tests {
         let (_dir, client) = indexed_store();
 
         let tag = client
-            .tag_mail(query("invoice"), &[String::from("flagged")], &[], false)
+            .tag_mail(
+                query("invoice"),
+                &[String::from("flagged")],
+                &[],
+                false,
+                &PimdirSearchClock::default(),
+            )
             .unwrap();
 
         assert_eq!(tag.tagged.len(), 1);
@@ -1032,7 +1117,13 @@ mod tests {
         let (_dir, client) = indexed_store();
 
         let err = client
-            .tag_mail(query("lunch"), &[String::from("unread")], &[], false)
+            .tag_mail(
+                query("lunch"),
+                &[String::from("unread")],
+                &[],
+                false,
+                &PimdirSearchClock::default(),
+            )
             .err()
             .unwrap();
 
@@ -1145,7 +1236,7 @@ mod tests {
         let (dir, client) = indexed_store();
         let conn = rusqlite::Connection::open(dir.path().join("index.db")).unwrap();
         conn.execute(
-            "UPDATE index_meta SET format_version = 'search-draft-07'",
+            "UPDATE index_meta SET format_version = 'search-draft-08'",
             [],
         )
         .unwrap();
@@ -1161,7 +1252,7 @@ mod tests {
             "{err:#}"
         );
         let err = format!("{err:#}");
-        assert!(err.contains("search-draft-07"), "{err}");
+        assert!(err.contains("search-draft-08"), "{err}");
         assert!(err.contains("sync engine"), "{err}");
         assert!(!err.contains("delete"), "{err}");
         let version: String = conn
@@ -1169,7 +1260,7 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(version, "search-draft-07", "the index was rebuilt");
+        assert_eq!(version, "search-draft-08", "the index was rebuilt");
     }
 
     #[test]

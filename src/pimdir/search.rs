@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use io_pimdir::client::search::{PimdirSearchClock, PimdirSearchOptions, PimdirSearchSort};
+use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
 use pimalaya_cli::{
     printer::Printer,
     table::{Cell, Row, sanitize},
@@ -21,7 +21,7 @@ use crate::{
         client::PimdirClient,
         index::{
             PimdirMailCoverage, PimdirMailHit, PimdirMailThread, PimdirTableStyle,
-            keep_first_column, parse_query,
+            keep_first_column, local_clock, parse_query,
         },
     },
     shared::envelope::list::format_addresses,
@@ -33,7 +33,8 @@ use crate::{
 /// for a prefix), `field:value` terms (`from:`, `to:`, `subject:`,
 /// `body:`, `is:unread`, `has:attachment`, `date:2026-01..2026-03`,
 /// `folder:`, `thread:` and the others), `and`, `or`, `not` or a leading
-/// `-`, and parentheses. It is read over the account's mail.
+/// `-`, and parentheses. It is read over the account's mail, its dates
+/// in the local zone (`TZ`, then the system's).
 ///
 /// The answer comes from the store's search index, which the sync engine
 /// builds and refreshes after each run: a message is found once it is
@@ -91,7 +92,7 @@ impl PimdirSearchCommand {
             sort: self.sort.into(),
             limit,
             offset: self.page.saturating_sub(1).saturating_mul(limit),
-            clock: PimdirSearchClock::default(),
+            clock: local_clock(),
         };
         let style = PimdirTableStyle::new(account, self.max_width);
 

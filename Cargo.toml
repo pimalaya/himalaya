@@ -25,7 +25,7 @@ maildir = ["dep:convert_case", "dep:io-maildir", "dep:mime-rs", "io-maildir/clie
 mbox = ["dep:io-mbox", "dep:mime-rs", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mime-rs", "io-m2dir/client"]
 sieve = ["dep:io-managesieve", "io-managesieve/client", "io-managesieve/scram"]
-pimdir = ["dep:io-pimdir", "dep:mime-rs", "io-pimdir/search"]
+pimdir = ["dep:io-pimdir", "dep:jiff", "dep:mime-rs", "io-pimdir/search"]
 vendored = ["pimalaya-stream/vendored", "io-pimdir?/vendored"]
 wizard = ["dep:io-pim-discovery", "pimalaya-cli/wizard", "pimalaya-cli/imap", "pimalaya-cli/smtp", "pimalaya-cli/jmap", "pimalaya-cli/spinner"]
 
@@ -63,11 +63,12 @@ io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.6", default-features = false, optional = true }
 io-pim-discovery = { version = "0.9", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620", "stream"], optional = true }
-io-pimdir = { version = "0.8", default-features = false, features = ["client"], optional = true }
+io-pimdir = { version = "0.9", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
+jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
 log = "0.4"
-mime-rs = { version = "0.0.1", git = "https://github.com/pimalaya/mime-rs", rev = "d7ea03296a197647a6effeb593a8528b47bdb0ed", optional = true }
+mime-rs = { version = "0.1", optional = true }
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"
@@ -89,8 +90,7 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
-ical-rs = { git = "https://github.com/pimalaya/ical", rev = "99b92736a6a076c72936fac29c9b85a5168e4c2f" }
 io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "0c701447473a03e5cf9effcd0039a49a78419c4d" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "5c18a026b9c85b470984192452c2aa66e060a3fe" }

@@ -42,9 +42,11 @@ Each backend SHALL translate the shared query into its native surface. IMAP tran
 Graph SHALL refuse a filter holding a flag clause with the code `search-unsupported`, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
 
 ### Requirement: pimdir searches through the store's index
-`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-08 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
+`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-09 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
 
 Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page carries `more`, whether hits or threads follow it.
+
+A `date:` term's years, months and days, `today` and `yesterday` SHALL be read in the local zone (SEARCH §8.1), in `pimdir search`, `count` and `tag` alike: `TZ`, then the system's zone, by its IANA name. A zone with no IANA name, a POSIX `TZ` string or a system zone that cannot be named, or no zone at all, SHALL leave them in UTC with one warning.
 
 #### Scenario: A body match
 - GIVEN a pimdir store whose index holds a message whose body says `quarterly`
@@ -55,6 +57,11 @@ Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, whic
 - GIVEN a message added to a pimdir mailbox and still in the queue
 - WHEN `himalaya pimdir search` runs a query its body matches
 - THEN it is not listed until the owner applies the add and refreshes the index
+
+#### Scenario: A day is the local day
+- GIVEN `TZ=Europe/Paris` and an indexed message received at 00:30 on 2026-11-07 in that zone
+- WHEN `himalaya pimdir search date:2026-11-07` runs
+- THEN the message is listed, and `date:2026-11-06` does not list it
 
 ### Requirement: pimdir counts, threads and tags from the index
 `himalaya pimdir count <query>...` SHALL answer how many messages the scoped query matches, with its coverage. `himalaya pimdir thread <id>` SHALL list the thread of one message, oldest first, a message no thread holds being its own. `himalaya pimdir tag <query>... --add <flag> --remove <flag>` SHALL stage one `set-flags` per placement each hit's flags change in, through the queue as a producer (io-pimdir `PimdirSearchTagPlan::stage`), every action passing the capability gate before the first is appended, and SHALL report each placement as `queued` with its row, `unchanged`, `unknown-flags` (its flags were never read), `ambiguous-source`, `unsynced` or `unsupported`, staging nothing for those. `read`, `flagged`, `answered` and `draft` name `\Seen`, `\Flagged`, `\Answered` and `\Draft` as `is:` does; a flag is otherwise checked as `pimdir flag` checks it. `--dry-run` reports the plan and stages nothing. Himalaya SHALL NOT drain the queue: the owner applies the rows.
@@ -81,7 +88,7 @@ A store with no search index SHALL fail every index command with the code `index
 - THEN the command exits 1 with the code `index-missing`
 
 #### Scenario: An index of an earlier draft
-- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-07`
+- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-08`
 - WHEN `himalaya --json pimdir search lunch` runs
 - THEN the command exits 1 with the code `index-version`, and the index is left as it is
 

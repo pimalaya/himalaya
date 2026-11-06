@@ -20,7 +20,8 @@ use crate::{
         client::PimdirClient,
         flag::parse_flag,
         index::{
-            PimdirMailCoverage, PimdirTableStyle, PimdirTagged, keep_first_column, parse_query,
+            PimdirMailCoverage, PimdirTableStyle, PimdirTagged, keep_first_column, local_clock,
+            parse_query,
         },
     },
 };
@@ -72,7 +73,7 @@ impl PimdirTagCommand {
         let remove = flags(&self.remove)?;
         let query = parse_query(&self.query, printer.is_json())?;
 
-        let tag = client.tag_mail(query, &add, &remove, self.dry_run)?;
+        let tag = client.tag_mail(query, &add, &remove, self.dry_run, &local_clock())?;
         printer.out(PimdirTagOutput {
             style: PimdirTableStyle::new(account, self.max_width),
             tagged: tag.tagged,

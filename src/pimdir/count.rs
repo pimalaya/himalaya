@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::pimdir::{
     client::PimdirClient,
-    index::{PimdirMailCoverage, parse_query},
+    index::{PimdirMailCoverage, local_clock, parse_query},
 };
 
 /// Count the account's messages a query matches.
@@ -32,7 +32,7 @@ impl PimdirCountCommand {
     /// Counts and prints the count.
     pub fn execute(self, printer: &mut impl Printer, client: &mut PimdirClient) -> Result<()> {
         let query = parse_query(&self.query, printer.is_json())?;
-        let (count, coverage) = client.count_mail(query)?;
+        let (count, coverage) = client.count_mail(query, &local_clock())?;
         printer.out(PimdirCountOutput { count, coverage })
     }
 }

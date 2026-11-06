@@ -2369,7 +2369,7 @@ mod tests {
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        stamp_format(dir.path(), "storage-draft-07");
+        stamp_format(dir.path(), "storage-draft-08");
 
         let err = client.cancel_queued(staged.queue_id).unwrap_err();
 
@@ -2392,7 +2392,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            version, "storage-draft-07",
+            version, "storage-draft-08",
             "the cancel restamped the store"
         );
         assert_eq!(queued, 1, "the cancel dropped the row");
@@ -2442,7 +2442,7 @@ mod tests {
     /// deleting the store.
     #[test]
     fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
-        for version in ["storage-draft-07", "storage-draft-09"] {
+        for version in ["storage-draft-08", "storage-draft-10"] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
 
@@ -3493,7 +3493,8 @@ mod tests {
                     .hits
                     .len()
             });
-            let counted = median(|| client.count_mail(parsed.clone()).unwrap().0 as usize);
+            let counted =
+                median(|| client.count_mail(parsed.clone(), &options.clock).unwrap().0 as usize);
             eprintln!("pimdir search `{query}`: page {searched:?}, count {counted:?}");
         }
     }
