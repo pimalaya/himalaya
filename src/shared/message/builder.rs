@@ -62,6 +62,8 @@ pub struct BuilderArgs<'a> {
     pub body_file: Option<&'a Path>,
     /// The files to attach.
     pub attach: &'a [PathBuf],
+    /// The attachments given inline, attached after the files.
+    pub attach_data: Vec<InlineAttachment>,
     /// The signature, `None` when `signature_file` names the file holding
     /// it.
     pub signature: Option<&'a str>,
@@ -69,6 +71,19 @@ pub struct BuilderArgs<'a> {
     pub signature_file: Option<&'a Path>,
     /// Separator written before the signature, verbatim.
     pub signature_delim: &'a str,
+}
+
+/// An attachment given as its bytes rather than a path, which only the MCP
+/// server hands a composer (`attach-data`).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct InlineAttachment {
+    /// The file name the part carries.
+    pub filename: String,
+    /// The MIME type, guessed from the file name when `None`, as a path
+    /// given to `--attach` is.
+    pub mime: Option<String>,
+    /// The decoded bytes.
+    pub content: Vec<u8>,
 }
 
 /// The source message a reply or a forward is derived from.
@@ -209,6 +224,14 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "attachment".to_string());
         builder.attachment(attachment(&mime_for(path), file_name, bytes))?;
+    }
+
+    for inline in args.attach_data {
+        let mime = match inline.mime {
+            Some(mime) => mime,
+            None => mime_for(Path::new(&inline.filename)),
+        };
+        builder.attachment(attachment(&mime, inline.filename, inline.content))?;
     }
 
     if let (Some(source), Some(parsed)) = (source.as_ref(), parsed_source.as_ref())
@@ -674,6 +697,7 @@ Original body line.\r\n";
             body: Some(body),
             body_file: None,
             attach: &[],
+            attach_data: Vec::new(),
             signature: None,
             signature_file: None,
             signature_delim: "-- \n",

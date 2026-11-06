@@ -17,7 +17,7 @@ use crate::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::{
-            builder::{self, BuilderArgs, SourceArgs, SourceMode},
+            builder::{self, BuilderArgs, InlineAttachment, SourceArgs, SourceMode},
             handler,
         },
     },
@@ -69,6 +69,10 @@ pub struct MessageForwardCommand {
     /// Files to attach.
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
+    /// Attachments given inline, which only the MCP server sets
+    /// (`attach-data`): no command line reaches this field.
+    #[arg(skip)]
+    pub attach_data: Vec<InlineAttachment>,
     /// Leave the attachments of the source out of the forward, keeping
     /// the quoted body alone.
     #[arg(long = "no-attachments")]
@@ -144,6 +148,7 @@ impl MessageForwardCommand {
                 body: self.body.as_deref(),
                 body_file: self.body_file.as_deref(),
                 attach: &self.attach,
+                attach_data: self.attach_data,
                 signature,
                 signature_file,
                 signature_delim: account.signature_delim(),

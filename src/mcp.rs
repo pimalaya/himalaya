@@ -9,6 +9,11 @@
 //! [`Session`] the server keeps, and print into an [`McpPrinter`] whose one
 //! JSON value becomes the call's structured result.
 //!
+//! A tool may also take a [`ServerArg`], an input the CLI says another
+//! way (a path the server keeps closed): declared on the tool in
+//! [`TOOLS`], taken off the call before the argv is rebuilt, validated
+//! here, and handed to the parsed command through a field clap skips.
+//!
 //! Refs: <https://modelcontextprotocol.io/specification/2025-06-18>
 
 use std::{
@@ -63,9 +68,15 @@ const TOOLS: &[McpTool] = &[
     McpTool::send("message", "send"),
     // NOTE: the composers print the composed message, or a confirmation
     // once `save` or `send` is given, so they declare no output schema.
-    McpTool::read("message", "compose").untyped(),
-    McpTool::read("message", "reply").untyped(),
-    McpTool::read("message", "forward").untyped(),
+    McpTool::read("message", "compose")
+        .untyped()
+        .server(COMPOSER_ARGS),
+    McpTool::read("message", "reply")
+        .untyped()
+        .server(COMPOSER_ARGS),
+    McpTool::read("message", "forward")
+        .untyped()
+        .server(COMPOSER_ARGS),
     McpTool::read("attachment", "list"),
     McpTool::read("vacation", "get"),
     // NOTE: an auto-reply once on answers incoming mail, so setting it
@@ -81,6 +92,17 @@ const WRITE_ARGS: &[&str] = &["save", "seen"];
 /// The arguments turning a tool into one that sends mail, listed only
 /// under `--allow-send`.
 const SEND_ARGS: &[&str] = &["send"];
+
+/// The server-only arguments of the composers: the attachments given
+/// inline, which `--attach` takes as paths.
+const COMPOSER_ARGS: &[ServerArg] = &[ServerArg {
+    name: "attach-data",
+    schema: attach_data_schema,
+    hand: hand_attach_data,
+}];
+
+/// The default of `--max-attachment-size`, 10 MiB.
+const DEFAULT_MAX_ATTACHMENT_SIZE: u64 = 10 * 1024 * 1024;
 
 /// Whether local file paths given as command input are read as such.
 static PATHS_CLOSED: AtomicBool = AtomicBool::new(false);
@@ -107,6 +129,12 @@ pub struct McpCommand {
     /// to send mail, so sending is never on by default.
     #[arg(long)]
     pub allow_send: bool,
+    /// Largest attachment a tool takes or returns, in bytes.
+    ///
+    /// An attachment over it is refused with `attachment-too-large`
+    /// before it is decoded.
+    #[arg(long, value_name = "BYTES", default_value_t = DEFAULT_MAX_ATTACHMENT_SIZE)]
+    pub max_attachment_size: u64,
 }
 
 impl McpCommand {
@@ -128,6 +156,9 @@ impl McpCommand {
         let mut server = McpServer {
             session,
             tools: McpToolSpec::all(self.allow_write, self.allow_send, Some(&resolution)),
+            limits: McpLimits {
+                max_attachment_size: self.max_attachment_size,
+            },
         };
 
         let mut stdout = io::stdout();
@@ -164,6 +195,32 @@ struct McpTool {
     destructive: bool,
     typed: bool,
     without: &'static [&'static str],
+    server: &'static [ServerArg],
+}
+
+/// An argument a tool takes that its command's grammar does not, for
+/// what the CLI says through a path or stdin the server keeps closed.
+///
+/// It is a property of the tool's `inputSchema`, listed whenever the tool
+/// is, taken off the call before the argv is rebuilt so clap never sees
+/// it, then validated by `hand`, which sets it on the parsed command
+/// through a field clap skips (`#[arg(skip)]`), so no command line can
+/// reach it.
+struct ServerArg {
+    /// The property name, spelled as a CLI flag would be.
+    name: &'static str,
+    /// The JSON Schema of the property.
+    schema: fn() -> Value,
+    /// Validates the value and sets it on the parsed command, a bad value
+    /// failing with a stable code before the command runs.
+    hand: fn(&Value, &McpLimits, &mut Command) -> Result<()>,
+}
+
+/// The bounds the server puts on what a call carries.
+#[cfg_attr(not(any(backend, feature = "smtp")), allow(dead_code))]
+struct McpLimits {
+    /// The largest attachment a call may carry, in bytes.
+    max_attachment_size: u64,
 }
 
 /// What a tool may do, deciding which flag lists it.
@@ -200,6 +257,7 @@ impl McpTool {
             destructive,
             typed: true,
             without: &[],
+            server: &[],
         }
     }
 
@@ -213,6 +271,10 @@ impl McpTool {
     const fn without(self, without: &'static [&'static str]) -> Self {
         Self { without, ..self }
     }
+
+    const fn server(self, server: &'static [ServerArg]) -> Self {
+        Self { server, ..self }
+    }
 }
 
 /// A listed tool: its definition and the arguments a call maps onto.
@@ -220,6 +282,7 @@ struct McpToolSpec {
     group: &'static str,
     leaf: &'static str,
     args: Vec<McpToolArg>,
+    server: &'static [ServerArg],
     definition: Value,
 }
 
@@ -318,6 +381,11 @@ impl McpToolSpec {
                 args.push(spec);
             }
 
+            // NOTE: what the grammar does not say, declared on the tool.
+            for arg in tool.server {
+                properties.insert(arg.name.to_string(), (arg.schema)());
+            }
+
             let writes = |arg: &McpToolArg| {
                 WRITE_ARGS.contains(&arg.name.as_str()) || SEND_ARGS.contains(&arg.name.as_str())
             };
@@ -369,11 +437,33 @@ impl McpToolSpec {
                 group: tool.group,
                 leaf: tool.leaf,
                 args,
+                server: tool.server,
                 definition,
             });
         }
 
         tools
+    }
+
+    /// Splits a call's arguments into those of the command's grammar and
+    /// the server-only ones, which never reach the argv.
+    fn split<'a>(
+        &self,
+        arguments: &'a Map<String, Value>,
+    ) -> (Map<String, Value>, Vec<(&'static ServerArg, &'a Value)>) {
+        let mut grammar = Map::new();
+        let mut server = Vec::new();
+
+        for (key, value) in arguments {
+            match self.server.iter().find(|arg| arg.name == key) {
+                Some(arg) => server.push((arg, value)),
+                None => {
+                    grammar.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        (grammar, server)
     }
 
     /// Turns a call's arguments back into the argv of the command,
@@ -386,7 +476,12 @@ impl McpToolSpec {
             .keys()
             .find(|key| !self.args.iter().any(|arg| &arg.name == *key))
         {
-            let known: Vec<&str> = self.args.iter().map(|arg| arg.name.as_str()).collect();
+            let known: Vec<&str> = self
+                .args
+                .iter()
+                .map(|arg| arg.name.as_str())
+                .chain(self.server.iter().map(|arg| arg.name))
+                .collect();
             return Err(anyhow!(
                 "Unknown argument `{key}`, expected one of: {}",
                 known.join(", ")
@@ -481,6 +576,7 @@ impl McpToolArg {
 struct McpServer<'a, 'b> {
     session: &'a mut Session<'b>,
     tools: Vec<McpToolSpec>,
+    limits: McpLimits,
 }
 
 impl McpServer<'_, '_> {
@@ -545,10 +641,18 @@ impl McpServer<'_, '_> {
         };
 
         let mut printer = McpPrinter::default();
+        let (grammar, server) = tool.split(arguments);
+        let limits = &self.limits;
 
         let result = tool
-            .argv(arguments)
+            .argv(&grammar)
             .and_then(|argv| Ok(McpLine::try_parse_from(argv)?))
+            .and_then(|mut line| {
+                for (arg, value) in server {
+                    (arg.hand)(value, limits, &mut line.cmd)?;
+                }
+                Ok(line)
+            })
             .and_then(|line| line.cmd.execute(&mut printer, self.session));
 
         // NOTE: a partial outcome printed its result, which stays the tool
@@ -719,6 +823,230 @@ fn search_options(resolution: &Resolution) -> String {
     text
 }
 
+/// The JSON Schema of `attach-data`: attachments given inline, each named,
+/// its bytes in base64 or its text as is.
+fn attach_data_schema() -> Value {
+    json!({
+        "type": "array",
+        "description": "Files to attach, given inline rather than by path. Each needs a `filename` and exactly one of `data` (base64) or `text` (UTF-8, attached as is); `mimeType` is guessed from the filename when left out. An attachment larger than the server's limit is refused.",
+        "items": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "Name the attachment carries, which may hold any character but a control one.",
+                },
+                "mimeType": {
+                    "type": "string",
+                    "description": "MIME type as `type/subtype`, guessed from the filename when left out.",
+                },
+                "data": {
+                    "type": "string",
+                    "description": "Content in base64 (RFC 4648 standard alphabet, padding optional, no whitespace).",
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Content as UTF-8 text, attached as is.",
+                },
+            },
+            "required": ["filename"],
+            "additionalProperties": false,
+        },
+    })
+}
+
+/// Sets `attach-data` on the composer it was given to, once every item is
+/// valid.
+#[cfg(any(backend, feature = "smtp"))]
+fn hand_attach_data(value: &Value, limits: &McpLimits, cmd: &mut Command) -> Result<()> {
+    use crate::shared::message::cli::MessageCommand;
+
+    let attachments = inline::attachments(value, limits.max_attachment_size)?;
+
+    match cmd {
+        Command::Message(MessageCommand::Compose(cmd)) => cmd.attach_data = attachments,
+        Command::Message(MessageCommand::Reply(cmd)) => cmd.attach_data = attachments,
+        Command::Message(MessageCommand::Forward(cmd)) => cmd.attach_data = attachments,
+        // NOTE: only the composers declare it.
+        _ => return Err(anyhow!("`attach-data` is not taken by this tool")),
+    }
+
+    Ok(())
+}
+
+/// No composer is compiled in, so no tool declaring `attach-data` is
+/// listed.
+#[cfg(not(any(backend, feature = "smtp")))]
+fn hand_attach_data(_: &Value, _: &McpLimits, _: &mut Command) -> Result<()> {
+    Err(anyhow!("`attach-data` is not taken by this build"))
+}
+
+/// The attachments `attach-data` carries, validated, each refused before
+/// it is decoded when over the cap.
+#[cfg(any(backend, feature = "smtp"))]
+mod inline {
+    use anyhow::Result;
+    use base64::{
+        Engine, alphabet,
+        engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
+    };
+    use pimalaya_cli::error::CodedError;
+    use serde_json::{Map, Value};
+
+    use crate::{error::ErrorCode, shared::message::builder::InlineAttachment};
+
+    /// The RFC 4648 standard alphabet, padding optional.
+    const BASE64: GeneralPurpose = GeneralPurpose::new(
+        &alphabet::STANDARD,
+        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+    );
+
+    /// The keys an item takes.
+    const KEYS: &[&str] = &["filename", "mimeType", "data", "text"];
+
+    /// Validates and decodes every item, the first bad one refusing the
+    /// whole call.
+    pub fn attachments(value: &Value, max: u64) -> Result<Vec<InlineAttachment>> {
+        let Value::Array(items) = value else {
+            return Err(invalid(String::from(
+                "`attach-data` must be an array of objects",
+            )));
+        };
+
+        items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| attachment(index, item, max))
+            .collect()
+    }
+
+    /// One item, refused naming its index and its file name.
+    fn attachment(index: usize, item: &Value, max: u64) -> Result<InlineAttachment> {
+        let mut label = format!("`attach-data[{index}]`");
+
+        let Value::Object(item) = item else {
+            return Err(invalid(format!(
+                "{label} must be an object {{filename, mimeType, data, text}}"
+            )));
+        };
+
+        let filename = match item.get("filename") {
+            Some(Value::String(filename)) => filename,
+            Some(_) => return Err(invalid(format!("{label}: `filename` must be a string"))),
+            None => return Err(invalid(format!("{label}: `filename` is missing"))),
+        };
+
+        if !filename.is_empty() {
+            label.push_str(&format!(" (`{}`)", filename.escape_debug()));
+        }
+
+        if let Some(key) = item.keys().find(|key| !KEYS.contains(&key.as_str())) {
+            return Err(invalid(format!(
+                "{label}: unknown key `{key}`, expected one of: {}",
+                KEYS.join(", ")
+            )));
+        }
+
+        if filename.is_empty() {
+            return Err(invalid(format!("{label}: `filename` is empty")));
+        }
+
+        if filename.chars().any(char::is_control) {
+            return Err(invalid(format!(
+                "{label}: `filename` holds a control character"
+            )));
+        }
+
+        let mime = match item.get("mimeType") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(mime)) => Some(mime_type(mime).ok_or_else(|| {
+                invalid(format!(
+                    "{label}: `mimeType` `{}` is no bare `type/subtype`",
+                    mime.escape_debug()
+                ))
+            })?),
+            Some(_) => return Err(invalid(format!("{label}: `mimeType` must be a string"))),
+        };
+
+        let content = content(&label, item, max)?;
+
+        Ok(InlineAttachment {
+            filename: filename.clone(),
+            mime,
+            content,
+        })
+    }
+
+    /// The bytes of an item, its size checked against the cap before
+    /// anything is decoded.
+    fn content(label: &str, item: &Map<String, Value>, max: u64) -> Result<Vec<u8>> {
+        let string = |key: &str| match item.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(value)) => Ok(Some(value)),
+            Some(_) => Err(invalid(format!("{label}: `{key}` must be a string"))),
+        };
+
+        let (size, data, text) = match (string("data")?, string("text")?) {
+            (Some(data), None) => (estimated_size(data), Some(data), None),
+            (None, Some(text)) => (text.len() as u64, None, Some(text)),
+            (Some(_), Some(_)) => {
+                return Err(invalid(format!(
+                    "{label}: give one of `data` and `text`, not both"
+                )));
+            }
+            (None, None) => {
+                return Err(invalid(format!(
+                    "{label}: give one of `data` (base64) and `text`"
+                )));
+            }
+        };
+
+        if size > max {
+            let message = format!(
+                "{label} holds {size} bytes, over the server's --max-attachment-size of {max}"
+            );
+            return Err(CodedError::new(ErrorCode::AttachmentTooLarge, message).into());
+        }
+
+        match (data, text) {
+            (Some(data), _) => BASE64
+                .decode(data)
+                .map_err(|err| invalid(format!("{label}: `data` is not base64: {err}"))),
+            (_, Some(text)) => Ok(text.as_bytes().to_vec()),
+            (None, None) => unreachable!("one of them is given"),
+        }
+    }
+
+    /// The size the base64 `data` decodes to, read off its length alone:
+    /// three bytes per four characters, less the padding.
+    pub fn estimated_size(data: &str) -> u64 {
+        let padding = data
+            .bytes()
+            .rev()
+            .take(2)
+            .filter(|byte| *byte == b'=')
+            .count();
+        (data.len() as u64 * 3 / 4).saturating_sub(padding as u64)
+    }
+
+    /// A bare `type/subtype` of RFC 2045 tokens, lowercased.
+    fn mime_type(mime: &str) -> Option<String> {
+        let token = |part: &str| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_graphic() && !b"()<>@,;:\\\"/[]?=".contains(&byte))
+        };
+
+        let (top, sub) = mime.split_once('/')?;
+        (token(top) && token(sub)).then(|| mime.to_ascii_lowercase())
+    }
+
+    fn invalid(message: String) -> anyhow::Error {
+        CodedError::new(ErrorCode::AttachmentInvalid, message).into()
+    }
+}
+
 /// A JSON-RPC error response.
 fn failure(id: Value, code: i64, message: String) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
@@ -764,6 +1092,199 @@ mod tests {
 
                 assert!(classified, "{path:?} is neither a tool nor excluded");
             }
+        }
+    }
+
+    /// The listed tool `name`, every gate open.
+    #[cfg(any(backend, feature = "smtp"))]
+    fn spec(name: &str) -> McpToolSpec {
+        McpToolSpec::all(true, true, None)
+            .into_iter()
+            .find(|tool| tool.definition["name"] == name)
+            .unwrap()
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_server_only_argument_is_declared_on_its_tool_and_not_in_clap() {
+        for name in ["message_compose", "message_reply", "message_forward"] {
+            let tool = spec(name);
+            let properties = &tool.definition["inputSchema"]["properties"];
+
+            assert_eq!(properties["attach-data"], attach_data_schema(), "{name}");
+            assert!(tool.args.iter().all(|arg| arg.name != "attach-data"));
+        }
+
+        for tool in McpToolSpec::all(true, true, None) {
+            let declared = tool.server.iter().any(|arg| arg.name == "attach-data");
+            let composer = (tool.group, tool.leaf) == ("message", "compose")
+                || (tool.group, tool.leaf) == ("message", "reply")
+                || (tool.group, tool.leaf) == ("message", "forward");
+            assert_eq!(declared, composer, "{}", tool.definition["name"]);
+        }
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_server_only_argument_is_taken_off_before_the_argv_and_handed_to_the_command() {
+        use crate::shared::message::{builder::InlineAttachment, cli::MessageCommand};
+
+        let tool = spec("message_compose");
+        let arguments = json!({
+            "to": ["b@example.org"],
+            "attach-data": [{ "filename": "a.txt", "text": "ok" }],
+        });
+        let (grammar, server) = tool.split(arguments.as_object().unwrap());
+
+        assert!(grammar.get("attach-data").is_none());
+        assert_eq!(server.len(), 1);
+
+        let argv = tool.argv(&grammar).unwrap();
+        assert!(
+            argv.iter().all(|word| !word.contains("attach-data")),
+            "{argv:?}"
+        );
+
+        let mut line = McpLine::try_parse_from(argv).unwrap();
+        let limits = McpLimits {
+            max_attachment_size: DEFAULT_MAX_ATTACHMENT_SIZE,
+        };
+        for (arg, value) in server {
+            (arg.hand)(value, &limits, &mut line.cmd).unwrap();
+        }
+
+        let Command::Message(MessageCommand::Compose(cmd)) = line.cmd else {
+            panic!("not a compose");
+        };
+        assert_eq!(
+            cmd.attach_data,
+            vec![InlineAttachment {
+                filename: String::from("a.txt"),
+                mime: None,
+                content: b"ok".to_vec(),
+            }]
+        );
+
+        // NOTE: the argv alone, as a command line would carry it, is
+        // refused by clap.
+        let refused = McpLine::try_parse_from(["message", "compose", "--attach-data=x"]);
+        assert!(refused.is_err());
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn an_unknown_key_names_the_server_only_arguments_too() {
+        let tool = spec("message_compose");
+        let arguments = json!({ "attachments": [] });
+        let (grammar, _) = tool.split(arguments.as_object().unwrap());
+        let err = tool.argv(&grammar).unwrap_err().to_string();
+
+        assert!(err.contains("Unknown argument `attachments`"), "{err}");
+        assert!(err.contains("attach-data"), "{err}");
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    mod inline_attachments {
+        use pimalaya_cli::error::code_of;
+        use serde_json::json;
+
+        use crate::{error::ErrorCode, mcp::inline};
+
+        fn code(item: serde_json::Value, max: u64) -> Option<ErrorCode> {
+            let err = inline::attachments(&json!([item]), max).unwrap_err();
+            code_of::<ErrorCode>(&err)
+        }
+
+        #[test]
+        fn the_size_of_base64_is_read_off_its_length() {
+            assert_eq!(inline::estimated_size(""), 0);
+            assert_eq!(inline::estimated_size("AAAA"), 3);
+            assert_eq!(inline::estimated_size("AAAAAAAAAAA="), 8);
+            assert_eq!(inline::estimated_size("AAAAAAAAAA=="), 7);
+            assert_eq!(inline::estimated_size("iVBORw0KGgo"), 8);
+
+            // NOTE: exactly 10 MiB of bytes is not over a 10 MiB cap.
+            let encoded = "A".repeat(13_981_014) + "==";
+            assert_eq!(inline::estimated_size(&encoded), 10 * 1024 * 1024);
+        }
+
+        #[test]
+        fn data_and_text_decode_to_their_bytes() {
+            let attachments = inline::attachments(
+                &json!([
+                    { "filename": "a.bin", "mimeType": "Application/X-Test", "data": "AP8=" },
+                    { "filename": "b.txt", "text": "é" },
+                ]),
+                16,
+            )
+            .unwrap();
+
+            assert_eq!(attachments[0].content, vec![0x00, 0xff]);
+            assert_eq!(attachments[0].mime.as_deref(), Some("application/x-test"));
+            assert_eq!(attachments[1].content, "é".as_bytes());
+            assert_eq!(attachments[1].mime, None);
+        }
+
+        #[test]
+        fn a_malformed_item_is_invalid() {
+            let invalid = Some(ErrorCode::AttachmentInvalid);
+
+            assert_eq!(
+                code(json!({ "filename": "a", "data": "%%%%" }), 16),
+                invalid
+            );
+            assert_eq!(
+                code(json!({ "filename": "a", "data": "", "text": "" }), 16),
+                invalid
+            );
+            assert_eq!(code(json!({ "filename": "a" }), 16), invalid);
+            assert_eq!(code(json!({ "text": "x" }), 16), invalid);
+            assert_eq!(code(json!({ "filename": 1, "text": "x" }), 16), invalid);
+            assert_eq!(
+                code(json!({ "filename": "a\u{7}", "text": "x" }), 16),
+                invalid
+            );
+            assert_eq!(code(json!({ "filename": "a", "data": 1 }), 16), invalid);
+            assert_eq!(
+                code(json!({ "filename": "a", "text": "x", "x": 1 }), 16),
+                invalid
+            );
+            for mime in [
+                "text",
+                "text/",
+                "/plain",
+                "text/plain; charset=utf-8",
+                "te xt/plain",
+            ] {
+                let item = json!({ "filename": "a", "mimeType": mime, "text": "x" });
+                assert_eq!(code(item, 16), invalid, "{mime}");
+            }
+
+            let err = inline::attachments(&json!({ "filename": "a" }), 16).unwrap_err();
+            assert_eq!(code_of::<ErrorCode>(&err), invalid);
+        }
+
+        #[test]
+        fn the_cap_is_checked_before_decoding() {
+            let too_large = Some(ErrorCode::AttachmentTooLarge);
+
+            assert_eq!(
+                code(json!({ "filename": "a", "data": "!!!!!!!!" }), 5),
+                too_large
+            );
+            assert_eq!(
+                code(json!({ "filename": "a", "text": "123456" }), 5),
+                too_large
+            );
+            assert_eq!(
+                code(json!({ "filename": "a", "text": "ééé" }), 5),
+                too_large
+            );
+
+            let err = inline::attachments(&json!([{ "filename": "a", "text": "123456" }]), 5)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("`attach-data[0]` (`a`)"), "{err}");
         }
     }
 }
