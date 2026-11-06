@@ -19,11 +19,12 @@
 use std::{
     fmt,
     io::{self, BufRead, Write},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Arg, ArgAction, CommandFactory, Parser, ValueHint};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use pimalaya_cli::{
     error::{ErrorReport, partial_outcome_of},
     output::Bytes,
@@ -47,7 +48,7 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 ///
 /// A leaf missing here is not exposed, so a new command is listed only
 /// once it is classified; `message parse` (reads a local file the caller
-/// names) and `attachment download` (writes files on disk) are left out.
+/// names) is left out.
 const TOOLS: &[McpTool] = &[
     McpTool::read("mailbox", "list"),
     McpTool::write("mailbox", "create", false),
@@ -78,6 +79,12 @@ const TOOLS: &[McpTool] = &[
         .untyped()
         .server(COMPOSER_ARGS),
     McpTool::read("attachment", "list"),
+    // NOTE: always run with `--stdout`, which writes no file and reads
+    // exactly one part, whose bytes travel as an embedded resource.
+    McpTool::read("attachment", "download")
+        .fixed(&["--stdout"])
+        .one(&["attachment-id"])
+        .part(),
     McpTool::read("vacation", "get"),
     // NOTE: an auto-reply once on answers incoming mail, so setting it
     // is sending, listed under `--allow-send` alone.
@@ -107,6 +114,18 @@ const DEFAULT_MAX_ATTACHMENT_SIZE: u64 = 10 * 1024 * 1024;
 /// Whether local file paths given as command input are read as such.
 static PATHS_CLOSED: AtomicBool = AtomicBool::new(false);
 
+/// The decoded size a part read inside the server may reach, unbounded
+/// (`u64::MAX`) outside it.
+static ATTACHMENT_CAP: AtomicU64 = AtomicU64::new(u64::MAX);
+
+/// The characters a segment of a part URI keeps as they are: RFC 3986's
+/// unreserved ones.
+const URI_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
 /// Start an MCP server over stdio for one account.
 ///
 /// Each tool is a shared API command (`envelope_list`, `message_read`)
@@ -129,10 +148,12 @@ pub struct McpCommand {
     /// to send mail, so sending is never on by default.
     #[arg(long)]
     pub allow_send: bool,
-    /// Largest attachment a tool takes or returns, in bytes.
+    /// Largest attachment a tool takes or reads, in bytes.
     ///
-    /// An attachment over it is refused with `attachment-too-large`
-    /// before it is decoded.
+    /// An attachment over it is refused with `attachment-too-large`, one
+    /// given inline before it is decoded, one read before it is encoded
+    /// so it never reaches the model. A server flag rather than a tool
+    /// argument, so the model cannot raise it.
     #[arg(long, value_name = "BYTES", default_value_t = DEFAULT_MAX_ATTACHMENT_SIZE)]
     pub max_attachment_size: u64,
 }
@@ -152,9 +173,11 @@ impl McpCommand {
 
         repl::claim_stdin();
         PATHS_CLOSED.store(true, Ordering::Relaxed);
+        ATTACHMENT_CAP.store(self.max_attachment_size, Ordering::Relaxed);
 
         let mut server = McpServer {
             session,
+            account: name,
             tools: McpToolSpec::all(self.allow_write, self.allow_send, Some(&resolution)),
             limits: McpLimits {
                 max_attachment_size: self.max_attachment_size,
@@ -187,6 +210,12 @@ pub fn paths_closed() -> bool {
     PATHS_CLOSED.load(Ordering::Relaxed)
 }
 
+/// The decoded size a part read as command output may reach, `None`
+/// outside an MCP server.
+pub fn max_attachment_size() -> Option<u64> {
+    Some(ATTACHMENT_CAP.load(Ordering::Relaxed)).filter(|max| *max != u64::MAX)
+}
+
 /// A shared API leaf as a tool, and what it may do.
 struct McpTool {
     group: &'static str,
@@ -196,6 +225,9 @@ struct McpTool {
     typed: bool,
     without: &'static [&'static str],
     server: &'static [ServerArg],
+    fixed: &'static [&'static str],
+    one: &'static [&'static str],
+    part: bool,
 }
 
 /// An argument a tool takes that its command's grammar does not, for
@@ -258,6 +290,9 @@ impl McpTool {
             typed: true,
             without: &[],
             server: &[],
+            fixed: &[],
+            one: &[],
+            part: false,
         }
     }
 
@@ -275,6 +310,36 @@ impl McpTool {
     const fn server(self, server: &'static [ServerArg]) -> Self {
         Self { server, ..self }
     }
+
+    /// Arguments appended to every call's argv, before its positionals:
+    /// the command runs as with them typed, and an argument they set is
+    /// no property, so the call cannot unset it.
+    const fn fixed(self, fixed: &'static [&'static str]) -> Self {
+        Self { fixed, ..self }
+    }
+
+    /// Repeatable arguments this tool takes exactly one value of.
+    const fn one(self, one: &'static [&'static str]) -> Self {
+        Self { one, ..self }
+    }
+
+    /// The command prints one part, `{id, mime, filename, size, data}`,
+    /// whose `data` becomes an embedded resource.
+    const fn part(self) -> Self {
+        Self { part: true, ..self }
+    }
+
+    /// Whether `arg` is set by one of the fixed arguments.
+    fn fixes(&self, arg: &Arg) -> bool {
+        arg.get_long().is_some_and(|long| {
+            self.fixed.iter().any(|fixed| {
+                fixed
+                    .strip_prefix("--")
+                    .and_then(|fixed| fixed.split('=').next())
+                    == Some(long)
+            })
+        })
+    }
 }
 
 /// A listed tool: its definition and the arguments a call maps onto.
@@ -283,6 +348,8 @@ struct McpToolSpec {
     leaf: &'static str,
     args: Vec<McpToolArg>,
     server: &'static [ServerArg],
+    fixed: &'static [&'static str],
+    part: bool,
     definition: Value,
 }
 
@@ -354,7 +421,11 @@ impl McpToolSpec {
                 let gated = (SEND_ARGS.contains(&name.as_str()) && !allow_send)
                     || (WRITE_ARGS.contains(&name.as_str()) && !allow_write);
 
-                if gated || tool.without.contains(&name.as_str()) || !exposes(arg) {
+                if gated
+                    || tool.without.contains(&name.as_str())
+                    || tool.fixes(arg)
+                    || !exposes(arg)
+                {
                     continue;
                 }
 
@@ -367,14 +438,22 @@ impl McpToolSpec {
                         || arg.get_num_args().is_some_and(|n| n.max_values() > 1),
                 };
 
-                properties.insert(spec.name.clone(), spec.schema(arg));
+                let one = spec.multiple && tool.one.contains(&spec.name.as_str());
+                let mut schema = spec.schema(arg);
+
+                if one {
+                    schema["minItems"] = Value::from(1);
+                    schema["maxItems"] = Value::from(1);
+                }
+
+                properties.insert(spec.name.clone(), schema);
 
                 // NOTE: a positional taking at least one value is required
                 // without being marked so.
                 let at_least_one =
                     arg.is_positional() && arg.get_num_args().is_some_and(|n| n.min_values() > 0);
 
-                if arg.is_required_set() || at_least_one {
+                if arg.is_required_set() || at_least_one || one {
                     required.push(Value::from(spec.name.as_str()));
                 }
 
@@ -407,6 +486,18 @@ impl McpToolSpec {
                 description.push_str(&search_options(resolution));
             }
 
+            if !tool.fixed.is_empty() {
+                description.push_str(&format!("\n\nAlways run with `{}`.", tool.fixed.join(" ")));
+            }
+
+            if tool.part {
+                let max = max_attachment_size().unwrap_or(DEFAULT_MAX_ATTACHMENT_SIZE);
+                description.push_str(&format!(
+                    " The part's bytes come as an embedded resource rather than as `data`; \
+                     a part over {max} bytes is refused as `attachment-too-large`."
+                ));
+            }
+
             let mut definition = json!({
                 "name": format!("{}_{}", tool.group, tool.leaf),
                 "description": description,
@@ -424,13 +515,17 @@ impl McpToolSpec {
             });
 
             // NOTE: MCP wants an object root, which a tagged or untagged
-            // enum payload would not have.
-            let output_schema = schemas
-                .get(&format!("himalaya-{}-{}", tool.group, tool.leaf))
-                .filter(|schema| tool.typed && schema["type"] == "object");
+            // enum payload would not have. A part tool prints one shape of
+            // its two, the part, `data` moved out of it.
+            let schema = schemas.get(&format!("himalaya-{}-{}", tool.group, tool.leaf));
+            let output_schema = match schema {
+                Some(schema) if tool.part => part_schema(schema),
+                Some(schema) if tool.typed && schema["type"] == "object" => Some(schema.clone()),
+                _ => None,
+            };
 
             if let Some(schema) = output_schema {
-                definition["outputSchema"] = schema.clone();
+                definition["outputSchema"] = schema;
             }
 
             tools.push(Self {
@@ -438,6 +533,8 @@ impl McpToolSpec {
                 leaf: tool.leaf,
                 args,
                 server: tool.server,
+                fixed: tool.fixed,
+                part: tool.part,
                 definition,
             });
         }
@@ -532,6 +629,9 @@ impl McpToolSpec {
             }
         }
 
+        // NOTE: before the `--`, after which a flag would be a value.
+        argv.extend(self.fixed.iter().map(ToString::to_string));
+
         if !positionals.is_empty() {
             positionals.sort_by_key(|(index, _)| *index);
             argv.push(String::from("--"));
@@ -575,6 +675,8 @@ impl McpToolArg {
 /// The server: the tools it lists and the session they run over.
 struct McpServer<'a, 'b> {
     session: &'a mut Session<'b>,
+    /// The name of the account served, the first segment of a part URI.
+    account: String,
     tools: Vec<McpToolSpec>,
     limits: McpLimits,
 }
@@ -688,7 +790,38 @@ impl McpServer<'_, '_> {
             .iter()
             .map(|event| json!({ "type": "text", "text": event.to_string() }))
             .collect();
+
+        // NOTE: a part's bytes travel once, as an embedded resource after
+        // the part's JSON, never also as its `data`.
+        let (value, resource) = if tool.part {
+            let uri = part_uri(
+                &self.account,
+                arguments
+                    .get("mailbox")
+                    .and_then(Value::as_str)
+                    .unwrap_or("inbox"),
+                arguments
+                    .get("message-id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+                value["id"].as_str().unwrap_or_default(),
+            );
+
+            let Some((value, resource)) = embedded_part(value, uri) else {
+                let message = "The command printed no part to embed";
+                return Ok(json!({
+                    "content": [{ "type": "text", "text": message }],
+                    "isError": true,
+                }));
+            };
+
+            (value, Some(resource))
+        } else {
+            (value, None)
+        };
+
         content.push(json!({ "type": "text", "text": value.to_string() }));
+        content.extend(resource);
 
         let mut result = json!({ "content": content });
 
@@ -1047,6 +1180,55 @@ mod inline {
     }
 }
 
+/// The output schema of a part tool: the registered `PartBytes`
+/// definition without `data`, whose bytes travel as an embedded resource.
+fn part_schema(schema: &Value) -> Option<Value> {
+    let mut part = schema.get("$defs")?.get("PartBytes")?.clone();
+
+    part.get_mut("properties")?
+        .as_object_mut()?
+        .remove("data")?;
+    part.get_mut("required")?
+        .as_array_mut()?
+        .retain(|key| key != "data");
+
+    if let Some(dialect) = schema.get("$schema") {
+        part["$schema"] = dialect.clone();
+    }
+
+    Some(part)
+}
+
+/// The URI of a part the server read,
+/// `himalaya://<account>/<mailbox>/<message-id>/<part-id>`, each segment
+/// percent-encoded, so it maps back onto the call that read it.
+fn part_uri(account: &str, mailbox: &str, message_id: &str, part_id: &str) -> String {
+    let segment = |segment: &str| utf8_percent_encode(segment, URI_SEGMENT).to_string();
+    format!(
+        "himalaya://{}/{}/{}/{}",
+        segment(account),
+        segment(mailbox),
+        segment(message_id),
+        segment(part_id),
+    )
+}
+
+/// A printed part split into its JSON without `data` and the embedded
+/// resource carrying `data`, already base64, as its blob; `None` when the
+/// value holds no `data` string.
+fn embedded_part(mut part: Value, uri: String) -> Option<(Value, Value)> {
+    let Value::String(blob) = part.as_object_mut()?.remove("data")? else {
+        return None;
+    };
+
+    let resource = json!({
+        "type": "resource",
+        "resource": { "uri": uri, "mimeType": part["mime"], "blob": blob },
+    });
+
+    Some((part, resource))
+}
+
 /// A JSON-RPC error response.
 fn failure(id: Value, code: i64, message: String) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
@@ -1059,8 +1241,8 @@ mod tests {
     use crate::{cli::Cli, mcp::*};
 
     /// The shared API leaves no tool exposes: `message parse` reads a local
-    /// file the caller names, `attachment download` writes files on disk.
-    const EXCLUDED: &[(&str, &str)] = &[("message", "parse"), ("attachment", "download")];
+    /// file the caller names.
+    const EXCLUDED: &[(&str, &str)] = &[("message", "parse")];
 
     /// The command groups of the shared API.
     const GROUPS: &[&str] = &[
@@ -1169,6 +1351,113 @@ mod tests {
         // refused by clap.
         let refused = McpLine::try_parse_from(["message", "compose", "--attach-data=x"]);
         assert!(refused.is_err());
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_fixed_argument_goes_before_the_positionals_and_is_no_property() {
+        let tool = spec("attachment_download");
+        let arguments = json!({
+            "mailbox": "-odd",
+            "message-id": "m2",
+            "attachment-id": ["3"],
+        });
+
+        let argv = tool.argv(arguments.as_object().unwrap()).unwrap();
+        assert_eq!(
+            argv,
+            [
+                "attachment",
+                "download",
+                "--mailbox=-odd",
+                "--stdout",
+                "--",
+                "m2",
+                "3"
+            ]
+        );
+
+        let properties = &tool.definition["inputSchema"]["properties"];
+        assert!(properties.get("stdout").is_none(), "{properties}");
+        assert!(properties.get("dir").is_none(), "{properties}");
+
+        let refused = tool.argv(json!({ "stdout": true }).as_object().unwrap());
+        assert!(refused.unwrap_err().to_string().contains("`stdout`"));
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn an_argument_taking_one_value_is_a_required_array_of_one() {
+        let tool = spec("attachment_download");
+        let schema = &tool.definition["inputSchema"];
+
+        assert_eq!(schema["properties"]["attachment-id"]["minItems"], json!(1));
+        assert_eq!(schema["properties"]["attachment-id"]["maxItems"], json!(1));
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("attachment-id"))
+        );
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn the_download_output_schema_is_the_part_without_data() {
+        let schema = &spec("attachment_download").definition["outputSchema"];
+
+        assert_eq!(schema["type"], "object");
+        assert!(schema["properties"].get("data").is_none(), "{schema}");
+        for key in ["id", "mime", "filename", "size"] {
+            assert!(schema["properties"].get(key).is_some(), "{key}: {schema}");
+        }
+        assert!(
+            !schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("data"))
+        );
+    }
+
+    #[test]
+    fn a_part_uri_percent_encodes_each_segment() {
+        assert_eq!(part_uri("a", "inbox", "m2", "3"), "himalaya://a/inbox/m2/3");
+        assert_eq!(
+            part_uri("my work", "[Gmail]/All Mail", "<a/b@c>", "2"),
+            "himalaya://my%20work/%5BGmail%5D%2FAll%20Mail/%3Ca%2Fb%40c%3E/2"
+        );
+    }
+
+    #[test]
+    fn a_part_moves_its_data_into_an_embedded_resource() {
+        let part = json!({
+            "id": "3",
+            "mime": "application/pdf",
+            "filename": "a.pdf",
+            "size": 2,
+            "data": "AAE=",
+        });
+
+        let (structured, resource) =
+            embedded_part(part, String::from("himalaya://a/inbox/m2/3")).unwrap();
+
+        assert_eq!(
+            structured,
+            json!({ "id": "3", "mime": "application/pdf", "filename": "a.pdf", "size": 2 })
+        );
+        assert_eq!(
+            resource,
+            json!({
+                "type": "resource",
+                "resource": {
+                    "uri": "himalaya://a/inbox/m2/3",
+                    "mimeType": "application/pdf",
+                    "blob": "AAE=",
+                },
+            })
+        );
+
+        assert!(embedded_part(json!({ "id": "3" }), String::new()).is_none());
     }
 
     #[cfg(any(backend, feature = "smtp"))]
