@@ -13,7 +13,7 @@ use crate::{
     shared::{
         client::EmailClient,
         message::{
-            builder::{self, BuilderArgs},
+            builder::{self, BuilderArgs, InlineAttachment},
             handler,
         },
     },
@@ -59,6 +59,10 @@ pub struct MessageComposeCommand {
     /// Files to attach.
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
+    /// Attachments given inline, which only the MCP server sets
+    /// (`attach-data`): no command line reaches this field.
+    #[arg(skip)]
+    pub attach_data: Vec<InlineAttachment>,
     /// Signature appended after the body, defaulting to the account's
     /// `signature`.
     ///
@@ -113,6 +117,7 @@ impl MessageComposeCommand {
                 body: self.body.as_deref(),
                 body_file: self.body_file.as_deref(),
                 attach: &self.attach,
+                attach_data: self.attach_data,
                 signature,
                 signature_file,
                 signature_delim: account.signature_delim(),

@@ -3,8 +3,10 @@
 //! `himalaya mcp` run as the built binary against a Maildir, fed JSON-RPC
 //! requests on stdin, asserting the tools each gate lists, that a call
 //! answers the command's payload, that an unknown argument or a failing
-//! command is a tool error the caller reads, and that a path given as a
-//! message is never read from disk.
+//! command is a tool error the caller reads, that a path given as a
+//! message is never read from disk, and that the composers' inline
+//! attachments, a server-only argument, are stored byte for byte, refused
+//! with their codes, and capped before they are decoded.
 
 #![cfg(all(backend, feature = "maildir"))]
 
@@ -15,6 +17,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+use base64::{Engine, prelude::BASE64_STANDARD};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -304,4 +307,371 @@ fn the_search_tool_says_what_the_backend_answers() {
         description.contains("(maildir) answers fully: date, after, before"),
         "{description}"
     );
+}
+
+/// The tools taking `attach-data`, the server-only argument carrying
+/// attachments inline.
+const COMPOSERS: &[&str] = &["message_compose", "message_reply", "message_forward"];
+
+/// The messages the fixture's inbox holds, by file name.
+fn stored(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = ["cur", "new"]
+        .iter()
+        .flat_map(|sub| fs::read_dir(dir.join("root/inbox").join(sub)).unwrap())
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// The raw bytes of the stored message whose file name starts with `id`.
+fn stored_raw(dir: &Path, id: &str) -> String {
+    ["cur", "new"]
+        .iter()
+        .flat_map(|sub| fs::read_dir(dir.join("root/inbox").join(sub)).unwrap())
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.file_name().unwrap().to_string_lossy().starts_with(id))
+        .map(|path| fs::read_to_string(path).unwrap())
+        .unwrap()
+}
+
+/// Runs the CLI with `--json` and returns its one value.
+fn cli(config: &Path, args: &[&str]) -> Value {
+    let dir = config.parent().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .args(["-c", config.to_str().unwrap(), "--json"])
+        .args(args)
+        .env("HOME", dir)
+        .env("XDG_CONFIG_HOME", dir)
+        .env_remove("HIMALAYA_CONFIG")
+        .env_remove("XDG_CONFIG_DIRS")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+/// The attachments of a stored message as `attachment download --stdout
+/// --json` prints them, `data` decoded, keyed by file name.
+fn attachments(config: &Path, id: &str) -> Vec<(String, String, Vec<u8>)> {
+    let listed = cli(config, &["attachment", "list", id]);
+    listed["attachments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|part| part["role"] == "attachment")
+        .map(|part| {
+            let part_id = part["id"].as_str().unwrap();
+            let part = cli(config, &["attachment", "download", "--stdout", id, part_id]);
+            let data = BASE64_STANDARD
+                .decode(part["data"].as_str().unwrap())
+                .unwrap();
+            (
+                part["filename"].as_str().unwrap().to_string(),
+                part["mime"].as_str().unwrap().to_string(),
+                data,
+            )
+        })
+        .collect()
+}
+
+/// The error object a refused call carries.
+fn refusal(response: &Value) -> Value {
+    let result = &response["result"];
+    assert_eq!(result["isError"], true, "{response}");
+    serde_json::from_str(result["content"][0]["text"].as_str().unwrap()).unwrap()
+}
+
+#[test]
+fn attach_data_is_a_typed_property_of_the_composers_only() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+
+    for flags in [&[][..], &["--allow-write", "--allow-send"][..]] {
+        let tools = &serve(&config, flags, &[list(1)])[0];
+
+        for tool in tools["result"]["tools"].as_array().unwrap() {
+            let name = tool["name"].as_str().unwrap();
+            let properties = &tool["inputSchema"]["properties"];
+            assert!(properties.get("max-attachment-size").is_none(), "{name}");
+
+            if !COMPOSERS.contains(&name) {
+                assert!(properties.get("attach-data").is_none(), "{name}");
+                continue;
+            }
+
+            let schema = &properties["attach-data"];
+            assert_eq!(schema["type"], "array", "{name}");
+
+            let item = &schema["items"];
+            assert_eq!(item["type"], "object", "{name}");
+            assert_eq!(item["additionalProperties"], false, "{name}");
+            assert_eq!(item["required"], json!(["filename"]), "{name}");
+            for key in ["filename", "mimeType", "data", "text"] {
+                assert_eq!(item["properties"][key]["type"], "string", "{name} {key}");
+            }
+            assert!(
+                !tool["inputSchema"]["required"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("attach-data")),
+                "{name}"
+            );
+        }
+
+        for name in COMPOSERS {
+            assert!(tool(tools, name).is_some(), "{name}");
+        }
+    }
+}
+
+#[test]
+fn attach_data_is_no_cli_argument() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+
+    for leaf in ["compose", "reply", "forward"] {
+        let help = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+            .args(["message", leaf, "--help"])
+            .output()
+            .unwrap();
+        let help = String::from_utf8_lossy(&help.stdout);
+        assert!(help.contains("--attach"), "{leaf}: {help}");
+        assert!(!help.contains("attach-data"), "{leaf}: {help}");
+
+        let refused = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+            .args(["-c", config.to_str().unwrap(), "message", leaf])
+            .args(["--attach-data", "x"])
+            .env("HOME", dir.path())
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        assert!(!refused.status.success(), "{leaf}");
+        assert!(
+            String::from_utf8_lossy(&refused.stdout).contains("--attach-data")
+                || String::from_utf8_lossy(&refused.stderr).contains("--attach-data"),
+            "{leaf}"
+        );
+    }
+}
+
+#[test]
+fn inline_attachments_are_stored_with_their_bytes_names_and_types() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let binary: Vec<u8> = (0..=255).collect();
+    let text = "Résumé:\n\tligne 1\r\nligne 2 ✓\n";
+
+    let responses = serve(
+        &config,
+        &["--allow-write"],
+        &[call(
+            1,
+            "message_compose",
+            json!({
+                "to": ["b@example.org"],
+                "subject": "Report",
+                "body": "See attached.",
+                "save": "inbox",
+                "attach-data": [
+                    {
+                        "filename": "q3: raw.bin",
+                        "mimeType": "application/x-himalaya-test",
+                        "data": BASE64_STANDARD.encode(&binary),
+                    },
+                    { "filename": "rapport été.txt", "text": text },
+                    { "filename": "pixel.png", "data": "iVBORw0KGgo" },
+                ],
+            }),
+        )],
+    );
+
+    let result = &responses[0]["result"];
+    assert!(result.get("isError").is_none(), "{result}");
+    let id = result["structuredContent"]["id"].as_str().unwrap();
+
+    let parts = attachments(&config, id);
+    assert_eq!(
+        parts,
+        vec![
+            (
+                "q3: raw.bin".to_string(),
+                "application/x-himalaya-test".to_string(),
+                binary,
+            ),
+            (
+                "rapport été.txt".to_string(),
+                "text/plain".to_string(),
+                text.as_bytes().to_vec(),
+            ),
+            (
+                "pixel.png".to_string(),
+                "image/png".to_string(),
+                b"\x89PNG\r\n\x1a\n".to_vec(),
+            ),
+        ]
+    );
+
+    // NOTE: a non-ASCII name goes out RFC 2231 encoded.
+    let raw = stored_raw(dir.path(), id);
+    assert!(raw.contains("filename*"), "{raw}");
+}
+
+#[test]
+fn a_reply_and_a_forward_carry_inline_attachments() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let item = json!([{ "filename": "notes.md", "text": "# Notes\n" }]);
+
+    let responses = serve(
+        &config,
+        &["--allow-write"],
+        &[
+            call(
+                1,
+                "message_reply",
+                json!({ "id": "m1", "body": "Re", "save": "inbox", "attach-data": item }),
+            ),
+            call(
+                2,
+                "message_forward",
+                json!({
+                    "id": "m1",
+                    "to": ["c@example.org"],
+                    "body": "Fwd",
+                    "save": "inbox",
+                    "attach-data": item,
+                }),
+            ),
+        ],
+    );
+
+    for response in &responses {
+        let id = response["result"]["structuredContent"]["id"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{response}"));
+        let parts = attachments(&config, id);
+        assert_eq!(
+            parts,
+            vec![(
+                "notes.md".to_string(),
+                "text/markdown".to_string(),
+                b"# Notes\n".to_vec()
+            )]
+        );
+    }
+}
+
+#[test]
+fn a_malformed_attachment_is_refused_and_nothing_is_stored() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let before = stored(dir.path());
+
+    let items = [
+        json!({ "filename": "a.bin", "data": "not base64!" }),
+        json!({ "filename": "a.txt", "data": "b2s=", "text": "ok" }),
+        json!({ "filename": "a.txt" }),
+        json!({ "text": "ok" }),
+        json!({ "filename": "", "text": "ok" }),
+        json!({ "filename": "a\r\nBcc: x@example.org", "text": "ok" }),
+        json!({ "filename": "a.txt", "mimeType": "text/plain; charset=utf-8", "text": "ok" }),
+        json!({ "filename": "a.txt", "text": "ok", "size": 2 }),
+        json!("a.txt"),
+    ];
+
+    let requests: Vec<Value> = items
+        .iter()
+        .enumerate()
+        .map(|(id, item)| {
+            call(
+                id as u32,
+                "message_compose",
+                json!({
+                    "body": "x",
+                    "save": "inbox",
+                    "attach-data": [{ "filename": "fine.txt", "text": "fine" }, item],
+                }),
+            )
+        })
+        .collect();
+
+    let responses = serve(&config, &["--allow-write"], &requests);
+    assert_eq!(responses.len(), items.len());
+
+    for (response, item) in responses.iter().zip(&items) {
+        let report = refusal(response);
+        let error = report["error"].as_str().unwrap();
+        assert_eq!(report["code"], "attachment-invalid", "{item}: {error}");
+        assert!(error.contains("attach-data[1]"), "{item}: {error}");
+    }
+
+    let wrong_type = serve(
+        &config,
+        &["--allow-write"],
+        &[call(
+            1,
+            "message_compose",
+            json!({ "body": "x", "save": "inbox", "attach-data": { "filename": "a" } }),
+        )],
+    );
+    assert_eq!(refusal(&wrong_type[0])["code"], "attachment-invalid");
+
+    assert_eq!(stored(dir.path()), before);
+}
+
+#[test]
+fn an_oversized_attachment_is_refused_before_it_is_decoded() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let before = stored(dir.path());
+    let compose = |id, item: Value| {
+        call(
+            id,
+            "message_compose",
+            json!({ "body": "x", "save": "inbox", "attach-data": [item] }),
+        )
+    };
+
+    let responses = serve(
+        &config,
+        &["--allow-write", "--max-attachment-size", "8"],
+        &[
+            // NOTE: 16 characters that are no base64 at all: the size
+            // estimate refuses them before a decoder reads them.
+            compose(
+                1,
+                json!({ "filename": "a.bin", "data": "!!!!!!!!!!!!!!!!" }),
+            ),
+            compose(2, json!({ "filename": "a.txt", "text": "123456789" })),
+            compose(3, json!({ "filename": "a.txt", "text": "ééééé" })),
+        ],
+    );
+
+    for response in &responses {
+        let report = refusal(response);
+        assert_eq!(report["code"], "attachment-too-large", "{report}");
+        assert!(report["error"].as_str().unwrap().contains("attach-data[0]"));
+    }
+    assert_eq!(stored(dir.path()), before);
+
+    // NOTE: exactly at the cap, 8 bytes as 12 base64 characters.
+    let responses = serve(
+        &config,
+        &["--allow-write", "--max-attachment-size", "8"],
+        &[
+            compose(1, json!({ "filename": "a.bin", "data": "AAAAAAAAAAA=" })),
+            compose(2, json!({ "filename": "a.txt", "text": "12345678" })),
+        ],
+    );
+    for response in &responses {
+        assert!(response["result"].get("isError").is_none(), "{response}");
+    }
+    assert_eq!(stored(dir.path()).len(), before.len() + 2);
 }
