@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `tls.identity.cert` and `tls.identity.key` to every backend, a client certificate presented when the server asks for one (mutual TLS). native-tls reads a PKCS#8 key only, rustls PKCS#1 and SEC1 too.
 - Added `--page-token` to `envelope list` and `envelope search`, which print `nextPage` (the next page number while a page comes back full, `null` otherwise), and to `msgraph messages list`, whose `nextPage` is the `$skip` of Graph's next link.
 - Added a JSON Schema for every command, 216 in all, checked by a test walking the command tree, with `himalaya-imap-raw.events` and `himalaya-sieve-raw.events` describing the events those commands print.
 - Added events to the MCP tool results, one text content each before the result; a refused protocol completion or a failed `account check` keeps its result as `structuredContent` with `isError`.
