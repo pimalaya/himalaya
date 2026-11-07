@@ -41,7 +41,7 @@ use pimalaya_config::{
 ))]
 use pimalaya_stream::{
     proxy::{Proxy, ProxyAuth},
-    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+    tls::{Identity, Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 #[cfg(any(
     feature = "imap",
@@ -1169,6 +1169,22 @@ pub struct TlsConfig {
     /// A custom certificate to trust, in PEM format.
     #[serde(default, deserialize_with = "opt_shell_expanded_path")]
     pub cert: Option<PathBuf>,
+    /// A client certificate presented when the server asks for one
+    /// (mutual TLS).
+    pub identity: Option<TlsIdentityConfig>,
+}
+
+/// Client certificate configuration, both halves in PEM format.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct TlsIdentityConfig {
+    /// The certificate, optionally followed by its intermediates.
+    #[serde(deserialize_with = "shell_expanded_path")]
+    pub cert: PathBuf,
+    /// The private key, PKCS#8 under native-tls; rustls also reads
+    /// PKCS#1 and SEC1.
+    #[serde(deserialize_with = "shell_expanded_path")]
+    pub key: PathBuf,
 }
 
 /// SSL/TLS provider configuration.
@@ -1228,6 +1244,10 @@ impl TlsConfig {
                 alpn,
             },
             cert: self.cert,
+            identity: self.identity.map(|i| Identity {
+                cert: i.cert,
+                key: i.key,
+            }),
         }
     }
 }
@@ -1801,6 +1821,16 @@ inbox = "~/spool""#,
 
         let tls: TlsConfig = toml::from_str("").unwrap();
         assert_eq!(tls.cert, None);
+        assert!(tls.identity.is_none());
+
+        let tls: TlsConfig =
+            toml::from_str(r#"identity = { cert = "~/me.pem", key = "~/me.key.pem" }"#).unwrap();
+        let identity = tls.identity.unwrap();
+        assert_eq!(identity.cert, home.join("me.pem"));
+        assert_eq!(identity.key, home.join("me.key.pem"));
+
+        // NOTE: a certificate without its key cannot be presented
+        assert!(toml::from_str::<TlsConfig>(r#"identity.cert = "~/me.pem""#).is_err());
     }
 
     #[cfg(any(

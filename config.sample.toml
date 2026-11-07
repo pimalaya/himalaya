@@ -212,6 +212,11 @@ imap.server = "example.com"
 # Custom TLS certificate (extra root, PEM-encoded).
 #imap.tls.cert = "/path/to/custom/cert.pem"
 
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#imap.tls.identity.cert = "/path/to/client.cert.pem"
+#imap.tls.identity.key = "/path/to/client.key.pem"
+
 # Upgrade the connection with STARTTLS, valid only for an `imap://` server.
 #imap.starttls = false
 
@@ -294,6 +299,11 @@ imap.sasl.plain.password.raw = "***"
 #jmap.tls.rustls.crypto = "ring"
 #jmap.tls.cert = "/path/to/custom/cert.pem"
 
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#jmap.tls.identity.cert = "/path/to/client.cert.pem"
+#jmap.tls.identity.key = "/path/to/client.key.pem"
+
 # ALPN identifiers offered during the TLS handshake, defaulting to ["http/1.1"]
 # since JMAP rides on HTTP/1.1. An empty list skips ALPN.
 #jmap.alpn = ["http/1.1"]
@@ -347,6 +357,11 @@ imap.sasl.plain.password.raw = "***"
 #gmail.tls.rustls.crypto = "ring"
 #gmail.tls.cert = "/path/to/custom/cert.pem"
 
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#gmail.tls.identity.cert = "/path/to/client.cert.pem"
+#gmail.tls.identity.key = "/path/to/client.key.pem"
+
 # ALPN identifiers offered during the TLS handshake, defaulting to ["http/1.1"]
 # since the REST API rides on HTTP/1.1. An empty list skips ALPN.
 #gmail.alpn = ["http/1.1"]
@@ -376,6 +391,11 @@ imap.sasl.plain.password.raw = "***"
 #msgraph.tls.provider = "rustls"
 #msgraph.tls.rustls.crypto = "ring"
 #msgraph.tls.cert = "/path/to/custom/cert.pem"
+
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#msgraph.tls.identity.cert = "/path/to/client.cert.pem"
+#msgraph.tls.identity.key = "/path/to/client.key.pem"
 
 # ALPN identifiers offered during the TLS handshake, defaulting to ["http/1.1"]
 # since the Graph API rides on HTTP/1.1. An empty list skips ALPN.
@@ -496,6 +516,11 @@ smtp.server = "example.com"
 # Custom TLS certificate (extra root, PEM-encoded).
 #smtp.tls.cert = "/path/to/custom/cert.pem"
 
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#smtp.tls.identity.cert = "/path/to/client.cert.pem"
+#smtp.tls.identity.key = "/path/to/client.key.pem"
+
 # Upgrade the connection with STARTTLS, valid only for an `smtp://` server.
 #smtp.starttls = false
 
@@ -550,6 +575,11 @@ smtp.sasl.plain.password.raw = "***"
 #sieve.tls.provider = "rustls"
 #sieve.tls.provider = "native-tls"
 #sieve.tls.cert = "/path/to/custom/cert.pem"
+
+# Client certificate presented when the server asks for one (mutual TLS),
+# PEM-encoded; native-tls reads a PKCS#8 key only.
+#sieve.tls.identity.cert = "/path/to/client.cert.pem"
+#sieve.tls.identity.key = "/path/to/client.key.pem"
 
 # Upgrade the connection with STARTTLS, unset following the scheme: on for
 # `sieve://`, off for `sieves://` and `unix://`. Set it to false for a cleartext
