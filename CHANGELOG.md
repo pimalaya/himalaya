@@ -101,6 +101,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed a pimdir send to name its performer in the queued `submit` whatever the sources declare, the one source syncing the mailbox when none declares capabilities; a mailbox no source syncs yet is refused with `no-performer`, staging nothing.
 - Changed `pimdir flag` and `pimdir tag` to refuse a flag the store cannot hold (empty, or holding whitespace, a control or a non-ASCII character) with the code `flag-invalid`.
 - Changed `pimdir search`, `count` and `tag` to refuse a query past the SEARCH §8.3 bounds (1,024 characters, 32 groups open at once, 128 terms) with `query-refused`, naming `limit-exceeded` and the span.
+- Changed the wizard to pick the best option for mail and for sending without a question, then show the picks in a review where any of them can be changed.
+
+  Mail takes a provider's own API first (the Gmail API, Microsoft Graph), then JMAP, then IMAP, implicit TLS before STARTTLS, and OAuth first only when Ortie is installed; sending goes through mail over JMAP and the provider APIs, else over the best discovered SMTP server. Unencrypted discovered servers are no longer offered.
+
+- Changed the wizard to stop asking for a SASL mechanism, a JMAP authentication scheme, a login it knows, and the Gmail and Graph user id.
+
+  IMAP takes the best mechanism its CAPABILITY probe advertises (SCRAM-SHA-256, PLAIN, then LOGIN), SMTP PLAIN or XOAUTH2, JMAP Basic or Bearer, and the APIs `me`.
+
+- Changed the wizard to take a password once, show every server it goes to (flagging one off the address's domain), test it at once, then store it in an installed keyring under `himalaya-<account>-<service>`, read back through its command.
+
+  IMAP and SMTP of one domain share one password and one entry; a refused sign-in offers to try again, change the login, leave the domain out or go back to the review.
+
+- Changed the wizard's OAuth 2.0 sign-in to hand off to Ortie (`ortie configure`, then `ortie auth get`) when it is installed, one sign-in per authorization server, the token brokers being offered otherwise.
+- Changed the wizard to ask for a server URL when discovery finds nothing, rather than stopping.
+
+  The scheme names the protocol (`imaps://`, `imap://`, `smtps://`, `smtp://`, `https://`, `jmap://`), `http://` is refused unless on this machine, and an empty answer stops as before.
+
+- Changed the wizard to ask `Your name (optional):` last, written as `display-name`.
+- Bumped io-pim-discovery to 0.11, adding the autoconfig of the provider a domain's MX records name.
 - Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
 
 ### Fixed

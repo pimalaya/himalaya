@@ -170,7 +170,7 @@ The binary lands at `target/release/himalaya`.
 
 Run `himalaya`. With no configuration file on disk, the wizard asks for an email address and discovers the services reachable from it, probing PACC, Thunderbird Autoconfiguration, RFC 6186 SRV and RFC 8620 JMAP resolution in parallel.
 
-Picking one prompts the authentication it advertises, tests the connection, then writes the account to disk.
+Each domain, mail and sending, gets the best option found without a question (a provider's own API first, then JMAP, then IMAP and SMTP), shown in a review where any pick can be changed, a custom server URL included. Then each sign-in runs once: a password is typed once, tested at once, and stored in an installed keyring (or kept raw, or read by your own command); OAuth 2.0 hands off to [Ortie](https://github.com/pimalaya/ortie) when it is installed. When discovery finds nothing, the wizard asks for the server URL (`imaps://`, `imap://` or `https://`, then `smtps://` or `smtp://` for sending). The account is then written to disk.
 
 A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
@@ -184,7 +184,7 @@ These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya
 
 Override those paths with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
 
-To add or reconfigure an account, run the bare `himalaya` wizard again and redirect its printed TOML into (or merge it with) your config file. There is no in-place edit subcommand; `himalaya account list` and `himalaya account check` inspect and validate the accounts already declared.
+To add an account, run `himalaya configure`: the account is appended to your config file, or printed when stdout is redirected. There is no in-place edit subcommand; `himalaya account list` and `himalaya account check` inspect and validate the accounts already declared.
 
 ### Proton Mail
 
@@ -458,14 +458,14 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How does the wizard discover IMAP/SMTP/JMAP configs?</summary>
 
-  The wizard probes several discovery mechanisms in parallel on the email address domain, merges their results and keeps the most secure endpoint per service:
+  The wizard probes several discovery mechanisms in parallel on the email address domain, merges their results and ranks them per domain, implicit TLS before STARTTLS, unencrypted servers dropped:
 
   - **PACC** <sup>[draft-ietf-mailmaint-pacc-02](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc-02)</sup>: well-known JSON, digest-verified against the `_ua-auto-config` TXT record.
-  - **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then MX-based retry, then the `mailconf=<URL>` TXT redirect.
+  - **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then the autoconfig of the provider the MX records name, then the `mailconf=<URL>` TXT redirect.
   - **RFC 6186 SRV**: `_imap._tcp`, `_imaps._tcp`, `_submission._tcp` lookups assembled into a single report.
   - **RFC 8620 JMAP**: the SRV record and the `/.well-known/jmap` session resource.
 
-  A final WWW-Authenticate probe refines the advertised auth schemes, and a detected Google or Microsoft account short-circuits to its dedicated configurations. See [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery) for the full chain.
+  A final WWW-Authenticate probe refines the advertised auth schemes. A Google or Microsoft account, detected by its domain or its MX records, puts the Gmail API or Microsoft Graph first, IMAP and SMTP staying one change away. See [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery) for the full chain.
 </details>
 
 <details>

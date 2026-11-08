@@ -11,11 +11,13 @@
 # by repeating `-c`; the first one is the base and the rest are deep-merged on
 # top of it.
 #
-# Bare `himalaya` launches the wizard, which discovers an account from your
-# email address and offers to write it here. Prompts go to stderr and the
+# Bare `himalaya` (or `himalaya configure`) launches the wizard, which discovers
+# an account from your email address, or takes a server URL when discovery finds
+# nothing, signs it in and offers to write it here. A password it stores in a
+# keyring is read back through `*.command`. Prompts go to stderr and the
 # document to stdout, so `himalaya > <path>` writes the file itself.
 #
-# Everything discovery does not cover is written by hand, from this page.
+# Everything the wizard does not cover is written by hand, from this page.
 # ================================================================================
 
 # --------------------------------------------------------------------------------

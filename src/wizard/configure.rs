@@ -3,9 +3,10 @@
 //! The `configure` command: the wizard generates an account, it never
 //! edits one.
 //!
-//! An account is discovered from one prompt, tested, then handed back as
-//! a file to create, a block to append or a document on stdout. Whatever
-//! discovery does not cover is written by hand against the sample.
+//! An account is discovered from one prompt, reviewed, signed in and
+//! tested, then handed back as a file to create, a block to append or a
+//! document on stdout. Whatever the wizard does not cover is written by
+//! hand against the sample.
 //!
 //! It runs from `himalaya configure`, and from the offer a bare
 //! `himalaya` raises when it finds no configuration. That offer is the
@@ -43,10 +44,11 @@ use crate::{
 /// Configure an account interactively.
 ///
 /// Discovers a provider from an email address, a server URL or a local
-/// folder path, tests the connection, then writes the account, appends it
-/// to the configuration already there, or prints it to be placed by hand.
+/// folder path, signs in and tests the connection, then writes the account,
+/// appends it to the configuration already there, or prints it to be placed
+/// by hand.
 ///
-/// Anything discovery does not cover is written by hand.
+/// Anything the wizard does not cover is written by hand.
 #[derive(Debug, Parser)]
 pub struct ConfigureCommand;
 
@@ -71,8 +73,7 @@ impl ConfigureCommand {
         let path = Config::target_path(config_paths)?;
         let existing = ExistingConfig::read(&path, config_paths)?;
 
-        let (base_name, mut account) = discover::run()?;
-        let name = account_name(&base_name, existing.as_ref());
+        let (name, mut account) = discover::run(|base| account_name(base, existing.as_ref()))?;
 
         // NOTE: a second `default = true` would make the account every
         // command picks depend on map ordering, so the generated one
@@ -172,9 +173,9 @@ pub fn print_welcome(path: &Path) {
     eprintln!();
     eprintln!("  {}", path.display());
     eprintln!();
-    eprintln!("The wizard discovers a provider's settings from your email address, tests");
-    eprintln!("the connection and generates a ready-to-use account. Everything discovery");
-    eprintln!("does not cover is written by hand, and every field is documented at:");
+    eprintln!("The wizard discovers a provider's settings from your email address, signs");
+    eprintln!("you in, tests the connection and generates a ready-to-use account. What");
+    eprintln!("the wizard does not cover is written by hand, every field documented at:");
     eprintln!();
     eprintln!("  {CONFIG_SAMPLE_URL}");
     eprintln!();

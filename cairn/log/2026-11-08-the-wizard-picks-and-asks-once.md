@@ -1,0 +1,27 @@
+---
+cairn: log
+change: the-wizard-picks-and-asks-once
+landed: 2026-11-08
+---
+
+# The wizard picks, then asks once
+
+The wizard adopts the flow of the Pimalaya Android app's onboarding, approved by the owner for the CLIs on 2026-11-08; Himalaya is the reference cardamum and calendula mirror.
+
+- Dependencies: io-pim-discovery 0.9 to 0.11 from crates.io (same features: autoconfig, pacc, rfc6186, rfc8620, stream). No compile break: Himalaya never built a `DiscoveryServiceConfig` nor matched the OAuth grant fields, and `DiscoveryConfigSource::Mx` falls in a wildcard. rfc8414 and rfc9728 stay off: their OAuth resolution runs after the deadline, unbounded, and Ortie discovers the grants itself. pimalaya-cli is patched to the local checkout (6d8daa7) for `keyring::prompt_password`, `keyring::prompt_store`, `review::prompt` and `ortie::sign_in`; the lock moves pimalaya-stream to 0.3.1, io-proxy to 0.1.1 and adds io-http 0.6 beside the patched 0.5.
+- Discovery asks the provider rules for the Gmail API and Microsoft Graph services they carry, rather than synthesizing them from the detected provider, so their OAuth grants name the authorization server.
+- src/wizard/plan.rs (new, pure): routes (protocol, server, sign-in) from the discovered configs, plain TCP and non-https HTTP servers dropped, deduplicated, ranked (provider API, JMAP, IMAP; implicit TLS before STARTTLS; OAuth first only with `ortie` on the PATH), Auto resolution for mail and for sending (through mail, else the best SMTP server signing in as mail does, else none), the review sentences, the change lists, the host grouping and the sign-in groups.
+- src/wizard/server.rs (new, pure): the typed server URL, its schemes and default ports, `http://` refused unless its host is `localhost` or a loopback address (a rule added mid-change so cardamum and calendula stay mirrored).
+- src/wizard/signin.rs (new): the sign-ins grouped by identity, the password typed once and tested at once, `prompt_store` under `himalaya-<account>-<service>`, the reuse question for another host, the refusal menu, OAuth through `ortie::sign_in` (account `himalaya-<account>`, suffixed with its first service when several OAuth sign-ins are needed) or the broker list. Domains signed in survive a return to the review.
+- src/wizard/imap_smtp.rs split into imap.rs and smtp.rs, so a build with one of the two features sets that one up. The IMAP mechanism comes from the CAPABILITY probe (SCRAM-SHA-256, PLAIN, LOGIN; OAUTHBEARER else XOAUTH2 for a token), SMTP takes PLAIN or XOAUTH2. The Gmail API and Graph blocks are tested inline (`check::connect_gmail` and `connect_msgraph` made `pub(crate)`), user id `me`.
+- discover.rs: the review loop, the change lists, the `Server URL:` prompt when nothing is discovered (an empty answer stops with the old message), `Sending server URL (empty for none):` after a typed IMAP server when no SMTP server was discovered, `Your name (optional):` last. The account name is settled before any sign-in (`discover::run` takes the closure making it free), since the keyring entries and the Ortie account carry it.
+- secret.rs no longer prompts for a keyring entry to read: `configure_password` is gone, `to_secret` and `command_secret` are public for the sign-ins.
+- README, config.sample.toml, the welcome and the `configure` help say what the wizard now does.
+
+Decided beyond the brief: a discovered IMAP or SMTP server without TLS or STARTTLS is dropped like a non-https one, so a discovered server is never weaker than a typed one may be. A typed server URL at the first prompt that discovery does not match becomes the mail server directly instead of asking `Server URL:` again. `Sending server URL (empty for none):` is asked only when no SMTP server was discovered, so an empty answer cannot silently drop a discovered one; the review offers the change. A resolver that does not answer reads as nothing discovered, its reason shown, rather than ending the wizard.
+
+Verified: `cargo test --all-features` green (455 unit tests, 1 ignored, and the integration suites), `cargo clippy --all-features --all-targets` clean, `cargo check --no-default-features`, each backend feature alone with rustls-ring and the wizard with each of imap, smtp, jmap, gmail, msgraph, maildir and m2dir: all build. The wizard-alone build and the wizard with a local store only warn on src/wizard (unused imports and unreachable code around the then uninhabited `Backend`): 98 warnings in all for the wizard-alone build, against the 101 the 2026-11-06 log counted on master.
+
+Left: no interactive run against a server (the network was out of bounds for this work); Ortie's `configure [INPUT] --service --name` was coded against its contract, not run. pimalaya-cli's patch moves to a git rev at push time.
+
+Spec: wizard (added: Each domain gets its best option without a question, The review lists each pick in plain words, Nothing discovered asks for a server URL, A typed server URL names its protocol by its scheme, The sign-in mechanism is picked, not asked, Sign-ins are grouped by identity, A password is typed once, tested, then stored, OAuth hands off to Ortie, A refusal offers a way on; modified: Input orients the flow, Discovery is time-bounded, The prompted address is kept, Connection tested before printing; removed: One entry per service, then auth, OAuth folds into the API token, Per-protocol test and shared SMTP credentials, Stop when nothing is discovered).

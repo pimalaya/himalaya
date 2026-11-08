@@ -371,7 +371,7 @@ fn connect_jmap(
 
 /// Opens a Gmail client and fetches the account profile.
 #[cfg(feature = "gmail")]
-fn connect_gmail(
+pub(crate) fn connect_gmail(
     gmail_config: &crate::config::GmailConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
@@ -394,7 +394,7 @@ fn connect_gmail(
 
 /// Opens a Microsoft Graph client and fetches the signed-in user.
 #[cfg(feature = "msgraph")]
-fn connect_msgraph(
+pub(crate) fn connect_msgraph(
     msgraph_config: &crate::config::MsgraphConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
