@@ -76,6 +76,8 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | `body-pending` | a listed message's body is not local yet (pimdir); a sync brings it |
 | `message-too-complex` | a message is nested deeper than 8 levels, or holds more than 200 parts or 500 header lines; it is refused whole |
 | `stdin-taken` | a command inside a `repl` session would read its input from stdin, which carries the session's commands; pass it as an argument or a file path |
+| `attachment-too-large` | an attachment is larger than `himalaya mcp --max-attachment-size`; refused before it is decoded, nothing is done |
+| `attachment-invalid` | an `attach-data` item given to an MCP composer is malformed (no file name, both or neither of `data` and `text`, bad base64, a bad `mimeType`); nothing is composed |
 | `search-invalid` | an `envelope search` query does not parse; nothing is searched |
 | `search-unsupported` | an `envelope search` clause the account's backend cannot search, quoted as written; nothing is searched, no clause dropped |
 | `capability-missing` | the account's backend does not serve the verb, or the option of it asked for, as its capability table declares or its server advertises; nothing is done, the message naming the capability and what serves it instead |

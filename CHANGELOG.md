@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `attach-data` to the MCP tools `message_compose`, `message_reply` and `message_forward`, attaching files given inline: a list of `{filename, mimeType, data, text}`, with `data` in base64 or `text` as UTF-8, `mimeType` guessed from the filename as `--attach` guesses it ([#806]). It is an argument of the server alone, not of the CLI, where `--attach` already takes a path. Each attachment over `himalaya mcp --max-attachment-size` (10 MiB by default) is refused before it is decoded, under the new error code `attachment-too-large`; a malformed one is refused under `attachment-invalid`. Under `--allow-send`, an agent can now send arbitrary binary data, not only text.
 - Added `--page-token` to `envelope list` and `envelope search`, which print `nextPage` (the next page number while a page comes back full, `null` otherwise), and to `msgraph messages list`, whose `nextPage` is the `$skip` of Graph's next link.
 - Added a JSON Schema for every command, 216 in all, checked by a test walking the command tree, with `himalaya-imap-raw.events` and `himalaya-sieve-raw.events` describing the events those commands print.
 - Added events to the MCP tool results, one text content each before the result; a refused protocol completion or a failed `account check` keeps its result as `structuredContent` with `isError`.
@@ -1532,6 +1533,7 @@ Few major concepts changed:
 [#786]: https://github.com/pimalaya/himalaya/issues/786
 [#790]: https://github.com/pimalaya/himalaya/issues/790
 [#802]: https://github.com/pimalaya/himalaya/issues/802
+[#806]: https://github.com/pimalaya/himalaya/issues/806
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
