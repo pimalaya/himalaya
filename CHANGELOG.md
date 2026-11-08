@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `--page-token` to `envelope list` and `envelope search`, which print `nextPage` (the next page number while a page comes back full, `null` otherwise), and to `msgraph messages list`, whose `nextPage` is the `$skip` of Graph's next link.
 - Added a JSON Schema for every command, 216 in all, checked by a test walking the command tree, with `himalaya-imap-raw.events` and `himalaya-sieve-raw.events` describing the events those commands print.
 - Added events to the MCP tool results, one text content each before the result; a refused protocol completion or a failed `account check` keeps its result as `structuredContent` with `isError`.
+- Added `attachment_download` to `himalaya mcp`, a reading tool always run as `attachment download --stdout` and taking one part id, so an agent reads an attachment without a file being written ([#805]). Its structured content is the part without `data` (`{id, mime, filename, size}`), with that schema as output schema, and the bytes follow once as an embedded resource (`blob` in base64, the part's MIME type, the URI `himalaya://<account>/<mailbox>/<message-id>/<part-id>`). The server flag `--max-attachment-size` added with `attach-data` also refuses a larger part before it is encoded, under `attachment-too-large`.
 - Added `mailbox create <NAME> [--parent <MAILBOX>]`, `mailbox rename <MAILBOX> <NAME>` and `mailbox delete <MAILBOX>` to the shared API, on every backend: a name is one level of the hierarchy, a rename keeps the parent, a delete takes the messages the mailbox holds. IMAP joins the levels with the delimiter its `LIST` reports, Gmail and the local stores with `/`. On pimdir each is queued, its `id` `null`. m2dir has no rename and refuses `--parent`, its folders being flat; Graph creates under a parent in two requests; what a delete leaves behind on JMAP, Gmail and Graph is in the `--help` footer.
 - Added the `important` and `junk` flags to `flag add|set|remove` (RFC 8457 `$Important`, `$Junk`). Graph has no junk mark and refuses it; on Gmail `junk` is the `SPAM` label, which moves the message to Spam.
 - Added `vacation get` and `vacation set`, reading and changing the auto-reply (`{enabled, from, to, subject, text, html}`, dates in RFC 3339 UTC) on JMAP and Gmail. It resolves to the first configured backend keeping one, so an account syncing a Maildir from JMAP reaches JMAP. IMAP refuses it naming `himalaya sieve`; the MCP server lists `vacation_set` under `--allow-send` only, an auto-reply answering mail.
@@ -1533,6 +1534,7 @@ Few major concepts changed:
 [#786]: https://github.com/pimalaya/himalaya/issues/786
 [#790]: https://github.com/pimalaya/himalaya/issues/790
 [#802]: https://github.com/pimalaya/himalaya/issues/802
+[#805]: https://github.com/pimalaya/himalaya/issues/805
 [#806]: https://github.com/pimalaya/himalaya/issues/806
 
 [core#1]: https://github.com/pimalaya/core/issues/1

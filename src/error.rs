@@ -39,7 +39,8 @@ pub enum ErrorCode {
     /// stdin carries the commands: pass it as an argument or a file path.
     StdinTaken,
     /// An attachment is larger than the server's `--max-attachment-size`:
-    /// nothing was done.
+    /// one given inline is refused before being decoded, one read before
+    /// being encoded, and nothing was done.
     AttachmentTooLarge,
     /// An attachment given inline is malformed (no file name, both or
     /// neither of `data` and `text`, bad base64, a bad MIME type): nothing
