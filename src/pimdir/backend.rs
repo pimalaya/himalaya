@@ -1572,7 +1572,7 @@ fn reads_body(filter: &SearchEmailsFilterQuery) -> bool {
     match filter {
         Q::And(left, right) | Q::Or(left, right) => reads_body(left) || reads_body(right),
         Q::Not(inner) => reads_body(inner),
-        Q::Body(_) => true,
+        Q::Body(_) | Q::Header(_, _) => true,
         _ => false,
     }
 }

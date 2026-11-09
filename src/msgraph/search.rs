@@ -51,6 +51,12 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
                 "Microsoft Graph search has no flag property; use `himalaya msgraph messages list --filter`",
             ));
         }
+        SearchEmailsFilterQuery::Header(_, _) => {
+            return Err(unsupported(
+                filter,
+                "Microsoft Graph search has no arbitrary header property",
+            ));
+        }
     })
 }
 
@@ -144,6 +150,12 @@ mod tests {
     #[test]
     fn a_flag_clause_is_refused_by_name() {
         let filter = SearchEmailsFilterQuery::Flag(Flag::from_iana(IanaFlag::Seen));
+        assert!(filter_to_kql(&filter).is_err());
+    }
+
+    #[test]
+    fn a_header_clause_is_refused() {
+        let filter = SearchEmailsFilterQuery::Header("Message-ID".into(), "id".into());
         assert!(filter_to_kql(&filter).is_err());
     }
 }

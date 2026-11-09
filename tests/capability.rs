@@ -152,6 +152,16 @@ fn imap_refuses_an_attachment_clause_before_connecting() {
 }
 
 #[test]
+fn graph_refuses_a_header_clause_before_connecting() {
+    refused(
+        MSGRAPH,
+        &["envelope", "search", "header Message-ID <id>"],
+        "search-unsupported",
+        "header",
+    );
+}
+
+#[test]
 fn a_backend_filter_narrows_the_resolution() {
     refused(
         &format!("{IMAP}{SMTP}"),

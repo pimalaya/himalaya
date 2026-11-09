@@ -1023,6 +1023,7 @@ fn convert_filter(
             has_attachment: Some(true),
             ..Default::default()
         }),
+        Q::Header(_, _) => condition(JmapEmailFilter::default()),
 
         // NOTE: a message is received no earlier than it is sent, so the
         // start of the day bounds the received-at from below.

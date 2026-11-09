@@ -1170,6 +1170,7 @@ fn convert_filter_with(
         Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
+        Q::Header(name, pattern) => SearchKey::Header(astring(name)?, astring(pattern)?),
         Q::Attachment => {
             return Err(unsupported(
                 filter,

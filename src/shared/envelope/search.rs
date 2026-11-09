@@ -28,7 +28,7 @@ use crate::{
 /// over the whole message on Gmail, KQL terms on Microsoft Graph, and as the
 /// server defines it on JMAP.
 /// A clause the backend cannot search is refused with `search-unsupported`,
-/// never dropped: every flag on Microsoft Graph, `flag answered` and keywords
+/// never dropped: every flag and header on Microsoft Graph, `flag answered` and keywords
 /// on Gmail, `attachment` on IMAP.
 #[derive(Debug, Parser)]
 pub struct EnvelopeSearchCommand {
@@ -56,7 +56,7 @@ pub struct EnvelopeSearchCommand {
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
     /// Query: date, after, before, from, to, cc, bcc, address, subject, body,
-    /// flag, attachment; and, or, not, ( ); order by. See --help.
+    /// flag, attachment, header; and, or, not, ( ); order by. See --help.
     ///
     /// Clauses:
     ///
@@ -74,8 +74,9 @@ pub struct EnvelopeSearchCommand {
     ///
     /// - `flag <name>`: carrying the flag, `seen`, `answered`, `flagged`,
     ///   `draft` or a keyword;
+    /// - `attachment`: holding an attachment;
+    /// - `header <name> <pattern>`: that header holds the pattern.
     ///
-    /// - `attachment`: holding an attachment.
     ///
     /// Dates also read `yyyy/mm/dd`, `dd-mm-yyyy` and `dd/mm/yyyy`. A pattern
     /// holding spaces is quoted, `"weekly report"`, or its spaces are

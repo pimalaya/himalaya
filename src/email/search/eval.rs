@@ -112,6 +112,7 @@ fn matches(
         Q::Body(pattern) => body_contains(raw, pattern),
         Q::Flag(flag) => envelope.flags.contains(flag),
         Q::Attachment => has_attachment(envelope, raw),
+        Q::Header(name, pattern) => header_contains(envelope, raw, name, pattern),
     }
 }
 
@@ -135,6 +136,39 @@ fn has_attachment(envelope: &Envelope, raw: &[u8]) -> bool {
     }
 
     !raw.is_empty() && part::has_attachment(&MimeCst::parse(raw))
+}
+
+fn header_contains(envelope: &Envelope, raw: &[u8], name: &str, pattern: &str) -> bool {
+    if name.eq_ignore_ascii_case("subject") && contains_ci(&envelope.subject, pattern) {
+        return true;
+    }
+    if name.eq_ignore_ascii_case("message-id")
+        && envelope
+            .message_id
+            .as_deref()
+            .is_some_and(|id| contains_ci(id, pattern))
+    {
+        return true;
+    }
+
+    if raw.is_empty() {
+        return false;
+    }
+
+    let opts = MimeParseOptions {
+        structure_depth: Some(0),
+        ..Default::default()
+    };
+    let message = MimeCst::parse_with(raw, opts);
+    let needle = pattern.to_lowercase();
+    message.root.header.get_all(name).any(|field| {
+        let raw_val = String::from_utf8_lossy(&field.unfolded()).to_lowercase();
+        if raw_val.contains(&needle) {
+            return true;
+        }
+        let decoded = crate::shared::message::header::decode_words(&raw_val).to_lowercase();
+        decoded.contains(&needle)
+    })
 }
 
 /// Whether a text or HTML part of the message holds `pattern`, folding
@@ -239,6 +273,38 @@ mod tests {
             None,
             &raw,
             &SearchEmailsFilterQuery::Subject("release".into())
+        ));
+    }
+
+    #[test]
+    fn header_matches_case_insensitively_and_supports_custom_headers() {
+        let mut env = envelope();
+        env.message_id = Some("<msg-123@example.org>".into());
+        let raw = b"From: a@b\r\nSubject: x\r\nMessage-ID: <msg-123@example.org>\r\nX-Spam-Score: 0.15\r\n\r\nbody\r\n";
+
+        assert!(matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Header("Message-ID".into(), "123".into())
+        ));
+        assert!(matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Header("x-spam-score".into(), "0.15".into())
+        ));
+        assert!(!matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Header("x-spam-score".into(), "9.99".into())
+        ));
+        assert!(!matches_filter(
+            &env,
+            None,
+            raw,
+            &SearchEmailsFilterQuery::Header("non-existent".into(), "foo".into())
         ));
     }
 

@@ -35,6 +35,7 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserEr
             body(),
             flag(),
             attachment(),
+            header(),
             filter
                 .delimited_by(lparen().then_ignore(blanks()), rparen())
                 .labelled("(nested filter)"),
@@ -151,6 +152,19 @@ fn attachment<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserE
                 .labelled("space or end after `attachment`"),
         )
         .to(SearchEmailsFilterQuery::Attachment)
+}
+
+fn header<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("header", "`header`", "space after `header`")
+        .ignore_then(pattern().labelled("header name after `header`"))
+        .then_ignore(
+            space()
+                .labelled("space after header name")
+                .repeated()
+                .at_least(1),
+        )
+        .then(pattern().labelled("pattern after header name"))
+        .map(|(name, pattern)| SearchEmailsFilterQuery::Header(name, pattern))
 }
 
 /// A clause keyword followed by the spaces separating it from its value.
@@ -401,5 +415,22 @@ mod tests {
     fn attachment_ends_where_its_word_does() {
         assert!(super::query().parse("attachments").into_result().is_err());
         assert!(super::query().parse("attachment x").into_result().is_err());
+    }
+
+    #[test]
+    fn header() {
+        assert_eq!(
+            super::query()
+                .parse("header Message-ID \"<id@example.com>\"")
+                .into_result(),
+            Ok(Header("Message-ID".into(), "<id@example.com>".into())),
+        );
+
+        assert_eq!(
+            super::query()
+                .parse("header \"X-Custom-Header\" unquoted-val")
+                .into_result(),
+            Ok(Header("X-Custom-Header".into(), "unquoted-val".into())),
+        );
     }
 }

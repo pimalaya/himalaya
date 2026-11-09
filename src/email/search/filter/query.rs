@@ -47,6 +47,8 @@ pub enum SearchEmailsFilterQuery {
     Flag(Flag),
     /// Emails holding at least one attachment.
     Attachment,
+    /// Emails whose specified header contains the pattern.
+    Header(String, String),
 }
 
 /// Renders the filter in the query language, so an error can quote the
@@ -71,6 +73,9 @@ impl fmt::Display for SearchEmailsFilterQuery {
             Q::Body(pattern) => write!(f, "body {}", Pattern(pattern)),
             Q::Flag(flag) => write!(f, "flag {}", flag.raw()),
             Q::Attachment => write!(f, "attachment"),
+            Q::Header(name, pattern) => {
+                write!(f, "header {} {}", Pattern(name), Pattern(pattern))
+            }
         }
     }
 }
@@ -103,6 +108,8 @@ mod tests {
             "not subject \"weekly report\"",
             "(cc bob or attachment)",
             "(before 2026-01-01 and address \"say \\\"hi\\\"\")",
+            "header Message-ID \"<id@example.com>\"",
+            "header \"X-Custom-Header\" \"custom val\"",
         ];
 
         for query in queries {

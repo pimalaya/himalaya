@@ -69,6 +69,13 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Body(pattern) => value_q(filter, pattern),
         SearchEmailsFilterQuery::Flag(flag) => flag_q(filter, flag),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("has:attachment")),
+        SearchEmailsFilterQuery::Header(name, pattern) => {
+            if name.eq_ignore_ascii_case("message-id") {
+                Ok(format!("rfc822msgid:{}", value_q(pattern)))
+            } else {
+                Ok(format!("header:{}:{}", value_q(name), value_q(pattern)))
+            }
+        }
     }
 }
 
@@ -111,6 +118,13 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(filter, flag)?)),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("-has:attachment")),
+        SearchEmailsFilterQuery::Header(name, pattern) => {
+            if name.eq_ignore_ascii_case("message-id") {
+                Ok(format!("-rfc822msgid:{}", value_q(pattern)))
+            } else {
+                Ok(format!("-header:{}:{}", value_q(name), value_q(pattern)))
+            }
+        }
     }
 }
 
@@ -216,6 +230,18 @@ mod tests {
         assert_eq!(q("to bob@example.org"), "to:bob@example.org");
         assert_eq!(q("subject hello"), "subject:hello");
         assert_eq!(q("body world"), "world");
+    }
+
+    #[test]
+    fn header_conditions() {
+        assert_eq!(q("header Message-ID id123"), "rfc822msgid:id123");
+        assert_eq!(
+            q("header \"message-id\" \"<abc@xyz>\""),
+            "rfc822msgid:<abc@xyz>"
+        );
+        assert_eq!(q("header X-Custom value"), "header:X-Custom:value");
+        assert_eq!(q("not header Message-ID id123"), "-rfc822msgid:id123");
+        assert_eq!(q("not header X-Custom value"), "-header:X-Custom:value");
     }
 
     #[test]
