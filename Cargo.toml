@@ -35,11 +35,11 @@ strip = "symbols"
 panic = "abort"
 
 [build-dependencies]
-pimalaya-cli = { version = "0.3", default-features = false, features = ["build"] }
+pimalaya-cli = { version = "0.4", default-features = false, features = ["build"] }
 
 [dev-dependencies]
 io-oauth = { version = "0.5.2", default-features = false, features = ["client", "jwt-bearer", "rustls-ring"] }
-pimalaya-config = { version = "0.3", default-features = false, features = ["sample"] }
+pimalaya-config = { version = "0.4", default-features = false, features = ["sample"] }
 rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
 tempfile = { version = "3", default-features = false }
 toml = { version = "1.1", default-features = false, features = ["parse", "serde"] }
@@ -55,15 +55,15 @@ dirs = { version = "7", default-features = false }
 gethostname = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 idna_adapter = { version = "=1.0.0", default-features = false }
-io-gmail = { version = "0.5", default-features = false, optional = true }
+io-gmail = { version = "0.6", default-features = false, optional = true }
 io-imap = { version = "0.8", default-features = false, optional = true }
-io-jmap = { version = "0.6", default-features = false, optional = true }
+io-jmap = { version = "0.7", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
-io-msgraph = { version = "0.6", default-features = false, optional = true }
-io-pimdir = { version = "0.9", default-features = false, features = ["client"], optional = true }
+io-msgraph = { version = "0.7", default-features = false, optional = true }
+io-pimdir = { version = "0.10", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
 jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
@@ -71,8 +71,8 @@ log = { version = "0.4", default-features = false }
 mime-rs = { version = "0.1", default-features = false, features = ["base64", "encoding", "parser"], optional = true }
 mime_guess = { version = "2", default-features = false, features = ["rev-mappings"] }
 percent-encoding = { version = "2", default-features = false }
-pimalaya-cli = { version = "0.3", default-features = false, features = ["mcp", "repl", "terminal"] }
-pimalaya-config = { version = "0.3", default-features = false, features = ["toml", "secret"] }
+pimalaya-cli = { version = "0.4", default-features = false, features = ["mcp", "repl", "terminal"] }
+pimalaya-config = { version = "0.4", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 schemars = { version = "1", default-features = false, features = ["chrono04", "derive", "std"] }
 secrecy = { version = "0.10", default-features = false }
@@ -81,11 +81,3 @@ serde_json = { version = "1", default-features = false, features = ["std"] }
 sha2 = { version = "0.11", default-features = false, optional = true }
 simd-cpu = { version = "0.1", default-features = false, features = ["std"] }
 url = { version = "2.5", default-features = false }
-
-[patch.crates-io]
-io-http = { git = "https://github.com/pimalaya/io-http", rev = "e1815307771c1ec65a86b77256d46c33241d3038" }
-io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b323f9191ab8de2f640bc4a1d2" }
-io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "5c18a026b9c85b470984192452c2aa66e060a3fe" }
-pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "3a0d6380a00858d84986c2a84d14766c17f5cd74" }
-pimalaya-config = { git = "https://github.com/pimalaya/config", rev = "05109108da308f1d38c72606b3bb5bff8c4c7d83" }
