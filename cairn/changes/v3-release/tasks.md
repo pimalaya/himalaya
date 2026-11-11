@@ -20,6 +20,7 @@ change: v3-release
 
 - [x] MIGRATION.md: the v2 to v3 section (drafted 2026-11-02, final once the JSON review is done)
 - [x] MIGRATION.md: the v2 to v3 section gains the breaking changes landed since its draft (the wizard, the table presets and colours and `-w/--max-width` removed, `-c` one path per flag, `HIMALAYA_CONFIG` removed, ASCII hosts, the plain text output)
+- [ ] A new screenshot.jpeg showing the plain columns, the current one showing the v2 coloured table (postponed by the owner on 2026-11-11)
 - [ ] Bump the version to 3.0.0 (the schema `$id`s follow, `v3`)
 - [ ] Finalise the CHANGELOG `[Unreleased]` section into `[3.0.0]`, its breaking entries marked
 - [ ] Run the manual provider reports under cairn/spec/testing against the release build, on the Google, Microsoft and Fastmail test accounts only
