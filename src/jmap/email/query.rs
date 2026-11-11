@@ -16,14 +16,16 @@ use io_jmap::{
         },
     },
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    jmap::client::JmapClient,
-    shared::envelope::list::{ATTACHMENT_GLYPH, FLAGGED_GLYPH, UNSEEN_GLYPH},
-};
+use crate::jmap::client::JmapClient;
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -163,34 +165,44 @@ pub struct JmapEmailQueryOutput {
 
 impl fmt::Display for JmapEmailQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the subject is the one free-text column, so it reads last.
-        let mut columns = Columns::new(["ID", "FLAGS", "FROM", "DATE", "SUBJECT"]);
+        let mut records = Records::default();
 
         for e in &self.emails {
-            let mut flags = String::new();
-            let kw = e.keywords.as_ref();
-            if !kw.and_then(|k| k.get("$seen")).copied().unwrap_or(false) {
-                flags.push(UNSEEN_GLYPH);
+            let keyword = |name: &str| {
+                let keywords = e.keywords.as_ref();
+                keywords.and_then(|k| k.get(name)).copied().unwrap_or(false)
+            };
+
+            let mut state = Vec::new();
+            if !keyword("$seen") {
+                state.push(String::from("unread"));
             }
-            if kw.and_then(|k| k.get("$flagged")).copied().unwrap_or(false) {
-                flags.push(FLAGGED_GLYPH);
+            if keyword("$answered") {
+                state.push(String::from("answered"));
             }
-            if e.has_attachment.unwrap_or(false) {
-                flags.push(ATTACHMENT_GLYPH);
+            if keyword("$flagged") {
+                state.push(String::from("flagged"));
+            }
+            if e.has_attachment == Some(true) {
+                state.push(String::from("attachment"));
             }
 
             let from = format_addresses(e.from.as_deref().unwrap_or_default());
+            let date = e.received_at.as_deref().unwrap_or_default();
 
-            columns.push([
-                sanitize::text(e.id.as_deref().unwrap_or_default()).into_owned(),
-                flags,
-                sanitize::text(&from).into_owned(),
-                sanitize::text(e.received_at.as_deref().unwrap_or_default()).into_owned(),
-                sanitize::text(e.subject.as_deref().unwrap_or_default()).into_owned(),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("From", sanitize::text(&from));
+            fields.push("Date", sanitize::text(date));
+
+            records.push(Record {
+                title: sanitize::text(e.id.as_deref().unwrap_or_default()).into_owned(),
+                state,
+                fields,
+                body: sanitize::text(e.subject.as_deref().unwrap_or_default()).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }
 
@@ -243,16 +255,14 @@ impl From<SortArg> for JmapEmailSortProperty {
     }
 }
 
+/// Renders addresses as a comma-separated list of `Name <email>`, or the
+/// bare email when it has no name.
 fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
     addrs
         .iter()
-        .map(|a| {
-            if let Some(name) = &a.name
-                && !name.is_empty()
-            {
-                return name.clone();
-            }
-            a.email.clone()
+        .map(|a| match &a.name {
+            Some(name) if !name.is_empty() => format!("{name} <{}>", a.email),
+            _ => a.email.clone(),
         })
         .collect::<Vec<_>>()
         .join(", ")

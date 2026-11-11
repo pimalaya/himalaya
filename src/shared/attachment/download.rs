@@ -27,7 +27,7 @@ use crate::{
         base64,
         client::EmailClient,
         mailbox::arg::MailboxArg,
-        message::part::{self, PartRole},
+        message::part,
     },
 };
 
@@ -138,8 +138,6 @@ impl AttachmentDownloadCommand {
         }
 
         let attachments = AttachmentListOutput {
-            with_inline: written.iter().any(|a| a.role == PartRole::Inline),
-            with_path: true,
             attachments: written,
         };
 

@@ -406,7 +406,7 @@ pub enum SaveCopyConfig {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListConfig {
-    /// chrono `strftime` format of the DATE column, defaulting to
+    /// chrono `strftime` format of an envelope date, defaulting to
     /// `"%F %R%:z"`.
     pub datetime_fmt: Option<String>,
     /// Whether the `Date:` offset is converted to the local timezone

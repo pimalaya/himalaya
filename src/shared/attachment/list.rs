@@ -9,7 +9,12 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -58,13 +63,7 @@ impl AttachmentListCommand {
             .filter(|attachment| self.inline || attachment.role != PartRole::Inline)
             .collect();
 
-        let attachments = AttachmentListOutput {
-            with_inline: self.inline,
-            with_path: false,
-            attachments,
-        };
-
-        printer.out(attachments)
+        printer.out(AttachmentListOutput { attachments })
     }
 }
 
@@ -123,54 +122,42 @@ impl Attachment {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AttachmentListOutput {
-    /// Whether the INLINE column is drawn.
-    #[serde(skip)]
-    pub with_inline: bool,
-    /// Whether the PATH column is drawn.
-    #[serde(skip)]
-    pub with_path: bool,
     /// The attachments, in part order.
     pub attachments: Vec<Attachment>,
 }
 
 impl fmt::Display for AttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a file name is free text, so it reads last, but for the
-        // path a download wrote it to, which ends with it.
-        let mut header = vec!["ID", "TYPE", "SIZE"];
-        if self.with_inline {
-            header.push("INLINE");
-        }
-        header.push("FILENAME");
-        if self.with_path {
-            header.push("PATH");
-        }
-
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for attachment in &self.attachments {
             let text = |value: &Option<String>| {
                 sanitize::text(value.as_deref().unwrap_or_default()).into_owned()
             };
 
-            let mut row = vec![
-                sanitize::text(&attachment.id).into_owned(),
-                text(&attachment.mime),
-                format_size(attachment.size, BINARY),
-            ];
-            if self.with_inline {
-                let inline = attachment.role == PartRole::Inline;
-                row.push(String::from(if inline { "yes" } else { "no" }));
-            }
-            row.push(text(&attachment.filename));
-            if self.with_path {
-                row.push(text(&attachment.path));
+            let mut state = Vec::new();
+            if attachment.role == PartRole::Inline {
+                state.push(String::from("inline"));
             }
 
-            columns.push(row);
+            let mut fields = Fields::default();
+            fields.push("Filename", text(&attachment.filename));
+            fields.push("Type", text(&attachment.mime));
+            fields.push("Size", format_size(attachment.size, BINARY));
+
+            if attachment.path.is_some() {
+                fields.push("Path", text(&attachment.path));
+            }
+
+            records.push(Record {
+                title: sanitize::text(&attachment.id).into_owned(),
+                state,
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }
 
@@ -252,11 +239,50 @@ mod tests {
         );
     }
 
+    /// The list prints as records: the id with `inline` when the part is
+    /// one, the filename, type and size, and the path once downloaded.
+    #[test]
+    fn the_list_prints_as_records() {
+        let attachment = |id: &str, name: &str, mime: &str, role, path: Option<&str>| Attachment {
+            id: String::from(id),
+            filename: Some(String::from(name)),
+            mime: Some(String::from(mime)),
+            size: 1024,
+            role,
+            content_id: None,
+            path: path.map(String::from),
+        };
+        let attachments = AttachmentListOutput {
+            attachments: vec![
+                attachment("2", "logo.png", "image/png", PartRole::Inline, None),
+                attachment(
+                    "5",
+                    "report.pdf",
+                    "application/pdf",
+                    PartRole::Attachment,
+                    Some("/tmp/report.pdf"),
+                ),
+            ],
+        };
+
+        let expected = "\
+2 (inline)
+Filename:  logo.png
+Type:      image/png
+Size:      1 KiB
+
+5
+Filename:  report.pdf
+Type:      application/pdf
+Size:      1 KiB
+Path:      /tmp/report.pdf
+";
+        assert_eq!(attachments.to_string(), expected);
+    }
+
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
         let attachments = AttachmentListOutput {
-            with_inline: false,
-            with_path: true,
             attachments: vec![Attachment {
                 id: String::from("1"),
                 filename: Some(String::from("invoice\x1b]8;;https://example.org\x07.pdf")),

@@ -8,10 +8,15 @@ use std::fmt;
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::{
-    MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
+    MsgraphFlagStatus, MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
 use pimalaya_cli::{
-    clap::args::PageTokenArg, columns::Columns, output::Paginated, printer::Printer, sanitize,
+    clap::args::PageTokenArg,
+    fields::Fields,
+    output::Paginated,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -136,25 +141,39 @@ pub struct MsgraphMessageListOutput {
 
 impl fmt::Display for MsgraphMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the subject is the one free-text column, so it reads last.
-        let mut columns = Columns::new(["ID", "FLAGS", "FROM", "RECEIVED", "SUBJECT"]);
+        let mut records = Records::default();
 
         for msg in &self.messages {
-            let flags = if msg.is_read == Some(false) { "U" } else { "" };
+            let mut state = Vec::new();
+            if msg.is_read == Some(false) {
+                state.push(String::from("unread"));
+            }
+            if msg.flag.as_ref().and_then(|flag| flag.flag_status)
+                == Some(MsgraphFlagStatus::Flagged)
+            {
+                state.push(String::from("flagged"));
+            }
+            if msg.has_attachments == Some(true) {
+                state.push(String::from("attachment"));
+            }
+
             let from = msg.from.as_ref().map(recipient).unwrap_or_default();
             let received = msg.received_date_time.as_deref().unwrap_or_default();
             let subject = msg.subject.as_deref().unwrap_or_default();
 
-            columns.push([
-                sanitize::text(&msg.id).into_owned(),
-                String::from(flags),
-                sanitize::text(&from).into_owned(),
-                sanitize::text(received).into_owned(),
-                sanitize::text(subject).into_owned(),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("From", sanitize::text(&from));
+            fields.push("Received", sanitize::text(received));
+
+            records.push(Record {
+                title: sanitize::text(&msg.id).into_owned(),
+                state,
+                fields,
+                body: sanitize::text(subject).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }
 

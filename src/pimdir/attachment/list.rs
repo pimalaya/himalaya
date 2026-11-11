@@ -11,7 +11,12 @@ use chrono::{DateTime, Local};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use io_pimdir::client::reader::PimdirAccountAttachment;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -149,7 +154,7 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirAttachmentListOutput {
-    /// The chrono `strftime` format of the DATE column.
+    /// The chrono `strftime` format of a date.
     #[serde(skip)]
     pub datetime_fmt: String,
     /// Whether a date is converted to the local timezone first.
@@ -189,35 +194,42 @@ impl PimdirAttachmentListOutput {
 
 impl fmt::Display for PimdirAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the free-text columns, the sender then the file name, read
-        // last.
-        let header = [
-            "ID", "TYPE", "SIZE", "SECTION", "MESSAGE", "MAILBOX", "DATE", "FROM", "NAME",
-        ];
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for file in &self.attachments {
             let text = |value: Option<&str>| sanitize::text(value.unwrap_or_default()).into_owned();
             let size = file.size.map(|size| format_size(size, BINARY));
             let date = file.date.as_deref().map(|date| self.format_date(date));
-            let from = file.sender_name.as_deref().or(file.sender.as_deref());
+            let from = match (file.sender_name.as_deref(), file.sender.as_deref()) {
+                (Some(name), Some(email)) if !name.is_empty() => format!("{name} <{email}>"),
+                (name, email) => email.or(name).unwrap_or_default().to_owned(),
+            };
 
-            columns.push([
-                sanitize::text(&file.id).into_owned(),
-                text(file.media_type.as_deref()),
-                size.unwrap_or_default(),
-                text(file.section.as_deref()),
-                sanitize::text(&file.message_id).into_owned(),
-                sanitize::text(&file.mailbox).into_owned(),
-                date.unwrap_or_default(),
-                text(from),
-                text(file.name.as_deref()),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("Name", text(file.name.as_deref()));
+            fields.push("Type", text(file.media_type.as_deref()));
+            fields.push("Size", size.unwrap_or_default());
+            fields.push("Section", text(file.section.as_deref()));
+            fields.push("Message", sanitize::text(&file.message_id));
+            fields.push("Mailbox", sanitize::text(&file.mailbox));
+            fields.push("Date", date.unwrap_or_default());
+            fields.push("From", sanitize::text(&from));
+
+            records.push(Record {
+                title: sanitize::text(&file.id).into_owned(),
+                state: Vec::new(),
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")?;
+        write!(f, "{records}")?;
 
         if let Some(token) = &self.next_page {
+            if !records.items.is_empty() {
+                writeln!(f)?;
+            }
+
             writeln!(f, "Next page: {}", sanitize::text(token))?;
         }
 

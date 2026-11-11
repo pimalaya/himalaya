@@ -19,7 +19,7 @@ use crate::config::{AccountConfig, Config, PostingStyle, SaveCopyConfig};
 #[cfg(any(backend, feature = "smtp"))]
 use crate::email::mailbox::{Mailbox, MailboxRole};
 
-/// chrono `strftime` format of the envelope DATE column.
+/// chrono `strftime` format of an envelope date.
 #[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
 /// Page size of `envelope list` when nothing names one.
@@ -42,7 +42,7 @@ pub struct Account {
     pub signature_delim: Option<String>,
     /// Directory attachments are downloaded to.
     pub downloads_dir: Option<PathBuf>,
-    /// chrono `strftime` format of the envelope DATE column.
+    /// chrono `strftime` format of an envelope date.
     pub datetime_fmt: Option<String>,
     /// Whether an envelope date is converted to the local timezone.
     pub datetime_local_tz: Option<bool>,
@@ -175,7 +175,7 @@ impl Account {
             .unwrap_or_else(temp_dir)
     }
 
-    /// chrono `strftime` format of the DATE column, defaulting to
+    /// chrono `strftime` format of an envelope date, defaulting to
     /// `%F %R%:z`.
     pub fn datetime_fmt(&self) -> &str {
         self.datetime_fmt.as_deref().unwrap_or(DEFAULT_DATETIME_FMT)

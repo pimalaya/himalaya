@@ -45,7 +45,7 @@
   - [Native TLS](https://crates.io/crates/native-tls) (requires `native-tls` feature)
 - **SOCKS5**, **HTTP** proxy support, per account or via `$ALL_PROXY` and `$HTTPS_PROXY`
 - **TOML configuration** with multi-account support
-- **Plain text** output: lists as aligned columns, records as `Label: value` lines, no border, no colour
+- **Plain text** output: wide lists as records the way `git log` prints commits, short ones as aligned columns, records as `Label: value` lines, no border, no colour
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
 - **MCP server** via `himalaya mcp`, the shared API as tools, read-only by default
@@ -486,7 +486,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How to read the text output from a script?</summary>
 
-  A list prints a header of uppercase labels, then one item per line, its columns two spaces apart, an empty cell as `-`; the free-text column (a subject, a name) comes last. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.
+  A wide list (envelopes, attachments, search hits) prints each item as a record, the way `git log` prints a commit: its id and its state words in parentheses (`42 (unread, flagged)`), one `Label: value` line per property, then its subject indented by four spaces, a blank line between items. Any other list prints a header of uppercase labels, then one item per line, its columns two spaces apart, an empty cell as `-`; the free-text column (a name) comes last. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.
 </details>
 
 ## License

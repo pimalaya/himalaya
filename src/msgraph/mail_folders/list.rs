@@ -10,7 +10,12 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -71,24 +76,28 @@ impl MsgraphMailFolderListOutput {
 
 impl fmt::Display for MsgraphMailFolderListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut columns = Columns::new(["ID", "TOTAL", "UNREAD", "CHILDREN", "NAME"]);
+        let mut records = Records::default();
 
         for folder in &self.folders {
-            columns.push([
-                sanitize::text(&folder.id).into_owned(),
-                count(folder.total_item_count),
-                count(folder.unread_item_count),
-                count(folder.child_folder_count),
-                sanitize::text(&folder.display_name).into_owned(),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("Name", sanitize::text(&folder.display_name));
+            fields.push("Total", count(folder.total_item_count));
+            fields.push("Unread", count(folder.unread_item_count));
+            fields.push("Children", count(folder.child_folder_count));
+
+            records.push(Record {
+                title: sanitize::text(&folder.id).into_owned(),
+                state: Vec::new(),
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }
 
-/// Renders a count, or an empty cell when Graph gave none.
+/// Renders a count, or nothing when Graph gave none.
 fn count(value: Option<impl ToString>) -> String {
     value.map(|n| n.to_string()).unwrap_or_default()
 }

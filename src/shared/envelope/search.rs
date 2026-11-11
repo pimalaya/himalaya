@@ -47,7 +47,8 @@ pub struct EnvelopeSearchCommand {
     /// Render recipients instead of senders.
     #[arg(long, short)]
     pub recipient: bool,
-    /// Fill the ATT column.
+    /// Tell which envelopes carry an attachment, which on some backends
+    /// costs one extra lookup per envelope.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
     /// Query: date, after, before, from, to, cc, bcc, address, subject, body,
@@ -137,7 +138,6 @@ impl EnvelopeSearchCommand {
             datetime_local_tz: account.datetime_local_tz(),
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
-            with_attachment: self.has_attachment,
             envelopes,
         };
 

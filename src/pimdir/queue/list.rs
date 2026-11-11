@@ -7,7 +7,13 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    columns::Columns,
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,7 +21,7 @@ use crate::{
     account::context::Account,
     pimdir::{backend::PimdirQueuedEnvelope, client::PimdirClient},
     shared::{
-        envelope::list::{format_addresses, format_flags},
+        envelope::list::{format_addresses, format_state},
         mailbox::arg::MailboxArg,
     },
 };
@@ -145,26 +151,28 @@ impl fmt::Display for PimdirQueueListOutput {
 }
 
 impl PimdirQueueListOutput {
-    /// The list of queued creations and sends.
+    /// The records of queued creations and sends.
     fn fmt_queued(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the subject is the one free-text column, so it reads last.
-        let header = ["ROW", "ACTION", "FLAGS", "QUEUED", "TO", "SUBJECT"];
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for queued in &self.messages {
-            let to = format_addresses(&queued.envelope.to);
+            let envelope = &queued.envelope;
+            let to = format_addresses(&envelope.to);
 
-            columns.push([
-                queued.id.to_string(),
-                String::from(if queued.send { "send" } else { "save" }),
-                format_flags(&queued.envelope.flags),
-                sanitize::text(&queued.queued_at).into_owned(),
-                sanitize::text(&to).into_owned(),
-                sanitize::text(&queued.envelope.subject).into_owned(),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("Action", if queued.send { "send" } else { "save" });
+            fields.push("Queued", sanitize::text(&queued.queued_at));
+            fields.push("To", sanitize::text(&to));
+
+            records.push(Record {
+                title: queued.id.to_string(),
+                state: format_state(&envelope.flags, envelope.has_attachment),
+                fields,
+                body: sanitize::text(&envelope.subject).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")?;
+        writeln!(f, "{records}")?;
         writeln!(
             f,
             "Queued until the next sync. Cancel one with `himalaya pimdir queue cancel <ROW>`"

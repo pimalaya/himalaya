@@ -9,7 +9,12 @@ use chrono::{DateTime, FixedOffset, Local, NaiveDate};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use pimalaya_cli::{
-    clap::args::PageTokenArg, columns::Columns, output::Paginated, printer::Printer, sanitize,
+    clap::args::PageTokenArg,
+    fields::Fields,
+    output::Paginated,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -45,8 +50,8 @@ pub struct EnvelopeListCommand {
     /// mailbox wants.
     #[arg(long, short)]
     pub recipient: bool,
-    /// Fill the ATT column, which on some backends costs one extra
-    /// lookup per envelope.
+    /// Tell which envelopes carry an attachment, which on some backends
+    /// costs one extra lookup per envelope.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
 }
@@ -88,7 +93,6 @@ impl EnvelopeListCommand {
             datetime_local_tz: account.datetime_local_tz(),
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
-            with_attachment: self.has_attachment,
             envelopes,
         };
 
@@ -99,20 +103,11 @@ impl EnvelopeListCommand {
     }
 }
 
-/// FLAGS glyph of a message lacking `\Seen`.
-pub const UNSEEN_GLYPH: char = '*';
-/// FLAGS glyph of a message carrying `\Answered`.
-pub const REPLIED_GLYPH: char = 'R';
-/// FLAGS glyph of a message carrying `\Flagged`.
-pub const FLAGGED_GLYPH: char = '!';
-/// ATT glyph of a message carrying an attachment.
-pub const ATTACHMENT_GLYPH: char = '@';
-
 /// The `envelope list` output, the envelopes of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvelopeListOutput {
-    /// The chrono `strftime` format of the DATE column.
+    /// The chrono `strftime` format of a date.
     #[serde(skip)]
     pub datetime_fmt: String,
     /// Whether a date is converted to the local timezone first.
@@ -121,12 +116,9 @@ pub struct EnvelopeListOutput {
     /// Whether a recent date renders relative to today.
     #[serde(skip)]
     pub datetime_relative: bool,
-    /// Whether recipients are drawn instead of senders.
+    /// Whether recipients are printed instead of senders.
     #[serde(skip)]
     pub recipient: bool,
-    /// Whether the ATT column is drawn.
-    #[serde(skip)]
-    pub with_attachment: bool,
     /// The envelopes of this page.
     pub envelopes: Vec<Envelope>,
 }
@@ -134,75 +126,62 @@ pub struct EnvelopeListOutput {
 impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let today = Local::now().date_naive();
-
-        // NOTE: the subject is the one free-text column, so it reads last
-        // and a long one never pushes the others out of line.
-        let mut header = vec!["ID", "FLAGS"];
-        if self.with_attachment {
-            header.push("ATT");
-        }
-        header.push(if self.recipient { "TO" } else { "FROM" });
-        header.extend(["DATE", "SIZE", "SUBJECT"]);
-
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for env in &self.envelopes {
-            let addresses = if self.recipient { &env.to } else { &env.from };
+            let (label, addresses) = if self.recipient {
+                ("To", &env.to)
+            } else {
+                ("From", &env.from)
+            };
 
-            let mut row = vec![
-                sanitize::text(&env.id).into_owned(),
-                format_flags(&env.flags),
-            ];
-            if self.with_attachment {
-                row.push(format_attachment(env.has_attachment));
-            }
-            row.push(sanitize::text(&format_addresses(addresses)).into_owned());
-            row.push(self.format_date(env.date, today));
-            row.push(format_size(env.size, BINARY));
-            row.push(sanitize::text(&env.subject).into_owned());
+            let mut fields = Fields::default();
+            fields.push(label, sanitize::text(&format_addresses(addresses)));
+            fields.push("Date", self.format_date(env.date, today));
+            fields.push("Size", format_size(env.size, BINARY));
 
-            columns.push(row);
+            records.push(Record {
+                title: sanitize::text(&env.id).into_owned(),
+                state: format_state(&env.flags, env.has_attachment),
+                fields,
+                body: sanitize::text(&env.subject).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }
 
-/// Renders the FLAGS cell: the glyphs of unseen, replied and flagged, in
-/// that order, each only when it applies.
+/// Renders the state words of a message: `unread`, `answered`, `flagged`
+/// and `attachment`, in that order, each only when it applies.
 ///
-/// No flag renders an empty cell, which a list prints as `-`.
-pub fn format_flags(flags: &BTreeSet<Flag>) -> String {
-    let mut out = String::with_capacity(3);
+/// An unknown attachment says nothing.
+pub fn format_state(flags: &BTreeSet<Flag>, has_attachment: Option<bool>) -> Vec<String> {
+    let mut state = Vec::new();
+
     if !flags.iter().any(Flag::is_seen) {
-        out.push(UNSEEN_GLYPH);
+        state.push(String::from("unread"));
     }
     if flags.iter().any(Flag::is_answered) {
-        out.push(REPLIED_GLYPH);
+        state.push(String::from("answered"));
     }
     if flags.iter().any(Flag::is_flagged) {
-        out.push(FLAGGED_GLYPH);
+        state.push(String::from("flagged"));
     }
-    out
+    if has_attachment == Some(true) {
+        state.push(String::from("attachment"));
+    }
+
+    state
 }
 
-/// Renders the ATT cell: the glyph, nothing, or `?` when the backend
-/// could not tell.
-pub(super) fn format_attachment(has: Option<bool>) -> String {
-    match has {
-        Some(true) => ATTACHMENT_GLYPH.to_string(),
-        Some(false) => String::new(),
-        None => "?".to_string(),
-    }
-}
-
-/// Renders addresses as a comma-separated list of display names, falling
-/// back to the address itself.
+/// Renders addresses as a comma-separated list of `Name <email>`, or the
+/// bare email when it has no name.
 pub fn format_addresses(addrs: &[Address]) -> String {
     addrs
         .iter()
         .map(|a| match &a.name {
-            Some(name) if !name.is_empty() => name.clone(),
+            Some(name) if !name.is_empty() => format!("{name} <{}>", a.email),
             _ => a.email.clone(),
         })
         .collect::<Vec<_>>()
@@ -240,8 +219,6 @@ impl EnvelopeListOutput {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
     use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
 
     use crate::{
@@ -259,45 +236,73 @@ mod tests {
             datetime_local_tz: false,
             datetime_relative: relative,
             recipient: false,
-            with_attachment: false,
             envelopes: Vec::new(),
         }
     }
 
-    fn envelope(id: &str, flags: BTreeSet<Flag>, subject: &str, from: &str) -> Envelope {
+    fn envelope(id: &str, flags: &[IanaFlag], from: Address, subject: &str) -> Envelope {
         Envelope {
             id: String::from(id),
             message_id: None,
             in_reply_to: Vec::new(),
-            flags,
+            flags: flags.iter().copied().map(Flag::from_iana).collect(),
             subject: String::from(subject),
-            from: vec![Address {
-                name: Some(String::from(from)),
-                email: String::from("alice@example.org"),
-            }],
+            from: vec![from],
             to: Vec::new(),
-            date: None,
+            date: DateTime::parse_from_rfc3339("2026-11-11T10:00:00+01:00").ok(),
             size: 2048,
             has_attachment: None,
         }
     }
 
-    /// The list is plain text: a header, aligned columns, no border and
-    /// no colour, the subject last and a flagless message's FLAGS `-`.
+    fn address(name: Option<&str>, email: &str) -> Address {
+        Address {
+            name: name.map(String::from),
+            email: String::from(email),
+        }
+    }
+
+    /// The list prints as records: the id with its state words, the
+    /// sender, date and size, then the subject as the body.
     #[test]
-    fn the_list_is_aligned_plain_text() {
+    fn the_list_prints_as_records() {
         let mut envelopes = envelopes(false);
-        let unseen_flagged = BTreeSet::from([Flag::from_iana(IanaFlag::Flagged)]);
-        let seen = BTreeSet::from([Flag::from_iana(IanaFlag::Seen)]);
-        envelopes.envelopes = vec![
-            envelope("12", unseen_flagged, "Lunch on Friday?", "Alice"),
-            envelope("3", seen, "Re: the report", "Bob Martin"),
-        ];
+        envelopes.datetime_fmt = String::from("%F %R%:z");
+
+        let alice = address(Some("Alice"), "alice@example.org");
+        let mut unread = envelope("42", &[IanaFlag::Flagged], alice, "Lunch on Friday?");
+        unread.has_attachment = Some(true);
+
+        let bob = address(None, "bob@example.org");
+        let flags = [IanaFlag::Seen, IanaFlag::Answered];
+        let mut answered = envelope("41", &flags, bob, "Re: the report");
+        answered.has_attachment = Some(false);
+
+        let carol = address(Some("Carol"), "carol@example.org");
+        let mut seen = envelope("40", &[IanaFlag::Seen], carol, "");
+        seen.date = None;
+
+        envelopes.envelopes = vec![unread, answered, seen];
 
         let expected = "\
-ID  FLAGS  FROM        DATE  SIZE   SUBJECT
-12  *!     Alice       -     2 KiB  Lunch on Friday?
-3   -      Bob Martin  -     2 KiB  Re: the report
+42 (unread, flagged, attachment)
+From:  Alice <alice@example.org>
+Date:  2026-11-11 10:00+01:00
+Size:  2 KiB
+
+    Lunch on Friday?
+
+41 (answered)
+From:  bob@example.org
+Date:  2026-11-11 10:00+01:00
+Size:  2 KiB
+
+    Re: the report
+
+40
+From:  Carol <carol@example.org>
+Date:
+Size:  2 KiB
 ";
         assert_eq!(envelopes.to_string(), expected);
     }

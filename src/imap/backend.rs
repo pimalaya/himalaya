@@ -567,7 +567,7 @@ fn apply_status(mailbox: &mut Mailbox, items: Vec<StatusDataItem>) {
 }
 
 /// The `FETCH` item names a listing asks for, `BODYSTRUCTURE` included
-/// only when the attachment column is drawn.
+/// only when the caller asks whether each message has an attachment.
 fn build_item_names(with_attachment: bool) -> MacroOrMessageDataItemNames<'static> {
     let mut names = vec![
         MessageDataItemName::Uid,

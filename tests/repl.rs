@@ -149,9 +149,16 @@ fn a_line_json_flag_switches_that_line_alone() {
     assert_eq!(json["envelopes"][0]["id"], "m1", "{stdout}");
 
     // The text list follows, nothing added between the two answers.
-    assert!(lines.next().unwrap().starts_with("ID "), "{stdout}");
-    assert!(lines.next().unwrap().starts_with("m1 "), "{stdout}");
-    assert_eq!(lines.next(), None, "{stdout}");
+    let text: Vec<&str> = lines.collect();
+    let expected = [
+        "m1",
+        "From:  a@example.org",
+        "Date:",
+        "Size:  51 B",
+        "",
+        "    Hello there",
+    ];
+    assert_eq!(text, expected, "{stdout}");
 }
 
 #[test]

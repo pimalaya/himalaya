@@ -8,7 +8,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,28 +50,31 @@ pub struct MsgraphAttachmentListOutput {
 
 impl fmt::Display for MsgraphAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut columns = Columns::new(["ID", "TYPE", "SIZE", "INLINE", "NAME"]);
+        let mut records = Records::default();
 
         for attachment in &self.attachments {
             let name = attachment.name.as_deref().unwrap_or_default();
             let content_type = attachment.content_type.as_deref().unwrap_or_default();
             let size = attachment.size.map(|n| n.to_string()).unwrap_or_default();
-            let inline = if attachment.is_inline == Some(true) {
-                "yes"
-            } else {
-                ""
-            };
 
-            columns.push([
-                sanitize::text(&attachment.id).into_owned(),
-                sanitize::text(content_type).into_owned(),
-                size,
-                String::from(inline),
-                sanitize::text(name).into_owned(),
-            ]);
+            let mut state = Vec::new();
+            if attachment.is_inline == Some(true) {
+                state.push(String::from("inline"));
+            }
+
+            let mut fields = Fields::default();
+            fields.push("Name", sanitize::text(name));
+            fields.push("Type", sanitize::text(content_type));
+            fields.push("Size", size);
+
+            records.push(Record {
+                title: sanitize::text(&attachment.id).into_owned(),
+                state,
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }

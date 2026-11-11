@@ -47,7 +47,7 @@ The shared `Envelope` SHALL carry `message_id` and `in_reply_to`, the RFC 5322 ย
 
 Each backend SHALL source the field from the response its listing already makes, and SHALL leave it empty rather than issue a request of its own: IMAP from the `ENVELOPE` (RFC 3501 ยง7.4.2, 9th element), JMAP from the `inReplyTo` property of `Email/get`, Gmail from the metadata headers, Maildir, m2dir and mbox from the parsed message, and pimdir from the stored summary. Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
 
-The field SHALL NOT take a column in the `envelope list` text output, where a column of raw msg-ids would be noise; it rides the JSON output.
+The field SHALL NOT be printed by the `envelope list` text output, where raw msg-ids would be noise; it rides the JSON output.
 
 ### Requirement: An IMAP envelope reads its strings as a header
 The subject and display names of an IMAP `ENVELOPE`, as `envelope list`, `envelope search`, `imap fetch` and `imap thread` print them, SHALL be read as `message read` reads a header (commands: "Malformed mail reads as its sender meant"): raw 8-bit bytes as UTF-8 when they are valid UTF-8 and as Windows-1252 otherwise, line breaks dropped, adjacent RFC 2047 encoded words of one charset joined as bytes before their charset is decoded, and UTF-7 read as written.
@@ -209,7 +209,7 @@ A queued creation has no public id until the store's owner applies it, so the pi
 ### Requirement: The pimdir subcommand reads and retracts the queue
 Himalaya SHALL carry a `pimdir` subcommand for what the operator CLI cannot do without knowing mail. `queue list` SHALL render a queued creation as a message (flags, subject, recipient, and when it was queued, from the row's `created_at`) where the kind-agnostic `pimdir` binary can only print ids and hashes. The queued action carries no summary, so the row SHALL be derived from the body the action pins, through the same derivation the owner applies; an action pinning no body renders with its flags alone.
 
-Under `--json` the message SHALL be printed as an `envelope` with the shared envelope's keys and `"id": null`, a queued message having no id until the owner applies its action. No placeholder SHALL stand in for it (no `""`, `0` nor row id): the row id is the row's own `id`, shown under ROW.
+Under `--json` the message SHALL be printed as an `envelope` with the shared envelope's keys and `"id": null`, a queued message having no id until the owner applies its action. No placeholder SHALL stand in for it (no `""`, `0` nor row id): the row id is the row's own `id`, the title of its record.
 
 `queue cancel` SHALL retract one pending or parked row of the account's queue, confirming first unless `--yes`, and SHALL name the row's action kind in its prompt and output. A row anchored on a collection of another account, or one neither pending nor parked, SHALL be refused before anything is opened, and stays as it was.
 

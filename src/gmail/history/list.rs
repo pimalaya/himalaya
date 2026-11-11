@@ -11,7 +11,11 @@ use io_gmail::v1::rest::history::{
     list::{GmailHistoryList, GmailHistoryListParams},
 };
 use pimalaya_cli::{
-    columns::Columns, fields::Fields, output::Paginated, printer::Printer, sanitize,
+    fields::Fields,
+    output::Paginated,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -23,7 +27,7 @@ use crate::gmail::client::GmailClient;
 /// JSON includes `historyId`, `history`, and an optional `nextPage` cursor.
 /// Each record retains its message-id arrays and adds `messagesAddedDetails`
 /// with each arrival's `id`, nullable `threadId`, and `labelIds` supplied by
-/// Gmail. Missing labels become an empty array; text output shows counts.
+/// Gmail. Missing labels become an empty array; text output lists the ids.
 #[derive(Debug, Parser)]
 pub struct GmailHistoryListCommand {
     /// History id to start listing changes from.
@@ -106,10 +110,8 @@ impl From<HistoryTypeArg> for GmailHistoryType {
     }
 }
 
-/// The `gmail history list` output, one summary line per record.
-///
-/// JSON carries affected message ids and added-message details; text shows
-/// counts for incremental sync summaries.
+/// The `gmail history list` output: the new history id, then each record
+/// with the ids of the messages it added, deleted, labeled and unlabeled.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryListOutput {
@@ -124,22 +126,46 @@ impl fmt::Display for GmailHistoryListOutput {
         fields.push("New history id", sanitize::text(history_id));
         write!(f, "{fields}")?;
 
-        // NOTE: the counts of messages added and deleted, then of the
-        // messages labels were added to and removed from.
-        let header = ["ID", "ADDED", "DELETED", "LABELED", "UNLABELED"];
-        let mut columns = Columns::new(header);
+        let ids = |ids: &[String]| sanitize::text(&ids.join(", ")).into_owned();
+        let labels = |changes: &[GmailHistoryLabelOutput]| {
+            changes
+                .iter()
+                .map(|change| format!("{} ({})", change.message_id, change.label_ids.join(", ")))
+                .map(|line| sanitize::text(&line).into_owned())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        let mut records = Records::default();
 
         for record in &self.history {
-            columns.push([
-                sanitize::text(&record.id).into_owned(),
-                record.messages_added.len().to_string(),
-                record.messages_deleted.len().to_string(),
-                record.labels_added.len().to_string(),
-                record.labels_removed.len().to_string(),
-            ]);
+            let changes = [
+                ("Added", ids(&record.messages_added)),
+                ("Deleted", ids(&record.messages_deleted)),
+                ("Labeled", labels(&record.labels_added)),
+                ("Unlabeled", labels(&record.labels_removed)),
+            ];
+
+            let mut fields = Fields::default();
+            for (label, value) in changes {
+                if !value.is_empty() {
+                    fields.push(label, value);
+                }
+            }
+
+            records.push(Record {
+                title: sanitize::text(&record.id).into_owned(),
+                state: Vec::new(),
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")
+        if !records.items.is_empty() {
+            writeln!(f)?;
+        }
+
+        write!(f, "{records}")
     }
 }
 

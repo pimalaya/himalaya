@@ -8,7 +8,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::list::{GmailFiltersList, GmailFiltersListResponse};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -52,23 +57,33 @@ pub struct GmailSettingsFilterListOutput {
 
 impl fmt::Display for GmailSettingsFilterListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["ID", "CRITERIA", "ACTION"]);
+        let mut records = Records::default();
 
         for filter in &self.response.filter {
-            let criteria = filter
-                .criteria
-                .as_ref()
-                .map(criteria_summary)
-                .unwrap_or_default();
-            let action = filter
-                .action
-                .as_ref()
-                .map(action_summary)
-                .unwrap_or_default();
+            let mut fields = Fields::default();
 
-            columns.push([sanitize::text(&filter.id).into_owned(), criteria, action]);
+            if let Some(criteria) = &filter.criteria {
+                let summary = criteria_summary(criteria);
+                if !summary.is_empty() {
+                    fields.push("Criteria", summary);
+                }
+            }
+
+            if let Some(action) = &filter.action {
+                let summary = action_summary(action);
+                if !summary.is_empty() {
+                    fields.push("Action", summary);
+                }
+            }
+
+            records.push(Record {
+                title: sanitize::text(&filter.id).into_owned(),
+                state: Vec::new(),
+                fields,
+                body: String::new(),
+            });
         }
 
-        write!(f, "{columns}")
+        write!(f, "{records}")
     }
 }

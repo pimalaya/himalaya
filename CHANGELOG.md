@@ -103,13 +103,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `pimdir flag` and `pimdir tag` to refuse a flag the store cannot hold (empty, or holding whitespace, a control or a non-ASCII character) with the code `flag-invalid`.
 - Changed `pimdir search`, `count` and `tag` to refuse a query past the SEARCH §8.3 bounds (1,024 characters, 32 groups open at once, 128 terms) with `query-refused`, naming `limit-exceeded` and the span.
 - Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
-- **BREAKING**: Changed the lists to print as plain text: an uppercase header, then one item per line in columns two spaces apart, an empty cell as `-`, with no border, no colour, no truncation and no blank line before them.
+- **BREAKING**: Changed the lists to print as plain text, with no border, no colour, no truncation and no blank line before them: a wide list as records, the others as columns.
 
-  The free-text column reads last (`envelope list` ends with SUBJECT, `mailbox list` with NAME), a FLAGS cell holds only the glyphs that apply, and a multi-valued cell joins its values with `,`. The `--json` output is unchanged.
+  A list whose items carry more than one value of unbounded length prints each item the way `git log` prints a commit: its id followed by its state words in parentheses, its properties as aligned `Label: value` lines, then its subject or other free text indented by four spaces, one blank line between items. An envelope reads `42 (unread, answered, flagged, attachment)` (each word only when it applies), then `From:` (`To:` with `--recipient`), `Date:` and `Size:`, then its subject; addresses print whole, `Name <email>`. These are `envelope list|search`, `attachment list|download` (`inline` as a state word, the download path as `Path:`), `jmap email query|get`, `msgraph messages list`, `msgraph attachments list`, `msgraph mail-folders list|get|child-folders`, `pimdir search` (and `--threads`), `pimdir thread`, `pimdir tag` (its status as the state word), the queued messages of `pimdir queue list`, `pimdir attachment list|search`, `gmail settings filters list` and `gmail history list`, which lists the ids of the messages each record touched.
+
+  Every other list prints as columns: an uppercase header, then one item per line in columns two spaces apart, an empty cell as `-`, the free-text column last (`mailbox list` ends with NAME) and a multi-valued cell joining its values with `,`. The `--json` output is unchanged.
 
 - **BREAKING**: Changed the records to print as aligned `Label: value` lines: `account check`, `imap select`, `imap status`, `imap id`, `imap fetch`, `vacation get|set`, `jmap vacation get`, `sieve capability`, the Gmail and Microsoft Graph `get`s and the header block of `message read` and `message parse`.
 
-  `jmap thread get` lists one email per line, `gmail history list` its records as columns, and `imap search` and `imap sort` no longer end with a count.
+  `jmap thread get` lists one email per line, and `imap search` and `imap sort` no longer end with a count.
 
 - Changed `--help` to print without colour and each paragraph on one line, no longer wrapped to the terminal width.
 - **BREAKING**: Changed every `http` or `https` URL Himalaya parses, a JMAP `server` and an HTTP proxy `url`, to take an ASCII host only, an internationalised one written in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers never went through IDNA, a non-ASCII host there never resolving.
@@ -128,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Removed the `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` options.
 
-  FLAGS shows `*`, `R` and `!`, ATT `@`, and the `envelope.list.table` block is ignored whatever it holds, so a v2 configuration or one shared with himalaya-tui keeps loading.
+  The envelope lists name the state in words (`unread`, `answered`, `flagged`, `attachment`), and the `envelope.list.table` block is ignored whatever it holds, so a v2 configuration or one shared with himalaya-tui keeps loading.
 
 - **BREAKING**: Removed the `HIMALAYA_CONFIG` environment variable, with the `:`-delimited list it took: write `-c "$HIMALAYA_CONFIG"` for one path, one `-c` per path for several.
 

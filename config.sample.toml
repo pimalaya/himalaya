@@ -18,7 +18,7 @@ message.forward.posting-style = "top"		# write a forward above the forwarded mes
 #message.forward.posting-style = "none"		# quote nothing
 
 envelope.list.page-size = 25			# envelopes per page, absent -s
-envelope.list.datetime-fmt = "%F %R%:z"		# the chrono strftime format of the DATE column
+envelope.list.datetime-fmt = "%F %R%:z"		# the chrono strftime format of an envelope date
 #envelope.list.datetime-fmt = "%d/%m/%Y %H:%M"	# or any other
 envelope.list.datetime-local-tz = false		# show a date at the offset it was sent with
 #envelope.list.datetime-local-tz = true		# show it in the local timezone

@@ -8,7 +8,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -145,8 +150,8 @@ pub struct PimdirSearchOutput {
 
 impl fmt::Display for PimdirSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.style.hits(&self.hits))?;
-        write!(f, "{}", self.coverage)
+        let hits = self.style.hits(&self.hits);
+        self.coverage.write_under(f, &hits)
     }
 }
 
@@ -164,10 +169,7 @@ pub struct PimdirSearchThreadsOutput {
 
 impl fmt::Display for PimdirSearchThreadsOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the free-text columns read last, the hit ids joining
-        // without a blank.
-        let header = ["THREAD", "MESSAGES", "LAST", "HITS", "FROM", "SUBJECT"];
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for thread in &self.threads {
             let first = thread.hits.first();
@@ -188,17 +190,86 @@ impl fmt::Display for PimdirSearchThreadsOutput {
                 .map(|hit| hit.envelope.id.as_str())
                 .collect();
 
-            columns.push([
-                sanitize::text(thread.thread.as_deref().unwrap_or_default()).into_owned(),
-                thread.count.to_string(),
-                sanitize::text(last).into_owned(),
-                sanitize::text(&ids.join(",")).into_owned(),
-                sanitize::text(&from).into_owned(),
-                sanitize::text(subject).into_owned(),
-            ]);
+            let mut fields = Fields::default();
+            fields.push("Messages", thread.count);
+            fields.push("Last", sanitize::text(last));
+            fields.push("Hits", sanitize::text(&ids.join(", ")));
+            fields.push("From", sanitize::text(&from));
+
+            let title = thread.thread.as_deref().unwrap_or("-");
+
+            records.push(Record {
+                title: sanitize::text(title).into_owned(),
+                state: Vec::new(),
+                fields,
+                body: sanitize::text(subject).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")?;
-        write!(f, "{}", self.coverage)
+        self.coverage.write_under(f, &records)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        email::{address::Address, envelope::Envelope},
+        pimdir::{
+            index::{PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched},
+            search::PimdirSearchOutput,
+        },
+    };
+
+    /// A hit prints as a record, its subject then its snippet as the body,
+    /// and what the answer could not see a blank line under the records.
+    #[test]
+    fn hits_print_as_records_above_the_coverage() {
+        let envelope = Envelope {
+            id: String::from("7"),
+            message_id: None,
+            in_reply_to: Vec::new(),
+            flags: Default::default(),
+            subject: String::from("Quarterly report"),
+            from: vec![Address {
+                name: Some(String::from("Alice")),
+                email: String::from("alice@example.org"),
+            }],
+            to: Vec::new(),
+            date: None,
+            size: 0,
+            has_attachment: Some(true),
+        };
+        let output = PimdirSearchOutput {
+            style: PimdirListStyle {
+                datetime_fmt: String::from("%F"),
+                datetime_local_tz: false,
+            },
+            hits: vec![PimdirMailHit {
+                envelope,
+                mailboxes: vec![String::from("imap/INBOX"), String::from("imap/Archive")],
+                matched: Some(PimdirMailMatched::Body),
+                snippet: Some(String::from("the  figures\nare in")),
+            }],
+            more: false,
+            coverage: PimdirMailCoverage {
+                bodiless: 1,
+                ..Default::default()
+            },
+        };
+
+        let expected = "\
+7 (unread, attachment)
+From:     Alice <alice@example.org>
+Date:
+Mailbox:  imap/INBOX, imap/Archive
+Matched:  body
+
+    Quarterly report
+
+    the figures are in
+
+Incomplete: 1 message(s) have no local body and matched on their headers alone
+";
+        assert_eq!(output.to_string(), expected);
     }
 }

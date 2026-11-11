@@ -33,7 +33,12 @@ use io_pimdir::{
 };
 use jiff::tz::TimeZone;
 use log::warn;
-use pimalaya_cli::{columns::Columns, error::CodedError, sanitize};
+use pimalaya_cli::{
+    error::CodedError,
+    fields::Fields,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -46,7 +51,7 @@ use crate::{
         client::PimdirClient,
         mailbox::list::span,
     },
-    shared::envelope::list::format_addresses,
+    shared::envelope::list::{format_addresses, format_state},
 };
 
 impl PimdirClient {
@@ -602,6 +607,21 @@ impl fmt::Display for PimdirMailCoverage {
     }
 }
 
+impl PimdirMailCoverage {
+    /// Writes `records`, then this line a blank line under them.
+    pub fn write_under(&self, f: &mut fmt::Formatter<'_>, records: &Records) -> fmt::Result {
+        let line = self.to_string();
+
+        write!(f, "{records}")?;
+
+        if !records.items.is_empty() && !line.is_empty() {
+            writeln!(f)?;
+        }
+
+        f.write_str(&line)
+    }
+}
+
 /// How the plain output writes its lists, from the account's settings.
 #[derive(Clone, Debug)]
 pub struct PimdirListStyle {
@@ -620,36 +640,44 @@ impl PimdirListStyle {
         }
     }
 
-    /// The hits as a list: the id a follow-up command takes, the
-    /// mailboxes, date, what matched, sender, subject and the snippet.
-    ///
-    /// The free-text columns read last, the mailboxes joining without a
-    /// blank.
-    pub fn hits(&self, hits: &[PimdirMailHit]) -> Columns<'static> {
-        let header = [
-            "ID", "MAILBOX", "DATE", "MATCHED", "FROM", "SUBJECT", "SNIPPET",
-        ];
-        let mut columns = Columns::new(header);
+    /// The hits as records: the id a follow-up command takes and its
+    /// state, the sender, date, mailboxes and what matched, then the
+    /// subject and the snippet.
+    pub fn hits(&self, hits: &[PimdirMailHit]) -> Records<'static> {
+        let mut records = Records::default();
 
         for hit in hits {
-            let matched = match hit.matched {
-                Some(PimdirMailMatched::Body) => "body",
-                Some(PimdirMailMatched::Summary) => "headers",
-                None => "",
-            };
+            let mut fields = Fields::default();
+            let from = format_addresses(&hit.envelope.from);
+            fields.push("From", sanitize::text(&from));
+            fields.push("Date", self.date(hit.envelope.date));
+            fields.push("Mailbox", sanitize::text(&hit.mailboxes.join(", ")));
 
-            columns.push([
-                sanitize::text(&hit.envelope.id).into_owned(),
-                sanitize::text(&hit.mailboxes.join(",")).into_owned(),
-                self.date(hit.envelope.date),
-                String::from(matched),
-                sanitize::text(&format_addresses(&hit.envelope.from)).into_owned(),
-                sanitize::text(&hit.envelope.subject).into_owned(),
-                sanitize::text(&one_line(hit.snippet.as_deref())).into_owned(),
-            ]);
+            match hit.matched {
+                Some(PimdirMailMatched::Body) => fields.push("Matched", "body"),
+                Some(PimdirMailMatched::Summary) => fields.push("Matched", "headers"),
+                None => (),
+            }
+
+            let snippet = one_line(hit.snippet.as_deref());
+            let body = [
+                sanitize::text(&hit.envelope.subject),
+                sanitize::text(&snippet),
+            ]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+            records.push(Record {
+                title: sanitize::text(&hit.envelope.id).into_owned(),
+                state: format_state(&hit.envelope.flags, hit.envelope.has_attachment),
+                fields,
+                body,
+            });
         }
 
-        columns
+        records
     }
 
     /// A date in the account's format, nothing without one.

@@ -7,7 +7,12 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{
+    fields::Fields,
+    printer::Printer,
+    records::{Record, Records},
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -96,25 +101,25 @@ pub struct PimdirTagOutput {
 
 impl fmt::Display for PimdirTagOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the subject is the one free-text column, so it reads last,
-        // and the flags join without a blank.
-        let header = ["ID", "MAILBOX", "FLAGS", "STATUS", "ROW", "SUBJECT"];
-        let mut columns = Columns::new(header);
+        let mut records = Records::default();
 
         for tagged in &self.tagged {
-            let row = tagged.queue_id.map(|id| id.to_string());
+            let mut fields = Fields::default();
+            fields.push("Mailbox", sanitize::text(&tagged.mailbox));
+            fields.push("Flags", sanitize::text(&tagged.flags.join(", ")));
 
-            columns.push([
-                sanitize::text(&tagged.id).into_owned(),
-                sanitize::text(&tagged.mailbox).into_owned(),
-                sanitize::text(&tagged.flags.join(",")).into_owned(),
-                tagged.status.to_string(),
-                row.unwrap_or_default(),
-                sanitize::text(&tagged.subject).into_owned(),
-            ]);
+            if let Some(row) = tagged.queue_id {
+                fields.push("Row", row);
+            }
+
+            records.push(Record {
+                title: sanitize::text(&tagged.id).into_owned(),
+                state: vec![tagged.status.to_string()],
+                fields,
+                body: sanitize::text(&tagged.subject).into_owned(),
+            });
         }
 
-        write!(f, "{columns}")?;
-        write!(f, "{}", self.coverage)
+        self.coverage.write_under(f, &records)
     }
 }
