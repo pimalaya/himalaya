@@ -16,6 +16,12 @@
 - [Features](#features)
 - [Installation](#installation)
 - [Configuration](#configuration)
+  - [Proton Mail](#proton-mail)
+  - [Fastmail](#fastmail)
+  - [Gmail](#gmail)
+  - [Outlook](#outlook)
+  - [Posteo](#posteo)
+  - [iCloud Mail](#icloud-mail)
 - [Usage](#usage)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
@@ -57,13 +63,13 @@ Himalaya can be installed with the installer:
 
 *As root:*
 
-```
+```sh
 curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
 ```
 
 *As a regular user:*
 
-```
+```sh
 curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
@@ -76,13 +82,13 @@ For a more up-to-date version than the latest release, check out the [releases](
 
 ### Cargo
 
-```
+```sh
 cargo install --locked --git https://github.com/pimalaya/himalaya.git
 ```
 
 With only IMAP+SMTP support:
 
-```
+```sh
 cargo install --locked --git https://github.com/pimalaya/himalaya.git \
   --no-default-features \
   --features imap,smtp,rustls-ring
@@ -92,13 +98,13 @@ cargo install --locked --git https://github.com/pimalaya/himalaya.git \
 
 From the community repository:
 
-```
+```sh
 pacman -S himalaya
 ```
 
 Or the [user repository](https://aur.archlinux.org/):
 
-```
+```sh
 git clone https://aur.archlinux.org/himalaya-git.git
 cd himalaya-git
 makepkg -isc
@@ -106,13 +112,13 @@ makepkg -isc
 
 Or with [yay](https://github.com/Jguer/yay):
 
-```
+```sh
 yay -S himalaya-git
 ```
 
 ### Homebrew
 
-```
+```sh
 brew install himalaya
 ```
 
@@ -121,7 +127,7 @@ brew install himalaya
 
 ### Scoop
 
-```
+```sh
 scoop install himalaya
 ```
 
@@ -129,7 +135,7 @@ scoop install himalaya
 
 From the [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
 
-```
+```sh
 dnf copr enable atim/himalaya
 dnf install himalaya
 ```
@@ -138,13 +144,13 @@ dnf install himalaya
 
 If you have the [Flakes](https://nixos.wiki/wiki/Flakes) feature enabled:
 
-```
+```sh
 nix profile install github:pimalaya/himalaya
 ```
 
 Or run without installing:
 
-```
+```sh
 nix run github:pimalaya/himalaya
 ```
 
@@ -152,33 +158,35 @@ nix run github:pimalaya/himalaya
 
 Requires [Rust](https://www.rust-lang.org/tools/install) 1.89 or later:
 
-```
+```sh
 git clone https://github.com/pimalaya/himalaya
 cd himalaya
 cargo build --release --locked
 ```
 
-The binary lands at `target/release/himalaya`.
+The binary lands at target/release/himalaya.
 
 ## Configuration
 
-Himalaya reads a TOML configuration you write, and never writes one. [config.sample.toml](./config.sample.toml) holds one account: the options every account shares with their values, then one commented section per backend or provider, yours to uncomment: IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox and pimdir. The OAuth 2.0 sections read their token from [Ortie](https://github.com/pimalaya/ortie), whose sample has the matching sections. Releases and packages ship it as share/doc/himalaya/config.sample.toml. Run without a configuration at a terminal, Himalaya welcomes you with the commands copying the sample in place, or downloading it, and the first command to run; under `--json` or in a script, it fails naming the path it looked at.
+Himalaya reads a TOML configuration you write, and never writes one. [config.sample.toml](./config.sample.toml) holds one account: the options every account shares with their values, then one commented section per backend or provider, yours to uncomment: IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox and pimdir. The OAuth 2.0 sections read their token from [Ortie](https://github.com/pimalaya/ortie), whose sample has the matching sections. Releases and packages ship it as share/doc/himalaya/config.sample.toml.
+
+Run without a configuration at a terminal, Himalaya welcomes you with the commands copying the shipped sample in place, or downloading it when none ships, then the first command to run. Under `--json` or in a script, it fails naming the path it looked at and the sample.
 
 The `imap`, `smtp` and `sieve` blocks take one SASL mechanism, or none to skip authentication: `plain`, `login` and `scram-sha-256` with a `username` and a `password`, `oauthbearer` and `xoauth2` with a `username` and a `token`, `anonymous` with an optional `message`. `jmap.auth` takes `basic` (`username` and `password`), `bearer` (`token`) or `header`, a whole `Authorization` value. A secret is given as `raw` or as `command`, a shell string or an argument list printing it.
 
 `display-name`, `signature`, `signature-delim`, `downloads-dir` and the `message`, `envelope` and `mailbox` options may also sit at the top level, before any table, as the fallback of every account not setting them: drop the sample's default lines from an account for the top level to apply.
 
-A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
+A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so $HOME/.himalayarc overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
-- `$XDG_CONFIG_HOME/himalaya/config.toml`
-- `$HOME/.config/himalaya/config.toml`
-- `$HOME/.himalayarc`
+- $XDG_CONFIG_HOME/himalaya/config.toml
+- $HOME/.config/himalaya/config.toml
+- $HOME/.himalayarc
 
 At most one account may be marked `default = true` across them: an rc file moving the default sets `default = false` on the account the other file marks.
 
 These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors.
 
-Override those paths with `-c <PATH>`. Repeat it to merge several files, such as `-c public.toml -c private.toml`: the first one is the base and the next ones are deep-merged on top. Each `-c` takes one path, never split, and no environment variable is read: write `-c "$HIMALAYA_CONFIG"` where `HIMALAYA_CONFIG` used to be enough.
+Override those paths with `-c <PATH>`. Repeat it to merge several files, such as `-c public.toml -c private.toml`: the first one is the base and the next ones are deep-merged on top. Each `-c` takes one path, never split, and no environment variable is read.
 
 To add an account, add an `[accounts.<name>]` table to your config file. `himalaya account list` and `himalaya account check` inspect and validate the accounts declared.
 
@@ -446,7 +454,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How is OAuth 2.0 handled?</summary>
 
-  v2 ships no OAuth flow. Use [ortie](https://github.com/pimalaya/ortie), or any other token broker, to obtain an access token, then plug it in as a `command` printing that token on stdout.
+  Himalaya runs no OAuth flow of its own. Use [ortie](https://github.com/pimalaya/ortie), or any other token broker, to obtain an access token, then plug it in as a `command` printing that token on stdout.
 
   For JMAP, point `jmap.auth.bearer.token.command` at the broker. For IMAP and SMTP, route the bearer through a SASL mechanism taking a command-sourced password.
 </details>
@@ -456,7 +464,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
   Use `--log-level <level>` (alias `--log`) where `<level>` is one of `off`, `error`, `warn`, `info`, `debug`, `trace`:
 
-  ```
+  ```sh
   himalaya --log trace mailbox list
   ```
 
@@ -464,13 +472,13 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
   Logs are written to `stderr`, so they can be redirected easily to a file:
 
-  ```
+  ```sh
   himalaya --log trace mailbox list 2>/tmp/himalaya.log
   ```
 
   You can also send logs straight to a file via `--log-file <path>`:
 
-  ```
+  ```sh
   himalaya --log trace --log-file /tmp/himalaya.log mailbox list
   ```
 </details>

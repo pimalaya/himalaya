@@ -22,7 +22,7 @@ use crate::{
 pub struct GmailSettingsVacationGetCommand;
 
 impl GmailSettingsVacationGetCommand {
-    /// Fetches the vacation responder and tables it.
+    /// Fetches the vacation responder and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailVacationGet::new(&client.auth, &client.user_id)?;

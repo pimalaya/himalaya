@@ -23,7 +23,7 @@ pub struct GmailSettingsDelegateGetCommand {
 }
 
 impl GmailSettingsDelegateGetCommand {
-    /// Fetches the delegate and tables it.
+    /// Fetches the delegate and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailDelegateGet::new(&client.auth, &client.user_id, &self.email)?;

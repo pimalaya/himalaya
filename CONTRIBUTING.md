@@ -19,7 +19,7 @@ Himalaya is the CLI front-end of the Pimalaya email stack, a thin shell driving 
 - local storage semantics belong in [io-maildir](https://github.com/pimalaya/io-maildir), [io-m2dir](https://github.com/pimalaya/io-m2dir) and [io-mbox](https://github.com/pimalaya/io-mbox);
 - the commands, rendering, composition and the shared cross-protocol surface live here.
 
-The clap, printer, plain text layout (columns and fields) and prompt primitives come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/main.rs header maps each backend to its crate.
+The clap, printer, plain text layout (columns and fields), prompt, first-run welcome, REPL loop and MCP protocol come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader, account resolution and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/main.rs header maps each backend to its crate.
 
 ## Feature matrix
 

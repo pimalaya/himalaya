@@ -4,7 +4,8 @@
 
 | Version | Supported      |
 | ------- | -------------- |
-| 2.x.x   | :green_circle: |
+| 3.x.x   | :green_circle: |
+| 2.x.x   | :red_circle:   |
 | 1.x.x   | :red_circle:   |
 | 0.x.x   | :red_circle:   |
 

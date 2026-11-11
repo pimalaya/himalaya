@@ -2,7 +2,26 @@
 
 ## From v2 to v3
 
-v3 changes no configuration key: a v2 configuration loads as it is. What changes is what a script or a frontend reads off `--json`, and a few commands that used to report a success they did not achieve. The CHANGELOG lists every change; these are the ones to act on.
+v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `envelope.list.table` or `mailbox`, or marks several accounts default.
+
+What a script or a frontend reads off `--json` and the text output changes, and a few commands that used to report a success they did not achieve now fail. The CHANGELOG lists every change; these are the ones to act on.
+
+### Configuration and first run
+
+- **The wizard is gone.** Bare `himalaya` prints the help, `himalaya configure` (alias `wizard`) and its `himalaya-configure` schema no longer exist, and no command offers to create a configuration. Write it from config.sample.toml, which releases and packages ship as share/doc/himalaya/config.sample.toml: run at a terminal without a configuration, Himalaya prints the commands copying it in place. Drop the `wizard` cargo feature from a build's `--features`.
+- **`-c` takes one path per flag.** A value is no longer split on `:`, so a Windows path stays whole. Repeat the flag to merge several files: `-c public.toml -c private.toml`.
+- **`HIMALAYA_CONFIG` is no longer read.** Pass `-c "$HIMALAYA_CONFIG"` for one path, and one `-c` per path for what was a `:`-separated list.
+- **Every default path is read, as layers.** $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml and $HOME/.himalayarc are each deep-merged on top of the ones before, where v2 read the first one found. An rc file left beside a config.toml now overrides it: delete the one you do not use.
+- **Several `default = true` accounts are refused**, naming them, where v2 picked one at random. Keep it on one account across the merged files: an rc file moving the default sets `default = false` on the account the other file marks.
+- **Colour and table keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, and `table.preset` and `table.arrangement`. Under `envelope.list.table` and `mailbox` they fail the configuration as unknown keys; elsewhere they are ignored. The `envelope.list.table.*-char` glyphs stay.
+- **`http` and `https` hosts are ASCII.** A JMAP `server` or an HTTP proxy `url` with an internationalised host is refused: write the host in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers are unchanged.
+
+### Text output
+
+- **Lists are plain columns**: an uppercase header, then one item per line, columns two spaces apart, an empty cell as `-`, no border, no colour, no truncation. The free-text column comes last (`envelope list` ends with SUBJECT, `mailbox list` with NAME), a FLAGS cell holds only the glyphs that apply, and a multi-valued cell joins its values with `,`. A script cutting the v2 tables reads these columns instead, or better `--json`, which is unchanged.
+- **Records are `Label: value` lines**: `account check`, `imap select`, `imap status`, `imap id`, `imap fetch`, `vacation get|set`, `jmap vacation get`, `sieve capability`, the Gmail and Microsoft Graph `get`s, and the header block of `message read` and `message parse`. `imap search` and `imap sort` no longer end with a count.
+- **`-w/--max-width` is gone** from `envelope list`, `envelope search`, `mailbox list` and the pimdir lists, nothing being truncated any more: a command passing it now fails, so drop it.
+- **`--help` prints without colour**, each paragraph on one line for the terminal to fold.
 
 ### JSON output
 
@@ -15,14 +34,14 @@ v3 changes no configuration key: a v2 configuration loads as it is. What changes
 - **Absent values are `null`**, every key printed.
 - **Shapes made one:** flags written print `{raw, iana}` like envelopes, `inReplyTo` is a list in the read view, `imap fetch` addresses are `{name, email}`, `imap search` ids are numbers, an attachment row carries `role` instead of `inline`, maildir and mbox `flag list` rows are `{raw, iana}`.
 - **Listings say whether more follow.** `envelope list` and `search` print `nextPage`, `null` on the last page, which `--page-token` takes back; `msgraph messages list` does the same with Graph's `$skip`.
-- **`account check` prints every backend and exits 2** when one fails, each row carrying the failure's `code`, rather than one joined error exiting 1.
+- **`account check` prints every backend and exits 2** when one fails, each row carrying the failure's `code`, where v2 exited 0 whatever failed.
 - **A protocol command prints its completion.** Every `imap` command prints `status` (`OK`, or `NO`/`BAD` with `text`, exiting 2). `imap raw` and `sieve raw` print the server's untagged or data responses as events, one JSON line each, then the completion; `smtp raw` prints `{code, text}`. Exit 2 means the server refused; exit 1 still means no answer.
 - **pimdir names a queue row `row`** (`queueId`, `copyQueueId` and the queue view's `id` before); `pimdir flag add|set|remove` print `{messages: [{id, row}]}`; tag statuses are kebab-case (`unknown-flags`, `ambiguous-source`).
 - **Gmail lists use the provider's key**: `messages list` prints `messages` (not `ids`), the settings lists `delegates`, `filter` and `forwardingAddresses` (not `response`); settings writes print the settings.
 
 ### Commands that now fail instead of pretending
 
-- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the shared API; `--help` ends with the table. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
+- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the shared API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
 - **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
 - **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
@@ -137,6 +156,8 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 - Rename `template.reply.posting-style` → `message.reply.posting-style` and `template.forward.posting-style` → `message.forward.posting-style`, taking `top`, `bottom` or `none`. v1's `interleaved` is gone: use `none` and write the reply inside the quoted block yourself. v1's forward `attached` has no v2 equivalent.
 
 #### Table customization
+
+v3 removes these keys again, the glyphs aside: see [From v2 to v3](#from-v2-to-v3).
 
 - The per-type `{account,folder,envelope}.list.table.{preset,arrangement}` keys collapse into a single `table.{preset,arrangement}` (global / per-account). `table.arrangement` (`dynamic`, `dynamic-full-width`, `disabled`) is new.
 - Rename `folder.list.table.*` → `mailbox.list.table.*` (mirrors the `folders` → `mailboxes` command rename).

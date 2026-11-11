@@ -28,15 +28,16 @@
 //! ## Command families
 //!
 //! The command tree ([`cli`], `Command`) splits in three. The shared API
-//! (mailbox, envelope, flag, message, attachment) is the cross-protocol
-//! surface: the union of what the backends serve, each verb meaning one
-//! thing wherever it runs, a backend that cannot give that result
-//! declaring it unserved ([`capability`]).
+//! (mailbox, envelope, flag, message, attachment, vacation) is the
+//! cross-protocol surface: the union of what the backends serve, each verb
+//! meaning one thing wherever it runs, a backend that cannot give that
+//! result declaring it unserved ([`capability`]).
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
-//! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one backend,
-//! including operations the shared API cannot model. The meta commands
-//! cover account configuration, completions, man pages and JSON Schemas.
+//! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one
+//! backend, including operations the shared API cannot model. The meta
+//! commands cover the accounts, the sessions (repl, mcp), completions, man
+//! pages and JSON Schemas.
 //!
 //! ## Shared commands and backend selection
 //!
@@ -98,9 +99,9 @@
 //! the printer, `--json` switching every command to JSON, and stderr
 //! carries the logs, the welcome, the REPL's prompt and its help in a
 //! JSON session, and the failures of the MCP server, whose stdout is the
-//! protocol's. Text output is plain text, with no
-//! border, no colour and nothing sized to the terminal: a list prints as
-//! aligned columns, a record as aligned `Label: value` lines. Each
+//! protocol's. Text output is plain text, with no border, no colour and
+//! nothing sized to the terminal: a list prints as aligned columns, a
+//! record as aligned `Label: value` lines. Each
 //! command's doc comment is its `--help`, so `himalaya <command> --help`
 //! is the canonical usage reference.
 

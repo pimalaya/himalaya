@@ -71,7 +71,6 @@ an IMAP UID, `<NAME>` a mailbox name.
 | paging | `envelope list -m "$A" -s 2 -p 1` then `-p 2` |
 | recipient | `envelope list -m "$A" -r` (TO instead of FROM) |
 | attachment column | `envelope list -m "$A" --has-attachment` (ATT `@`) |
-| width | `envelope list -m "$A" -w 60` |
 | json | `--json envelope list -m "$A"` |
 | empty mailbox | `envelope list -m "$B"` |
 | default mailbox | `envelope list` (no `-m` — see default-mailbox note) |

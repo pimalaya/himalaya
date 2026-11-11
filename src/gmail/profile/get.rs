@@ -18,7 +18,7 @@ use crate::gmail::client::GmailClient;
 pub struct GmailProfileGetCommand;
 
 impl GmailProfileGetCommand {
-    /// Fetches the profile and tables it.
+    /// Fetches the profile and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let profile = client.profile_get()?.response;
 

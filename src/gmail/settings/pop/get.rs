@@ -21,7 +21,7 @@ use crate::gmail::{
 pub struct GmailSettingsPopGetCommand;
 
 impl GmailSettingsPopGetCommand {
-    /// Fetches the POP settings and tables them.
+    /// Fetches the POP settings and prints them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailPopGet::new(&client.auth, &client.user_id)?;
