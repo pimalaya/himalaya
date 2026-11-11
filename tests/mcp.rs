@@ -20,9 +20,24 @@ use std::{
     process::{Command, Stdio},
 };
 
-use base64::{Engine, prelude::BASE64_STANDARD};
+use base64_codec::codec::Base64Codec;
 use serde_json::{Value, json};
 use tempfile::TempDir;
+
+/// The standard padded base64 of `bytes`.
+fn base64_encode(bytes: &[u8]) -> String {
+    let mut encoded = Vec::new();
+    Base64Codec::default().encode_vec(bytes, &mut encoded);
+    String::from_utf8(encoded).unwrap()
+}
+
+/// The bytes `data` encodes, asserting it is their standard padded base64.
+fn base64_decode(data: &str) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    Base64Codec::default().decode_vec(data.as_bytes(), &mut bytes);
+    assert_eq!(base64_encode(&bytes), data);
+    bytes
+}
 
 /// A Maildir account holding one message in its inbox as `m1`, and the
 /// configuration reaching it.
@@ -514,7 +529,7 @@ fn an_attachment_is_read_as_an_embedded_resource_and_nothing_is_written() {
     assert_eq!(embedded["resource"]["mimeType"], "application/octet-stream");
 
     let blob = embedded["resource"]["blob"].as_str().unwrap();
-    assert_eq!(BASE64_STANDARD.decode(blob).unwrap(), BLOB);
+    assert_eq!(base64_decode(blob), BLOB);
 
     // NOTE: the bytes travel once, never also as `data`.
     assert!(!result.to_string().contains("\"data\""), "{result}");
@@ -537,12 +552,7 @@ fn the_part_uri_names_the_mailbox_as_the_call_does() {
     let resource = &responses[0]["result"]["content"][1]["resource"];
     assert_eq!(resource["uri"], "himalaya://a/inbox/m2/2");
     assert_eq!(resource["mimeType"], "text/plain");
-    assert_eq!(
-        BASE64_STANDARD
-            .decode(resource["blob"].as_str().unwrap())
-            .unwrap(),
-        b"body"
-    );
+    assert_eq!(base64_decode(resource["blob"].as_str().unwrap()), b"body");
 }
 
 #[test]
@@ -695,9 +705,7 @@ fn attachments(config: &Path, id: &str) -> Vec<(String, String, Vec<u8>)> {
         .map(|part| {
             let part_id = part["id"].as_str().unwrap();
             let part = cli(config, &["attachment", "download", "--stdout", id, part_id]);
-            let data = BASE64_STANDARD
-                .decode(part["data"].as_str().unwrap())
-                .unwrap();
+            let data = base64_decode(part["data"].as_str().unwrap());
             (
                 part["filename"].as_str().unwrap().to_string(),
                 part["mime"].as_str().unwrap().to_string(),
@@ -809,7 +817,7 @@ fn inline_attachments_are_stored_with_their_bytes_names_and_types() {
                     {
                         "filename": "q3: raw.bin",
                         "mimeType": "application/x-himalaya-test",
-                        "data": BASE64_STANDARD.encode(&binary),
+                        "data": base64_encode(&binary),
                     },
                     { "filename": "rapport été.txt", "text": text },
                     { "filename": "pixel.png", "data": "iVBORw0KGgo" },

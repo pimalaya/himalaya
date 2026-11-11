@@ -25,3 +25,17 @@ Himalaya SHALL be dual-licensed MIT OR Apache-2.0, with no per-file headers.
 
 ### Requirement: The sample ships beside the binary
 The Nix package SHALL install config.sample.toml as share/doc/himalaya/config.sample.toml, the release archives SHALL carry it with the share/ of the build they come from, and install.sh SHALL copy it to the same path under its prefix when the downloaded archive holds it, so the first-run welcome copies it rather than downloading it.
+
+### Requirement: Hosts are ASCII
+Himalaya SHALL build url's IDNA without a Unicode back end, `idna_adapter` being pinned to 1.0.0 in Cargo.toml. A host SHALL be written in ASCII, an internationalised one in its Punycode form (`xn--…`), and an `http` or `https` URL with a non-ASCII host (a JMAP server, an HTTP proxy) SHALL be refused when parsed. IMAP, SMTP and ManageSieve servers are URLs of schemes url keeps opaque, which never reach IDNA: their host is written in ASCII as well.
+
+#### Scenario: An internationalised JMAP server
+- GIVEN `jmap.server = "https://bücher.example/jmap"`
+- WHEN the account connects
+- THEN the server is refused before any connection, and the same account connects with `jmap.server = "https://xn--bcher-kva.example/jmap"`
+
+### Requirement: Dependencies name their features
+Every dependency, build and dev ones included, SHALL be declared with `default-features = false` and the features Himalaya uses, so a default turned on upstream never reaches the binary. A feature only one backend needs SHALL be turned on by that backend's cargo feature: pimalaya-cli's `prompt`, which `pimdir queue cancel` alone asks through, by `pimdir`. A dependency nothing uses SHALL be removed, and a crate the tests alone use SHALL be a dev-dependency.
+
+### Requirement: Dependency checks pass clean
+`cargo deny check` SHALL pass over the targets deny.toml lists, which are the release targets and the ones people build from source, allowing only the licences the tree carries. A duplicate the tree cannot avoid stays a visible warning rather than a skip: today getrandom 0.2 (ring 0.17), syn 2 (bounded-static-derive under io-imap and io-smtp, windows-core under chrono on Windows), and hashbrown 0.15 with foldhash 0.1 (chumsky 0.13).

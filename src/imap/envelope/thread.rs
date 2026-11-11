@@ -20,12 +20,14 @@ use pimalaya_cli::printer::Printer;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
-use crate::imap::{
-    client::ImapClient,
-    envelope::search::SearchCriteriaArgs,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
-    outcome,
-    utils::decode_mime,
+use crate::{
+    imap::{
+        client::ImapClient,
+        envelope::search::SearchCriteriaArgs,
+        mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+        outcome,
+    },
+    shared::message::header,
 };
 
 /// Thread messages (THREAD, RFC 5256).
@@ -181,7 +183,7 @@ fn fetch_subjects(
                 }
                 MessageDataItem::Envelope(env) => {
                     if let Some(s) = &env.subject.0 {
-                        subject = decode_mime(&String::from_utf8_lossy(s.as_ref()));
+                        subject = header::decode_bytes(s.as_ref());
                     }
                 }
                 _ => {}

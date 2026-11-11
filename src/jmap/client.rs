@@ -10,7 +10,6 @@
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
-use base64::{Engine, prelude::BASE64_STANDARD};
 use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
@@ -20,6 +19,7 @@ use crate::{
     account::context::Account,
     config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, ProxyConfig, parse_server},
     email::mailbox::{MailboxIndex, MailboxRole},
+    shared::base64,
 };
 
 /// A live JMAP session and the mailbox index it caches.
@@ -188,8 +188,40 @@ pub fn jmap_http_auth(
                 username,
                 resolver.resolve(password)?.expose_secret()
             );
-            let encoded = BASE64_STANDARD.encode(creds.into_bytes());
+            let encoded = base64::encode(creds.as_bytes());
             Ok(format!("Basic {encoded}").into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pimalaya_config::secret::{Secret, SecretResolver};
+    use secrecy::{ExposeSecret, SecretString};
+
+    use crate::{
+        config::JmapAuthConfig,
+        jmap::client::{jmap_http_auth, parse_server_url},
+    };
+
+    #[test]
+    fn basic_auth_is_standard_padded_base64() {
+        let auth = JmapAuthConfig::Basic {
+            username: String::from("user"),
+            password: Secret::Raw(SecretString::from("pa\u{e9}ss")),
+        };
+        let header = jmap_http_auth(auth, &mut SecretResolver::new()).unwrap();
+        assert_eq!(header.expose_secret(), "Basic dXNlcjpwYcOpc3M=");
+    }
+
+    #[test]
+    fn a_non_ascii_host_is_refused() {
+        assert!(parse_server_url("https://b\u{fc}cher.example/jmap").is_err());
+        assert!(parse_server_url("b\u{fc}cher.example").is_err());
+
+        let url = parse_server_url("https://xn--bcher-kva.example/jmap").unwrap();
+        assert_eq!(url.host_str(), Some("xn--bcher-kva.example"));
+        let url = parse_server_url("xn--bcher-kva.example").unwrap();
+        assert_eq!(url.host_str(), Some("xn--bcher-kva.example"));
     }
 }

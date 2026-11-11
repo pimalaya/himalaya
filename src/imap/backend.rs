@@ -42,7 +42,6 @@ use io_imap::{
 };
 use log::debug;
 use mime::header::marker::MESSAGE_ID;
-use rfc2047_decoder::{Decoder, RecoverStrategy};
 
 use crate::{
     capability,
@@ -625,7 +624,7 @@ fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
             }
             MessageDataItem::Envelope(env) => {
                 if let Some(s) = env.subject.into_option() {
-                    subject = decode_mime_bytes(s.as_ref());
+                    subject = header::decode_bytes(s.as_ref());
                 }
                 if let Some(d) = env.date.into_option() {
                     date = parse_rfc2822_date(&bytes_to_string(d.as_ref()));
@@ -682,7 +681,7 @@ fn address_from(addr: &ImapAddress<'_>) -> Address {
         .name
         .0
         .as_ref()
-        .map(|s| decode_mime_bytes(s.as_ref()))
+        .map(|s| header::decode_bytes(s.as_ref()))
         .filter(|s| !s.is_empty());
 
     let mailbox = addr
@@ -895,15 +894,6 @@ fn bytes_to_string(bytes: &[u8]) -> String {
     })
 }
 
-/// Decodes the RFC 2047 encoded words of an ENVELOPE string, falling back
-/// to [`bytes_to_string`] on malformed input.
-fn decode_mime_bytes(bytes: &[u8]) -> String {
-    let decoder = Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Decode);
-    decoder
-        .decode(bytes)
-        .unwrap_or_else(|_| bytes_to_string(bytes))
-}
-
 /// The `SEARCH` keys of a shared filter, `ALL` when there is none.
 fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKey<'static>>> {
     let key = match filter {
@@ -1079,8 +1069,8 @@ mod tests {
     };
 
     use super::{
-        SearchKey, body_structure_has_attachment, convert_filter, parse_rfc2822_date,
-        refuse_impermanent,
+        SearchKey, body_structure_has_attachment, convert_filter, envelope_from,
+        parse_rfc2822_date, refuse_impermanent,
     };
     use crate::{
         email::{
@@ -1130,6 +1120,29 @@ mod tests {
             Some(ErrorCode::SearchUnsupported)
         );
         assert!(err.to_string().contains("`attachment`"), "{err}");
+    }
+
+    #[test]
+    fn an_envelope_reads_its_header_strings_as_message_read_does() {
+        // NOTE: an emoji split across two encoded words, and a name in
+        // raw Windows-1252 bytes beside an encoded word.
+        const LINE: &[u8] = b"* 1 FETCH (UID 7 ENVELOPE (NIL \
+            \"=?UTF-8?Q?=F0=9F?= =?UTF-8?Q?=98=82?=\" \
+            (({24}\r\n\x93Ann\x94 =?UTF-8?Q?=C3=A9?= NIL \"a\" \"example.org\")) \
+            NIL NIL NIL NIL NIL NIL NIL))\r\n";
+
+        let (_, response) = ResponseCodec::new().decode(LINE).unwrap();
+        let Response::Data(Data::Fetch { items, .. }) = response else {
+            panic!("not a FETCH answer");
+        };
+        let envelope = envelope_from(1, items.into_inner());
+
+        assert_eq!(envelope.subject, "\u{1f602}");
+        assert_eq!(
+            envelope.from[0].name.as_deref(),
+            Some("\u{201c}Ann\u{201d} \u{e9}")
+        );
+        assert_eq!(envelope.from[0].email, "a@example.org");
     }
 
     /// What `hasAttachment` reads off an untagged `FETCH` answer.

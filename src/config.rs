@@ -1028,7 +1028,8 @@ pub struct JmapConfig {
     ///
     /// A bare authority is discovered through `GET /.well-known/jmap`,
     /// a full URL reaching the session endpoint directly. The schemes are
-    /// `http`, `https`, `jmap` and `jmaps`.
+    /// `http` and `https`, a bare authority taking `https`. The host is
+    /// ASCII, an internationalised one written in Punycode (`xn--…`).
     pub server: String,
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]

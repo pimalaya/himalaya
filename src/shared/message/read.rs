@@ -676,7 +676,7 @@ fn format_addr(mailbox: &MimeMailbox) -> String {
 
 #[cfg(test)]
 mod tests {
-    use base64::{Engine, prelude::BASE64_STANDARD};
+    use crate::shared::base64;
 
     use super::*;
 
@@ -690,7 +690,7 @@ mod tests {
             "first\tline\r\n日本語\n\x1b[2J\x1b]52;c;YXVkaXQ=\x07\u{9b}\x7f\u{202e}end\rtail";
         let raw = format!(
             "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n",
-            BASE64_STANDARD.encode(text)
+            base64::encode(text.as_bytes())
         );
         let view = MessageReadOutput::from_raw(raw.as_bytes()).unwrap();
         let rendered = view.to_string();
@@ -711,7 +711,7 @@ mod tests {
     fn message_headers_and_part_metadata_are_sanitized() {
         let encoded = format!(
             "=?utf-8?B?{}?=",
-            BASE64_STANDARD.encode("audit\x1b]52;c;YQ==\x07\u{202e}")
+            base64::encode("audit\x1b]52;c;YQ==\x07\u{202e}".as_bytes())
         );
         let raw = format!(
             "From: {encoded} <audit@example.test>\r\nTo: {encoded} <to@example.test>\r\nCc: {encoded} <cc@example.test>\r\nSubject: {encoded}\r\nContent-Type: text/plain; name=\"{encoded}\"\r\nContent-Disposition: attachment; filename=\"{encoded}\"\r\nContent-Description: {encoded}\r\nContent-ID: <audit\x1b[2J@example.test>\r\n\r\nbody"
@@ -1040,7 +1040,7 @@ mod tests {
 
     #[test]
     fn bodies_are_decoded_by_their_charset_and_transfer_encoding() {
-        let cp1252 = BASE64_STANDARD.encode(b"5 \x80 l\x92heure");
+        let cp1252 = base64::encode(b"5 \x80 l\x92heure");
         let raw = format!(
             "Content-Type: multipart/mixed; boundary=\"b\"\r\n\
             \r\n\

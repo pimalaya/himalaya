@@ -1,33 +1,21 @@
 //! # IMAP utils
 //!
-//! RFC 2047 header decoding and envelope address conversion, shared by
-//! the `fetch` and `thread` commands.
+//! Envelope address conversion, shared by the `fetch` and `thread`
+//! commands.
 
 use io_imap::types::envelope::Address;
-use log::debug;
-use rfc2047_decoder::{Decoder, RecoverStrategy};
 
-/// Decodes an RFC 2047 encoded string, falling back to the input on
-/// error.
-pub fn decode_mime(s: &str) -> String {
-    let decoder = Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Decode);
-    match decoder.decode(s.as_bytes()) {
-        Ok(s) => s,
-        Err(err) => {
-            debug!("cannot decode rfc2047 string `{s}`: {err}");
-            s.to_string()
-        }
-    }
-}
+use crate::shared::message::header;
 
 /// Turns an envelope address into the shared address shape, its personal
-/// name RFC 2047 decoded, `None` when absent or empty.
+/// name read as `message read` reads a header, `None` when absent or
+/// empty.
 pub fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
     let name = addr
         .name
         .0
         .as_ref()
-        .map(|name| decode_mime(&String::from_utf8_lossy(name.as_ref())))
+        .map(|name| header::decode_bytes(name.as_ref()))
         .filter(|name| !name.is_empty());
 
     crate::email::address::Address {

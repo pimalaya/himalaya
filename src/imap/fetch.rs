@@ -6,7 +6,6 @@ use io_imap::client::ImapClient as _;
 use std::fmt;
 
 use anyhow::Result;
-use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
@@ -28,9 +27,9 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
-        utils::{decode_mime, to_address},
+        utils::to_address,
     },
-    shared::envelope::list::format_addresses,
+    shared::{base64, envelope::list::format_addresses, message::header},
 };
 
 /// Fetch message data items (FETCH, RFC 3501).
@@ -221,7 +220,7 @@ impl FetchedMessage {
 /// no binary type.
 fn serialize_base64<S: Serializer>(body: &Option<Vec<u8>>, s: S) -> Result<S::Ok, S::Error> {
     match body {
-        Some(bytes) => s.serialize_some(&BASE64_STANDARD.encode(bytes)),
+        Some(bytes) => s.serialize_some(&base64::encode(bytes)),
         None => s.serialize_none(),
     }
 }
@@ -256,7 +255,11 @@ impl From<&Envelope<'_>> for EnvelopeView {
     fn from(env: &Envelope<'_>) -> Self {
         Self {
             date: nstring(&env.date),
-            subject: nstring(&env.subject).map(|s| decode_mime(&s)),
+            subject: env
+                .subject
+                .0
+                .as_ref()
+                .map(|s| header::decode_bytes(s.as_ref())),
             message_id: nstring(&env.message_id),
             in_reply_to: nstring(&env.in_reply_to),
             from: env.from.iter().map(to_address).collect(),
@@ -532,5 +535,17 @@ mod tests {
         };
         let message = FetchedMessage::from_items(1, [item].into_iter());
         assert_eq!(message.body.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn body_prints_as_standard_padded_base64() {
+        // NOTE: the last octets map to `+` and `/`, and 26 octets end on
+        // one `=` of padding.
+        let message = FetchedMessage {
+            body: Some(b"Subject: x\r\n\r\n\xf0\xd2\xc9\xd7\xc5\xd4 \xff\xfb\xff\xbf\r".to_vec()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&message).unwrap();
+        assert_eq!(json["body"], "U3ViamVjdDogeA0KDQrw0snXxdQg//v/vw0=");
     }
 }

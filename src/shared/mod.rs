@@ -11,6 +11,8 @@
 #[cfg(any(backend, feature = "smtp"))]
 pub mod attachment;
 #[cfg(any(backend, feature = "smtp"))]
+pub mod base64;
+#[cfg(any(backend, feature = "smtp"))]
 pub mod client;
 pub mod crlf;
 #[cfg(any(backend, feature = "smtp"))]

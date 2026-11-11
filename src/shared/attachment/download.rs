@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
 use pimalaya_cli::{error::CodedError, printer::Printer};
@@ -25,6 +24,7 @@ use crate::{
     mcp,
     shared::{
         attachment::list::{self, AttachmentListOutput},
+        base64,
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::part::{self, PartRole},
@@ -225,7 +225,7 @@ impl PartBytes {
             mime: part::mime(part),
             filename: part::filename(part),
             size: bytes.len() as u64,
-            data: BASE64_STANDARD.encode(&bytes),
+            data: base64::encode(&bytes),
             bytes,
         }
     }
@@ -313,7 +313,6 @@ mod tests {
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
 
-    use base64::{Engine, prelude::BASE64_STANDARD};
     use clap::Parser;
     use pimalaya_cli::error::code_of;
 
@@ -413,7 +412,7 @@ mod tests {
         assert_eq!(blob.size, 7);
         assert_eq!(blob.mime, "application/octet-stream");
         assert_eq!(blob.filename.as_deref(), Some("blob.bin"));
-        assert_eq!(BASE64_STANDARD.decode(&blob.data).unwrap(), blob.bytes);
+        assert_eq!(blob.data, "AAH//gAKDQ==");
 
         let invite = PartBytes::new(&message, "4").unwrap();
         assert_eq!(invite.bytes, b"SUMMARY:Caf\xe9 \x80 5");

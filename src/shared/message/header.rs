@@ -49,6 +49,13 @@ pub fn unstructured(entity: &MimeEntity, name: &str) -> Option<String> {
     (!text.is_empty()).then(|| text.to_owned())
 }
 
+/// A header value given as bytes, such as an IMAP `ENVELOPE` string, read
+/// as [`raw_text`] reads one, then its encoded words decoded.
+#[cfg(feature = "imap")]
+pub fn decode_bytes(bytes: &[u8]) -> String {
+    decode_words(&eight_bit(bytes).replace(['\r', '\n'], ""))
+}
+
 /// Header bytes as text: UTF-8 when they are valid UTF-8, Windows-1252
 /// otherwise.
 pub fn eight_bit(bytes: &[u8]) -> String {

@@ -149,6 +149,7 @@ use pimalaya_cli::{
     welcome::{is_wanted, shipped_sample},
 };
 use pimalaya_config::toml::ConfigMissingError;
+use simd_cpu::SimdCpu;
 
 use crate::{
     cli::{Cli, Command},
@@ -157,6 +158,10 @@ use crate::{
 };
 
 fn main() {
+    // NOTE: the base64 and quoted-printable codecs read the installed CPU
+    // token, the portable baseline until one is installed.
+    let _ = SimdCpu::install_detected();
+
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(&cli.json);
 

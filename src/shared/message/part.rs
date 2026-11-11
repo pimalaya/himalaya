@@ -619,6 +619,8 @@ pub fn bare_id(id: &str) -> &str {
 mod tests {
     use pimalaya_cli::error::code_of;
 
+    use crate::shared::base64;
+
     use super::*;
 
     /// A message whose top-level part sits `levels` containers deep, a
@@ -774,9 +776,7 @@ mod tests {
         raw.extend_from_slice(
             b"\r\n--b\r\nContent-Type: message/rfc822\r\nContent-Transfer-Encoding: base64\r\n\r\n",
         );
-        raw.extend_from_slice(
-            base64::Engine::encode(&base64::prelude::BASE64_STANDARD, inner).as_bytes(),
-        );
+        raw.extend_from_slice(base64::encode(inner).as_bytes());
         raw.extend_from_slice(b"\r\n--b--\r\n");
         let message = parse(&raw).unwrap();
 

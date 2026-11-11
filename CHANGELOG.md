@@ -115,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed `--help` to print without colour and each paragraph on one line, no longer wrapped to the terminal width.
 
+- **BREAKING**: Changed every `http` or `https` URL Himalaya parses, a JMAP `server` and an HTTP proxy `url`, to take an ASCII host only, an internationalised one written in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers never went through IDNA, a non-ASCII host there never resolving.
+
+- Changed the subject and display names of an IMAP envelope (`envelope list`, `envelope search`, `imap fetch`, `imap thread`) to read as `message read` reads a header: a character split across two encoded words is rebuilt, raw 8-bit bytes that are not UTF-8 read as Windows-1252 rather than Latin-1, an encoded word beside them is decoded, and a UTF-7 encoded word is shown as written.
+
+- Replaced the base64 crate with [base64-codec](https://crates.io/crates/base64-codec) in `imap fetch --body`, `attachment download --stdout`, the JMAP `Basic` header and the MCP `attach-data`, byte for byte as before, and turned on the SIMD features of the CPU, detected at startup, for it and for the base64 and quoted-printable codecs mime-rs reads messages with. An `attach-data` item whose `data` is not base64 keeps its `attachment-invalid` code, its message naming the form taken rather than the offset of the first bad byte.
+
 ### Removed
 
 - **BREAKING**: Removed the configuration wizard: bare `himalaya` running it, the `configure` command (alias `wizard`), the offer a command made without a configuration, the `wizard` cargo feature, the `himalaya-configure` JSON Schema and the io-pim-discovery dependency.
@@ -128,6 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Removed the `HIMALAYA_CONFIG` environment variable, with the `:`-delimited list it took: write `-c "$HIMALAYA_CONFIG"` for one path, one `-c` per path for several.
 
 - **BREAKING**: Removed `-w/--max-width` from `envelope list`, `envelope search`, `mailbox list`, `pimdir search`, `pimdir thread`, `pimdir tag`, `pimdir mailbox list` and `pimdir attachment list|search`, nothing being truncated anymore.
+
+- Removed the open, convert_case, uds_windows and rfc2047-decoder dependencies, and the toml one from the binary (the tests keep it).
 
 ### Fixed
 

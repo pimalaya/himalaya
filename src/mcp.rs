@@ -700,20 +700,13 @@ fn hand_attach_data(_: &Value, _: &McpLimits, _: &mut Command) -> Result<()> {
 #[cfg(any(backend, feature = "smtp"))]
 mod inline {
     use anyhow::Result;
-    use base64::{
-        Engine, alphabet,
-        engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
-    };
     use pimalaya_cli::error::CodedError;
     use serde_json::{Map, Value};
 
-    use crate::{error::ErrorCode, shared::message::builder::InlineAttachment};
-
-    /// The RFC 4648 standard alphabet, padding optional.
-    const BASE64: GeneralPurpose = GeneralPurpose::new(
-        &alphabet::STANDARD,
-        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
-    );
+    use crate::{
+        error::ErrorCode,
+        shared::{base64, message::builder::InlineAttachment},
+    };
 
     /// The keys an item takes.
     const KEYS: &[&str] = &["filename", "mimeType", "data", "text"];
@@ -823,9 +816,11 @@ mod inline {
         }
 
         match (data, text) {
-            (Some(data), _) => BASE64
-                .decode(data)
-                .map_err(|err| invalid(format!("{label}: `data` is not base64: {err}"))),
+            (Some(data), _) => base64::decode_strict(data).ok_or_else(|| {
+                invalid(format!(
+                    "{label}: `data` is not base64 (standard alphabet, padding optional, no whitespace)"
+                ))
+            }),
             (_, Some(text)) => Ok(text.as_bytes().to_vec()),
             (None, None) => unreachable!("one of them is given"),
         }
@@ -1275,6 +1270,39 @@ mod tests {
             assert_eq!(attachments[0].mime.as_deref(), Some("application/x-test"));
             assert_eq!(attachments[1].content, "é".as_bytes());
             assert_eq!(attachments[1].mime, None);
+        }
+
+        #[test]
+        fn data_is_the_standard_alphabet_padding_optional() {
+            let decode = |data: &str| {
+                let item = json!([{ "filename": "a", "data": data }]);
+                match inline::attachments(&item, 64) {
+                    Ok(mut attachments) => Ok(attachments.remove(0).content),
+                    Err(err) => Err(code_of::<ErrorCode>(&err)),
+                }
+            };
+
+            assert_eq!(decode(""), Ok(vec![]));
+            assert_eq!(decode("aGk="), Ok(b"hi".to_vec()));
+            assert_eq!(decode("aGk"), Ok(b"hi".to_vec()));
+            assert_eq!(decode("aA=="), Ok(b"h".to_vec()));
+            assert_eq!(decode("aA="), Ok(b"h".to_vec()));
+            assert_eq!(decode("aA"), Ok(b"h".to_vec()));
+            assert_eq!(decode("+/+/"), Ok(vec![0xfb, 0xff, 0xbf]));
+            assert_eq!(
+                decode("AAH//gAKDQ=="),
+                Ok(vec![0x00, 0x01, 0xff, 0xfe, 0x00, 0x0a, 0x0d])
+            );
+
+            // NOTE: non-zero trailing bits, padding past the quantum or
+            // inside the data, a lone last symbol, whitespace and the URL
+            // alphabet are refused.
+            for data in [
+                "aGl=", "aG", "aGk==", "Zm9v=", "=", "aGk=aGk=", "aGkxY", "aG k=", "aGk=\n", "-_-_",
+            ] {
+                let invalid = Err(Some(ErrorCode::AttachmentInvalid));
+                assert_eq!(decode(data), invalid, "{data:?}");
+            }
         }
 
         #[test]

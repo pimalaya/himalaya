@@ -49,6 +49,14 @@ Each backend SHALL source the field from the response its listing already makes,
 
 The field SHALL NOT take a column in the `envelope list` text output, where a column of raw msg-ids would be noise; it rides the JSON output.
 
+### Requirement: An IMAP envelope reads its strings as a header
+The subject and display names of an IMAP `ENVELOPE`, as `envelope list`, `envelope search`, `imap fetch` and `imap thread` print them, SHALL be read as `message read` reads a header (commands: "Malformed mail reads as its sender meant"): raw 8-bit bytes as UTF-8 when they are valid UTF-8 and as Windows-1252 otherwise, line breaks dropped, adjacent RFC 2047 encoded words of one charset joined as bytes before their charset is decoded, and UTF-7 read as written.
+
+#### Scenario: An emoji split across two encoded words
+- GIVEN an IMAP message whose `ENVELOPE` subject is `=?UTF-8?Q?=F0=9F?= =?UTF-8?Q?=98=82?=`
+- WHEN `envelope list` prints it
+- THEN its subject is 😂, as `message read` shows it
+
 ### Requirement: Network backends
 IMAP, JMAP, Gmail and Microsoft Graph SHALL each adapt their io-* high-level client. IMAP reuses io-imap's `select`/`fetch`/`store`/`copy`/`move`/`append`/`list`/`status`. JMAP reuses io-jmap's `mailbox_get`/`email_query`/`email_get`/`email_set`/`email_import`/`email_submission_set`/`blob_upload`/`blob_download`, addressing mailboxes by their JMAP id. Gmail treats labels as mailboxes over io-gmail's `labels`/`messages` surface; Graph treats mail folders as mailboxes over io-msgraph's `mail_folders`/`messages` surface.
 
