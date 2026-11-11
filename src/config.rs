@@ -419,27 +419,11 @@ pub struct EnvelopeListConfig {
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
-    /// Flag glyphs of the listed envelopes.
-    #[serde(default)]
-    pub table: EnvelopeListTableConfig,
-}
-
-/// Flag glyph overrides of the listed envelopes.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct EnvelopeListTableConfig {
-    /// FLAGS glyph of a message lacking `\Seen`, defaulting to `*`.
-    pub unseen_char: Option<char>,
-    /// FLAGS glyph of a message carrying `\Answered`, defaulting to `R`.
-    pub replied_char: Option<char>,
-    /// FLAGS glyph of a message carrying `\Flagged`, defaulting to `!`.
-    pub flagged_char: Option<char>,
-    /// ATT glyph of a message with an attachment, defaulting to `@`.
-    pub attachment_char: Option<char>,
+    /// The v2 `table` block, whatever it holds, ignored rather than
+    /// refused: its glyph and colour keys no longer apply, and a file
+    /// shared with himalaya-tui keeps loading.
+    #[serde(rename = "table")]
+    _table: Option<IgnoredAny>,
 }
 
 /// Parses a backend `server` string into a [`Url`].
@@ -1341,21 +1325,22 @@ mod tests {
         assert_eq!(name, "spare");
     }
 
-    /// Text output carries no colour, so a colour key is refused as
-    /// unknown where its table denies unknown keys, rather than ignored.
+    /// The v2 `envelope.list.table` block loads whatever it holds, while
+    /// `envelope.list` still refuses an unknown key of its own, and a
+    /// `mailbox` colour key stays refused.
     #[test]
-    fn colour_keys_are_refused() {
-        let toml = "[accounts.example]\nenvelope.list.table.subject-color = \"green\"\n";
+    fn envelope_table_is_ignored() {
+        let toml = "[envelope.list.table]\nunseen-char = \"N\"\nsubject-color = \"green\"\n\
+                    [accounts.example]\nenvelope.list.table.flagged-char = \"F\"\n";
+        toml::from_str::<Config>(toml).unwrap();
+
+        let toml = "[accounts.example]\nenvelope.list.datetime-fnt = \"%F\"\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-        assert!(err.contains("subject-color"), "{err}");
+        assert!(err.contains("datetime-fnt"), "{err}");
 
         let toml = "[mailbox.list.table]\nname-color = \"blue\"\n[accounts]\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
         assert!(err.contains("unknown field `list`"), "{err}");
-
-        let toml = "[envelope.list.table]\nunseen-char = \"N\"\n[accounts]\n";
-        let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.envelope.list.table.unseen_char, Some('N'));
     }
 
     #[test]

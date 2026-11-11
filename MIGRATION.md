@@ -2,7 +2,7 @@
 
 ## From v2 to v3
 
-v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `envelope.list.table` or `mailbox`, or marks several accounts default.
+v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, or marks several accounts default.
 
 What a script or a frontend reads off `--json` and the text output changes, and a few commands that used to report a success they did not achieve now fail. The CHANGELOG lists every change; these are the ones to act on.
 
@@ -13,7 +13,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`HIMALAYA_CONFIG` is no longer read.** Pass `-c "$HIMALAYA_CONFIG"` for one path, and one `-c` per path for what was a `:`-separated list.
 - **Every default path is read, as layers.** $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml and $HOME/.himalayarc are each deep-merged on top of the ones before, where v2 read the first one found. An rc file left beside a config.toml now overrides it: delete the one you do not use.
 - **Several `default = true` accounts are refused**, naming them, where v2 picked one at random. Keep it on one account across the merged files: an rc file moving the default sets `default = false` on the account the other file marks.
-- **Colour and table keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, and `table.preset` and `table.arrangement`. Under `envelope.list.table` and `mailbox` they fail the configuration as unknown keys; elsewhere they are ignored. The `envelope.list.table.*-char` glyphs stay.
+- **Colour, table and glyph keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, `table.preset` and `table.arrangement`, and the `envelope.list.table.*-char` glyphs. Under `mailbox` they fail the configuration as unknown keys; elsewhere they are ignored, the whole `envelope.list.table` block included. FLAGS always shows `*` for unread, `R` for answered and `!` for flagged, and ATT `@` for a message with an attachment.
 - **`http` and `https` hosts are ASCII.** A JMAP `server` or an HTTP proxy `url` with an internationalised host is refused: write the host in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers are unchanged.
 
 ### Text output

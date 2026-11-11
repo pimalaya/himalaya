@@ -15,7 +15,7 @@ use std::{env::temp_dir, path::Path};
 #[cfg(any(backend, feature = "smtp"))]
 use dirs::download_dir;
 
-use crate::config::{AccountConfig, Config, EnvelopeListTableConfig, PostingStyle, SaveCopyConfig};
+use crate::config::{AccountConfig, Config, PostingStyle, SaveCopyConfig};
 #[cfg(any(backend, feature = "smtp"))]
 use crate::email::mailbox::{Mailbox, MailboxRole};
 
@@ -28,18 +28,6 @@ const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
 /// RFC 3676 section 4.3 signature separator.
 #[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_SIGNATURE_DELIM: &str = "-- \n";
-/// FLAGS glyph of a message lacking `\Seen`.
-#[cfg(any(backend, feature = "smtp"))]
-const DEFAULT_UNSEEN_CHAR: char = '*';
-/// FLAGS glyph of a message carrying `\Answered`.
-#[cfg(any(backend, feature = "smtp"))]
-const DEFAULT_REPLIED_CHAR: char = 'R';
-/// FLAGS glyph of a message carrying `\Flagged`.
-#[cfg(any(backend, feature = "smtp"))]
-const DEFAULT_FLAGGED_CHAR: char = '!';
-/// ATT glyph of a message carrying an attachment.
-#[cfg(any(backend, feature = "smtp"))]
-const DEFAULT_ATTACHMENT_CHAR: char = '@';
 
 /// Merged runtime account settings consumed by every command.
 #[derive(Debug, Default)]
@@ -62,8 +50,6 @@ pub struct Account {
     pub datetime_relative: Option<bool>,
     /// Page size of `envelope list` when `-s/--page-size` is not passed.
     pub envelopes_list_page_size: Option<u32>,
-    /// Flag glyphs of `envelope list`.
-    pub envelopes_list_table: EnvelopeListTableConfig,
     /// Mailbox aliases, keys lowercased, an account entry overwriting the
     /// global one of the same name.
     pub mailbox_alias: HashMap<String, String>,
@@ -97,10 +83,6 @@ impl Account {
             envelopes_list_page_size: other
                 .envelopes_list_page_size
                 .or(self.envelopes_list_page_size),
-            envelopes_list_table: merge_envelope_table(
-                self.envelopes_list_table,
-                other.envelopes_list_table,
-            ),
 
             mailbox_alias,
             save_copy: other.save_copy.or(self.save_copy),
@@ -255,46 +237,6 @@ impl Account {
             }
         }
     }
-
-    /// FLAGS glyph of a message lacking `\Seen`, defaulting to `*`.
-    pub fn envelopes_list_table_unseen_char(&self) -> char {
-        self.envelopes_list_table
-            .unseen_char
-            .unwrap_or(DEFAULT_UNSEEN_CHAR)
-    }
-
-    /// FLAGS glyph of a message carrying `\Answered`, defaulting to `R`.
-    pub fn envelopes_list_table_replied_char(&self) -> char {
-        self.envelopes_list_table
-            .replied_char
-            .unwrap_or(DEFAULT_REPLIED_CHAR)
-    }
-
-    /// FLAGS glyph of a message carrying `\Flagged`, defaulting to `!`.
-    pub fn envelopes_list_table_flagged_char(&self) -> char {
-        self.envelopes_list_table
-            .flagged_char
-            .unwrap_or(DEFAULT_FLAGGED_CHAR)
-    }
-
-    /// ATT glyph of a message carrying an attachment, defaulting to `@`.
-    pub fn envelopes_list_table_attachment_char(&self) -> char {
-        self.envelopes_list_table
-            .attachment_char
-            .unwrap_or(DEFAULT_ATTACHMENT_CHAR)
-    }
-}
-
-fn merge_envelope_table(
-    base: EnvelopeListTableConfig,
-    over: EnvelopeListTableConfig,
-) -> EnvelopeListTableConfig {
-    EnvelopeListTableConfig {
-        unseen_char: over.unseen_char.or(base.unseen_char),
-        replied_char: over.replied_char.or(base.replied_char),
-        flagged_char: over.flagged_char.or(base.flagged_char),
-        attachment_char: over.attachment_char.or(base.attachment_char),
-    }
 }
 
 /// Lowercases every alias key, leaving the values untouched.
@@ -324,7 +266,6 @@ impl From<Config> for Account {
             datetime_local_tz: config.envelope.list.datetime_local_tz,
             datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
-            envelopes_list_table: config.envelope.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,
@@ -348,7 +289,6 @@ impl From<AccountConfig> for Account {
             datetime_local_tz: config.envelope.list.datetime_local_tz,
             datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
-            envelopes_list_table: config.envelope.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,

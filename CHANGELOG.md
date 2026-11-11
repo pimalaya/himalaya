@@ -124,7 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Removed the `*.list.table.*-color` options, `table.preset` and `table.arrangement`.
 
-  A colour key under `envelope.list.table` or `mailbox` is refused as unknown; `table`, `attachment` and `account` are ignored like any unknown top-level key. The `envelope.list.table.*-char` glyphs stay.
+  A colour key under `mailbox` is refused as unknown; `table`, `attachment` and `account` are ignored like any unknown top-level key.
+
+- **BREAKING**: Removed the `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` options.
+
+  FLAGS shows `*`, `R` and `!`, ATT `@`, and the `envelope.list.table` block is ignored whatever it holds, so a v2 configuration or one shared with himalaya-tui keeps loading.
 
 - **BREAKING**: Removed the `HIMALAYA_CONFIG` environment variable, with the `:`-delimited list it took: write `-c "$HIMALAYA_CONFIG"` for one path, one `-c` per path for several.
 

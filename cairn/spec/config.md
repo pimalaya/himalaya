@@ -100,7 +100,17 @@ Unknown keys SHALL stay tolerated, the file being shared with himalaya-tui. When
 `message.reply.posting-style` and `message.forward.posting-style`, global or per account, SHALL take `top`, `bottom` or `none` and SHALL be the posting style `message reply` and `message forward` use when `--posting-style` is not passed. With neither, the style SHALL be `top`.
 
 ### Requirement: No colour is configured
-The configuration SHALL hold no colour and no table shape: `*.list.table.*-color`, `table.preset` and `table.arrangement` are unknown keys, refused where their table denies unknown keys (`envelope.list.table`, `mailbox`) and ignored at the top level and the account level, which tolerate unknown keys for himalaya-tui. `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` SHALL keep naming the FLAGS and ATT glyphs, a FLAGS cell holding only the glyphs that apply.
+The configuration SHALL hold no colour, no table shape and no glyph: `*.list.table.*-color`, `table.preset` and `table.arrangement` are unknown keys, refused where their table denies unknown keys (`mailbox`) and ignored at the top level and the account level, which tolerate unknown keys for himalaya-tui. The `envelope.list.table` block SHALL be ignored whatever it holds, its v2 glyph and colour keys included, while `envelope.list` keeps refusing an unknown key of its own. A FLAGS cell SHALL hold only the glyphs that apply, `*` for a message lacking `\Seen`, `R` for `\Answered` and `!` for `\Flagged`, and an ATT cell `@` for a message with an attachment.
+
+#### Scenario: A v2 glyph key
+- GIVEN an account setting `envelope.list.table.unseen-char = "N"`
+- WHEN `envelope list` runs
+- THEN the configuration loads and an unread message shows `*`
+
+#### Scenario: A typo under envelope.list
+- GIVEN an account setting `envelope.list.datetime-fnt`
+- WHEN any command reads the configuration
+- THEN it is refused naming `datetime-fnt`
 
 ### Requirement: One sample configuration, with a section per backend
 The repository SHALL ship config.sample.toml holding one `[accounts.example]` table with dotted keys and no other table header. It SHALL list the options every account shares and each of their values, the default active and the others commented as `#key = value`, every line ending in one tab-aligned comment, and every password command a failing `exit 127` placeholder. It SHALL end with one section per backend or provider (IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox, pimdir), each a paragraph of commented code headed by its name, its own alternatives commented twice, an OAuth 2.0 token read through `ortie token show -a example`, so the file holds a working account once one section is uncommented. The test suite SHALL parse config.sample.toml through the loader `-c` uses with each section uncommented whole, then on top of it each line commented twice inside it and each line of commented code outside the sections, in place of the active lines of its field, and SHALL resolve `example` as the default account each time, so a configuration change breaking one fails the build.

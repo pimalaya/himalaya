@@ -55,7 +55,7 @@ impl JmapCommand {
     ) -> Result<()> {
         match self {
             Self::Mailbox(cmd) => cmd.execute(printer, account, client),
-            Self::Email(cmd) => cmd.execute(printer, account, client),
+            Self::Email(cmd) => cmd.execute(printer, client),
             Self::Thread(cmd) => cmd.execute(printer, account, client),
             Self::Identity(cmd) => cmd.execute(printer, account, client),
             Self::Submission(cmd) => cmd.execute(printer, account, client),

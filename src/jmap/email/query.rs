@@ -20,7 +20,10 @@ use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, jmap::client::JmapClient};
+use crate::{
+    jmap::client::JmapClient,
+    shared::envelope::list::{ATTACHMENT_GLYPH, FLAGGED_GLYPH, UNSEEN_GLYPH},
+};
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -82,12 +85,7 @@ pub struct JmapEmailQueryCommand {
 
 impl JmapEmailQueryCommand {
     /// Queries the emails and prints the page it returned.
-    pub fn execute(
-        self,
-        printer: &mut impl Printer,
-        account: &mut Account,
-        client: &mut JmapClient,
-    ) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let filter = {
             let f = JmapEmailFilter {
                 in_mailbox: self.mailbox,
@@ -148,11 +146,6 @@ impl JmapEmailQueryCommand {
         })?;
 
         let emails = JmapEmailQueryOutput {
-            chars: EmailsChars {
-                unseen: account.envelopes_list_table_unseen_char(),
-                flagged: account.envelopes_list_table_flagged_char(),
-                attachment: account.envelopes_list_table_attachment_char(),
-            },
             emails: output.emails,
         };
 
@@ -160,24 +153,10 @@ impl JmapEmailQueryCommand {
     }
 }
 
-/// Flag glyphs of the listed emails.
-#[derive(Clone, Copy, Debug)]
-pub struct EmailsChars {
-    /// Glyph of an email lacking `$seen`.
-    pub unseen: char,
-    /// Glyph of an email carrying `$flagged`.
-    pub flagged: char,
-    /// Glyph of an email carrying an attachment.
-    pub attachment: char,
-}
-
 /// The `jmap email query` output, the envelopes of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapEmailQueryOutput {
-    /// The flag glyphs.
-    #[serde(skip)]
-    pub chars: EmailsChars,
     /// The emails, in the order the server returned them.
     pub emails: Vec<JmapEmail>,
 }
@@ -191,13 +170,13 @@ impl fmt::Display for JmapEmailQueryOutput {
             let mut flags = String::new();
             let kw = e.keywords.as_ref();
             if !kw.and_then(|k| k.get("$seen")).copied().unwrap_or(false) {
-                flags.push(self.chars.unseen);
+                flags.push(UNSEEN_GLYPH);
             }
             if kw.and_then(|k| k.get("$flagged")).copied().unwrap_or(false) {
-                flags.push(self.chars.flagged);
+                flags.push(FLAGGED_GLYPH);
             }
             if e.has_attachment.unwrap_or(false) {
-                flags.push(self.chars.attachment);
+                flags.push(ATTACHMENT_GLYPH);
             }
 
             let from = format_addresses(e.from.as_deref().unwrap_or_default());

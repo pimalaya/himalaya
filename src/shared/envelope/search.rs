@@ -15,11 +15,7 @@ use crate::{
     capability::Capability,
     email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
     error::ErrorCode,
-    shared::{
-        client::EmailClient,
-        envelope::list::{EnvelopeListOutput, FlagChars},
-        mailbox::arg::MailboxArg,
-    },
+    shared::{client::EmailClient, envelope::list::EnvelopeListOutput, mailbox::arg::MailboxArg},
 };
 
 /// Search the envelopes of a mailbox with the shared query language.
@@ -142,7 +138,6 @@ impl EnvelopeSearchCommand {
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
-            chars: FlagChars::of(account),
             envelopes,
         };
 

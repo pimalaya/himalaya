@@ -89,7 +89,6 @@ impl EnvelopeListCommand {
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
-            chars: FlagChars::of(account),
             envelopes,
         };
 
@@ -100,31 +99,14 @@ impl EnvelopeListCommand {
     }
 }
 
-/// Glyphs the FLAGS and ATT columns are drawn with, from the merged
-/// account configuration.
-#[derive(Clone, Copy, Debug)]
-pub struct FlagChars {
-    /// Glyph of a message lacking `\Seen`.
-    pub unseen: char,
-    /// Glyph of a message carrying `\Answered`.
-    pub replied: char,
-    /// Glyph of a message carrying `\Flagged`.
-    pub flagged: char,
-    /// Glyph of a message carrying an attachment.
-    pub attachment: char,
-}
-
-impl FlagChars {
-    /// Reads the glyphs off the merged account configuration.
-    pub fn of(account: &Account) -> Self {
-        Self {
-            unseen: account.envelopes_list_table_unseen_char(),
-            replied: account.envelopes_list_table_replied_char(),
-            flagged: account.envelopes_list_table_flagged_char(),
-            attachment: account.envelopes_list_table_attachment_char(),
-        }
-    }
-}
+/// FLAGS glyph of a message lacking `\Seen`.
+pub const UNSEEN_GLYPH: char = '*';
+/// FLAGS glyph of a message carrying `\Answered`.
+pub const REPLIED_GLYPH: char = 'R';
+/// FLAGS glyph of a message carrying `\Flagged`.
+pub const FLAGGED_GLYPH: char = '!';
+/// ATT glyph of a message carrying an attachment.
+pub const ATTACHMENT_GLYPH: char = '@';
 
 /// The `envelope list` output, the envelopes of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
@@ -145,8 +127,6 @@ pub struct EnvelopeListOutput {
     /// Whether the ATT column is drawn.
     #[serde(skip)]
     pub with_attachment: bool,
-    #[serde(skip)]
-    pub(super) chars: FlagChars,
     /// The envelopes of this page.
     pub envelopes: Vec<Envelope>,
 }
@@ -171,10 +151,10 @@ impl fmt::Display for EnvelopeListOutput {
 
             let mut row = vec![
                 sanitize::text(&env.id).into_owned(),
-                format_flags(&env.flags, &self.chars),
+                format_flags(&env.flags),
             ];
             if self.with_attachment {
-                row.push(format_attachment(env.has_attachment, self.chars.attachment));
+                row.push(format_attachment(env.has_attachment));
             }
             row.push(sanitize::text(&format_addresses(addresses)).into_owned());
             row.push(self.format_date(env.date, today));
@@ -192,25 +172,25 @@ impl fmt::Display for EnvelopeListOutput {
 /// that order, each only when it applies.
 ///
 /// No flag renders an empty cell, which a list prints as `-`.
-pub fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
+pub fn format_flags(flags: &BTreeSet<Flag>) -> String {
     let mut out = String::with_capacity(3);
     if !flags.iter().any(Flag::is_seen) {
-        out.push(chars.unseen);
+        out.push(UNSEEN_GLYPH);
     }
     if flags.iter().any(Flag::is_answered) {
-        out.push(chars.replied);
+        out.push(REPLIED_GLYPH);
     }
     if flags.iter().any(Flag::is_flagged) {
-        out.push(chars.flagged);
+        out.push(FLAGGED_GLYPH);
     }
     out
 }
 
 /// Renders the ATT cell: the glyph, nothing, or `?` when the backend
 /// could not tell.
-pub(super) fn format_attachment(has: Option<bool>, glyph: char) -> String {
+pub(super) fn format_attachment(has: Option<bool>) -> String {
     match has {
-        Some(true) => glyph.to_string(),
+        Some(true) => ATTACHMENT_GLYPH.to_string(),
         Some(false) => String::new(),
         None => "?".to_string(),
     }
@@ -270,7 +250,7 @@ mod tests {
             envelope::Envelope,
             flag::{Flag, IanaFlag},
         },
-        shared::envelope::list::{EnvelopeListOutput, FlagChars},
+        shared::envelope::list::EnvelopeListOutput,
     };
 
     fn envelopes(relative: bool) -> EnvelopeListOutput {
@@ -280,12 +260,6 @@ mod tests {
             datetime_relative: relative,
             recipient: false,
             with_attachment: false,
-            chars: FlagChars {
-                unseen: '*',
-                replied: 'R',
-                flagged: '!',
-                attachment: '@',
-            },
             envelopes: Vec::new(),
         }
     }

@@ -15,7 +15,7 @@ use crate::{
     account::context::Account,
     pimdir::{backend::PimdirQueuedEnvelope, client::PimdirClient},
     shared::{
-        envelope::list::{FlagChars, format_addresses, format_flags},
+        envelope::list::{format_addresses, format_flags},
         mailbox::arg::MailboxArg,
     },
 };
@@ -51,7 +51,6 @@ impl PimdirQueueListCommand {
         let parked = client.parked_actions(&mailbox)?;
 
         printer.out(PimdirQueueListOutput {
-            chars: FlagChars::of(account),
             messages: queued
                 .into_iter()
                 .map(|queued| PimdirQueuedMessage {
@@ -121,9 +120,6 @@ pub struct PimdirParkedRow {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueListOutput {
-    /// The FLAGS glyphs.
-    #[serde(skip)]
-    pub chars: FlagChars,
     /// The messages staged for creation in the mailbox.
     pub messages: Vec<PimdirQueuedMessage>,
     /// The mailbox's parked rows, any kind.
@@ -161,7 +157,7 @@ impl PimdirQueueListOutput {
             columns.push([
                 queued.id.to_string(),
                 String::from(if queued.send { "send" } else { "save" }),
-                format_flags(&queued.envelope.flags, &self.chars),
+                format_flags(&queued.envelope.flags),
                 sanitize::text(&queued.queued_at).into_owned(),
                 sanitize::text(&to).into_owned(),
                 sanitize::text(&queued.envelope.subject).into_owned(),
