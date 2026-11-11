@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -71,7 +71,7 @@ impl fmt::Display for PimdirMessageAddOutput {
         writeln!(
             f,
             "Message {} queued as row {}",
-            sanitize(&self.message_id),
+            sanitize::text(&self.message_id),
             self.queue_id
         )
     }

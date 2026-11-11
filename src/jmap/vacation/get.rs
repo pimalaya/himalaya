@@ -10,13 +10,12 @@ use clap::Parser;
 use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table, sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
+    account::context::Account, jmap::client::JmapClient, shared::message::read::sanitize_body,
 };
 
 /// Get the JMAP vacation response (VacationResponse/get).
@@ -28,7 +27,7 @@ impl JmapVacationGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let has_vacation = client
@@ -57,62 +56,42 @@ impl JmapVacationGetCommand {
                 html_body: None,
             });
 
-        let table = JmapVacationResponseGetOutput {
-            preset: account.table_preset().to_string(),
-            vacation,
-        };
-
-        printer.out(table)
+        printer.out(JmapVacationResponseGetOutput { vacation })
     }
 }
 
-/// Renderable table of the vacation response settings.
-/// The vacation response rendered as a table.
+/// The `jmap vacation get` output, the vacation response the server
+/// holds.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct JmapVacationResponseGetOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The vacation response the server holds.
     pub vacation: JmapVacationResponse,
 }
 
 impl fmt::Display for JmapVacationResponseGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
         let v = &self.vacation;
+        let mut fields = Fields::default();
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("KEY"), Cell::new("VALUE")]));
-
-        table.add_row(Row::from([
-            Cell::new("Enabled"),
-            Cell::new(if v.is_enabled { "true" } else { "" }),
-        ]));
+        fields.push("Enabled", v.is_enabled);
 
         if let Some(d) = &v.from_date {
-            table.add_row(Row::from([Cell::new("From"), Cell::new(sanitize(d))]));
+            fields.push("From", sanitize::text(d));
         }
-
         if let Some(d) = &v.to_date {
-            table.add_row(Row::from([Cell::new("To"), Cell::new(sanitize(d))]));
+            fields.push("To", sanitize::text(d));
         }
-
         if let Some(s) = &v.subject {
-            table.add_row(Row::from([Cell::new("Subject"), Cell::new(sanitize(s))]));
+            fields.push("Subject", sanitize::text(s));
         }
-
         if let Some(b) = &v.text_body {
-            table.add_row(Row::from([Cell::new("Body (plain)"), Cell::new(b)]));
+            fields.push("Body (plain)", sanitize_body(b));
         }
-
         if let Some(b) = &v.html_body {
-            table.add_row(Row::from([Cell::new("Body (HTML)"), Cell::new(b)]));
+            fields.push("Body (HTML)", sanitize_body(b));
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{fields}")
     }
 }

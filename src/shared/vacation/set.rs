@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::vacation::{Vacation, VacationPatch, parse_date},
-    shared::vacation::{cli::VacationClient, get::vacation_table},
+    shared::vacation::{cli::VacationClient, get::vacation_fields},
 };
 
 /// Change the auto-reply, then print it as it stands.
@@ -54,7 +54,7 @@ impl VacationSetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: VacationClient<'_>,
     ) -> Result<()> {
         let enabled = match (self.enable, self.disable) {
@@ -73,7 +73,6 @@ impl VacationSetCommand {
         };
 
         printer.out(VacationSetOutput {
-            preset: account.table_preset().to_string(),
             vacation: client.set(patch)?,
         })
     }
@@ -83,16 +82,12 @@ impl VacationSetCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct VacationSetOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The auto-reply.
     pub vacation: Vacation,
 }
 
 impl fmt::Display for VacationSetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        writeln!(f, "{}", vacation_table(&self.preset, &self.vacation))
+        write!(f, "{}", vacation_fields(&self.vacation))
     }
 }

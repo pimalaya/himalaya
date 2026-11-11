@@ -18,7 +18,7 @@ use mime::{
         datetime::MimeDateTime,
     },
 };
-use pimalaya_cli::{output::Bytes, printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, output::Bytes, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -520,22 +520,25 @@ impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = &self.0;
         let root = &message.root;
+        let mut headers = Fields::default();
 
         if let Some(date) = root.header::<DATE>() {
-            writeln!(f, "Date: {date}")?;
+            headers.push("Date", date);
         }
         if let Some(from) = root.header::<FROM>() {
-            writeln!(f, "From: {}", sanitize(&format_address(&from)))?;
+            headers.push("From", sanitize::text(&format_address(&from)));
         }
         if let Some(to) = root.header::<TO>() {
-            writeln!(f, "To: {}", sanitize(&format_address(&to)))?;
+            headers.push("To", sanitize::text(&format_address(&to)));
         }
         if let Some(cc) = root.header::<CC>() {
-            writeln!(f, "Cc: {}", sanitize(&format_address(&cc)))?;
+            headers.push("Cc", sanitize::text(&format_address(&cc)));
         }
         if let Some(subject) = header::unstructured(root, "Subject") {
-            writeln!(f, "Subject: {}", sanitize(&subject))?;
+            headers.push("Subject", sanitize::text(&subject));
         }
+
+        write!(f, "{headers}")?;
 
         // NOTE: HTML markup is verbose and `--raw` covers it, so a part
         // stays a summary unless printing it is the only readable option.
@@ -550,11 +553,11 @@ impl fmt::Display for MessageView {
             match part::filename(part) {
                 Some(name) => writeln!(
                     f,
-                    "[{id}] {} — {} ({size})",
-                    sanitize(&mime),
-                    sanitize(&name)
+                    "[{id}] {}, {} ({size})",
+                    sanitize::text(&mime),
+                    sanitize::text(&name)
                 )?,
-                None => writeln!(f, "[{id}] {} ({size})", sanitize(&mime))?,
+                None => writeln!(f, "[{id}] {} ({size})", sanitize::text(&mime))?,
             }
             render_part_headers(f, part)?;
 
@@ -614,23 +617,31 @@ fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MimeEntity) -> fmt::Re
         let ctype = part.content_type().to_content_type();
         let media = format!("{}/{}", ctype.top, ctype.sub).to_ascii_lowercase();
         let rendered = format_params(&media, &ctype.params);
-        writeln!(f, "    Content-Type: {}", sanitize(&rendered))?;
+        writeln!(f, "    Content-Type: {}", sanitize::text(&rendered))?;
     }
     if let Some(encoding) = header::raw_text(part, "Content-Transfer-Encoding")
         .map(|encoding| encoding.trim().to_ascii_lowercase())
         .filter(|encoding| !encoding.is_empty())
     {
-        writeln!(f, "    Content-Transfer-Encoding: {}", sanitize(&encoding))?;
+        writeln!(
+            f,
+            "    Content-Transfer-Encoding: {}",
+            sanitize::text(&encoding)
+        )?;
     }
     if let Some(disposition) = part.disposition() {
         let rendered = format_params(&disposition.kind.to_ascii_lowercase(), &disposition.params);
-        writeln!(f, "    Content-Disposition: {}", sanitize(&rendered))?;
+        writeln!(f, "    Content-Disposition: {}", sanitize::text(&rendered))?;
     }
     if let Some(id) = part::content_id(part) {
-        writeln!(f, "    Content-ID: {}", sanitize(&id))?;
+        writeln!(f, "    Content-ID: {}", sanitize::text(&id))?;
     }
     if let Some(description) = header::unstructured(part, "Content-Description") {
-        writeln!(f, "    Content-Description: {}", sanitize(&description))?;
+        writeln!(
+            f,
+            "    Content-Description: {}",
+            sanitize::text(&description)
+        )?;
     }
     Ok(())
 }
@@ -709,7 +720,7 @@ mod tests {
         assert!(!rendered.contains('\x1b'));
         assert!(!rendered.contains('\x07'));
         assert!(!rendered.contains('\u{202e}'));
-        assert!(rendered.contains("Subject: audit�]52;c;YQ==��"));
+        assert!(rendered.contains("Subject:  audit�]52;c;YQ==��"));
     }
 
     #[test]
@@ -733,9 +744,13 @@ mod tests {
 
         let out = render(raw);
 
-        assert!(out.contains("From: Alice <alice@example.com>"));
-        assert!(out.contains("To: Bob <bob@example.com>"));
-        assert!(out.contains("Subject: Hello"));
+        assert!(out.starts_with("Date:     "), "{out}");
+        assert!(
+            out.contains("\nFrom:     Alice <alice@example.com>\n"),
+            "{out}"
+        );
+        assert!(out.contains("\nTo:       Bob <bob@example.com>\n"), "{out}");
+        assert!(out.contains("\nSubject:  Hello\n"), "{out}");
         assert!(!out.contains("Message-ID"));
         assert!(!out.contains("X-Mailer"));
 
@@ -772,7 +787,7 @@ mod tests {
         // leaves keeping the `attachment` command ids 2, 3 and 4.
         assert!(out.contains("[2] text/plain"));
         assert!(out.contains("[3] text/html"));
-        assert!(out.contains("[4] application/pdf — doc.pdf"));
+        assert!(out.contains("[4] application/pdf, doc.pdf"));
 
         assert!(out.contains("    Content-Type: application/pdf; name=doc.pdf"));
         assert!(out.contains("    Content-Transfer-Encoding: base64"));

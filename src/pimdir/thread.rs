@@ -15,7 +15,7 @@ use crate::{
     account::context::Account,
     pimdir::{
         client::PimdirClient,
-        index::{PimdirMailThread, PimdirTableStyle},
+        index::{PimdirListStyle, PimdirMailThread},
     },
 };
 
@@ -29,10 +29,6 @@ pub struct PimdirThreadCommand {
     /// The message id, as a listing prints it.
     #[arg(value_name = "ID")]
     pub id: String,
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
 }
 
 impl PimdirThreadCommand {
@@ -45,7 +41,7 @@ impl PimdirThreadCommand {
     ) -> Result<()> {
         let thread = client.mail_thread(&self.id)?;
         printer.out(PimdirThreadOutput {
-            style: PimdirTableStyle::new(account, self.max_width),
+            style: PimdirListStyle::new(account),
             thread,
         })
     }
@@ -55,9 +51,9 @@ impl PimdirThreadCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirThreadOutput {
-    /// How the table renders.
+    /// How the list renders.
     #[serde(skip)]
-    pub style: PimdirTableStyle,
+    pub style: PimdirListStyle,
     /// The thread, every message of it in the account, oldest first.
     #[serde(flatten)]
     pub thread: PimdirMailThread,
@@ -65,7 +61,6 @@ pub struct PimdirThreadOutput {
 
 impl fmt::Display for PimdirThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        writeln!(f, "{}", self.style.hits(&self.thread.hits))
+        write!(f, "{}", self.style.hits(&self.thread.hits))
     }
 }

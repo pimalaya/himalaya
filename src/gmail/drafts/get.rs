@@ -10,7 +10,7 @@ use io_gmail::v1::rest::{
     drafts::get::GmailDraftGet,
     messages::{GmailMessageFormat, decode_raw},
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -74,19 +74,20 @@ pub(crate) struct GmailDraftGetOutput {
 
 impl fmt::Display for GmailDraftGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Draft id: {}", self.id)?;
+        let mut fields = Fields::default();
+        fields.push("Draft id", sanitize::text(&self.id));
 
         if let Some(message) = &self.message {
-            writeln!(f, "Message id: {}", message.id)?;
+            fields.push("Message id", sanitize::text(&message.id));
             if let Some(thread_id) = &message.thread_id {
-                writeln!(f, "Thread: {thread_id}")?;
+                fields.push("Thread", sanitize::text(thread_id));
             }
             if let Some(snippet) = &message.snippet {
-                writeln!(f, "Snippet: {snippet}")?;
+                fields.push("Snippet", sanitize::text(snippet));
             }
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }
 

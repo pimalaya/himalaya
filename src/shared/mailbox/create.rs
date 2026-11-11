@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -66,13 +66,13 @@ pub struct MailboxCreateOutput {
 
 impl fmt::Display for MailboxCreateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = sanitize(&self.name);
+        let name = sanitize::text(&self.name);
         match &self.id {
             _ if self.queued => writeln!(f, "Mailbox `{name}` queued for creation"),
             Some(id) => writeln!(
                 f,
                 "Successfully created mailbox `{name}` as `{}`",
-                sanitize(id)
+                sanitize::text(id)
             ),
             None => writeln!(f, "Successfully created mailbox `{name}`"),
         }

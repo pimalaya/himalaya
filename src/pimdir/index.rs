@@ -12,14 +12,10 @@
 //! to run the sync engine, and every answer says how far the index lags
 //! the store.
 
-use std::{
-    collections::BTreeMap,
-    fmt,
-    io::{IsTerminal, stdout},
-};
+use std::{collections::BTreeMap, fmt};
 
 use anyhow::{Context, Result, bail};
-use ariadne::{Color, Config, Label, Report, ReportKind, Source};
+use ariadne::{Config, Label, Report, ReportKind, Source};
 use chrono::{DateTime, FixedOffset, Local};
 use io_pimdir::{
     client::search::{
@@ -37,10 +33,7 @@ use io_pimdir::{
 };
 use jiff::tz::TimeZone;
 use log::warn;
-use pimalaya_cli::{
-    error::CodedError,
-    table::{Cell, ColumnConstraint, ContentArrangement, Row, Table, sanitize},
-};
+use pimalaya_cli::{columns::Columns, error::CodedError, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -53,7 +46,7 @@ use crate::{
         client::PimdirClient,
         mailbox::list::span,
     },
-    shared::{envelope::list::format_addresses, table::style_from_preset},
+    shared::envelope::list::format_addresses,
 };
 
 impl PimdirClient {
@@ -363,22 +356,18 @@ fn refusal_line(err: &PimdirQueryError) -> String {
     line
 }
 
-/// A refusal drawn over the query with ariadne, color dropped when stdout
-/// is not a terminal.
+/// A refusal drawn over the query with ariadne, without colour, the string
+/// landing in a JSON error as often as on a terminal.
 fn refusal_report(query: &str, err: &PimdirQueryError) -> String {
     let name = "query";
-    let config = Config::default().with_color(stdout().is_terminal());
+    let config = Config::default().with_color(false);
     // NOTE: an empty span past the end is drawn on the last character.
     let end = err.end.max(err.start + 1);
     let mut report = Report::build(ReportKind::Error, (name, err.start..end))
         .with_config(config)
         .with_code(err.code.as_str())
         .with_message("Query refused")
-        .with_label(
-            Label::new((name, err.start..end))
-                .with_message(&err.message)
-                .with_color(Color::Red),
-        );
+        .with_label(Label::new((name, err.start..end)).with_message(&err.message));
     if !err.expected.is_empty() {
         report = report.with_note(format!("expected {}", err.expected.join(", ")));
     }
@@ -573,7 +562,7 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
     }
 }
 
-/// The line under a table, naming what the answer could not see; nothing
+/// The line under a list, naming what the answer could not see; nothing
 /// when it is complete.
 impl fmt::Display for PimdirMailCoverage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -613,70 +602,54 @@ impl fmt::Display for PimdirMailCoverage {
     }
 }
 
-/// How the plain output draws its table, from the account's settings.
+/// How the plain output writes its lists, from the account's settings.
 #[derive(Clone, Debug)]
-pub struct PimdirTableStyle {
-    /// The `comfy_table` preset string.
-    pub preset: String,
-    /// The column arrangement.
-    pub arrangement: ContentArrangement,
-    /// The width the table is capped at, when one was asked for.
-    pub max_width: Option<u16>,
+pub struct PimdirListStyle {
     /// The chrono `strftime` format of a date.
     pub datetime_fmt: String,
     /// Whether a date is converted to the local timezone first.
     pub datetime_local_tz: bool,
 }
 
-impl PimdirTableStyle {
-    /// The style `account` configures, capped at `max_width`.
-    pub fn new(account: &Account, max_width: Option<u16>) -> Self {
+impl PimdirListStyle {
+    /// The style `account` configures.
+    pub fn new(account: &Account) -> Self {
         Self {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            max_width,
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
         }
     }
 
-    /// An empty table with `header`, the first column never squeezed.
-    pub fn table(&self, header: &[&str]) -> Table {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from(header.to_vec()));
-        if let Some(width) = self.max_width {
-            table.set_width(width);
-        }
-        table
-    }
+    /// The hits as a list: the id a follow-up command takes, the
+    /// mailboxes, date, what matched, sender, subject and the snippet.
+    ///
+    /// The free-text columns read last, the mailboxes joining without a
+    /// blank.
+    pub fn hits(&self, hits: &[PimdirMailHit]) -> Columns<'static> {
+        let header = [
+            "ID", "MAILBOX", "DATE", "MATCHED", "FROM", "SUBJECT", "SNIPPET",
+        ];
+        let mut columns = Columns::new(header);
 
-    /// The hits as a table: the id a follow-up command takes, the
-    /// mailboxes, date, sender, subject, what matched and the snippet.
-    pub fn hits(&self, hits: &[PimdirMailHit]) -> Table {
-        let mut table = self.table(&[
-            "ID", "MAILBOX", "DATE", "FROM", "SUBJECT", "MATCHED", "SNIPPET",
-        ]);
-        table.add_rows(hits.iter().map(|hit| {
-            let mut row = Row::new();
-            row.max_height(1);
-            row.add_cell(Cell::new(sanitize(&hit.envelope.id)));
-            row.add_cell(Cell::new(sanitize(&hit.mailboxes.join(", "))));
-            row.add_cell(Cell::new(self.date(hit.envelope.date)));
-            row.add_cell(Cell::new(sanitize(&format_addresses(&hit.envelope.from))));
-            row.add_cell(Cell::new(sanitize(&hit.envelope.subject)));
-            row.add_cell(Cell::new(match hit.matched {
+        for hit in hits {
+            let matched = match hit.matched {
                 Some(PimdirMailMatched::Body) => "body",
                 Some(PimdirMailMatched::Summary) => "headers",
                 None => "",
-            }));
-            row.add_cell(Cell::new(sanitize(&one_line(hit.snippet.as_deref()))));
-            row
-        }));
-        keep_first_column(&mut table);
-        table
+            };
+
+            columns.push([
+                sanitize::text(&hit.envelope.id).into_owned(),
+                sanitize::text(&hit.mailboxes.join(",")).into_owned(),
+                self.date(hit.envelope.date),
+                String::from(matched),
+                sanitize::text(&format_addresses(&hit.envelope.from)).into_owned(),
+                sanitize::text(&hit.envelope.subject).into_owned(),
+                sanitize::text(&one_line(hit.snippet.as_deref())).into_owned(),
+            ]);
+        }
+
+        columns
     }
 
     /// A date in the account's format, nothing without one.
@@ -689,14 +662,6 @@ impl PimdirTableStyle {
                 .to_string(),
             Some(date) => date.format(&self.datetime_fmt).to_string(),
         }
-    }
-}
-
-/// Keeps a table's first column, the id a follow-up command takes, whole
-/// when `--max-width` squeezes the table.
-pub fn keep_first_column(table: &mut Table) {
-    if let Some(column) = table.column_mut(0) {
-        column.set_constraint(ColumnConstraint::ContentWidth);
     }
 }
 

@@ -14,7 +14,7 @@ use std::fmt;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use pimalaya_cli::{error::CodedError, table::sanitize};
+use pimalaya_cli::{error::CodedError, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -175,8 +175,8 @@ impl fmt::Display for PimdirFlagStageOutput {
             .queued
             .iter()
             .map(|row| match row.queue_id {
-                Some(queue_id) => format!("{} as row {queue_id}", sanitize(&row.id)),
-                None => format!("{} unchanged", sanitize(&row.id)),
+                Some(queue_id) => format!("{} as row {queue_id}", sanitize::text(&row.id)),
+                None => format!("{} unchanged", sanitize::text(&row.id)),
             })
             .collect();
         writeln!(

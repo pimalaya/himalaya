@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -67,7 +67,7 @@ pub struct MailboxRenameOutput {
 
 impl fmt::Display for MailboxRenameOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (mailbox, name) = (sanitize(&self.mailbox), sanitize(&self.name));
+        let (mailbox, name) = (sanitize::text(&self.mailbox), sanitize::text(&self.name));
         if self.queued {
             return writeln!(f, "Rename of mailbox `{mailbox}` to `{name}` queued");
         }

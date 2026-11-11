@@ -8,14 +8,11 @@ use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use log::warn;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, jmap::client::JmapClient};
 
 /// Get JMAP identities (Identity/get).
 ///
@@ -29,11 +26,11 @@ pub struct JmapIdentityGetCommand {
 }
 
 impl JmapIdentityGetCommand {
-    /// Fetches the identities and tables them.
+    /// Fetches the identities and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let output = client.identity_get(JmapIdentityGetOptions { ids: self.ids })?;
@@ -42,44 +39,33 @@ impl JmapIdentityGetCommand {
             warn!("identity `{id}` not found");
         }
 
-        let table = JmapIdentityGetOutput {
-            preset: account.table_preset().to_string(),
+        printer.out(JmapIdentityGetOutput {
             identities: output.identities,
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// The identities rendered as a table.
+/// The `jmap identity get` output, the identities the server holds.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapIdentityGetOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The identities, in the order the server returned them.
     pub identities: Vec<JmapIdentity>,
 }
 
 impl fmt::Display for JmapIdentityGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a name is free text, so it reads last.
+        let mut columns = Columns::new(["ID", "EMAIL", "NAME"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("NAME"),
-                Cell::new("EMAIL"),
-            ]))
-            .add_rows(
-                self.identities.iter().map(|i| {
-                    Row::from([Cell::new(&i.id), Cell::new(&i.name), Cell::new(&i.email)])
-                }),
-            );
+        for identity in &self.identities {
+            columns.push([
+                sanitize::text(&identity.id),
+                sanitize::text(&identity.email),
+                sanitize::text(&identity.name),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

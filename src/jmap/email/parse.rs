@@ -66,9 +66,20 @@ pub(crate) struct JmapEmailParseOutput {
 
 impl fmt::Display for JmapEmailParseOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for body in &self.bodies {
-            write!(f, "{body}")?;
+        // NOTE: the bodies are a blank line apart, each closed by a line
+        // break it may lack.
+        for (index, body) in self.bodies.iter().enumerate() {
+            if index > 0 {
+                writeln!(f)?;
+            }
+
+            f.write_str(body)?;
+
+            if !body.ends_with('\n') {
+                writeln!(f)?;
+            }
         }
+
         Ok(())
     }
 }

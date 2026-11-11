@@ -10,15 +10,13 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::list::{
     GmailForwardingAddressesList, GmailForwardingAddressesListResponse,
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
-    shared::table::style_from_preset,
 };
 
 /// List all Gmail forwarding addresses
@@ -27,11 +25,11 @@ use crate::{
 pub struct GmailSettingsForwardingAddressesListCommand;
 
 impl GmailSettingsForwardingAddressesListCommand {
-    /// Lists every forwarding address and tables it.
+    /// Lists every forwarding address and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -40,52 +38,32 @@ impl GmailSettingsForwardingAddressesListCommand {
         };
         let resp = out.response;
 
-        let table = GmailSettingsForwardingAddressListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            response: resp,
-        };
-
-        printer.out(table)
+        printer.out(GmailSettingsForwardingAddressListOutput { response: resp })
     }
 }
 
-/// Renderable table of Gmail forwarding addresses.
+/// The `gmail settings forwarding-addresses list` output, the Gmail
+/// forwarding addresses.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsForwardingAddressListOutput {
-    #[serde(skip)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     #[serde(flatten)]
     response: GmailForwardingAddressesListResponse,
 }
 
 impl fmt::Display for GmailSettingsForwardingAddressListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["EMAIL", "VERIFICATION"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("EMAIL"), Cell::new("VERIFICATION")]))
-            .add_rows(self.response.forwarding_addresses.iter().map(|address| {
-                let status = address
-                    .verification_status
-                    .map(verification_status_wire)
-                    .unwrap_or_default();
+        for address in &self.response.forwarding_addresses {
+            let status = address
+                .verification_status
+                .map(verification_status_wire)
+                .unwrap_or_default();
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(&address.forwarding_email).fg(Color::Reset))
-                    .add_cell(Cell::new(status).fg(Color::Reset));
-                row
-            }));
+            columns.push([&*sanitize::text(&address.forwarding_email), status]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

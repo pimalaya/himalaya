@@ -15,8 +15,7 @@ use io_imap::{
         extensions::sort::{SortCriterion, SortKey},
     },
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -28,7 +27,6 @@ use crate::{
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
-    shared::table::style_from_preset,
 };
 
 /// Sort messages (SORT, RFC 5256).
@@ -59,7 +57,7 @@ impl ImapEnvelopeSortCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -85,15 +83,10 @@ impl ImapEnvelopeSortCommand {
                 },
             )?;
 
-            let table = ImapSortOutput {
-                preset: account.table_preset().to_string(),
-                arrangement: account.table_arrangement(),
-                id_color: account.envelopes_list_table_id_color(),
+            Ok(ImapSortOutput {
                 uid_mode: !self.seq,
                 ids: ids.into_iter().map(|id| id.get()).collect(),
-            };
-
-            Ok(table)
+            })
         })();
 
         outcome::print(printer, result)
@@ -135,38 +128,22 @@ impl From<SortKeyArg> for SortKey {
     }
 }
 
-/// The `imap sort` output, a table of message ids in sorted order.
+/// The `imap sort` output, the message ids in sorted order.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapSortOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
-    #[serde(skip)]
-    id_color: Color,
     uid_mode: bool,
     ids: Vec<u32>,
 }
 
 impl fmt::Display for ImapSortOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        let id_header = if self.uid_mode { "UID" } else { "SEQ" };
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new(id_header)]));
+        let mut columns = Columns::new([if self.uid_mode { "UID" } else { "SEQ" }]);
 
         for id in &self.ids {
-            table.add_row(Row::from([Cell::new(id).fg(self.id_color)]));
+            columns.push([id]);
         }
 
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        writeln!(f, "Found {} message(s)", self.ids.len())
+        write!(f, "{columns}")
     }
 }

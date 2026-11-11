@@ -8,10 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, Row, sanitize},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,8 +17,8 @@ use crate::{
     pimdir::{
         client::PimdirClient,
         index::{
-            PimdirMailCoverage, PimdirMailHit, PimdirMailThread, PimdirTableStyle,
-            keep_first_column, local_clock, parse_query,
+            PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailThread, local_clock,
+            parse_query,
         },
     },
     shared::envelope::list::format_addresses,
@@ -39,7 +36,7 @@ use crate::{
 /// The answer comes from the store's search index, which the sync engine
 /// builds and refreshes after each run: a message is found once it is
 /// synced and indexed, and a queued write shows in no answer. A line
-/// under the table says what the answer could not see: messages whose
+/// under the list says what the answer could not see: messages whose
 /// body is not local, mail outside what the store holds, the index lagging
 /// the store.
 #[derive(Debug, Parser)]
@@ -65,10 +62,6 @@ pub struct PimdirSearchCommand {
     /// is what `thread:` takes.
     #[arg(long)]
     pub threads: bool,
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
     /// The query, its words joined by spaces.
     #[arg(value_name = "QUERY", required = true)]
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
@@ -94,12 +87,9 @@ impl PimdirSearchCommand {
             offset: self.page.saturating_sub(1).saturating_mul(limit),
             clock: local_clock(),
         };
-        let style = PimdirTableStyle::new(account, self.max_width);
-
         if self.threads {
             let page = client.search_mail_threads(query, &options)?;
             return printer.out(PimdirSearchThreadsOutput {
-                style,
                 threads: page.threads,
                 more: page.more,
                 coverage: page.coverage,
@@ -108,7 +98,7 @@ impl PimdirSearchCommand {
 
         let page = client.search_mail(query, &options)?;
         printer.out(PimdirSearchOutput {
-            style,
+            style: PimdirListStyle::new(account),
             hits: page.hits,
             more: page.more,
             coverage: page.coverage,
@@ -142,9 +132,9 @@ impl From<PimdirSearchSortArg> for PimdirSearchSort {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirSearchOutput {
-    /// How the table renders.
+    /// How the list renders.
     #[serde(skip)]
-    pub style: PimdirTableStyle,
+    pub style: PimdirListStyle,
     /// The messages of this page.
     pub hits: Vec<PimdirMailHit>,
     /// Whether messages follow this page.
@@ -155,8 +145,7 @@ pub struct PimdirSearchOutput {
 
 impl fmt::Display for PimdirSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        writeln!(f, "{}", self.style.hits(&self.hits))?;
+        write!(f, "{}", self.style.hits(&self.hits))?;
         write!(f, "{}", self.coverage)
     }
 }
@@ -165,9 +154,6 @@ impl fmt::Display for PimdirSearchOutput {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirSearchThreadsOutput {
-    /// How the table renders.
-    #[serde(skip)]
-    pub style: PimdirTableStyle,
     /// The threads of this page, in the order of their first message.
     pub threads: Vec<PimdirMailThread>,
     /// Whether threads follow this page.
@@ -178,42 +164,41 @@ pub struct PimdirSearchThreadsOutput {
 
 impl fmt::Display for PimdirSearchThreadsOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = self
-            .style
-            .table(&["THREAD", "MESSAGES", "LAST", "FROM", "SUBJECT", "HITS"]);
-        table.add_rows(self.threads.iter().map(|thread| {
+        // NOTE: the free-text columns read last, the hit ids joining
+        // without a blank.
+        let header = ["THREAD", "MESSAGES", "LAST", "HITS", "FROM", "SUBJECT"];
+        let mut columns = Columns::new(header);
+
+        for thread in &self.threads {
             let first = thread.hits.first();
-            let mut row = Row::new();
-            row.max_height(1);
-            row.add_cell(Cell::new(sanitize(thread.thread.as_deref().unwrap_or(""))));
-            row.add_cell(Cell::new(thread.count));
-            row.add_cell(Cell::new(sanitize(
-                thread
-                    .last
-                    .as_deref()
-                    .map(|last| last.get(..10).unwrap_or(last))
-                    .unwrap_or(""),
-            )));
-            row.add_cell(Cell::new(sanitize(
-                &first
-                    .map(|hit| format_addresses(&hit.envelope.from))
-                    .unwrap_or_default(),
-            )));
-            row.add_cell(Cell::new(sanitize(
-                first.map(|hit| hit.envelope.subject.as_str()).unwrap_or(""),
-            )));
+            let last = thread
+                .last
+                .as_deref()
+                .map(|last| last.get(..10).unwrap_or(last))
+                .unwrap_or_default();
+            let from = first
+                .map(|hit| format_addresses(&hit.envelope.from))
+                .unwrap_or_default();
+            let subject = first
+                .map(|hit| hit.envelope.subject.as_str())
+                .unwrap_or_default();
             let ids: Vec<&str> = thread
                 .hits
                 .iter()
                 .map(|hit| hit.envelope.id.as_str())
                 .collect();
-            row.add_cell(Cell::new(ids.join(", ")));
-            row
-        }));
-        keep_first_column(&mut table);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")?;
+            columns.push([
+                sanitize::text(thread.thread.as_deref().unwrap_or_default()).into_owned(),
+                thread.count.to_string(),
+                sanitize::text(last).into_owned(),
+                sanitize::text(&ids.join(",")).into_owned(),
+                sanitize::text(&from).into_owned(),
+                sanitize::text(subject).into_owned(),
+            ]);
+        }
+
+        write!(f, "{columns}")?;
         write!(f, "{}", self.coverage)
     }
 }

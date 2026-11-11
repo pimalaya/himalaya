@@ -10,7 +10,9 @@ use io_gmail::v1::rest::history::{
     GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
 };
-use pimalaya_cli::{output::Paginated, printer::Printer};
+use pimalaya_cli::{
+    columns::Columns, fields::Fields, output::Paginated, printer::Printer, sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -42,7 +44,7 @@ pub struct GmailHistoryListCommand {
 }
 
 impl GmailHistoryListCommand {
-    /// Lists one page of history records and tables it.
+    /// Lists one page of history records and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let types: Vec<GmailHistoryType> =
             self.history_types.iter().copied().map(Into::into).collect();
@@ -117,26 +119,27 @@ pub(crate) struct GmailHistoryListOutput {
 
 impl fmt::Display for GmailHistoryListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let history_id = self.history_id.as_deref().unwrap_or("(none)");
-        writeln!(f, "New history id: {history_id}")?;
+        let mut fields = Fields::default();
+        let history_id = self.history_id.as_deref().unwrap_or_default();
+        fields.push("New history id", sanitize::text(history_id));
+        write!(f, "{fields}")?;
 
-        if self.history.is_empty() {
-            return writeln!(f, "No history changes since the given history id.");
-        }
+        // NOTE: the counts of messages added and deleted, then of the
+        // messages labels were added to and removed from.
+        let header = ["ID", "ADDED", "DELETED", "LABELED", "UNLABELED"];
+        let mut columns = Columns::new(header);
 
         for record in &self.history {
-            writeln!(
-                f,
-                "{}: +{}msg -{}msg +{}lbl -{}lbl",
-                record.id,
-                record.messages_added.len(),
-                record.messages_deleted.len(),
-                record.labels_added.len(),
-                record.labels_removed.len(),
-            )?;
+            columns.push([
+                sanitize::text(&record.id).into_owned(),
+                record.messages_added.len().to_string(),
+                record.messages_deleted.len().to_string(),
+                record.labels_added.len().to_string(),
+                record.labels_removed.len().to_string(),
+            ]);
         }
 
-        Ok(())
+        write!(f, "{columns}")
     }
 }
 

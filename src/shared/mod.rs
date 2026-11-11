@@ -34,6 +34,5 @@ pub mod raw;
     feature = "sieve"
 ))]
 pub mod receipt;
-pub mod table;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod vacation;

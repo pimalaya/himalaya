@@ -16,14 +16,11 @@ use io_jmap::{
         },
     },
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, jmap::client::JmapClient};
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -84,7 +81,7 @@ pub struct JmapEmailQueryCommand {
 }
 
 impl JmapEmailQueryCommand {
-    /// Queries the emails and tables the page it returned.
+    /// Queries the emails and prints the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -150,16 +147,7 @@ impl JmapEmailQueryCommand {
             ..Default::default()
         })?;
 
-        let table = JmapEmailQueryOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            colors: EmailsColors {
-                id: account.envelopes_list_table_id_color(),
-                flags: account.envelopes_list_table_flags_color(),
-                subject: account.envelopes_list_table_subject_color(),
-                from: account.envelopes_list_table_from_color(),
-                date: account.envelopes_list_table_date_color(),
-            },
+        let emails = JmapEmailQueryOutput {
             chars: EmailsChars {
                 unseen: account.envelopes_list_table_unseen_char(),
                 flagged: account.envelopes_list_table_flagged_char(),
@@ -168,26 +156,11 @@ impl JmapEmailQueryCommand {
             emails: output.emails,
         };
 
-        printer.out(table)
+        printer.out(emails)
     }
 }
 
-/// Per-column colors of the emails table.
-#[derive(Clone, Copy, Debug)]
-pub struct EmailsColors {
-    /// Color of the ID column.
-    pub id: Color,
-    /// Color of the FLAGS column.
-    pub flags: Color,
-    /// Color of the SUBJECT column.
-    pub subject: Color,
-    /// Color of the FROM column.
-    pub from: Color,
-    /// Color of the DATE column.
-    pub date: Color,
-}
-
-/// Flag glyphs of the emails table.
+/// Flag glyphs of the listed emails.
 #[derive(Clone, Copy, Debug)]
 pub struct EmailsChars {
     /// Glyph of an email lacking `$seen`.
@@ -198,19 +171,10 @@ pub struct EmailsChars {
     pub attachment: char,
 }
 
-/// The emails rendered as a table of envelopes.
+/// The `jmap email query` output, the envelopes of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapEmailQueryOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
-    /// The per-column colors.
-    #[serde(skip)]
-    pub colors: EmailsColors,
     /// The flag glyphs.
     #[serde(skip)]
     pub chars: EmailsChars,
@@ -220,18 +184,8 @@ pub struct JmapEmailQueryOutput {
 
 impl fmt::Display for JmapEmailQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("FLAGS"),
-                Cell::new("SUBJECT"),
-                Cell::new("FROM"),
-                Cell::new("DATE"),
-            ]));
+        // NOTE: the subject is the one free-text column, so it reads last.
+        let mut columns = Columns::new(["ID", "FLAGS", "FROM", "DATE", "SUBJECT"]);
 
         for e in &self.emails {
             let mut flags = String::new();
@@ -246,20 +200,18 @@ impl fmt::Display for JmapEmailQueryOutput {
                 flags.push(self.chars.attachment);
             }
 
-            let mut row = Row::new();
-            row.max_height(1);
-            row.add_cell(Cell::new(e.id.as_deref().unwrap_or("")).fg(self.colors.id));
-            row.add_cell(Cell::new(&flags).fg(self.colors.flags));
-            row.add_cell(Cell::new(e.subject.as_deref().unwrap_or("")).fg(self.colors.subject));
-            row.add_cell(
-                Cell::new(format_addresses(e.from.as_deref().unwrap_or(&[]))).fg(self.colors.from),
-            );
-            row.add_cell(Cell::new(e.received_at.as_deref().unwrap_or("")).fg(self.colors.date));
-            table.add_row(row);
+            let from = format_addresses(e.from.as_deref().unwrap_or_default());
+
+            columns.push([
+                sanitize::text(e.id.as_deref().unwrap_or_default()).into_owned(),
+                flags,
+                sanitize::text(&from).into_owned(),
+                sanitize::text(e.received_at.as_deref().unwrap_or_default()).into_owned(),
+                sanitize::text(e.subject.as_deref().unwrap_or_default()).into_owned(),
+            ]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 

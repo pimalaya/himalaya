@@ -7,25 +7,22 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, shared::table::style_from_preset, sieve::client::SieveClient,
-};
+use crate::{account::context::Account, sieve::client::SieveClient};
 
 /// List all server-side Sieve scripts and mark the active script.
 #[derive(Debug, Parser)]
 pub struct SieveScriptListCommand;
 
 impl SieveScriptListCommand {
-    /// Lists the scripts and tables them, marking the active one.
+    /// Lists the scripts, marking the active one.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &Account,
+        _account: &Account,
         client: &mut SieveClient,
     ) -> Result<()> {
         let scripts = client
@@ -37,11 +34,7 @@ impl SieveScriptListCommand {
             })
             .collect();
 
-        printer.out(SieveListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            scripts,
-        })
+        printer.out(SieveListOutput { scripts })
     }
 }
 
@@ -55,36 +48,24 @@ pub struct SieveScript {
     pub active: bool,
 }
 
-/// The `sieve list` output, a table of scripts.
+/// The `sieve list` output, the scripts the account holds.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SieveListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
     /// The scripts the account holds, the active one marked.
     pub scripts: Vec<SieveScript>,
 }
 
 impl fmt::Display for SieveListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("NAME"), Cell::new("ACTIVE")]));
+        // NOTE: a name is free text, so it reads last.
+        let mut columns = Columns::new(["ACTIVE", "NAME"]);
 
         for script in &self.scripts {
-            table.add_row(Row::from([
-                Cell::new(&script.name),
-                Cell::new(if script.active { "yes" } else { "" }),
-            ]));
+            let active = if script.active { "yes" } else { "" };
+            columns.push([active, &*sanitize::text(&script.name)]);
         }
 
-        writeln!(f)?;
-        write!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

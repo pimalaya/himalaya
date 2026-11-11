@@ -11,13 +11,13 @@ use crate::{
     account::context::Account,
     jmap::{
         client::JmapClient,
-        email::query::{EmailsChars, EmailsColors, JmapEmailQueryOutput},
+        email::query::{EmailsChars, JmapEmailQueryOutput},
     },
 };
 
 /// Get JMAP emails by ID (Email/get).
 ///
-/// Fetches and displays email envelopes as a table.
+/// Fetches and lists their envelopes.
 #[derive(Debug, Parser)]
 pub struct JmapEmailGetCommand {
     /// The email ID(s) to retrieve.
@@ -26,7 +26,7 @@ pub struct JmapEmailGetCommand {
 }
 
 impl JmapEmailGetCommand {
-    /// Fetches the emails and tables their envelopes.
+    /// Fetches the emails and lists their envelopes.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -39,16 +39,7 @@ impl JmapEmailGetCommand {
             warn!("email `{id}` not found, ignoring it");
         }
 
-        let table = JmapEmailQueryOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            colors: EmailsColors {
-                id: account.envelopes_list_table_id_color(),
-                flags: account.envelopes_list_table_flags_color(),
-                subject: account.envelopes_list_table_subject_color(),
-                from: account.envelopes_list_table_from_color(),
-                date: account.envelopes_list_table_date_color(),
-            },
+        let emails = JmapEmailQueryOutput {
             chars: EmailsChars {
                 unseen: account.envelopes_list_table_unseen_char(),
                 flagged: account.envelopes_list_table_flagged_char(),
@@ -57,6 +48,6 @@ impl JmapEmailGetCommand {
             emails: output.emails,
         };
 
-        printer.out(table)
+        printer.out(emails)
     }
 }

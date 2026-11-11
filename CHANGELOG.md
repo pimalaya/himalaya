@@ -45,7 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `message.reply.posting-style` and `message.forward.posting-style`, global or per account, the posting style used when `--posting-style` is not passed ([#772]).
 - Added the role of a pimdir mailbox: `mailbox list` shows the role the sync engine recorded from the server (`collections.role`), and a role name (`inbox`, `sent`, `drafts`, `trash`, …) addresses its mailbox wherever a mailbox is taken, as on JMAP, so `envelope list` without `-m` reads the inbox and `message delete` finds the trash without `mailbox.alias.trash`. A collection's name does not address it.
 - Added a stable `code` to the `--json` error output for failures a caller is expected to act on, found anywhere in the error chain. The first is `body-pending`: a pimdir message listed but whose body is not downloaded yet. A pimdir store failure carries the code io-pimdir gives it: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `sync-version`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer` or `ambiguous-performer`, and a pimdir search failure `index-missing`, `index-outdated`, `index-version`, `index-zone-unknown`, `index-fts5-missing`, `query-refused`, `query-unanswerable` or `tag-refused`.
-- Added the `wizard` cargo feature, on by default, gating the interactive configuration: the `configure` command and the offer a first run makes. A build without it drops the prompts and the dependencies only they use, and a missing configuration points at the documented sample instead.
 - Added `pimdir message add` and `pimdir message send`, staging as the shared commands do and printing the queue row with the `Message-ID`, and `pimdir queue show <ROW>`, saying whether a row is pending, parked (with why), applied (with the id of the message an add created; a message sent or a mailbox created once the sync engine acknowledges it) or unknown.
 - Added `pimdir mailbox create <NAME>`, queueing a `collection-create` intent for the sync engine to create the mailbox on its server.
 - Added `pimdir mailbox rename <MAILBOX> <NAME>`, queueing a `collection-rename` intent for the sync engine to rename the mailbox on its server, keeping its parent and its messages (pimdir STORAGE Annex B.2, capability `collection.rename`).
@@ -57,15 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Breaking:** changed every `--json` output to data, pimalaya-cli dropping its `Message` wrapper ([pimalaya-cli every-output-is-data](https://github.com/pimalaya/cli)). Writes print what they acted on rather than a `{"message": ...}` sentence: `message copy|move` `{count, queued}`, `message send` and a composer's save or send `{id, saved, sent, queued}`, the shared receipts `queued`, a protocol write `{id}` or `{ids}`, Gmail settings writes the settings, `jmap email import` `{id, blobId}`, `jmap email read` the emails, `smtp send` the envelope, `sieve check|put` the server's `warnings`. MIGRATION.md lists every shape.
-- **Breaking:** changed byte outputs under `--json` to `{data, size, mime}` in base64: `message read --raw` (lossy text before), `jmap email export` (failing on non-UTF-8 before), the raw Gmail and Graph `get`s and their attachment downloads (raw bytes on a JSON stdout before).
-- **Breaking:** changed `account check` to print every backend's row, `{backend, ok, code, error}`, and exit 2 when one fails, rather than one joined error exiting 1.
-- **Breaking:** changed every `imap` command to print its completion, `status` beside what it understood (a select's state, an expunge's numbers, a store's FETCH data, `APPENDUID`, `COPYUID`), a `NO` or `BAD` printing `{status, text}` and exiting 2. `imap raw` prints untagged and continuation responses as events, then the completions split into `tag`, `status`, `code` and `text`; `sieve raw` prints data lines as events and the completion; `smtp raw` prints `{code, text}`; each exits 2 on a refusal.
-- **Breaking:** changed the shapes a concept takes to one: flags written as `{raw, iana}`, `inReplyTo` a list in the read view, `imap fetch` addresses `{name, email}`, `imap search` ids numbers, attachment rows `role` instead of `inline` and `path: null`, maildir and mbox `flag list` rows `{raw, iana}`, Himalaya's own outputs printing `null` rather than omitting a key, the failure object's `code` included.
-- **Breaking:** changed pimdir queue rows to `row` (`queueId`, `copyQueueId`, the queue view's `id`), `pimdir flag add|set|remove` to `{messages: [{id, row}]}`, and the tag statuses and search `matched` values to kebab-case.
-- **Breaking:** changed `gmail messages list` to print `messages` rather than `ids`, and the Gmail settings lists to print the provider's key rather than `response`.
+- **BREAKING**: Changed every `--json` output to data, pimalaya-cli dropping its `Message` wrapper ([pimalaya-cli every-output-is-data](https://github.com/pimalaya/cli)). Writes print what they acted on rather than a `{"message": ...}` sentence: `message copy|move` `{count, queued}`, `message send` and a composer's save or send `{id, saved, sent, queued}`, the shared receipts `queued`, a protocol write `{id}` or `{ids}`, Gmail settings writes the settings, `jmap email import` `{id, blobId}`, `jmap email read` the emails, `smtp send` the envelope, `sieve check|put` the server's `warnings`. MIGRATION.md lists every shape.
+- **BREAKING**: Changed byte outputs under `--json` to `{data, size, mime}` in base64: `message read --raw` (lossy text before), `jmap email export` (failing on non-UTF-8 before), the raw Gmail and Graph `get`s and their attachment downloads (raw bytes on a JSON stdout before).
+- **BREAKING**: Changed `account check` to print every backend's row, `{backend, ok, code, error}`, and exit 2 when one fails, rather than one joined error exiting 1.
+- **BREAKING**: Changed every `imap` command to print its completion, `status` beside what it understood (a select's state, an expunge's numbers, a store's FETCH data, `APPENDUID`, `COPYUID`), a `NO` or `BAD` printing `{status, text}` and exiting 2. `imap raw` prints untagged and continuation responses as events, then the completions split into `tag`, `status`, `code` and `text`; `sieve raw` prints data lines as events and the completion; `smtp raw` prints `{code, text}`; each exits 2 on a refusal.
+- **BREAKING**: Changed the shapes a concept takes to one: flags written as `{raw, iana}`, `inReplyTo` a list in the read view, `imap fetch` addresses `{name, email}`, `imap search` ids numbers, attachment rows `role` instead of `inline` and `path: null`, maildir and mbox `flag list` rows `{raw, iana}`, Himalaya's own outputs printing `null` rather than omitting a key, the failure object's `code` included.
+- **BREAKING**: Changed pimdir queue rows to `row` (`queueId`, `copyQueueId`, the queue view's `id`), `pimdir flag add|set|remove` to `{messages: [{id, row}]}`, and the tag statuses and search `matched` values to kebab-case.
+- **BREAKING**: Changed `gmail messages list` to print `messages` rather than `ids`, and the Gmail settings lists to print the provider's key rather than `response`.
 - Changed IMAP flag writes to refuse, under `capability-missing`, a keyword the mailbox's `PERMANENTFLAGS` lists neither by name nor by `\*`, which the server would keep for the session only.
-- Changed the configuration loading to read every existing default path as a layer, each deep-merged on top of the ones before: `$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, then `$HOME/.himalayarc`, which therefore overrides. Only the first one found was read, so an rc file beside a `config.toml` was silently ignored. A file named by two paths, a symlinked rc file being one, is read once; `-c` still replaces the default paths. The wizard checks the name and the default of the account it generates against every layer, not only the file it appends to.
+- Changed the configuration loading to read every existing default path as a layer, each deep-merged on top of the ones before: `$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, then `$HOME/.himalayarc`, which therefore overrides. Only the first one found was read, so an rc file beside a `config.toml` was silently ignored. A file named by two paths, a symlinked rc file being one, is read once; `-c` still replaces the default paths.
 - Changed the default account resolution to refuse several accounts marked `default = true`, naming them, where one was picked in an order that changed from run to run. Naming an account with `-a` still works.
 - Changed the MIME parsing and composing to mime-rs (github.com/pimalaya/mime-rs, 0.1), replacing mail-parser and mail-builder: `message read`, `message parse`, `attachment list|download`, the search evaluator, the Maildir, m2dir and mbox envelopes and the composers. On well-formed mail the part ids and the `--json` views stay as they were. The `text` of a `format=flowed` part, and the quote of a reply to one, is now unwrapped (RFC 3676). The plain `message read` view shows the same part types, sizes and names as the JSON view.
 - Changed the composed messages to mime-rs's layout: the same headers and parts, a `Date` and `Message-ID` written by Himalaya, charset names lowercased (`utf-8''` in an RFC 2231 file name).
@@ -84,11 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `message copy`, `message move` and `message delete` on a pimdir account to stage the ids the mailbox holds and report how many they found, an unknown id skipped, as on the other backends. They used to fail on the first unknown id after staging the ones before it.
 - Changed `pimdir queue list` to list the mailbox's parked rows, any action kind, with why the sync engine parked each (`parked` under `--json`), and `pimdir queue cancel` to take one, naming the row's action kind (`kind` under `--json`) rather than calling every row a message.
 - Bumped ctutils to 0.4.6, rustls-webpki to 0.103.16 and webpki-root-certs to 1.0.11, fixing RUSTSEC-2026-0382, RUSTSEC-2026-0383 and RUSTSEC-2026-0385.
-- **Breaking:** changed every `--json` key to camelCase, the spelling JMAP, Microsoft Graph and the Google APIs already use, so each key is reachable by dot access in jq and JavaScript: `messages-total` becomes `messagesTotal`, `next_page` becomes `nextPage`, `thread-id` becomes `threadId`, `uid_validity` becomes `uidValidity`. Values keep their spelling (error codes, flags, mailbox roles stay kebab-case or lowercase), provider passthrough keeps the provider's keys, and the TOML configuration stays kebab-case. The `json-schema` titles follow the output types, now all named `*Output` (`Envelopes` becomes `EnvelopeListOutput`).
+- **BREAKING**: Changed every `--json` key to camelCase, the spelling JMAP, Microsoft Graph and the Google APIs already use, so each key is reachable by dot access in jq and JavaScript: `messages-total` becomes `messagesTotal`, `next_page` becomes `nextPage`, `thread-id` becomes `threadId`, `uid_validity` becomes `uidValidity`. Values keep their spelling (error codes, flags, mailbox roles stay kebab-case or lowercase), provider passthrough keeps the provider's keys, and the TOML configuration stays kebab-case. The `json-schema` titles follow the output types, now all named `*Output` (`Envelopes` becomes `EnvelopeListOutput`).
 - Changed piped `--json` output to print one value per line, each schema of `json-schema` to carry an `$id` naming the contract version (`v2`), and added `himalaya-error`, the schema of the JSON failure object (pimalaya-cli `55b6693`).
 - Changed `imap.id.auto` to send himalaya's canned `name`, `version`, `vendor` and `support-url` when `imap.id.fields` is unset, rather than `ID NIL`, which 163.com acknowledges and then refuses with `Unsafe Login`. An explicit empty `imap.id.fields` still sends `ID NIL` ([#774]).
 - Changed `envelope list` and `envelope search` on a pimdir account to read only what the page needs: newest first by keyset pages up to the end of the page, a search bounded by its date clauses and reading unread mail through the store's unread index, rather than every message of the mailbox. Output is unchanged; on 50,000 mails `envelope list -s 50` goes from 3.65 s to 28 ms.
-- **Breaking:** changed the `--json` output of `message read`, which no longer prints mail-parser's own model of the message but the view above.
+- **BREAKING**: Changed the `--json` output of `message read`, which no longer prints mail-parser's own model of the message but the view above.
 - Changed the size `attachment list` reports, and the bytes `attachment download` writes, to be the part's bytes once its transfer encoding is undone, in its own charset: a text attachment is no longer converted to UTF-8, and an attached message is written alone rather than with the whole message holding it.
 - Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen. A write a source supports only in part logs a warning.
 - Changed a pimdir send asking for a copy to carry it in the queued send, so the copy is filed only once the message is sent; a store whose owner declares no capabilities still gets the copy queued beside the send.
@@ -101,26 +100,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed a pimdir send to name its performer in the queued `submit` whatever the sources declare, the one source syncing the mailbox when none declares capabilities; a mailbox no source syncs yet is refused with `no-performer`, staging nothing.
 - Changed `pimdir flag` and `pimdir tag` to refuse a flag the store cannot hold (empty, or holding whitespace, a control or a non-ASCII character) with the code `flag-invalid`.
 - Changed `pimdir search`, `count` and `tag` to refuse a query past the SEARCH §8.3 bounds (1,024 characters, 32 groups open at once, 128 terms) with `query-refused`, naming `limit-exceeded` and the span.
-- Changed the wizard to pick the best option for mail and for sending without a question, then show the picks in a review where any of them can be changed.
-
-  Mail takes a provider's own API first (the Gmail API, Microsoft Graph), then JMAP, then IMAP, implicit TLS before STARTTLS, and OAuth first only when Ortie is installed; sending goes through mail over JMAP and the provider APIs, else over the best discovered SMTP server. Unencrypted discovered servers are no longer offered.
-
-- Changed the wizard to stop asking for a SASL mechanism, a JMAP authentication scheme, a login it knows, and the Gmail and Graph user id.
-
-  IMAP takes the best mechanism its CAPABILITY probe advertises (SCRAM-SHA-256, PLAIN, then LOGIN), SMTP PLAIN or XOAUTH2, JMAP Basic or Bearer, and the APIs `me`.
-
-- Changed the wizard to take a password once, show every server it goes to (flagging one off the address's domain), test it at once, then store it in an installed keyring under `himalaya-<account>-<service>`, read back through its command.
-
-  IMAP and SMTP of one domain share one password and one entry; a refused sign-in offers to try again, change the login, leave the domain out or go back to the review.
-
-- Changed the wizard's OAuth 2.0 sign-in to hand off to Ortie (`ortie configure`, then `ortie auth get`) when it is installed, one sign-in per authorization server, the token brokers being offered otherwise.
-- Changed the wizard to ask for a server URL when discovery finds nothing, rather than stopping.
-
-  The scheme names the protocol (`imaps://`, `imap://`, `smtps://`, `smtp://`, `https://`, `jmap://`), `http://` is refused unless on this machine, and an empty answer stops as before.
-
-- Changed the wizard to ask `Your name (optional):` last, written as `display-name`.
-- Bumped io-pim-discovery to 0.11, adding the autoconfig of the provider a domain's MX records name.
 - Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
+- **BREAKING**: Changed the lists to print as plain text: an uppercase header, then one item per line in columns two spaces apart, an empty cell as `-`, with no border, no colour, no truncation and no blank line before them.
+
+  The free-text column reads last (`envelope list` ends with SUBJECT, `mailbox list` with NAME), a FLAGS cell holds only the glyphs that apply, and a multi-valued cell joins its values with `,`. The `--json` output is unchanged.
+
+- **BREAKING**: Changed the records to print as aligned `Label: value` lines: `account check`, `imap select`, `imap status`, `imap id`, `imap fetch`, `vacation get|set`, `jmap vacation get`, `sieve capability`, the Gmail and Microsoft Graph `get`s and the header block of `message read` and `message parse`.
+
+  `jmap thread get` lists one email per line, `gmail history list` its records as columns, and `imap search` and `imap sort` no longer end with a count.
+
+- Changed `--help` to print without colour and each paragraph on one line, no longer wrapped to the terminal width.
+
+### Removed
+
+- **BREAKING**: Removed the configuration wizard: bare `himalaya` running it, the `configure` command (alias `wizard`), the offer a command made without a configuration, the `wizard` cargo feature, the `himalaya-configure` JSON Schema and the io-pim-discovery dependency.
+
+  It handed OAuth 2.0 to `ortie configure`, which Ortie 3.0 removed. Write the configuration from config.sample.toml; a command finding none fails naming the path it looked at.
+
+- **BREAKING**: Removed the `*.list.table.*-color` options, `table.preset` and `table.arrangement`, with the crossterm dependency.
+
+  A colour key under `envelope.list.table` or `mailbox` is refused as unknown; `table`, `attachment` and `account` are ignored like any unknown top-level key. The `envelope.list.table.*-char` glyphs stay.
+
+- **BREAKING**: Removed `-w/--max-width` from `envelope list`, `envelope search`, `mailbox list`, `pimdir search`, `pimdir thread`, `pimdir tag`, `pimdir mailbox list` and `pimdir attachment list|search`, nothing being truncated anymore.
 
 ### Fixed
 
@@ -148,8 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `flag remove` on a pimdir account leaving a flag the store holds in another spelling than the canonical one, `\seen` or Thunderbird's `Junk`, and `flag add` adding the canonical spelling beside it: flags are now matched as flags, not as strings.
 - Fixed `flag add`, `flag set` and `flag remove` on a pimdir account staging the change on the first messages of a call and then failing on a later one: every message is now checked against the sources before the first row is queued, so a call the check refuses stages nothing, and an id the mailbox does not hold is skipped and counted out, as on the other backends.
 - Fixed Maildir mailboxes being named by their last path segment, so `Archive` and `[Gmail]/Archive` both listed as `Archive`: `mailbox list` and `maildir list` now name them by their path relative to `maildir.root`, the name `-m` takes, in both layouts ([himalaya-tui#22](https://github.com/pimalaya/himalaya-tui/issues/22)).
-- Fixed the wizard reading a `secret-tool` keyring entry only by its `account` attribute: it now prompts for the attribute (default `account`), so a KeePassXC entry keyed by `Title` is found. A secret command failing silently now names its program and exit status instead of an empty `Secret command error` ([#745]).
-- Fixed the wizard creating new configuration files with permissions that could expose raw credentials. New files use exclusive creation and Unix mode 0600, and new directories use mode 0700. Existing file and directory permissions are preserved.
+- Fixed a secret command failing silently: it now names its program and exit status instead of an empty `Secret command error` ([#745]).
 - Fixed attachment downloads following dangling symlinks or overwriting existing files after filename suffixes are exhausted. Concurrent downloads now reserve filenames exclusively.
 - Fixed decoded message bodies, headers and MIME metadata emitting terminal control or bidi characters in the human-readable view. JSON and explicitly requested raw output remain unchanged.
 - Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
@@ -158,6 +158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `message move` on an IMAP server without MOVE whose `COPYUID` cannot be read, such as Mailo's UIDVALIDITY 0: the message was copied, left in the source and reported as not found. Mailo's `COPYUID` is now read despite its UIDVALIDITY 0, so a copy, or a move without MOVE, is counted without an extra round trip. Without a readable `COPYUID`, `message copy` and `message move` count the requested UIDs a `UID SEARCH` finds in the source, so a message that no longer exists is still reported as not found ([#781]).
 - Fixed a raw message piped on stdin (`message send`, `message add`, `smtp send`, every `save`, `import` and `insert`) being cut at its first line that is not valid UTF-8 and still reported as sent or saved, or refused as empty when that line was the first. Stdin and message files are now read whole as bytes, so a message in another 8-bit charset goes through intact. `imap raw` and `smtp raw` read stdin whole too and refuse invalid UTF-8 rather than truncating ([#786]).
 - Fixed the plain output of `flag add`, `flag set`, `flag remove` and `message delete` not ending with a newline ([#777]).
+- Fixed the plain output of `maildir|m2dir|mbox message save`, the Gmail draft writes, `jmap query`, `sieve get`, `sieve list` and `sieve capability` not ending with a newline, and `jmap email parse` running its bodies together.
+- Fixed the query errors of `envelope search` and the pimdir search commands carrying ANSI colour escapes on a terminal, even inside the `--json` error string: they render without colour.
 
 ## [2.2.1] - 2026-10-02
 

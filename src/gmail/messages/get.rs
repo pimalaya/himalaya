@@ -9,7 +9,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::{
     GmailMessageFormat, GmailMessageHeader, GmailMessagePayload, decode_raw,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -83,28 +83,29 @@ pub(crate) struct GmailMessageGetOutput {
 
 impl fmt::Display for GmailMessageGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Id: {}", self.id)?;
+        let mut fields = Fields::default();
+        fields.push("Id", sanitize::text(&self.id));
         if let Some(thread_id) = &self.thread_id {
-            writeln!(f, "Thread: {thread_id}")?;
+            fields.push("Thread", sanitize::text(thread_id));
         }
         if !self.label_ids.is_empty() {
-            writeln!(f, "Labels: {}", self.label_ids.join(", "))?;
+            fields.push("Labels", sanitize::text(&self.label_ids.join(", ")));
         }
         if let Some(snippet) = &self.snippet {
-            writeln!(f, "Snippet: {snippet}")?;
+            fields.push("Snippet", sanitize::text(snippet));
         }
         if let Some(size) = self.size_estimate {
-            writeln!(f, "Size: {size}")?;
+            fields.push("Size", size);
         }
         if let Some(internal_date) = &self.internal_date {
-            writeln!(f, "Internal date: {internal_date}")?;
+            fields.push("Internal date", sanitize::text(internal_date));
         }
 
         for header in &self.headers {
-            writeln!(f, "{}: {}", header.name, header.value)?;
+            fields.push(&header.name, sanitize::text(&header.value));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }
 

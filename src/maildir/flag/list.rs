@@ -8,12 +8,11 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlag;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, email::flag::IanaFlag, shared::table::style_from_preset};
+use crate::{account::context::Account, email::flag::IanaFlag};
 
 /// List the standard Maildir flags.
 ///
@@ -23,11 +22,9 @@ use crate::{account::context::Account, email::flag::IanaFlag, shared::table::sty
 pub struct MaildirFlagListCommand;
 
 impl MaildirFlagListCommand {
-    /// Tables the six standard flags and their info letters.
-    pub fn execute(self, printer: &mut impl Printer, account: &mut Account) -> Result<()> {
+    /// Lists the six standard flags and their info letters.
+    pub fn execute(self, printer: &mut impl Printer, _account: &mut Account) -> Result<()> {
         let table = MaildirFlagListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
             flags: vec![
                 FlagRow::new(MaildirFlag::Passed, IanaFlag::Forwarded),
                 FlagRow::new(MaildirFlag::Replied, IanaFlag::Answered),
@@ -42,21 +39,15 @@ impl MaildirFlagListCommand {
     }
 }
 
-/// Renderable table of the standard Maildir flags.
+/// The `maildir flag list` output, the standard Maildir flags.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirFlagListOutput {
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     flags: Vec<FlagRow>,
 }
 
-/// One row of the Maildir flags table: the flag, as the shared flags
-/// print it, its info letter as `raw`.
+/// One Maildir flag: the flag, as the shared flags print it, its info
+/// letter as `raw`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlagRow {
@@ -81,18 +72,12 @@ impl FlagRow {
 
 impl fmt::Display for MaildirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("CODE"), Cell::new("NAME")]));
+        let mut columns = Columns::new(["CODE", "NAME"]);
 
         for flag in &self.flags {
-            table.add_row(Row::from([Cell::new(&flag.raw), Cell::new(&flag.name)]));
+            columns.push([&flag.raw, &flag.name]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

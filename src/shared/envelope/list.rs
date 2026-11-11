@@ -1,6 +1,6 @@
 //! # Envelope list
 //!
-//! The `envelope list` command, tabling one page of a mailbox.
+//! The `envelope list` command, listing one page of a mailbox.
 
 use std::{collections::BTreeSet, fmt};
 
@@ -8,17 +8,16 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset, Local, NaiveDate};
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use pimalaya_cli::table::{
-    Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, sanitize,
+use pimalaya_cli::{
+    clap::args::PageTokenArg, columns::Columns, output::Paginated, printer::Printer, sanitize,
 };
-use pimalaya_cli::{clap::args::PageTokenArg, output::Paginated, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     email::{address::Address, envelope::Envelope, flag::Flag},
-    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
+    shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
 
 /// List the envelopes of a mailbox, most recent first.
@@ -42,13 +41,6 @@ pub struct EnvelopeListCommand {
     pub page_size: Option<u32>,
     #[command(flatten)]
     pub page_token: PageTokenArg,
-    /// Maximum width of the rendered table, in terminal columns.
-    ///
-    /// Overrides the auto-detected width, columns shrinking with an
-    /// ellipsis as needed.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
     /// Render recipients instead of senders, which is what a sent
     /// mailbox wants.
     #[arg(long, short)]
@@ -60,7 +52,7 @@ pub struct EnvelopeListCommand {
 }
 
 impl EnvelopeListCommand {
-    /// Lists one page of the mailbox and prints it as a table.
+    /// Lists one page of the mailbox and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -92,30 +84,12 @@ impl EnvelopeListCommand {
         };
 
         let envelopes = EnvelopeListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            max_width: self.max_width,
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
-            chars: FlagChars {
-                unseen: account.envelopes_list_table_unseen_char(),
-                replied: account.envelopes_list_table_replied_char(),
-                flagged: account.envelopes_list_table_flagged_char(),
-                attachment: account.envelopes_list_table_attachment_char(),
-            },
-            colors: EnvelopeColors {
-                id: account.envelopes_list_table_id_color(),
-                flags: account.envelopes_list_table_flags_color(),
-                att: account.envelopes_list_table_att_color(),
-                subject: account.envelopes_list_table_subject_color(),
-                from: account.envelopes_list_table_from_color(),
-                to: account.envelopes_list_table_to_color(),
-                date: account.envelopes_list_table_date_color(),
-                size: account.envelopes_list_table_size_color(),
-            },
+            chars: FlagChars::of(account),
             envelopes,
         };
 
@@ -140,33 +114,22 @@ pub struct FlagChars {
     pub attachment: char,
 }
 
-/// Per-column colors of the envelopes table, `Color::Reset` leaving the
-/// terminal default in place.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct EnvelopeColors {
-    pub id: Color,
-    pub flags: Color,
-    pub att: Color,
-    pub subject: Color,
-    pub from: Color,
-    pub to: Color,
-    pub date: Color,
-    pub size: Color,
+impl FlagChars {
+    /// Reads the glyphs off the merged account configuration.
+    pub fn of(account: &Account) -> Self {
+        Self {
+            unseen: account.envelopes_list_table_unseen_char(),
+            replied: account.envelopes_list_table_replied_char(),
+            flagged: account.envelopes_list_table_flagged_char(),
+            attachment: account.envelopes_list_table_attachment_char(),
+        }
+    }
 }
 
-/// The `envelope list` output, a table of envelopes.
+/// The `envelope list` output, the envelopes of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvelopeListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
-    /// The width the table is capped at, when one was asked for.
-    #[serde(skip)]
-    pub max_width: Option<u16>,
     /// The chrono `strftime` format of the DATE column.
     #[serde(skip)]
     pub datetime_fmt: String,
@@ -184,8 +147,6 @@ pub struct EnvelopeListOutput {
     pub with_attachment: bool,
     #[serde(skip)]
     pub(super) chars: FlagChars,
-    #[serde(skip)]
-    pub(super) colors: EnvelopeColors,
     /// The envelopes of this page.
     pub envelopes: Vec<Envelope>,
 }
@@ -193,93 +154,55 @@ pub struct EnvelopeListOutput {
 impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let today = Local::now().date_naive();
-        let mut table = Table::new();
 
-        let mut header = vec![Cell::new("ID"), Cell::new("FLAGS")];
+        // NOTE: the subject is the one free-text column, so it reads last
+        // and a long one never pushes the others out of line.
+        let mut header = vec!["ID", "FLAGS"];
         if self.with_attachment {
-            header.push(Cell::new("ATT"));
+            header.push("ATT");
         }
-        header.push(Cell::new("SUBJECT"));
-        header.push(Cell::new(if self.recipient { "TO" } else { "FROM" }));
-        header.push(Cell::new("DATE"));
-        header.push(Cell::new("SIZE").set_alignment(CellAlignment::Right));
-        let mut header = Row::from(header);
-        header.max_height(1);
+        header.push(if self.recipient { "TO" } else { "FROM" });
+        header.extend(["DATE", "SIZE", "SUBJECT"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(header)
-            .add_rows(self.envelopes.iter().map(|env| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(sanitize(&env.id)).fg(self.colors.id));
-                row.add_cell(
-                    Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags),
-                );
-                if self.with_attachment {
-                    row.add_cell(
-                        Cell::new(format_attachment(env.has_attachment, self.chars.attachment))
-                            .fg(self.colors.att),
-                    );
-                }
-                row.add_cell(Cell::new(sanitize(&env.subject)).fg(self.colors.subject));
+        let mut columns = Columns::new(header);
 
-                let addresses = if self.recipient { &env.to } else { &env.from };
-                let from_or_to_color = if self.recipient {
-                    self.colors.to
-                } else {
-                    self.colors.from
-                };
-                row.add_cell(
-                    Cell::new(sanitize(&format_addresses(addresses))).fg(from_or_to_color),
-                );
+        for env in &self.envelopes {
+            let addresses = if self.recipient { &env.to } else { &env.from };
 
-                row.add_cell(Cell::new(self.format_date(env.date, today)).fg(self.colors.date));
-                row.add_cell(
-                    Cell::new(format_size(env.size, BINARY))
-                        .fg(self.colors.size)
-                        .set_alignment(CellAlignment::Right),
-                );
-                row
-            }));
+            let mut row = vec![
+                sanitize::text(&env.id).into_owned(),
+                format_flags(&env.flags, &self.chars),
+            ];
+            if self.with_attachment {
+                row.push(format_attachment(env.has_attachment, self.chars.attachment));
+            }
+            row.push(sanitize::text(&format_addresses(addresses)).into_owned());
+            row.push(self.format_date(env.date, today));
+            row.push(format_size(env.size, BINARY));
+            row.push(sanitize::text(&env.subject).into_owned());
 
-        // NOTE: an id is what a follow-up command takes, so squeezing
-        // the table into `--max-width` truncates any column but this one.
-        if let Some(column) = table.column_mut(0) {
-            column.set_constraint(ColumnConstraint::ContentWidth);
+            columns.push(row);
         }
 
-        if let Some(width) = self.max_width {
-            table.set_width(width);
-        }
-
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 
-/// Renders the three-slot FLAGS widget: unseen, replied, flagged.
+/// Renders the FLAGS cell: the glyphs of unseen, replied and flagged, in
+/// that order, each only when it applies.
 ///
-/// A slot is a space when its flag is absent and the configured glyph
-/// when it is set.
+/// No flag renders an empty cell, which a list prints as `-`.
 pub fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
     let mut out = String::with_capacity(3);
-    out.push(if flags.iter().any(Flag::is_seen) {
-        ' '
-    } else {
-        chars.unseen
-    });
-    out.push(if flags.iter().any(Flag::is_answered) {
-        chars.replied
-    } else {
-        ' '
-    });
-    out.push(if flags.iter().any(Flag::is_flagged) {
-        chars.flagged
-    } else {
-        ' '
-    });
+    if !flags.iter().any(Flag::is_seen) {
+        out.push(chars.unseen);
+    }
+    if flags.iter().any(Flag::is_answered) {
+        out.push(chars.replied);
+    }
+    if flags.iter().any(Flag::is_flagged) {
+        out.push(chars.flagged);
+    }
     out
 }
 
@@ -337,16 +260,21 @@ impl EnvelopeListOutput {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
-    use pimalaya_cli::table::{Color, ContentArrangement};
+    use std::collections::BTreeSet;
 
-    use super::{Address, Envelope, EnvelopeColors, EnvelopeListOutput, FlagChars};
+    use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
+
+    use crate::{
+        email::{
+            address::Address,
+            envelope::Envelope,
+            flag::{Flag, IanaFlag},
+        },
+        shared::envelope::list::{EnvelopeListOutput, FlagChars},
+    };
 
     fn envelopes(relative: bool) -> EnvelopeListOutput {
         EnvelopeListOutput {
-            preset: String::new(),
-            arrangement: ContentArrangement::Disabled,
-            max_width: None,
             datetime_fmt: String::from("%F"),
             datetime_local_tz: false,
             datetime_relative: relative,
@@ -358,18 +286,46 @@ mod tests {
                 flagged: '!',
                 attachment: '@',
             },
-            colors: EnvelopeColors {
-                id: Color::Reset,
-                flags: Color::Reset,
-                att: Color::Reset,
-                subject: Color::Reset,
-                from: Color::Reset,
-                to: Color::Reset,
-                date: Color::Reset,
-                size: Color::Reset,
-            },
             envelopes: Vec::new(),
         }
+    }
+
+    fn envelope(id: &str, flags: BTreeSet<Flag>, subject: &str, from: &str) -> Envelope {
+        Envelope {
+            id: String::from(id),
+            message_id: None,
+            in_reply_to: Vec::new(),
+            flags,
+            subject: String::from(subject),
+            from: vec![Address {
+                name: Some(String::from(from)),
+                email: String::from("alice@example.org"),
+            }],
+            to: Vec::new(),
+            date: None,
+            size: 2048,
+            has_attachment: None,
+        }
+    }
+
+    /// The list is plain text: a header, aligned columns, no border and
+    /// no colour, the subject last and a flagless message's FLAGS `-`.
+    #[test]
+    fn the_list_is_aligned_plain_text() {
+        let mut envelopes = envelopes(false);
+        let unseen_flagged = BTreeSet::from([Flag::from_iana(IanaFlag::Flagged)]);
+        let seen = BTreeSet::from([Flag::from_iana(IanaFlag::Seen)]);
+        envelopes.envelopes = vec![
+            envelope("12", unseen_flagged, "Lunch on Friday?", "Alice"),
+            envelope("3", seen, "Re: the report", "Bob Martin"),
+        ];
+
+        let expected = "\
+ID  FLAGS  FROM        DATE  SIZE   SUBJECT
+12  *!     Alice       -     2 KiB  Lunch on Friday?
+3   -      Bob Martin  -     2 KiB  Re: the report
+";
+        assert_eq!(envelopes.to_string(), expected);
     }
 
     fn today() -> NaiveDate {

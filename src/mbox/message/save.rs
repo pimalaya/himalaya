@@ -54,6 +54,6 @@ pub struct MboxMessageSaveOutput {
 
 impl fmt::Display for MboxMessageSaveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Message `{}` successfully saved", self.id)
+        writeln!(f, "Message `{}` successfully saved", self.id)
     }
 }

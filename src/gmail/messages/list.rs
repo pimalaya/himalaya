@@ -7,14 +7,11 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessageId, list::GmailMessagesListParams};
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
-use pimalaya_cli::{output::Paginated, printer::Printer};
+use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, gmail::client::GmailClient};
 
 /// List Gmail message ids matching the given query and labels
 /// (users.messages.list).
@@ -41,11 +38,11 @@ pub struct GmailMessagesListCommand {
 }
 
 impl GmailMessagesListCommand {
-    /// Lists one page of message ids and tables it.
+    /// Lists one page of message ids and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let params = GmailMessagesListParams {
@@ -58,54 +55,36 @@ impl GmailMessagesListCommand {
         let response = client.messages_list(&params)?.response;
 
         let next_page = response.next_page_token;
-        let table = GmailMessageListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            id_color: account.envelopes_list_table_id_color(),
+        let messages = GmailMessageListOutput {
             messages: response.messages,
         };
 
         printer.out(Paginated {
-            inner: table,
+            inner: messages,
             next_page,
         })
     }
 }
 
-/// Renders a list of Gmail message ids as a two-column table.
+/// The `gmail messages list` output, the message ids of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailMessageListOutput {
-    #[serde(skip)]
-    /// The `comfy_table` preset string the table renders with.
-    pub preset: String,
-    #[serde(skip)]
-    /// The column arrangement the table renders with.
-    pub arrangement: ContentArrangement,
-    #[serde(skip)]
-    /// The color of the ID column.
-    pub id_color: Color,
     /// The messages of this page, each named by its id and thread id.
     pub messages: Vec<GmailMessageId>,
 }
 
 impl fmt::Display for GmailMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["ID", "THREAD ID"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("ID"), Cell::new("THREAD ID")]))
-            .add_rows(self.messages.iter().map(|id| {
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(&id.id).fg(self.id_color))
-                    .add_cell(Cell::new(id.thread_id.as_deref().unwrap_or("")));
-                row
-            }));
+        for message in &self.messages {
+            columns.push([
+                sanitize::text(&message.id),
+                sanitize::text(message.thread_id.as_deref().unwrap_or_default()),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

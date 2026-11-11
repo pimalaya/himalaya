@@ -10,7 +10,7 @@ use io_gmail::v1::rest::{
     messages::{GmailMessage, GmailMessageFormat, GmailMessagePayload},
     threads::get::GmailThreadGet,
 };
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -81,20 +81,31 @@ pub(crate) struct GmailThreadGetOutput {
 
 impl fmt::Display for GmailThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Thread id: {}", sanitize(&self.id))?;
+        let mut thread = Fields::default();
+        thread.push("Thread id", sanitize::text(&self.id));
+        write!(f, "{thread}")?;
 
+        // NOTE: one record per message, a blank line apart, the way the
+        // parts of a read message are.
         for message in &self.messages {
-            let snippet = message.snippet.as_deref().unwrap_or("");
-            writeln!(f, "- {}: {}", sanitize(&message.id), sanitize(snippet))?;
+            let names: Vec<_> = message
+                .headers
+                .iter()
+                .map(|header| sanitize::text(&header.name))
+                .collect();
 
-            for header in &message.headers {
-                writeln!(
-                    f,
-                    "  {}: {}",
-                    sanitize(&header.name),
-                    sanitize(&header.value)
-                )?;
+            let mut fields = Fields::default();
+            fields.push("Message id", sanitize::text(&message.id));
+
+            if let Some(snippet) = &message.snippet {
+                fields.push("Snippet", sanitize::text(snippet));
             }
+
+            for (name, header) in names.iter().zip(&message.headers) {
+                fields.push(name, sanitize::text(&header.value));
+            }
+
+            write!(f, "\n{fields}")?;
         }
 
         Ok(())

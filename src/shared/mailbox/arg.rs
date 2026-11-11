@@ -51,7 +51,6 @@ mod tests {
         let aliased = Account::from(Config {
             mailbox: MailboxConfig {
                 aliases: [("inbox".to_string(), "raw-id".to_string())].into(),
-                ..MailboxConfig::default()
             },
             ..Config::default()
         });

@@ -14,14 +14,11 @@ use io_jmap::rfc8621::mailbox::{
         JmapMailboxSortProperty,
     },
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, jmap::client::JmapClient};
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
 ///
@@ -62,11 +59,11 @@ pub struct JmapMailboxQueryCommand {
 }
 
 impl JmapMailboxQueryCommand {
-    /// Queries the mailboxes and tables the page it returned.
+    /// Queries the mailboxes and prints the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
@@ -100,92 +97,44 @@ impl JmapMailboxQueryCommand {
             properties: None,
         })?;
 
-        let table = JmapMailboxQueryOutput {
-            preset: account.table_preset().to_string(),
-            colors: MailboxColors {
-                id: account.mailboxes_list_table_id_color(),
-                name: account.mailboxes_list_table_name_color(),
-                total: account.mailboxes_list_table_total_color(),
-                unread: account.mailboxes_list_table_unread_color(),
-            },
+        printer.out(JmapMailboxQueryOutput {
             mailboxes: output.mailboxes,
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// Per-column colors of the mailboxes table.
-#[derive(Clone, Copy, Debug)]
-pub struct MailboxColors {
-    /// Color of the ID column.
-    pub id: Color,
-    /// Color of the NAME column.
-    pub name: Color,
-    /// Color of the TOTAL column.
-    pub total: Color,
-    /// Color of the UNREAD column.
-    pub unread: Color,
-}
-
-impl Default for MailboxColors {
-    fn default() -> Self {
-        Self {
-            id: Color::Reset,
-            name: Color::Reset,
-            total: Color::Reset,
-            unread: Color::Reset,
-        }
-    }
-}
-
-/// The mailboxes rendered as a table.
+/// The `jmap mailbox query` and `get` output, the mailboxes the server
+/// returned.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapMailboxQueryOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The per-column colors.
-    #[serde(skip)]
-    pub colors: MailboxColors,
     /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<JmapMailbox>,
 }
 
 impl fmt::Display for JmapMailboxQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a name is free text, so it reads last.
+        let header = ["ID", "ROLE", "TOTAL", "UNREAD", "SUBSCRIBED", "NAME"];
+        let mut columns = Columns::new(header);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("NAME"),
-                Cell::new("ROLE"),
-                Cell::new("TOTAL"),
-                Cell::new("UNREAD"),
-                Cell::new("SUBSCRIBED"),
-            ]))
-            .add_rows(self.mailboxes.iter().map(|r| {
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(r.id.as_deref().unwrap_or("Unknown")).fg(self.colors.id))
-                    .add_cell(
-                        Cell::new(r.name.as_deref().unwrap_or("Unknown")).fg(self.colors.name),
-                    )
-                    .add_cell(match r.role.as_ref() {
-                        Some(r) => Cell::new(r.to_string()),
-                        None => Cell::new(""),
-                    })
-                    .add_cell(Cell::new(r.total_emails).fg(self.colors.total))
-                    .add_cell(Cell::new(r.unread_emails).fg(self.colors.unread))
-                    .add_cell(Cell::new(if r.is_subscribed { "yes" } else { "" }));
-                row
-            }));
+        for mailbox in &self.mailboxes {
+            let text = |value: &Option<String>| {
+                sanitize::text(value.as_deref().unwrap_or("Unknown")).into_owned()
+            };
+            let role = mailbox.role.as_ref().map(ToString::to_string);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+            columns.push([
+                text(&mailbox.id),
+                role.unwrap_or_default(),
+                mailbox.total_emails.to_string(),
+                mailbox.unread_emails.to_string(),
+                String::from(if mailbox.is_subscribed { "yes" } else { "" }),
+                text(&mailbox.name),
+            ]);
+        }
+
+        write!(f, "{columns}")
     }
 }
 

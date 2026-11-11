@@ -7,10 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, Row, sanitize},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -19,10 +16,7 @@ use crate::{
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
-        index::{
-            PimdirMailCoverage, PimdirTableStyle, PimdirTagged, keep_first_column, local_clock,
-            parse_query,
-        },
+        index::{PimdirMailCoverage, PimdirTagged, local_clock, parse_query},
     },
 };
 
@@ -51,10 +45,6 @@ pub struct PimdirTagCommand {
     /// Print what would be queued, and queue nothing.
     #[arg(long)]
     pub dry_run: bool,
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
     /// The query, its words joined by spaces.
     #[arg(value_name = "QUERY", required = true)]
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
@@ -66,7 +56,7 @@ impl PimdirTagCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
         let add = flags(&self.add)?;
@@ -75,7 +65,6 @@ impl PimdirTagCommand {
 
         let tag = client.tag_mail(query, &add, &remove, self.dry_run, &local_clock())?;
         printer.out(PimdirTagOutput {
-            style: PimdirTableStyle::new(account, self.max_width),
             tagged: tag.tagged,
             coverage: tag.coverage,
         })
@@ -99,9 +88,6 @@ fn flags(values: &[String]) -> Result<Vec<String>> {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirTagOutput {
-    /// How the table renders.
-    #[serde(skip)]
-    pub style: PimdirTableStyle,
     /// One entry per mailbox holding each matched message.
     pub tagged: Vec<PimdirTagged>,
     /// What the query could not see: the tag reaches only what it found.
@@ -110,26 +96,25 @@ pub struct PimdirTagOutput {
 
 impl fmt::Display for PimdirTagOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = self
-            .style
-            .table(&["ID", "MAILBOX", "SUBJECT", "FLAGS", "STATUS", "ROW"]);
-        table.add_rows(self.tagged.iter().map(|tagged| {
-            let mut row = Row::new();
-            row.max_height(1);
-            row.add_cell(Cell::new(sanitize(&tagged.id)));
-            row.add_cell(Cell::new(sanitize(&tagged.mailbox)));
-            row.add_cell(Cell::new(sanitize(&tagged.subject)));
-            row.add_cell(Cell::new(sanitize(&tagged.flags.join(" "))));
-            row.add_cell(Cell::new(tagged.status));
-            row.add_cell(Cell::new(
-                tagged.queue_id.map(|id| id.to_string()).unwrap_or_default(),
-            ));
-            row
-        }));
-        keep_first_column(&mut table);
+        // NOTE: the subject is the one free-text column, so it reads last,
+        // and the flags join without a blank.
+        let header = ["ID", "MAILBOX", "FLAGS", "STATUS", "ROW", "SUBJECT"];
+        let mut columns = Columns::new(header);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")?;
+        for tagged in &self.tagged {
+            let row = tagged.queue_id.map(|id| id.to_string());
+
+            columns.push([
+                sanitize::text(&tagged.id).into_owned(),
+                sanitize::text(&tagged.mailbox).into_owned(),
+                sanitize::text(&tagged.flags.join(",")).into_owned(),
+                tagged.status.to_string(),
+                row.unwrap_or_default(),
+                sanitize::text(&tagged.subject).into_owned(),
+            ]);
+        }
+
+        write!(f, "{columns}")?;
         write!(f, "{}", self.coverage)
     }
 }

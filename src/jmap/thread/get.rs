@@ -8,14 +8,11 @@ use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::thread::JmapThread;
 use log::warn;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, jmap::client::JmapClient};
 
 /// Get JMAP threads by ID (Thread/get).
 ///
@@ -28,11 +25,11 @@ pub struct JmapThreadGetCommand {
 }
 
 impl JmapThreadGetCommand {
-    /// Fetches the threads and tables the emails they hold.
+    /// Fetches the threads and lists the emails they hold.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let output = client.thread_get(self.ids.clone())?;
@@ -42,37 +39,37 @@ impl JmapThreadGetCommand {
         }
 
         printer.out(JmapThreadGetOutput {
-            preset: account.table_preset().to_string(),
             threads: output.threads,
         })
     }
 }
 
-/// The threads rendered as a table, each with the emails it holds.
+/// The `jmap thread get` output, the threads with the emails they hold.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapThreadGetOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The threads, in the order the server returned them.
     pub threads: Vec<JmapThread>,
 }
 
 impl fmt::Display for JmapThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: one row per email, in thread order, so each line is one
+        // pair a script can read, and an empty thread one row of its own.
+        let mut columns = Columns::new(["THREAD ID", "EMAIL ID"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("ID"), Cell::new("EMAIL IDS")]))
-            .add_rows(
-                self.threads
-                    .iter()
-                    .map(|t| Row::from([Cell::new(&t.id), Cell::new(t.email_ids.join(", "))])),
-            );
+        for thread in &self.threads {
+            let id = sanitize::text(&thread.id);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+            if thread.email_ids.is_empty() {
+                columns.push([&*id, ""]);
+            }
+
+            for email_id in &thread.email_ids {
+                columns.push([&*id, &*sanitize::text(email_id)]);
+            }
+        }
+
+        write!(f, "{columns}")
     }
 }

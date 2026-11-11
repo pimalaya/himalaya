@@ -22,11 +22,11 @@ pub struct JmapSubmissionGetCommand {
 }
 
 impl JmapSubmissionGetCommand {
-    /// Fetches the submissions and tables them.
+    /// Fetches the submissions and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let output = client.email_submission_get(JmapEmailSubmissionGetOptions {
@@ -37,11 +37,8 @@ impl JmapSubmissionGetCommand {
             warn!("submission `{id}` not found, ignoring it");
         }
 
-        let table = JmapSubmissionQueryOutput {
-            preset: account.table_preset().to_string(),
+        printer.out(JmapSubmissionQueryOutput {
             submissions: output.submissions,
-        };
-
-        printer.out(table)
+        })
     }
 }

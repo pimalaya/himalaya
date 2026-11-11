@@ -8,8 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -17,7 +16,6 @@ use crate::{
     account::context::Account,
     email::mailbox::MailboxRole,
     imap::{client::ImapClient, outcome},
-    shared::table::style_from_preset,
 };
 
 /// List mailboxes (LIST and LSUB, RFC 3501).
@@ -38,11 +36,11 @@ pub struct ImapMailboxListCommand {
 }
 
 impl ImapMailboxListCommand {
-    /// Lists the mailboxes and prints them as a table.
+    /// Lists the mailboxes and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let reference = self.reference.try_into()?;
@@ -55,74 +53,52 @@ impl ImapMailboxListCommand {
                 client.lsub(reference, pattern)?
             };
 
-            let table = ImapMailboxListOutput {
-                preset: account.table_preset().to_string(),
-                name_color: account.mailboxes_list_table_name_color(),
+            Ok(ImapMailboxListOutput {
                 mailboxes: mailboxes.into_iter().map(From::from).collect(),
-            };
-
-            Ok(table)
+            })
         })();
 
         outcome::print(printer, result)
     }
 }
 
-/// The `imap list` output, a table of mailboxes.
+/// The `imap list` output, the mailboxes the server lists.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapMailboxListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The color of the NAME column.
-    #[serde(skip)]
-    pub name_color: Color,
     /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<MailboxRow>,
 }
 
 impl fmt::Display for ImapMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a name is free text, so it reads last, and the attributes
+        // join without a blank, so each line still splits on blanks.
+        let mut columns = Columns::new(["DELIMITER", "ROLE", "ATTRIBUTES", "NAME"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("NAME"),
-                Cell::new("DELIMITER"),
-                Cell::new("ROLE"),
-                Cell::new("ATTRIBUTES"),
-            ]))
-            .add_rows(self.mailboxes.iter().map(|mbox| {
-                let mut row = Row::new();
+        for mbox in &self.mailboxes {
+            let role = mbox
+                .attributes
+                .iter()
+                .find_map(|raw| match MailboxRole::parse(raw) {
+                    MailboxRole::Other(_) => None,
+                    role => Some(format!("{role:?}")),
+                })
+                .unwrap_or_default();
 
-                let role = mbox
-                    .attributes
-                    .iter()
-                    .find_map(|raw| match MailboxRole::parse(raw) {
-                        MailboxRole::Other(_) => None,
-                        role => Some(format!("{role:?}")),
-                    })
-                    .unwrap_or_default();
+            columns.push([
+                sanitize::text(&mbox.delimiter).into_owned(),
+                role,
+                sanitize::text(&mbox.attributes.join(",")).into_owned(),
+                sanitize::text(&mbox.name).into_owned(),
+            ]);
+        }
 
-                row.max_height(1)
-                    .add_cell(Cell::new(sanitize(&mbox.name)).fg(self.name_color))
-                    .add_cell(Cell::new(sanitize(&mbox.delimiter)))
-                    .add_cell(Cell::new(role))
-                    .add_cell(Cell::new(sanitize(&mbox.attributes.join(", "))));
-
-                row
-            }));
-
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        write!(f, "{columns}")
     }
 }
 
-/// One row of the mailboxes table.
+/// One mailbox of the list.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MailboxRow {

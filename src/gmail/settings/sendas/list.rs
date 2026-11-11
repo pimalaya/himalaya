@@ -8,15 +8,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, list::GmailSendAsList};
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
-    shared::table::style_from_preset,
 };
 
 /// List all Gmail send-as aliases (settings.sendAs.list).
@@ -24,11 +22,11 @@ use crate::{
 pub struct GmailSettingsSendAsListCommand;
 
 impl GmailSettingsSendAsListCommand {
-    /// Lists every send-as alias and tables it.
+    /// Lists every send-as alias and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -36,67 +34,44 @@ impl GmailSettingsSendAsListCommand {
             client.run(c)?
         };
 
-        let table = GmailSettingsSendAsListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
+        printer.out(GmailSettingsSendAsListOutput {
             send_as: out.response.send_as,
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// Renderable table of Gmail send-as aliases.
+/// The `gmail settings sendas list` output, the Gmail send-as aliases.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsSendAsListOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
     send_as: Vec<GmailSendAs>,
 }
 
 impl fmt::Display for GmailSettingsSendAsListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a display name is free text, so it reads last.
+        let mut columns = Columns::new(["EMAIL", "DEFAULT", "VERIFICATION", "NAME"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("EMAIL"),
-                Cell::new("NAME"),
-                Cell::new("DEFAULT"),
-                Cell::new("VERIFICATION"),
-            ]))
-            .add_rows(self.send_as.iter().map(|send_as| {
-                let default = if send_as.is_default == Some(true) {
-                    "yes"
-                } else {
-                    ""
-                };
+        for send_as in &self.send_as {
+            let default = if send_as.is_default == Some(true) {
+                "yes"
+            } else {
+                ""
+            };
+            let status = send_as
+                .verification_status
+                .map(verification_status_wire)
+                .unwrap_or_default();
+            let name = send_as.display_name.as_deref().unwrap_or_default();
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(&send_as.send_as_email).fg(Color::Reset))
-                    .add_cell(
-                        Cell::new(send_as.display_name.as_deref().unwrap_or("")).fg(Color::Reset),
-                    )
-                    .add_cell(Cell::new(default).fg(Color::Reset))
-                    .add_cell(
-                        Cell::new(
-                            send_as
-                                .verification_status
-                                .map(verification_status_wire)
-                                .unwrap_or_default(),
-                        )
-                        .fg(Color::Reset),
-                    );
-                row
-            }));
+            columns.push([
+                &*sanitize::text(&send_as.send_as_email),
+                default,
+                status,
+                &*sanitize::text(name),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

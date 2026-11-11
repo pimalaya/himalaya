@@ -9,7 +9,7 @@ status: current
 `himalaya repl` keeps one process alive for one account and runs the CLI's own commands over its stdin, so each client connects once for the session rather than once per command. Every command, one-shot or not, runs over a session holding the clients it built.
 
 ### Requirement: A session runs the CLI over one account
-`himalaya repl` SHALL start a session bound to one account and one `--backend`, read one command per stdin line, split as a shell splits it, parse it with the one-shot grammar and run it, and loop until `quit`, `exit` or EOF. `repl`, `mcp` and `configure` SHALL be refused inside it. A parse error or a command error SHALL be printed, on stdout as the failure object when piped, and the loop SHALL continue.
+`himalaya repl` SHALL start a session bound to one account and one `--backend`, read one command per stdin line, split as a shell splits it, parse it with the one-shot grammar and run it, and loop until `quit`, `exit` or EOF. `repl` and `mcp` SHALL be refused inside it. A parse error or a command error SHALL be printed, on stdout as the failure object when piped, and the loop SHALL continue.
 
 ### Requirement: A session connects once
 Every command SHALL run over a session holding one optional client per kind: a client SHALL be built the first time a command needs it and kept for the commands after it. A command that fails SHALL drop the client it ran on, so the next command builds it again; the failed command SHALL NOT be retried. A one-shot run SHALL use a fresh session for its single command.

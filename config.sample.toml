@@ -11,13 +11,9 @@
 # by repeating `-c`; the first one is the base and the rest are deep-merged on
 # top of it.
 #
-# Bare `himalaya` (or `himalaya configure`) launches the wizard, which discovers
-# an account from your email address, or takes a server URL when discovery finds
-# nothing, signs it in and offers to write it here. A password it stores in a
-# keyring is read back through `*.command`. Prompts go to stderr and the
-# document to stdout, so `himalaya > <path>` writes the file itself.
-#
-# Everything the wizard does not cover is written by hand, from this page.
+# Himalaya never writes this file: copy it to one of the paths above, keep the
+# blocks of the backends your account uses, and fill them in. A secret is best
+# read through `*.command`, from a keyring CLI or a password manager.
 # ================================================================================
 
 # --------------------------------------------------------------------------------
@@ -49,16 +45,6 @@
 #message.reply.posting-style = "bottom"
 #message.forward.posting-style = "top"
 
-# One character per table component, a space skipping it.
-# https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
-#table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
-
-# How the columns are fitted to the terminal width.
-# https://docs.rs/comfy-table/latest/comfy_table/enum.ContentArrangement.html
-#table.arrangement = "dynamic"
-#table.arrangement = "dynamic-full-width"
-#table.arrangement = "disabled"
-
 # chrono strftime format of the DATE column, defaulting to `"%F %R%:z"`.
 #envelope.list.datetime-fmt = "%F %R%:z"
 
@@ -75,61 +61,13 @@
 # passed, and 25 is the hard fallback.
 #envelope.list.page-size = 50
 
-# --------------------------------------------------------------------------------
-# Table rendering: envelope list
-# --------------------------------------------------------------------------------
-
-# Per-column colors of the envelopes table, each a named crossterm color or a
-# `{ Rgb = { r, g, b } }` or `{ AnsiValue = N }` table. They apply to the shared
-# listing and to the protocol-specific ones alike, so one key covers every
-# backend. The values below are the defaults.
-#envelope.list.table.id-color = "red"
-#envelope.list.table.flags-color = "reset"
-#envelope.list.table.att-color = "reset"
-#envelope.list.table.subject-color = "green"
-#envelope.list.table.from-color = "blue"
-#envelope.list.table.to-color = "blue"
-#envelope.list.table.date-color = "dark_yellow"
-#envelope.list.table.size-color = "reset"
-
-# Glyphs drawn in the FLAGS and ATT columns, one character each. The values
+# Glyphs of the FLAGS and ATT columns of the envelope lists, one character
+# each, the flags printed in this order and only when they apply. The values
 # below are the defaults.
-#envelope.list.table.unseen-char = "*"      # FLAGS slot 1, `\Seen` absent
-#envelope.list.table.replied-char = "R"     # FLAGS slot 2, `\Answered` set
-#envelope.list.table.flagged-char = "!"     # FLAGS slot 3, `\Flagged` set
+#envelope.list.table.unseen-char = "*"      # FLAGS, `\Seen` absent
+#envelope.list.table.replied-char = "R"     # FLAGS, `\Answered` set
+#envelope.list.table.flagged-char = "!"     # FLAGS, `\Flagged` set
 #envelope.list.table.attachment-char = "@"  # ATT column, an attachment
-
-# --------------------------------------------------------------------------------
-# Table rendering: mailbox list
-# --------------------------------------------------------------------------------
-
-# Per-column colors of the mailboxes table. The values below are the defaults.
-#mailbox.list.table.id-color = "reset"
-#mailbox.list.table.name-color = "blue"
-#mailbox.list.table.role-color = "reset"
-#mailbox.list.table.total-color = "reset"
-#mailbox.list.table.unread-color = "reset"
-
-# --------------------------------------------------------------------------------
-# Table rendering: attachment list
-# --------------------------------------------------------------------------------
-
-# Per-column colors of the attachments table, every one neutral by default.
-#attachment.list.table.id-color = "reset"
-#attachment.list.table.filename-color = "reset"
-#attachment.list.table.type-color = "reset"
-#attachment.list.table.size-color = "reset"
-#attachment.list.table.inline-color = "reset"
-#attachment.list.table.path-color = "reset"
-
-# --------------------------------------------------------------------------------
-# Table rendering: account list
-# --------------------------------------------------------------------------------
-
-# Per-column colors of the accounts table. The values below are the defaults.
-#account.list.table.name-color = "green"
-#account.list.table.backends-color = "blue"
-#account.list.table.default-color = "reset"
 
 # --------------------------------------------------------------------------------
 # Mailbox aliases
@@ -178,8 +116,6 @@ default = true
 #message.send.save-copy = "sent"
 #message.reply.posting-style = "bottom"
 #message.forward.posting-style = "top"
-#table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
-#table.arrangement = "dynamic"
 #envelope.list.datetime-fmt = "%F %R%:z"
 #envelope.list.datetime-local-tz = false
 #envelope.list.datetime-relative = false

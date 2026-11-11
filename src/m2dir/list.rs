@@ -1,30 +1,27 @@
 //! # m2dir list
 //!
-//! The `m2dir list` command, tabling the folders under the store root.
+//! The `m2dir list` command, listing the folders under the store root.
 
 use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, m2dir::client::M2dirClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, m2dir::client::M2dirClient};
 
 /// List m2dir folders found under the store root.
 #[derive(Debug, Parser)]
 pub struct M2dirMailboxListCommand;
 
 impl M2dirMailboxListCommand {
-    /// Lists the folders under the store root and tables them.
+    /// Lists the folders under the store root and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
         let store = client.open_store()?;
@@ -41,26 +38,14 @@ impl M2dirMailboxListCommand {
             })
             .collect();
 
-        let table = M2dirListOutput {
-            preset: account.table_preset().to_string(),
-            name_color: account.mailboxes_list_table_name_color(),
-            rows,
-        };
-
-        printer.out(table)
+        printer.out(M2dirListOutput { rows })
     }
 }
 
-/// The `m2dir list` output, a table of folders.
+/// The `m2dir list` output, the folders of the store.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct M2dirListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The color of the NAME column.
-    #[serde(skip)]
-    pub name_color: Color,
     /// The folders found under the store root.
     #[serde(rename = "m2dirs")]
     pub rows: Vec<M2dirRow>,
@@ -68,29 +53,17 @@ pub struct M2dirListOutput {
 
 impl fmt::Display for M2dirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["NAME", "PATH"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("NAME"), Cell::new("PATH")]))
-            .add_rows(self.rows.iter().map(|m| {
-                let mut row = Row::new();
+        for m2dir in &self.rows {
+            columns.push([sanitize::text(&m2dir.name), sanitize::text(&m2dir.path)]);
+        }
 
-                row.max_height(1)
-                    .add_cell(Cell::new(&m.name).fg(self.name_color))
-                    .add_cell(Cell::new(&m.path));
-
-                row
-            }));
-
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        write!(f, "{columns}")
     }
 }
 
-/// One row of the folders table.
+/// One folder of the list.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct M2dirRow {

@@ -11,14 +11,11 @@ use io_jmap::rfc8621::email_submission::{
     JmapEmailSubmission, JmapUndoStatus,
     query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, jmap::client::JmapClient};
 
 /// How far along a submission is, and whether it can still be canceled.
 #[derive(Clone, Debug, ValueEnum)]
@@ -62,11 +59,11 @@ pub struct JmapSubmissionQueryCommand {
 }
 
 impl JmapSubmissionQueryCommand {
-    /// Queries the submissions and tables the page it returned.
+    /// Queries the submissions and prints the page it returned.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
@@ -89,55 +86,40 @@ impl JmapSubmissionQueryCommand {
             limit: Some(self.page_size),
         })?;
 
-        let table = JmapSubmissionQueryOutput {
-            preset: account.table_preset().to_string(),
+        printer.out(JmapSubmissionQueryOutput {
             submissions: output.submissions,
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// The submissions rendered as a table.
+/// The `jmap submission query` output, the submissions of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapSubmissionQueryOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The submissions, in the order the server returned them.
     pub submissions: Vec<JmapEmailSubmission>,
 }
 
 impl fmt::Display for JmapSubmissionQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let header = ["ID", "EMAIL-ID", "IDENTITY-ID", "STATUS", "SENT-AT"];
+        let mut columns = Columns::new(header);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("EMAIL-ID"),
-                Cell::new("IDENTITY-ID"),
-                Cell::new("STATUS"),
-                Cell::new("SENT-AT"),
-            ]))
-            .add_rows(self.submissions.iter().map(|s| {
-                Row::from([
-                    Cell::new(s.id.as_deref().unwrap_or("")),
-                    Cell::new(s.email_id.as_deref().unwrap_or("")),
-                    Cell::new(s.identity_id.as_deref().unwrap_or("")),
-                    Cell::new(
-                        s.undo_status
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_default(),
-                    ),
-                    Cell::new(s.send_at.as_deref().unwrap_or("")),
-                ])
-            }));
+        for submission in &self.submissions {
+            let text = |value: &Option<String>| {
+                sanitize::text(value.as_deref().unwrap_or_default()).into_owned()
+            };
+            let status = submission.undo_status.as_ref().map(ToString::to_string);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+            columns.push([
+                text(&submission.id),
+                text(&submission.email_id),
+                text(&submission.identity_id),
+                status.unwrap_or_default(),
+                text(&submission.send_at),
+            ]);
+        }
+
+        write!(f, "{columns}")
     }
 }

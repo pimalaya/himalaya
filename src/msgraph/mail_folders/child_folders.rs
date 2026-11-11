@@ -1,6 +1,6 @@
 //! # Microsoft Graph child folder list
 //!
-//! The `msgraph mail-folders child-folders` command, tabling the folders
+//! The `msgraph mail-folders child-folders` command, listing the folders
 //! under one folder.
 
 use anyhow::Result;
@@ -10,7 +10,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    msgraph::{client::MsgraphClient, mail_folders::list::folders_table},
+    msgraph::{client::MsgraphClient, mail_folders::list::MsgraphMailFolderListOutput},
 };
 
 /// List a mail folder's child folders (`GET
@@ -36,11 +36,11 @@ pub struct MsgraphChildFoldersListCommand {
 }
 
 impl MsgraphChildFoldersListCommand {
-    /// Lists the folders under the given one and tables them.
+    /// Lists the folders under the given one and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
@@ -54,6 +54,6 @@ impl MsgraphChildFoldersListCommand {
             .response
             .value;
 
-        printer.out(folders_table(account, folders))
+        printer.out(MsgraphMailFolderListOutput::new(folders))
     }
 }

@@ -6,7 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,16 +45,17 @@ pub(crate) struct GmailProfileOutput {
 
 impl fmt::Display for GmailProfileOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Email: {}", self.email)?;
+        let mut fields = Fields::default();
+        fields.push("Email", sanitize::text(&self.email));
         if let Some(total) = self.messages_total {
-            writeln!(f, "Messages: {total}")?;
+            fields.push("Messages", total);
         }
         if let Some(total) = self.threads_total {
-            writeln!(f, "Threads: {total}")?;
+            fields.push("Threads", total);
         }
         if let Some(history_id) = &self.history_id {
-            writeln!(f, "History id: {history_id}")?;
+            fields.push("History id", sanitize::text(history_id));
         }
-        Ok(())
+        write!(f, "{fields}")
     }
 }

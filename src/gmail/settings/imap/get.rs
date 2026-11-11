@@ -7,7 +7,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{GmailImapSettings, get_imap::GmailImapGet};
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -21,7 +21,7 @@ use crate::gmail::{
 pub struct GmailSettingsImapGetCommand;
 
 impl GmailSettingsImapGetCommand {
-    /// Fetches the IMAP settings and tables them.
+    /// Fetches the IMAP settings and prints them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailImapGet::new(&client.auth, &client.user_id)?;
@@ -60,18 +60,19 @@ pub(crate) struct GmailSettingsImapGetOutput {
 
 impl fmt::Display for GmailSettingsImapGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Enabled: {}", yes_no(self.enabled))?;
+        let mut fields = Fields::default();
+        fields.push("Enabled", yes_no(self.enabled));
 
         if let Some(auto_expunge) = self.auto_expunge {
-            writeln!(f, "Auto expunge: {}", yes_no(auto_expunge))?;
+            fields.push("Auto expunge", yes_no(auto_expunge));
         }
         if let Some(behavior) = &self.expunge_behavior {
-            writeln!(f, "Expunge behavior: {behavior}")?;
+            fields.push("Expunge behavior", behavior);
         }
         if let Some(size) = self.max_folder_size {
-            writeln!(f, "Max folder size: {size}")?;
+            fields.push("Max folder size", size);
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

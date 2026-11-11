@@ -7,15 +7,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    pimdir::client::PimdirClient,
-    shared::{mailbox::arg::MailboxArg, table::style_from_preset},
+    account::context::Account, pimdir::client::PimdirClient, shared::mailbox::arg::MailboxArg,
 };
 
 /// List the flags a pimdir message carries, one raw spelling per row.
@@ -33,7 +30,7 @@ pub struct PimdirFlagListCommand {
 }
 
 impl PimdirFlagListCommand {
-    /// Reads the message's flags and tables them.
+    /// Reads the message's flags and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -49,11 +46,7 @@ impl PimdirFlagListCommand {
             );
         }
 
-        printer.out(PimdirFlagListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            flags,
-        })
+        printer.out(PimdirFlagListOutput { flags })
     }
 }
 
@@ -61,12 +54,6 @@ impl PimdirFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirFlagListOutput {
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     /// The raw spellings, sorted, or `null` when the sync engine never
     /// read the message's flags.
     flags: Option<Vec<String>>,
@@ -74,32 +61,22 @@ pub struct PimdirFlagListOutput {
 
 impl fmt::Display for PimdirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("FLAG")]));
+        let mut columns = Columns::new(["FLAG"]);
 
         for flag in self.flags.iter().flatten() {
-            table.add_row(Row::from([Cell::new(flag)]));
+            columns.push([sanitize::text(flag)]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::pimdir::flag::list::PimdirFlagListOutput;
 
     fn list(flags: Option<Vec<String>>) -> PimdirFlagListOutput {
-        PimdirFlagListOutput {
-            preset: String::new(),
-            arrangement: ContentArrangement::Disabled,
-            flags,
-        }
+        PimdirFlagListOutput { flags }
     }
 
     #[test]
@@ -116,10 +93,9 @@ mod tests {
     }
 
     #[test]
-    fn the_table_lists_one_flag_per_row() {
-        let table = list(Some(vec!["\\Seen".into(), "act".into()])).to_string();
-        assert!(table.contains("FLAG"), "{table}");
-        assert!(table.contains("\\Seen") && table.contains("act"), "{table}");
-        assert!(!list(None).to_string().contains("act"));
+    fn the_list_names_one_flag_per_row() {
+        let known = list(Some(vec!["\\Seen".into(), "act".into()]));
+        assert_eq!(known.to_string(), "FLAG\n\\Seen\nact\n");
+        assert_eq!(list(None).to_string(), "FLAG\n");
     }
 }

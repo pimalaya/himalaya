@@ -7,7 +7,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{GmailPopSettings, get_pop::GmailPopGet};
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -57,13 +57,15 @@ pub(crate) struct GmailSettingsPopGetOutput {
 
 impl fmt::Display for GmailSettingsPopGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut fields = Fields::default();
+
         if let Some(access_window) = &self.access_window {
-            writeln!(f, "Access window: {access_window}")?;
+            fields.push("Access window", access_window);
         }
         if let Some(disposition) = &self.disposition {
-            writeln!(f, "Disposition: {disposition}")?;
+            fields.push("Disposition", disposition);
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

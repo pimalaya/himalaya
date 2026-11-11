@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::{GmailDelegate, get::GmailDelegateGet};
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,12 +45,13 @@ pub(crate) struct GmailSettingsDelegateGetOutput(GmailDelegate);
 
 impl fmt::Display for GmailSettingsDelegateGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Email: {}", self.0.delegate_email)?;
+        let mut fields = Fields::default();
+        fields.push("Email", sanitize::text(&self.0.delegate_email));
 
         if let Some(status) = self.0.verification_status {
-            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+            fields.push("Verification", verification_status_wire(status));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

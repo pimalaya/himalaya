@@ -8,15 +8,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::status::{StatusDataItem, StatusDataItemName};
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table};
+use pimalaya_cli::{fields::Fields, printer::Printer};
 use schemars::JsonSchema;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
-    shared::table::style_from_preset,
 };
 
 /// Get the status of the given mailbox (STATUS, RFC 3501).
@@ -29,11 +27,11 @@ pub struct ImapMailboxStatusCommand {
 }
 
 impl ImapMailboxStatusCommand {
-    /// Asks for every status item and tables what came back.
+    /// Asks for every status item and prints what came back.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -48,12 +46,7 @@ impl ImapMailboxStatusCommand {
         let result = (|| -> Result<_> {
             let items = client.status(mailbox, item_names.into())?;
 
-            let table = MailboxStatusTable {
-                preset: account.table_preset().to_string(),
-                status: items.into(),
-            };
-
-            Ok(table)
+            Ok(ImapMailboxStatusOutput::from(items))
         })();
 
         outcome::print(printer, result)
@@ -112,64 +105,27 @@ impl From<Vec<StatusDataItem>> for ImapMailboxStatusOutput {
     }
 }
 
-/// The status rendered as a table of attributes and values.
-pub struct MailboxStatusTable {
-    /// The `comfy_table` preset string the table renders with.
-    pub preset: String,
-    /// The status the server reported.
-    pub status: ImapMailboxStatusOutput,
-}
-
-impl fmt::Display for MailboxStatusTable {
+impl fmt::Display for ImapMailboxStatusOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let rows = [
+            ("Messages", self.messages.map(u64::from)),
+            ("Recent", self.recent.map(u64::from)),
+            ("Unseen", self.unseen.map(u64::from)),
+            ("Deleted", self.deleted.map(u64::from)),
+            ("Deleted storage", self.deleted_storage),
+            ("Highest modified sequence", self.highest_mod_seq),
+            ("UID next", self.uid_next.map(u64::from)),
+            ("UID validity", self.uid_validity.map(u64::from)),
+        ];
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("ATTRIBUTE"), Cell::new("VALUE")]));
+        let mut fields = Fields::default();
 
-        if let Some(n) = self.status.messages {
-            table.add_row(Row::from([Cell::new("Messages"), Cell::new(n)]));
+        for (label, value) in rows {
+            if let Some(value) = value {
+                fields.push(label, value);
+            }
         }
 
-        if let Some(n) = self.status.recent {
-            table.add_row(Row::from([Cell::new("Recent"), Cell::new(n)]));
-        }
-
-        if let Some(n) = self.status.unseen {
-            table.add_row(Row::from([Cell::new("Unseen"), Cell::new(n)]));
-        }
-
-        if let Some(n) = self.status.deleted {
-            table.add_row(Row::from([Cell::new("Deleted"), Cell::new(n)]));
-        }
-
-        if let Some(n) = self.status.deleted_storage {
-            table.add_row(Row::from([Cell::new("Deleted storage"), Cell::new(n)]));
-        }
-
-        if let Some(deleted) = self.status.highest_mod_seq {
-            table.add_row(Row::from([
-                Cell::new("Highest modified sequence"),
-                Cell::new(deleted),
-            ]));
-        }
-
-        if let Some(n) = self.status.uid_next {
-            table.add_row(Row::from([Cell::new("UID next"), Cell::new(n)]));
-        }
-
-        if let Some(n) = self.status.uid_validity {
-            table.add_row(Row::from([Cell::new("UID validity"), Cell::new(n)]));
-        }
-
-        writeln!(f)?;
-        writeln!(f, "{table}")
-    }
-}
-
-impl Serialize for MailboxStatusTable {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.status.serialize(serializer)
+        write!(f, "{fields}")
     }
 }

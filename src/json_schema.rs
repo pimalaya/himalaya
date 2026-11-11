@@ -8,10 +8,10 @@
 //! their command modules, so the registry stays coherent under any feature
 //! combination, none included.
 //!
-//! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::JsonSchemaCommand
+//! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::json_schema::JsonSchemaCommand
 
 use pimalaya_cli::{
-    clap::commands::JsonSchemaRegistry,
+    clap::commands::json_schema::JsonSchemaRegistry,
     error::ErrorReport,
     output::{Bytes, Paginated},
 };
@@ -159,11 +159,6 @@ pub fn registry() -> JsonSchemaRegistry {
         );
     }
 
-    #[cfg(feature = "wizard")]
-    insert!(
-        "himalaya-configure",
-        crate::wizard::configure::ConfigureOutput
-    );
     insert!(
         "himalaya-account-list",
         crate::account::list::AccountListOutput
@@ -798,8 +793,7 @@ mod tests {
 
     /// The commands printing nothing a schema could describe: the REPL
     /// and the MCP server speak their own protocols, and a bare
-    /// `himalaya` shows the help, or runs the wizard `configure`
-    /// describes.
+    /// `himalaya` shows the help.
     const SILENT: &[&str] = &["himalaya", "himalaya-repl", "himalaya-mcp"];
 
     #[test]

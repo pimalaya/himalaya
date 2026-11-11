@@ -11,7 +11,7 @@ use io_jmap::rfc8621::{
     identity::set::JmapIdentitySetItemError,
     mailbox::set::JmapMailboxSetItemError,
 };
-use pimalaya_cli::table::sanitize;
+use pimalaya_cli::sanitize;
 
 /// Returns the optional human-readable description carried by a JMAP set error.
 pub trait JmapSetError {
@@ -32,12 +32,12 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
     }
 
     if let Some(desc) = err.description() {
-        msg.push_str(" — ");
+        msg.push_str(": ");
         msg.push_str(desc.trim_end_matches(['.', '\n']));
     }
 
     // The type, properties and description come from the server.
-    sanitize(&msg).into_owned()
+    sanitize::text(&msg).into_owned()
 }
 
 impl JmapSetError for JmapMailboxSetItemError {

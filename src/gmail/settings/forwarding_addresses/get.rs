@@ -10,7 +10,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::{
     GmailForwardingAddress, get::GmailForwardingAddressGet,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -26,7 +26,7 @@ pub struct GmailSettingsForwardingAddressGetCommand {
 }
 
 impl GmailSettingsForwardingAddressGetCommand {
-    /// Fetches the forwarding address and tables it.
+    /// Fetches the forwarding address and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailForwardingAddressGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -48,12 +48,13 @@ pub(crate) struct GmailSettingsForwardingAddressGetOutput(GmailForwardingAddress
 
 impl fmt::Display for GmailSettingsForwardingAddressGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Email: {}", self.0.forwarding_email)?;
+        let mut fields = Fields::default();
+        fields.push("Email", sanitize::text(&self.0.forwarding_email));
 
         if let Some(status) = self.0.verification_status {
-            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+            fields.push("Verification", verification_status_wire(status));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

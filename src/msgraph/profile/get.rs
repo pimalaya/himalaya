@@ -6,7 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -18,7 +18,7 @@ use crate::msgraph::client::MsgraphClient;
 pub struct MsgraphProfileGetCommand;
 
 impl MsgraphProfileGetCommand {
-    /// Fetches the signed-in user and tables the profile.
+    /// Fetches the signed-in user and prints the profile.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let user = client.me()?.response;
 
@@ -45,16 +45,17 @@ pub(crate) struct MsgraphProfileOutput {
 
 impl fmt::Display for MsgraphProfileOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Id: {}", self.id)?;
+        let mut fields = Fields::default();
+        fields.push("Id", sanitize::text(&self.id));
         if let Some(display_name) = &self.display_name {
-            writeln!(f, "Display name: {display_name}")?;
+            fields.push("Display name", sanitize::text(display_name));
         }
         if let Some(mail) = &self.mail {
-            writeln!(f, "Mail: {mail}")?;
+            fields.push("Mail", sanitize::text(mail));
         }
         if let Some(upn) = &self.user_principal_name {
-            writeln!(f, "User principal name: {upn}")?;
+            fields.push("User principal name", sanitize::text(upn));
         }
-        Ok(())
+        write!(f, "{fields}")
     }
 }

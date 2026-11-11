@@ -10,15 +10,11 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, bail};
 use clap::Parser;
-#[cfg(all(feature = "imap", feature = "wizard"))]
-use io_sasl::mechanism::SaslMechanism;
-use pimalaya_cli::{error::PartialOutcome, printer::Printer};
+use pimalaya_cli::{error::PartialOutcome, fields::Fields, printer::Printer};
 use pimalaya_config::{secret::SecretResolver, toml::TomlConfig};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-#[cfg(feature = "wizard")]
-use crate::config::AccountConfig;
 #[cfg(feature = "imap")]
 use crate::config::ImapConfig;
 use crate::{
@@ -212,78 +208,9 @@ impl AccountCheckCommand {
     }
 }
 
-/// Tests every configured backend, failing on the first error.
-///
-/// The wizard runs it over a freshly built account, so a bad credential
-/// or endpoint stops it rather than yielding a configuration that cannot
-/// connect.
-#[cfg(feature = "wizard")]
-pub fn test_account(account_config: &AccountConfig) -> Result<()> {
-    // NOTE: one resolver for the whole account, as in `account check`.
-    #[cfg_attr(
-        not(any(
-            feature = "imap",
-            feature = "jmap",
-            feature = "gmail",
-            feature = "msgraph",
-            feature = "smtp",
-            feature = "sieve"
-        )),
-        allow(unused_mut, unused_variables)
-    )]
-    let mut resolver = SecretResolver::new();
-
-    #[cfg(feature = "imap")]
-    if let Some(imap_config) = &account_config.imap {
-        connect_imap(imap_config, &mut resolver)?;
-    }
-
-    #[cfg(feature = "jmap")]
-    if let Some(jmap_config) = &account_config.jmap {
-        connect_jmap(jmap_config, &mut resolver)?;
-    }
-
-    #[cfg(feature = "gmail")]
-    if let Some(gmail_config) = &account_config.gmail {
-        connect_gmail(gmail_config, &mut resolver)?;
-    }
-
-    #[cfg(feature = "msgraph")]
-    if let Some(msgraph_config) = &account_config.msgraph {
-        connect_msgraph(msgraph_config, &mut resolver)?;
-    }
-
-    #[cfg(feature = "maildir")]
-    if let Some(maildir_config) = &account_config.maildir {
-        connect_maildir(maildir_config)?;
-    }
-
-    #[cfg(feature = "m2dir")]
-    if let Some(m2dir_config) = &account_config.m2dir {
-        connect_m2dir(m2dir_config)?;
-    }
-
-    #[cfg(feature = "mbox")]
-    if let Some(mbox_config) = &account_config.mbox {
-        connect_mbox(mbox_config)?;
-    }
-
-    #[cfg(feature = "smtp")]
-    if let Some(smtp_config) = &account_config.smtp {
-        connect_smtp(smtp_config, &mut resolver)?;
-    }
-
-    #[cfg(feature = "sieve")]
-    if let Some(sieve_config) = &account_config.sieve {
-        connect_sieve(sieve_config, &mut resolver)?;
-    }
-
-    Ok(())
-}
-
 /// Opens an authenticated IMAP session and drops it.
 #[cfg(feature = "imap")]
-pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Result<()> {
+fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Result<()> {
     use io_imap::{
         client::{ImapClientStd, ImapClientStdConnectOptions, default_port},
         session::ImapSessionOpenOptions,
@@ -321,35 +248,6 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolv
     Ok(())
 }
 
-/// Reads a server's CAPABILITY over an unauthenticated connection and
-/// returns the mechanisms it advertises, most preferred first.
-///
-/// The wizard offers what comes back rather than the whole list, and the
-/// connection is dropped without ever authenticating.
-#[cfg(all(feature = "imap", feature = "wizard"))]
-pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
-    use io_imap::{
-        client::{ImapClientStd, ImapClientStdConnectOptions, default_alpn},
-        rfc3501::capability::available_auth_mechanisms,
-        session::ImapSessionOpenOptions,
-    };
-
-    use crate::{config::TlsConfig, imap::client::parse_imap_server};
-
-    let server = parse_imap_server(server)?;
-    let opts = ImapClientStdConnectOptions {
-        tls: TlsConfig::default().into_tls(default_alpn()),
-        session: ImapSessionOpenOptions {
-            starttls,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let (_client, capabilities) = ImapClientStd::connect(&server, opts)?;
-
-    Ok(available_auth_mechanisms(&capabilities))
-}
-
 /// Opens a JMAP client and fetches the session object.
 #[cfg(feature = "jmap")]
 fn connect_jmap(
@@ -371,7 +269,7 @@ fn connect_jmap(
 
 /// Opens a Gmail client and fetches the account profile.
 #[cfg(feature = "gmail")]
-pub(crate) fn connect_gmail(
+fn connect_gmail(
     gmail_config: &crate::config::GmailConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
@@ -394,7 +292,7 @@ pub(crate) fn connect_gmail(
 
 /// Opens a Microsoft Graph client and fetches the signed-in user.
 #[cfg(feature = "msgraph")]
-pub(crate) fn connect_msgraph(
+fn connect_msgraph(
     msgraph_config: &crate::config::MsgraphConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
@@ -485,7 +383,7 @@ fn connect_pimdir(pimdir_config: &crate::config::PimdirConfig) -> Result<()> {
 
 /// Opens an authenticated SMTP session and drops it.
 #[cfg(feature = "smtp")]
-pub(crate) fn connect_smtp(
+fn connect_smtp(
     smtp_config: &crate::config::SmtpConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
@@ -528,7 +426,7 @@ pub(crate) fn connect_smtp(
 
 /// Opens an authenticated ManageSieve session and drops it.
 #[cfg(feature = "sieve")]
-pub(crate) fn connect_sieve(
+fn connect_sieve(
     sieve_config: &crate::config::SieveConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
@@ -595,14 +493,17 @@ impl BackendCheck {
 
 impl fmt::Display for AccountCheckOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Account: {}", self.account)?;
+        let mut fields = Fields::default();
+        fields.push("Account", &self.account);
+
         for check in &self.backends {
             match &check.error {
-                None => writeln!(f, "  {}: OK", check.backend)?,
-                Some(err) => writeln!(f, "  {}: FAIL ({err})", check.backend)?,
+                None => fields.push(check.backend, "OK"),
+                Some(err) => fields.push(check.backend, format!("FAIL ({err})")),
             }
         }
-        Ok(())
+
+        write!(f, "{fields}")
     }
 }
 
@@ -686,7 +587,7 @@ mod tests {
         let (result, out) = check();
         let err = result.unwrap_err();
         assert_eq!(partial_outcome_of(&err).map(|o| o.status()), Some(2));
-        assert!(out.contains("pimdir: FAIL (No pimdir store"), "{out}");
+        assert!(out.contains("\npimdir:   FAIL (No pimdir store"), "{out}");
 
         io_pimdir::client::PimdirStore::open(&store)
             .unwrap()
@@ -694,7 +595,7 @@ mod tests {
             .unwrap();
         let (result, out) = check();
         result.unwrap();
-        assert!(out.contains("pimdir: OK"), "{out}");
+        assert_eq!(out, "Account:  test\npimdir:   OK\n");
     }
 
     /// A collector holding the staging lock fails the check at once with

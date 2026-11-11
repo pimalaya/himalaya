@@ -20,11 +20,11 @@ pub struct GmailLabelGetCommand {
 }
 
 impl GmailLabelGetCommand {
-    /// Fetches the labels and tables them.
+    /// Fetches the labels and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let mut labels = Vec::with_capacity(self.ids.len());
@@ -33,6 +33,6 @@ impl GmailLabelGetCommand {
             labels.push(client.label_get(&id)?.response);
         }
 
-        printer.out(GmailLabelListOutput::new(account, labels))
+        printer.out(GmailLabelListOutput::new(labels))
     }
 }

@@ -19,8 +19,6 @@
 //! The network backends are io-imap, io-jmap, io-gmail, io-msgraph,
 //! io-smtp and io-managesieve, the local ones io-maildir, io-m2dir, io-mbox
 //! and io-pimdir.
-//! Account discovery comes from io-pim-discovery: Mozilla autoconfig,
-//! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve.
 //!
 //! The CLI plumbing, TOML loading and blocking stream runtime come from
 //! pimalaya-cli, pimalaya-config and pimalaya-stream. Every backend sits
@@ -85,15 +83,17 @@
 //! ([`config`]) is multi-account: a top-level block plus named account
 //! blocks carrying optional per-backend sub-blocks.
 //!
-//! Bare `himalaya` runs the interactive [`wizard`], which discovers an
-//! account and offers to save it, or prints it on stdout when redirected;
-//! it is also proposed when a command finds no config. A config that
-//! exists but lacks the requested account is a hard error.
+//! Himalaya never writes a configuration: a person writes it from the
+//! documented sample, and a command finding none fails pointing at it. A
+//! config that exists but lacks the requested account is a hard error too.
 //!
 //! Output follows the Pimalaya rule: data and errors go to stdout through
 //! the printer, `--json` switching every command to JSON, and stderr
-//! carries logs only. Each command's doc comment is its `--help`, so
-//! `himalaya <command> --help` is the canonical usage reference.
+//! carries logs only. Text output is plain text, with no border, no
+//! colour and nothing sized to the terminal: a list prints as aligned
+//! columns, a record as aligned `Label: value` lines. Each command's doc
+//! comment is its `--help`, so `himalaya <command> --help` is the
+//! canonical usage reference.
 
 mod account;
 mod backend;
@@ -127,22 +127,13 @@ mod shared;
 mod sieve;
 #[cfg(feature = "smtp")]
 mod smtp;
-#[cfg(feature = "wizard")]
-mod wizard;
-
-use std::{
-    io::{IsTerminal, stdin},
-    path::PathBuf,
-};
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
-use pimalaya_cli::{error::ErrorReport, log::Logger, printer::Printer, printer::StdoutPrinter};
-use pimalaya_config::toml::TomlConfig;
+use pimalaya_cli::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
 
 use crate::{
     cli::Cli,
-    config::Config,
     error::ErrorCode,
     session::{Session, SessionAccount},
 };
@@ -161,7 +152,8 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
     let backend = cli.backend;
 
     let Some(cmd) = cli.cmd else {
-        return meet_bare_invocation(printer, config, account.is_some());
+        Cli::command().print_help()?;
+        return Ok(());
     };
 
     let mut session = Session {
@@ -174,34 +166,4 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
     };
 
     cmd.execute(printer, &mut session)
-}
-
-/// Meets a bare `himalaya`, which is where a newcomer lands.
-///
-/// A missing configuration raises the offer; anything else gets the help.
-/// A broken file counts as a configuration, so the offer never writes over
-/// one, and `--account` alone is a half-typed command, not a first run.
-fn meet_bare_invocation(
-    printer: &mut StdoutPrinter,
-    config_paths: &[PathBuf],
-    named_account: bool,
-) -> Result<()> {
-    let configured = Config::from_paths_or_default(config_paths)
-        .ok()
-        .flatten()
-        .is_some();
-
-    if !configured && !named_account && !printer.is_json() && stdin().is_terminal() {
-        let path = Config::target_path(config_paths)?;
-
-        // NOTE: a bare invocation has nothing to run after the offer, so a
-        // declined one falls back to the help.
-        if cli::offer_configuration(printer, config_paths, &path)? {
-            return Ok(());
-        }
-    }
-
-    Cli::command().print_help()?;
-
-    Ok(())
 }

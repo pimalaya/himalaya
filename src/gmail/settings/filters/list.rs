@@ -8,8 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::list::{GmailFiltersList, GmailFiltersListResponse};
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -19,7 +18,6 @@ use crate::{
         client::GmailClient,
         settings::filters::summary::{action_summary, criteria_summary},
     },
-    shared::table::style_from_preset,
 };
 
 /// List all Gmail filters (users.settings.filters.list).
@@ -27,11 +25,11 @@ use crate::{
 pub struct GmailSettingsFiltersListCommand;
 
 impl GmailSettingsFiltersListCommand {
-    /// Lists every filter and tables it.
+    /// Lists every filter and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -40,63 +38,37 @@ impl GmailSettingsFiltersListCommand {
         };
         let resp = out.response;
 
-        let table = GmailSettingsFilterListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            response: resp,
-        };
-
-        printer.out(table)
+        printer.out(GmailSettingsFilterListOutput { response: resp })
     }
 }
 
-/// Renderable table of Gmail filters.
+/// The `gmail settings filters list` output, the Gmail filters.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsFilterListOutput {
-    #[serde(skip)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     #[serde(flatten)]
     response: GmailFiltersListResponse,
 }
 
 impl fmt::Display for GmailSettingsFilterListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["ID", "CRITERIA", "ACTION"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("CRITERIA"),
-                Cell::new("ACTION"),
-            ]))
-            .add_rows(self.response.filter.iter().map(|filter| {
-                let criteria = filter
-                    .criteria
-                    .as_ref()
-                    .map(criteria_summary)
-                    .unwrap_or_default();
-                let action = filter
-                    .action
-                    .as_ref()
-                    .map(action_summary)
-                    .unwrap_or_default();
+        for filter in &self.response.filter {
+            let criteria = filter
+                .criteria
+                .as_ref()
+                .map(criteria_summary)
+                .unwrap_or_default();
+            let action = filter
+                .action
+                .as_ref()
+                .map(action_summary)
+                .unwrap_or_default();
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(sanitize(&filter.id)).fg(Color::Reset))
-                    .add_cell(Cell::new(criteria).fg(Color::Reset))
-                    .add_cell(Cell::new(action).fg(Color::Reset));
-                row
-            }));
+            columns.push([sanitize::text(&filter.id).into_owned(), criteria, action]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_pimdir::client::producer::PimdirActionStatus;
-use pimalaya_cli::{printer::Printer, prompt, table::sanitize};
+use pimalaya_cli::{printer::Printer, prompt, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -44,7 +44,11 @@ impl PimdirQueueCancelCommand {
         };
         if !self.yes
             && !prompt::bool(
-                format!("Cancel the {} queued as row {}?", sanitize(&named), self.id),
+                format!(
+                    "Cancel the {} queued as row {}?",
+                    sanitize::text(&named),
+                    self.id
+                ),
                 false,
             )?
         {
@@ -72,7 +76,7 @@ impl fmt::Display for PimdirQueueCancelOutput {
         writeln!(
             f,
             "Queued {} cancelled (row {})",
-            sanitize(&self.kind),
+            sanitize::text(&self.kind),
             self.id
         )
     }

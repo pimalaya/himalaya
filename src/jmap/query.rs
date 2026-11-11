@@ -133,8 +133,8 @@ pub(crate) struct JmapQueryOutput {
 impl fmt::Display for JmapQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match serde_json::to_string_pretty(&self.method_responses) {
-            Ok(s) => write!(f, "{s}"),
-            Err(e) => write!(f, "<serialization error: {e}>"),
+            Ok(s) => writeln!(f, "{s}"),
+            Err(e) => writeln!(f, "<serialization error: {e}>"),
         }
     }
 }

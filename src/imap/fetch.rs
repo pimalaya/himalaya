@@ -18,7 +18,7 @@ use io_imap::{
         flag::FlagFetch,
     },
 };
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
@@ -365,11 +365,10 @@ fn format_size(bytes: usize) -> String {
 
 impl fmt::Display for ImapFetchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-
-        for message in &self.messages {
-            let id = message.uid.unwrap_or(message.seq);
-            writeln!(f, "Message {id}:")?;
+        // NOTE: one record per message, a blank line apart.
+        for (index, message) in self.messages.iter().enumerate() {
+            let mut fields = Fields::default();
+            fields.push("Message", message.uid.unwrap_or(message.seq));
 
             if let Some(flags) = &message.flags {
                 let flags = if flags.is_empty() {
@@ -377,84 +376,83 @@ impl fmt::Display for ImapFetchOutput {
                 } else {
                     flags.join(" ")
                 };
-                writeln!(f, "  Flags: {}", sanitize(&flags))?;
+                fields.push("Flags", sanitize::text(&flags));
             }
             if let Some(date) = &message.internal_date {
-                writeln!(f, "  Internal date: {}", sanitize(date))?;
+                fields.push("Internal date", sanitize::text(date));
             }
             if let Some(size) = message.size {
-                writeln!(f, "  Size: {}", format_size(size as usize))?;
+                fields.push("Size", format_size(size as usize));
             }
             if let Some(envelope) = &message.envelope {
-                write_envelope(f, envelope)?;
+                push_envelope(&mut fields, envelope);
             }
             if let Some(structure) = &message.structure {
-                writeln!(f, "  Structure:")?;
-                write_body_tree(f, structure, "    ", true)?;
+                // NOTE: a leading line break leaves the label alone, the
+                // tree starting under it.
+                let mut tree = String::from("\n");
+                write_body_tree(&mut tree, structure, "", true)?;
+                fields.push("Structure", tree);
             }
             if let Some(body) = &message.body {
-                writeln!(f, "  Body: {}", format_size(body.len()))?;
+                fields.push("Body", format_size(body.len()));
             }
 
-            writeln!(f)?;
+            if index > 0 {
+                writeln!(f)?;
+            }
+
+            write!(f, "{fields}")?;
         }
 
         Ok(())
     }
 }
 
-/// Writes an envelope as one indented line per header it carries.
-fn write_envelope(f: &mut fmt::Formatter<'_>, env: &EnvelopeView) -> fmt::Result {
+/// Pushes the headers an envelope carries, one field each.
+fn push_envelope(fields: &mut Fields, env: &EnvelopeView) {
     if let Some(date) = &env.date {
-        writeln!(f, "  Date: {}", sanitize(date))?;
+        fields.push("Date", sanitize::text(date));
     }
     if let Some(subject) = &env.subject {
-        writeln!(f, "  Subject: {}", sanitize(subject))?;
-    }
-    if !env.from.is_empty() {
-        writeln!(f, "  From: {}", sanitize(&format_addresses(&env.from)))?;
-    }
-    if !env.sender.is_empty() {
-        writeln!(f, "  Sender: {}", sanitize(&format_addresses(&env.sender)))?;
-    }
-    if !env.reply_to.is_empty() {
-        writeln!(
-            f,
-            "  Reply-To: {}",
-            sanitize(&format_addresses(&env.reply_to))
-        )?;
-    }
-    if !env.to.is_empty() {
-        writeln!(f, "  To: {}", sanitize(&format_addresses(&env.to)))?;
-    }
-    if !env.cc.is_empty() {
-        writeln!(f, "  Cc: {}", sanitize(&format_addresses(&env.cc)))?;
-    }
-    if !env.bcc.is_empty() {
-        writeln!(f, "  Bcc: {}", sanitize(&format_addresses(&env.bcc)))?;
-    }
-    if let Some(message_id) = &env.message_id {
-        writeln!(f, "  Message-ID: {}", sanitize(message_id))?;
-    }
-    if let Some(in_reply_to) = &env.in_reply_to {
-        writeln!(f, "  In-Reply-To: {}", sanitize(in_reply_to))?;
+        fields.push("Subject", sanitize::text(subject));
     }
 
-    Ok(())
+    let addresses = [
+        ("From", &env.from),
+        ("Sender", &env.sender),
+        ("Reply-To", &env.reply_to),
+        ("To", &env.to),
+        ("Cc", &env.cc),
+        ("Bcc", &env.bcc),
+    ];
+
+    for (label, addresses) in addresses {
+        if !addresses.is_empty() {
+            fields.push(label, sanitize::text(&format_addresses(addresses)));
+        }
+    }
+
+    if let Some(message_id) = &env.message_id {
+        fields.push("Message-ID", sanitize::text(message_id));
+    }
+    if let Some(in_reply_to) = &env.in_reply_to {
+        fields.push("In-Reply-To", sanitize::text(in_reply_to));
+    }
 }
 
 /// Writes a body structure as an indented tree.
 fn write_body_tree(
-    f: &mut fmt::Formatter<'_>,
+    f: &mut impl fmt::Write,
     part: &BodyPart,
     prefix: &str,
     is_last: bool,
 ) -> fmt::Result {
     let connector = if is_last { "└─ " } else { "├─ " };
 
-    let mut desc = sanitize(&part.content_type).into_owned();
+    let mut desc = sanitize::text(&part.content_type).into_owned();
     if let Some(name) = &part.name {
-        desc.push_str(&format!(" \"{}\"", sanitize(name)));
+        desc.push_str(&format!(" \"{}\"", sanitize::text(name)));
     }
     if let Some(size) = part.size {
         desc.push_str(&format!(" ({})", format_size(size)));

@@ -7,10 +7,7 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, anyhow, bail};
 use clap::Parser;
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, ContentArrangement, Row, Table, sanitize},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use pimalaya_config::toml::TomlConfig;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -21,7 +18,6 @@ use crate::{
     backend::Backend,
     capability::{self, Resolution, StoreSupport},
     config::{Config, NO_CONFIG_HINT},
-    shared::table::{DEFAULT_PRESET, style_from_preset},
 };
 
 /// List what the account serves of the shared API.
@@ -36,7 +32,7 @@ use crate::{
 pub struct AccountCapabilityCommand;
 
 impl AccountCapabilityCommand {
-    /// Resolves each capability for the account and prints the table.
+    /// Resolves each capability for the account and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -86,14 +82,7 @@ impl AccountCapabilityCommand {
             });
         }
 
-        let preset = config
-            .table
-            .preset
-            .clone()
-            .unwrap_or_else(|| DEFAULT_PRESET.to_string());
-
         printer.out(AccountCapabilityOutput {
-            preset,
             account: name,
             capabilities,
         })
@@ -104,9 +93,6 @@ impl AccountCapabilityCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountCapabilityOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The account the capabilities are resolved for.
     pub account: String,
     /// One row per shared capability, in the order the commands reach
@@ -132,27 +118,17 @@ pub struct AccountCapability {
 
 impl fmt::Display for AccountCapabilityOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["CAPABILITY", "BACKEND", "LEVEL", "DETAIL"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(Row::from([
-                Cell::new("CAPABILITY"),
-                Cell::new("BACKEND"),
-                Cell::new("LEVEL"),
-                Cell::new("DETAIL"),
-            ]))
-            .add_rows(self.capabilities.iter().map(|capability| {
-                Row::from([
-                    Cell::new(&capability.name),
-                    Cell::new(capability.backend.as_deref().unwrap_or("")),
-                    Cell::new(&capability.level),
-                    Cell::new(sanitize(capability.detail.as_deref().unwrap_or(""))),
-                ])
-            }));
+        for capability in &self.capabilities {
+            columns.push([
+                capability.name.as_str(),
+                capability.backend.as_deref().unwrap_or_default(),
+                capability.level.as_str(),
+                &*sanitize::text(capability.detail.as_deref().unwrap_or_default()),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

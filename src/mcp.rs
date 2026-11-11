@@ -161,14 +161,13 @@ pub struct McpCommand {
 impl McpCommand {
     /// Serves JSON-RPC requests off stdin until EOF, answering each on
     /// stdout.
-    pub fn execute(self, printer: &mut impl Printer, session: &mut Session) -> Result<()> {
+    pub fn execute(self, _printer: &mut impl Printer, session: &mut Session) -> Result<()> {
         let account = session.account;
 
         // NOTE: resolved once up front, so a missing configuration or
         // account fails the server rather than its first call, and the
         // tools listed are the ones the account's backends serve.
-        let (_, name, account_config) =
-            resolve_account(printer, account.config_paths, account.name)?;
+        let (_, name, account_config) = resolve_account(account.config_paths, account.name)?;
         let resolution = Resolution::of(&name, &account_config, account.backend);
 
         repl::claim_stdin();
@@ -890,10 +889,7 @@ fn exposes(arg: &Arg) -> bool {
 
     let reachable = arg.get_long().is_some() || arg.is_positional();
 
-    // NOTE: the width only shapes a table, which JSON output never draws.
-    let display = arg.get_long() == Some("max-width");
-
-    !builtin && !path && !display && reachable && !arg.is_global_set() && !arg.is_hide_set()
+    !builtin && !path && reachable && !arg.is_global_set() && !arg.is_hide_set()
 }
 
 /// A JSON scalar as the word an argv carries.

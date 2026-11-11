@@ -1,6 +1,6 @@
 //! # Microsoft Graph attachment list
 //!
-//! The `msgraph attachments list` command, tabling the attachments of a
+//! The `msgraph attachments list` command, listing the attachments of a
 //! message.
 
 use std::fmt;
@@ -8,14 +8,11 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, msgraph::client::MsgraphClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, msgraph::client::MsgraphClient};
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
 #[derive(Debug, Parser)]
@@ -26,107 +23,50 @@ pub struct MsgraphAttachmentListCommand {
 }
 
 impl MsgraphAttachmentListCommand {
-    /// Lists the attachments of the message and tables them.
+    /// Lists the attachments of the message and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let attachments = client.attachments_list(&self.message_id)?.response.value;
 
-        let table = MsgraphAttachmentListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            colors: AttachmentColors {
-                id: account.attachments_list_table_id_color(),
-                name: account.attachments_list_table_filename_color(),
-                content_type: account.attachments_list_table_type_color(),
-                size: account.attachments_list_table_size_color(),
-                inline: account.attachments_list_table_inline_color(),
-            },
-            attachments,
-        };
-
-        printer.out(table)
+        printer.out(MsgraphAttachmentListOutput { attachments })
     }
 }
 
-/// Per-column colors for the Microsoft Graph attachments table.
-#[derive(Clone, Copy, Debug)]
-pub struct AttachmentColors {
-    /// Color of the ID column.
-    pub id: Color,
-    /// Color of the NAME column.
-    pub name: Color,
-    /// Color of the TYPE column.
-    pub content_type: Color,
-    /// Color of the SIZE column.
-    pub size: Color,
-    /// Color of the INLINE column.
-    pub inline: Color,
-}
-
-impl Default for AttachmentColors {
-    fn default() -> Self {
-        Self {
-            id: Color::Reset,
-            name: Color::Reset,
-            content_type: Color::Reset,
-            size: Color::Reset,
-            inline: Color::Reset,
-        }
-    }
-}
-
-/// Renderable table of Microsoft Graph message attachments.
+/// The `msgraph attachments list` output, the attachments of a message.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphAttachmentListOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
-    #[serde(skip)]
-    colors: AttachmentColors,
     attachments: Vec<MsgraphAttachment>,
 }
 
 impl fmt::Display for MsgraphAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a name is free text, so it reads last.
+        let mut columns = Columns::new(["ID", "TYPE", "SIZE", "INLINE", "NAME"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("NAME"),
-                Cell::new("TYPE"),
-                Cell::new("SIZE"),
-                Cell::new("INLINE"),
-            ]))
-            .add_rows(self.attachments.iter().map(|attachment| {
-                let name = attachment.name.clone().unwrap_or_default();
-                let content_type = attachment.content_type.clone().unwrap_or_default();
-                let size = attachment.size.map(|n| n.to_string()).unwrap_or_default();
-                let inline = if attachment.is_inline == Some(true) {
-                    "yes"
-                } else {
-                    ""
-                };
+        for attachment in &self.attachments {
+            let name = attachment.name.as_deref().unwrap_or_default();
+            let content_type = attachment.content_type.as_deref().unwrap_or_default();
+            let size = attachment.size.map(|n| n.to_string()).unwrap_or_default();
+            let inline = if attachment.is_inline == Some(true) {
+                "yes"
+            } else {
+                ""
+            };
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(sanitize(&attachment.id)).fg(self.colors.id))
-                    .add_cell(Cell::new(sanitize(&name)).fg(self.colors.name))
-                    .add_cell(Cell::new(sanitize(&content_type)).fg(self.colors.content_type))
-                    .add_cell(Cell::new(size).fg(self.colors.size))
-                    .add_cell(Cell::new(inline).fg(self.colors.inline));
-                row
-            }));
+            columns.push([
+                sanitize::text(&attachment.id).into_owned(),
+                sanitize::text(content_type).into_owned(),
+                size,
+                String::from(inline),
+                sanitize::text(name).into_owned(),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

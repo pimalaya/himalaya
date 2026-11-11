@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -73,8 +73,8 @@ impl fmt::Display for PimdirMailboxCreateOutput {
         writeln!(
             f,
             "Mailbox {} queued for creation by {} as row {}",
-            sanitize(&self.name),
-            sanitize(&self.source),
+            sanitize::text(&self.name),
+            sanitize::text(&self.source),
             self.queue_id
         )
     }

@@ -9,7 +9,7 @@ use clap::Parser;
 use io_imap::{
     client::ImapClient as _, rfc3501::select::ImapMailboxSelectOptions, types::flag::FlagPerm,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -91,18 +91,19 @@ pub(crate) struct ImapMailboxSelectOutput {
 
 impl fmt::Display for ImapMailboxSelectOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Mailbox successfully selected: {}", self.mailbox)?;
+        let mut fields = Fields::default();
+        fields.push("Mailbox", sanitize::text(&self.mailbox));
 
         if let Some(exists) = self.exists {
-            writeln!(f, "  Messages: {exists}")?;
+            fields.push("Messages", exists);
         }
         if let Some(uid_validity) = self.uid_validity {
-            writeln!(f, "  UID validity: {uid_validity}")?;
+            fields.push("UID validity", uid_validity);
         }
         if let Some(uid_next) = self.uid_next {
-            writeln!(f, "  UID next: {uid_next}")?;
+            fields.push("UID next", uid_next);
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

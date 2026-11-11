@@ -1,6 +1,6 @@
 //! # pimdir mailbox list
 //!
-//! The `pimdir mailbox list` command, tabling the mailboxes of the store
+//! The `pimdir mailbox list` command, listing the mailboxes of the store
 //! with what it holds of each: its counts and its coverage.
 
 use std::fmt;
@@ -8,10 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_pimdir::{client::reader::PimdirRoundState, collection::PimdirCoverage};
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, ContentArrangement, Row, Table, sanitize},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -19,7 +16,6 @@ use crate::{
     account::context::Account,
     email::mailbox::{Mailbox, MailboxRole},
     pimdir::{backend::PimdirCoveredMailbox, client::PimdirClient},
-    shared::table::style_from_preset,
 };
 
 /// List the mailboxes of the store, with their coverage.
@@ -30,12 +26,7 @@ use crate::{
 /// closed, the narrowest of them, and when. A mailbox no round closed on
 /// yet has none, and a round under way shows with the scope it lists.
 #[derive(Debug, Parser)]
-pub struct PimdirMailboxListCommand {
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
-}
+pub struct PimdirMailboxListCommand;
 
 impl PimdirMailboxListCommand {
     /// Lists the mailboxes with their coverage and prints them.
@@ -53,9 +44,6 @@ impl PimdirMailboxListCommand {
         account.apply_role_aliases(&mut mailboxes);
 
         printer.out(PimdirMailboxListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            max_width: self.max_width,
             mailboxes: mailboxes
                 .into_iter()
                 .zip(rest)
@@ -154,77 +142,49 @@ impl From<PimdirCoveredMailbox> for PimdirMailbox {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
-    /// The width the table is capped at, when one was asked for.
-    #[serde(skip)]
-    pub max_width: Option<u16>,
     /// The mailboxes, sorted by id.
     pub mailboxes: Vec<PimdirMailbox>,
 }
 
 impl fmt::Display for PimdirMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                "ID", "NAME", "ROLE", "TOTAL", "UNREAD", "COVERED", "SYNCING",
-            ]))
-            .add_rows(self.mailboxes.iter().map(|mailbox| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(sanitize(&mailbox.id)));
-                row.add_cell(Cell::new(sanitize(&mailbox.name)));
-                row.add_cell(Cell::new(
-                    mailbox
-                        .role
-                        .as_ref()
-                        .map(|r| r.to_string())
-                        .unwrap_or_default(),
-                ));
-                row.add_cell(count(mailbox.total));
-                row.add_cell(count(mailbox.unread));
-                row.add_cell(Cell::new(
-                    mailbox
-                        .coverage
-                        .as_ref()
-                        .map(|c| span(c.since.as_deref(), c.until.as_deref()))
-                        .unwrap_or_default(),
-                ));
-                row.add_cell(Cell::new(
-                    mailbox
-                        .round
-                        .as_ref()
-                        .map(|r| span(r.since.as_deref(), r.until.as_deref()))
-                        .unwrap_or_default(),
-                ));
-                row
-            }));
+        // NOTE: a name is free text, so it reads last.
+        let header = [
+            "ID", "ROLE", "TOTAL", "UNREAD", "COVERED", "SYNCING", "NAME",
+        ];
+        let mut columns = Columns::new(header);
 
-        if let Some(width) = self.max_width {
-            table.set_width(width);
+        for mailbox in &self.mailboxes {
+            let role = mailbox.role.as_ref().map(ToString::to_string);
+            let covered = mailbox.coverage.as_ref();
+            let covered = covered.map(|c| span(c.since.as_deref(), c.until.as_deref()));
+            let syncing = mailbox.round.as_ref();
+            let syncing = syncing.map(|r| span(r.since.as_deref(), r.until.as_deref()));
+
+            columns.push([
+                sanitize::text(&mailbox.id).into_owned(),
+                role.unwrap_or_default(),
+                count(mailbox.total),
+                count(mailbox.unread),
+                covered.unwrap_or_default(),
+                syncing.unwrap_or_default(),
+                sanitize::text(&mailbox.name).into_owned(),
+            ]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 
 /// A count, or an empty cell when there is none.
-fn count(value: Option<u64>) -> Cell {
-    Cell::new(value.map(|n| n.to_string()).unwrap_or_default())
+fn count(value: Option<u64>) -> String {
+    value.map(|n| n.to_string()).unwrap_or_default()
 }
 
 /// A scope as its dates read: `since 2026-09-07`, `2026-01-01 to
 /// 2026-09-07`, `all` when it has no bound.
 pub(crate) fn span(since: Option<&str>, until: Option<&str>) -> String {
-    let day = |instant: &str| sanitize(instant.get(..10).unwrap_or(instant)).into_owned();
+    let day = |instant: &str| sanitize::text(instant.get(..10).unwrap_or(instant)).into_owned();
     match (since.map(day), until.map(day)) {
         (None, None) => "all".into(),
         (Some(since), None) => format!("since {since}"),
@@ -237,7 +197,7 @@ pub(crate) fn span(since: Option<&str>, until: Option<&str>) -> String {
 mod tests {
     use io_pimdir::collection::PimdirScope;
 
-    use super::*;
+    use crate::pimdir::mailbox::list::*;
 
     #[test]
     fn a_scope_reads_as_its_days() {

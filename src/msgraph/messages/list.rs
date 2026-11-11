@@ -1,6 +1,6 @@
 //! # Microsoft Graph message list
 //!
-//! The `msgraph messages list` command, tabling one page of a mailbox or
+//! The `msgraph messages list` command, listing one page of a mailbox or
 //! of one folder.
 
 use std::fmt;
@@ -10,14 +10,13 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::messages::{
     MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
-use pimalaya_cli::{clap::args::PageTokenArg, output::Paginated, printer::Printer};
+use pimalaya_cli::{
+    clap::args::PageTokenArg, columns::Columns, output::Paginated, printer::Printer, sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, msgraph::client::MsgraphClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, msgraph::client::MsgraphClient};
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
@@ -58,11 +57,11 @@ pub struct MsgraphMessageListCommand {
 }
 
 impl MsgraphMessageListCommand {
-    /// Lists one page of messages and tables it.
+    /// Lists one page of messages and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let search = self.search.as_deref();
@@ -107,10 +106,12 @@ impl MsgraphMessageListCommand {
         let next_page = response
             .next_link
             .map(|link| skip_of(&link).map_or(link, |skip| skip.to_string()));
-        let table = messages_table(account, response.value);
+        let messages = MsgraphMessageListOutput {
+            messages: response.value,
+        };
 
         printer.out(Paginated {
-            inner: table,
+            inner: messages,
             next_page,
         })
     }
@@ -126,91 +127,34 @@ pub(crate) fn recipient(recipient: &MsgraphRecipient) -> String {
     }
 }
 
-/// Builds the renderable messages table with the account's
-/// envelope-table colors and layout.
-fn messages_table(account: &Account, messages: Vec<MsgraphMessage>) -> MsgraphMessageListOutput {
-    MsgraphMessageListOutput {
-        preset: account.table_preset().to_string(),
-        arrangement: account.table_arrangement(),
-        colors: MessageColors {
-            id: account.envelopes_list_table_id_color(),
-            subject: account.envelopes_list_table_subject_color(),
-            from: account.envelopes_list_table_from_color(),
-            date: account.envelopes_list_table_date_color(),
-        },
-        messages,
-    }
-}
-
-/// Per-column colors for the Microsoft Graph messages table.
-#[derive(Clone, Copy, Debug)]
-pub struct MessageColors {
-    /// Color of the ID column.
-    pub id: Color,
-    /// Color of the SUBJECT column.
-    pub subject: Color,
-    /// Color of the FROM column.
-    pub from: Color,
-    /// Color of the DATE column.
-    pub date: Color,
-}
-
-impl Default for MessageColors {
-    fn default() -> Self {
-        Self {
-            id: Color::Reset,
-            subject: Color::Reset,
-            from: Color::Reset,
-            date: Color::Reset,
-        }
-    }
-}
-
-/// Renderable table of Microsoft Graph messages.
+/// The `msgraph messages list` output, the messages of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphMessageListOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
-    #[serde(skip)]
-    colors: MessageColors,
     messages: Vec<MsgraphMessage>,
 }
 
 impl fmt::Display for MsgraphMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: the subject is the one free-text column, so it reads last.
+        let mut columns = Columns::new(["ID", "FLAGS", "FROM", "RECEIVED", "SUBJECT"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("FLAGS"),
-                Cell::new("SUBJECT"),
-                Cell::new("FROM"),
-                Cell::new("RECEIVED"),
-            ]))
-            .add_rows(self.messages.iter().map(|msg| {
-                let flags = if msg.is_read == Some(false) { "U" } else { "" };
-                let subject = msg.subject.clone().unwrap_or_default();
-                let from = msg.from.as_ref().map(recipient).unwrap_or_default();
-                let received = msg.received_date_time.clone().unwrap_or_default();
+        for msg in &self.messages {
+            let flags = if msg.is_read == Some(false) { "U" } else { "" };
+            let from = msg.from.as_ref().map(recipient).unwrap_or_default();
+            let received = msg.received_date_time.as_deref().unwrap_or_default();
+            let subject = msg.subject.as_deref().unwrap_or_default();
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(&msg.id).fg(self.colors.id))
-                    .add_cell(Cell::new(flags))
-                    .add_cell(Cell::new(subject).fg(self.colors.subject))
-                    .add_cell(Cell::new(from).fg(self.colors.from))
-                    .add_cell(Cell::new(received).fg(self.colors.date));
-                row
-            }));
+            columns.push([
+                sanitize::text(&msg.id).into_owned(),
+                String::from(flags),
+                sanitize::text(&from).into_owned(),
+                sanitize::text(received).into_owned(),
+                sanitize::text(subject).into_owned(),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 

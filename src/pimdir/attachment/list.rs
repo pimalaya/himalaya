@@ -1,6 +1,6 @@
 //! # pimdir attachment list
 //!
-//! The `pimdir attachment list` command, tabling one page of an account's
+//! The `pimdir attachment list` command, listing one page of an account's
 //! attachments, newest message first, and the output `pimdir attachment
 //! search` shares.
 
@@ -11,10 +11,7 @@ use chrono::{DateTime, Local};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use io_pimdir::client::reader::PimdirAccountAttachment;
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, CellAlignment, ColumnConstraint, ContentArrangement, Row, Table, sanitize},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -24,7 +21,6 @@ use crate::{
         attachment::{AttachmentQuery, PimdirAttachmentPage, page_token, parse_page_token},
         client::PimdirClient,
     },
-    shared::table::style_from_preset,
 };
 
 /// List the files the account's messages attach, newest message first.
@@ -60,10 +56,6 @@ pub struct PageArgs {
     #[arg(long = "page-token", short = 't')]
     #[arg(value_name = "TOKEN")]
     pub page_token: Option<String>,
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
 }
 
 impl PageArgs {
@@ -88,9 +80,6 @@ impl PageArgs {
         let page = client.list_attachments(after.as_ref(), limit, query)?;
 
         let mut output = PimdirAttachmentListOutput::from(page);
-        output.preset = account.table_preset().to_string();
-        output.arrangement = account.table_arrangement();
-        output.max_width = self.max_width;
         output.datetime_fmt = account.datetime_fmt().to_string();
         output.datetime_local_tz = account.datetime_local_tz();
         printer.out(output)
@@ -160,15 +149,6 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirAttachmentListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
-    /// The width the table is capped at, when one was asked for.
-    #[serde(skip)]
-    pub max_width: Option<u16>,
     /// The chrono `strftime` format of the DATE column.
     #[serde(skip)]
     pub datetime_fmt: String,
@@ -185,9 +165,6 @@ pub struct PimdirAttachmentListOutput {
 impl From<PimdirAttachmentPage> for PimdirAttachmentListOutput {
     fn from(page: PimdirAttachmentPage) -> Self {
         Self {
-            preset: String::new(),
-            arrangement: ContentArrangement::Dynamic,
-            max_width: None,
             datetime_fmt: String::new(),
             datetime_local_tz: false,
             attachments: page.attachments.into_iter().map(Into::into).collect(),
@@ -205,79 +182,43 @@ impl PimdirAttachmentListOutput {
                 .format(&self.datetime_fmt)
                 .to_string(),
             Ok(date) => date.format(&self.datetime_fmt).to_string(),
-            Err(_) => sanitize(date).into_owned(),
+            Err(_) => sanitize::text(date).into_owned(),
         }
     }
 }
 
 impl fmt::Display for PimdirAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("NAME"),
-                Cell::new("TYPE"),
-                Cell::new("SIZE").set_alignment(CellAlignment::Right),
-                Cell::new("SECTION"),
-                Cell::new("MESSAGE"),
-                Cell::new("MAILBOX"),
-                Cell::new("FROM"),
-                Cell::new("DATE"),
-            ]))
-            .add_rows(self.attachments.iter().map(|file| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(&file.id));
-                row.add_cell(Cell::new(sanitize(
-                    file.name.as_deref().unwrap_or_default(),
-                )));
-                row.add_cell(Cell::new(sanitize(
-                    file.media_type.as_deref().unwrap_or_default(),
-                )));
-                row.add_cell(
-                    Cell::new(
-                        file.size
-                            .map(|size| format_size(size, BINARY))
-                            .unwrap_or_default(),
-                    )
-                    .set_alignment(CellAlignment::Right),
-                );
-                row.add_cell(Cell::new(sanitize(
-                    file.section.as_deref().unwrap_or_default(),
-                )));
-                row.add_cell(Cell::new(&file.message_id));
-                row.add_cell(Cell::new(sanitize(&file.mailbox)));
-                let from = file.sender_name.as_deref().or(file.sender.as_deref());
-                row.add_cell(Cell::new(sanitize(from.unwrap_or_default())));
-                row.add_cell(Cell::new(
-                    file.date
-                        .as_deref()
-                        .map(|date| self.format_date(date))
-                        .unwrap_or_default(),
-                ));
-                row
-            }));
+        // NOTE: the free-text columns, the sender then the file name, read
+        // last.
+        let header = [
+            "ID", "TYPE", "SIZE", "SECTION", "MESSAGE", "MAILBOX", "DATE", "FROM", "NAME",
+        ];
+        let mut columns = Columns::new(header);
 
-        // NOTE: the ids are what follow-up commands take, so squeezing the
-        // table into `--max-width` truncates any column but those.
-        for at in [0, 5] {
-            if let Some(column) = table.column_mut(at) {
-                column.set_constraint(ColumnConstraint::ContentWidth);
-            }
+        for file in &self.attachments {
+            let text = |value: Option<&str>| sanitize::text(value.unwrap_or_default()).into_owned();
+            let size = file.size.map(|size| format_size(size, BINARY));
+            let date = file.date.as_deref().map(|date| self.format_date(date));
+            let from = file.sender_name.as_deref().or(file.sender.as_deref());
+
+            columns.push([
+                sanitize::text(&file.id).into_owned(),
+                text(file.media_type.as_deref()),
+                size.unwrap_or_default(),
+                text(file.section.as_deref()),
+                sanitize::text(&file.message_id).into_owned(),
+                sanitize::text(&file.mailbox).into_owned(),
+                date.unwrap_or_default(),
+                text(from),
+                text(file.name.as_deref()),
+            ]);
         }
 
-        if let Some(width) = self.max_width {
-            table.set_width(width);
-        }
-
-        writeln!(f)?;
-        writeln!(f, "{table}")?;
+        write!(f, "{columns}")?;
 
         if let Some(token) = &self.next_page {
-            writeln!(f, "Next page: {}", sanitize(token))?;
+            writeln!(f, "Next page: {}", sanitize::text(token))?;
         }
 
         Ok(())

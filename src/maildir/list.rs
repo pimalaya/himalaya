@@ -1,20 +1,17 @@
 //! # Maildir list
 //!
-//! The `maildir list` command, tabling the Maildirs under the store
+//! The `maildir list` command, listing the Maildirs under the store
 //! root.
 
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, maildir::client::MaildirClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, maildir::client::MaildirClient};
 
 /// List Maildir folders.
 ///
@@ -24,18 +21,16 @@ use crate::{
 pub struct MaildirMailboxListCommand;
 
 impl MaildirMailboxListCommand {
-    /// Lists the Maildirs under the store root and tables them.
+    /// Lists the Maildirs under the store root and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MaildirClient,
     ) -> Result<()> {
         let maildirs = client.list_maildirs()?;
 
         let table = MaildirListOutput {
-            preset: account.table_preset().to_string(),
-            name_color: account.mailboxes_list_table_name_color(),
             rows: maildirs
                 .into_iter()
                 .map(|maildir| MaildirRow {
@@ -49,16 +44,10 @@ impl MaildirMailboxListCommand {
     }
 }
 
-/// The `maildir list` output, a table of Maildirs.
+/// The `maildir list` output, the Maildirs of the store.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The color of the NAME column.
-    #[serde(skip)]
-    pub name_color: Color,
     /// The Maildirs found under the store root.
     #[serde(rename = "maildirs")]
     pub rows: Vec<MaildirRow>,
@@ -66,29 +55,18 @@ pub struct MaildirListOutput {
 
 impl fmt::Display for MaildirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["NAME", "PATH"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("NAME"), Cell::new("PATH")]))
-            .add_rows(self.rows.iter().map(|m| {
-                let mut row = Row::new();
+        for maildir in &self.rows {
+            let path = maildir.path.display().to_string();
+            columns.push([sanitize::text(&maildir.name), sanitize::text(&path)]);
+        }
 
-                row.max_height(1)
-                    .add_cell(Cell::new(&m.name).fg(self.name_color))
-                    .add_cell(Cell::new(format!("{}", m.path.display())));
-
-                row
-            }));
-
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        write!(f, "{columns}")
     }
 }
 
-/// One row of the Maildirs table.
+/// One Maildir of the list.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirRow {

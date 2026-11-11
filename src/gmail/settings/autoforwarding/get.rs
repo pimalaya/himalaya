@@ -10,7 +10,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::{
     GmailAutoForwarding, get_auto_forwarding::GmailAutoForwardingGet,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -24,7 +24,7 @@ use crate::gmail::{
 pub struct GmailSettingsAutoForwardingGetCommand;
 
 impl GmailSettingsAutoForwardingGetCommand {
-    /// Fetches the auto-forwarding settings and tables them.
+    /// Fetches the auto-forwarding settings and prints them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;
@@ -60,15 +60,16 @@ pub(crate) struct GmailSettingsAutoForwardingGetOutput {
 
 impl fmt::Display for GmailSettingsAutoForwardingGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Enabled: {}", yes_no(self.enabled))?;
+        let mut fields = Fields::default();
+        fields.push("Enabled", yes_no(self.enabled));
 
         if let Some(email_address) = &self.email_address {
-            writeln!(f, "Email address: {email_address}")?;
+            fields.push("Email address", sanitize::text(email_address));
         }
         if let Some(disposition) = &self.disposition {
-            writeln!(f, "Disposition: {disposition}")?;
+            fields.push("Disposition", disposition);
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

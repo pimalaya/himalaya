@@ -56,7 +56,7 @@ impl ReplCommand {
 
         // NOTE: resolved once up front, so a missing configuration or
         // account fails the session rather than its first command.
-        resolve_account(printer, account.config_paths, account.name)?;
+        resolve_account(account.config_paths, account.name)?;
 
         claim_stdin();
 
@@ -91,12 +91,6 @@ impl ReplCommand {
                 Some(Ok(ReplLine {
                     cmd: Command::Repl(_) | Command::Mcp(_),
                 })) => Err(anyhow!("Cannot start a session inside a session")),
-                #[cfg(feature = "wizard")]
-                Some(Ok(ReplLine {
-                    cmd: Command::Configure(_),
-                })) => Err(anyhow!(
-                    "Cannot run the wizard inside a session, run `himalaya configure` instead"
-                )),
                 Some(Ok(ReplLine { cmd })) => cmd.execute(printer, session),
                 // NOTE: help and version are not failures, clap prints
                 // them on stdout already, and a terminal gets clap's own

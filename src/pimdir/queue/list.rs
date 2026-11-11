@@ -1,14 +1,13 @@
 //! # pimdir queue list
 //!
-//! The `pimdir queue list` command, tabling the creations and sends staged
+//! The `pimdir queue list` command, listing the creations and sends staged
 //! in one mailbox.
 
 use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,9 +15,8 @@ use crate::{
     account::context::Account,
     pimdir::{backend::PimdirQueuedEnvelope, client::PimdirClient},
     shared::{
-        envelope::list::{format_addresses, format_flags},
+        envelope::list::{FlagChars, format_addresses, format_flags},
         mailbox::arg::MailboxArg,
-        table::style_from_preset,
     },
 };
 
@@ -41,7 +39,7 @@ pub struct PimdirQueueListCommand {
 }
 
 impl PimdirQueueListCommand {
-    /// Lists the creations and sends staged in the mailbox and tables them.
+    /// Lists the creations and sends staged in the mailbox and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -53,14 +51,7 @@ impl PimdirQueueListCommand {
         let parked = client.parked_actions(&mailbox)?;
 
         printer.out(PimdirQueueListOutput {
-            preset: account.table_preset().to_string(),
-            id_color: account.envelopes_list_table_id_color(),
-            subject_color: account.envelopes_list_table_subject_color(),
-            from_color: account.envelopes_list_table_from_color(),
-            date_color: account.envelopes_list_table_date_color(),
-            unseen_char: account.envelopes_list_table_unseen_char(),
-            replied_char: account.envelopes_list_table_replied_char(),
-            flagged_char: account.envelopes_list_table_flagged_char(),
+            chars: FlagChars::of(account),
             messages: queued
                 .into_iter()
                 .map(|queued| PimdirQueuedMessage {
@@ -130,30 +121,9 @@ pub struct PimdirParkedRow {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueListOutput {
-    /// The `comfy_table` preset string the table renders with.
+    /// The FLAGS glyphs.
     #[serde(skip)]
-    pub preset: String,
-    /// Color of the ID column.
-    #[serde(skip)]
-    pub id_color: Color,
-    /// Color of the SUBJECT column.
-    #[serde(skip)]
-    pub subject_color: Color,
-    /// Color of the FROM column.
-    #[serde(skip)]
-    pub from_color: Color,
-    /// Color of the DATE column.
-    #[serde(skip)]
-    pub date_color: Color,
-    /// FLAGS glyph of a message lacking `\Seen`.
-    #[serde(skip)]
-    pub unseen_char: char,
-    /// FLAGS glyph of a message carrying `\Answered`.
-    #[serde(skip)]
-    pub replied_char: char,
-    /// FLAGS glyph of a message carrying `\Flagged`.
-    #[serde(skip)]
-    pub flagged_char: char,
+    pub chars: FlagChars,
     /// The messages staged for creation in the mailbox.
     pub messages: Vec<PimdirQueuedMessage>,
     /// The mailbox's parked rows, any kind.
@@ -168,6 +138,9 @@ impl fmt::Display for PimdirQueueListOutput {
         if !self.messages.is_empty() {
             self.fmt_queued(f)?;
         }
+        if !self.messages.is_empty() && !self.parked.is_empty() {
+            writeln!(f)?;
+        }
         if !self.parked.is_empty() {
             self.fmt_parked(f)?;
         }
@@ -176,71 +149,46 @@ impl fmt::Display for PimdirQueueListOutput {
 }
 
 impl PimdirQueueListOutput {
-    /// The table of queued creations and sends.
+    /// The list of queued creations and sends.
     fn fmt_queued(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let chars = crate::shared::envelope::list::FlagChars {
-            unseen: self.unseen_char,
-            replied: self.replied_char,
-            flagged: self.flagged_char,
-            attachment: ' ',
-        };
+        // NOTE: the subject is the one free-text column, so it reads last.
+        let header = ["ROW", "ACTION", "FLAGS", "QUEUED", "TO", "SUBJECT"];
+        let mut columns = Columns::new(header);
 
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("ROW"),
-                Cell::new("ACTION"),
-                Cell::new("FLAGS"),
-                Cell::new("SUBJECT"),
-                Cell::new("TO"),
-                Cell::new("QUEUED"),
-            ]))
-            .add_rows(self.messages.iter().map(|queued| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(queued.id).fg(self.id_color));
-                row.add_cell(Cell::new(if queued.send { "send" } else { "save" }));
-                row.add_cell(Cell::new(format_flags(&queued.envelope.flags, &chars)));
-                row.add_cell(Cell::new(sanitize(&queued.envelope.subject)).fg(self.subject_color));
-                row.add_cell(
-                    Cell::new(sanitize(&format_addresses(&queued.envelope.to))).fg(self.from_color),
-                );
-                row.add_cell(Cell::new(&queued.queued_at).fg(self.date_color));
-                row
-            }));
+        for queued in &self.messages {
+            let to = format_addresses(&queued.envelope.to);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")?;
+            columns.push([
+                queued.id.to_string(),
+                String::from(if queued.send { "send" } else { "save" }),
+                format_flags(&queued.envelope.flags, &self.chars),
+                sanitize::text(&queued.queued_at).into_owned(),
+                sanitize::text(&to).into_owned(),
+                sanitize::text(&queued.envelope.subject).into_owned(),
+            ]);
+        }
+
+        write!(f, "{columns}")?;
         writeln!(
             f,
             "Queued until the next sync. Cancel one with `himalaya pimdir queue cancel <ROW>`"
         )
     }
 
-    /// The table of parked rows.
+    /// The list of parked rows.
     fn fmt_parked(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([
-                Cell::new("ROW"),
-                Cell::new("ACTION"),
-                Cell::new("QUEUED"),
-                Cell::new("ERROR"),
-            ]))
-            .add_rows(self.parked.iter().map(|parked| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(parked.id).fg(self.id_color));
-                row.add_cell(Cell::new(sanitize(&parked.kind)));
-                row.add_cell(Cell::new(&parked.queued_at).fg(self.date_color));
-                row.add_cell(Cell::new(sanitize(&parked.error)));
-                row
-            }));
+        let mut columns = Columns::new(["ROW", "ACTION", "QUEUED", "ERROR"]);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")?;
+        for parked in &self.parked {
+            columns.push([
+                parked.id.to_string(),
+                sanitize::text(&parked.kind).into_owned(),
+                sanitize::text(&parked.queued_at).into_owned(),
+                sanitize::text(&parked.error).into_owned(),
+            ]);
+        }
+
+        write!(f, "{columns}")?;
         writeln!(
             f,
             "Parked by the sync engine, which will not retry them. Cancel one with \

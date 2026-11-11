@@ -6,19 +6,14 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, Row, Table, sanitize},
-};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     email::vacation::Vacation,
-    shared::{
-        message::read::sanitize_body, table::style_from_preset, vacation::cli::VacationClient,
-    },
+    shared::{message::read::sanitize_body, vacation::cli::VacationClient},
 };
 
 /// Print the auto-reply.
@@ -32,11 +27,10 @@ impl VacationGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: VacationClient<'_>,
     ) -> Result<()> {
         printer.out(VacationGetOutput {
-            preset: account.table_preset().to_string(),
             vacation: client.get()?,
         })
     }
@@ -46,31 +40,23 @@ impl VacationGetCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct VacationGetOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The auto-reply.
     pub vacation: Vacation,
 }
 
 impl fmt::Display for VacationGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        writeln!(f, "{}", vacation_table(&self.preset, &self.vacation))
+        write!(f, "{}", vacation_fields(&self.vacation))
     }
 }
 
-/// The auto-reply as a key and value table, the unset values left out
-/// and the single-line ones made printable; the bodies keep their lines.
-pub fn vacation_table(preset: &str, vacation: &Vacation) -> Table {
-    let mut table = Table::new();
-
-    table
-        .load_style(style_from_preset(preset))
-        .set_header(Row::from([Cell::new("KEY"), Cell::new("VALUE")]));
+/// The auto-reply as a record, the unset values left out and the
+/// single-line ones made printable; the bodies keep their lines.
+pub fn vacation_fields(vacation: &Vacation) -> Fields<'static> {
+    let mut fields = Fields::default();
 
     let enabled = if vacation.enabled { "yes" } else { "no" };
-    table.add_row(Row::from([Cell::new("Enabled"), Cell::new(enabled)]));
+    fields.push("Enabled", enabled);
 
     let rows = [
         ("From", vacation.from.as_deref().map(line)),
@@ -80,16 +66,16 @@ pub fn vacation_table(preset: &str, vacation: &Vacation) -> Table {
         ("HTML", vacation.html.as_deref().map(sanitize_body)),
     ];
 
-    for (key, value) in rows {
+    for (label, value) in rows {
         if let Some(value) = value {
-            table.add_row(Row::from([Cell::new(key), Cell::new(value)]));
+            fields.push(label, value);
         }
     }
 
-    table
+    fields
 }
 
 /// A single-line value made printable.
 fn line(value: &str) -> String {
-    sanitize(value).into_owned()
+    sanitize::text(value).into_owned()
 }

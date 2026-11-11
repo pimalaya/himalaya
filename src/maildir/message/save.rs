@@ -66,6 +66,6 @@ impl fmt::Display for MaildirMessageSaveOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = &self.id;
         let path = self.path.display();
-        write!(f, "Message `{id}` successfully saved to {path}")
+        writeln!(f, "Message `{id}` successfully saved to {path}")
     }
 }

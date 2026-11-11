@@ -1,6 +1,6 @@
 //! # Attachment list
 //!
-//! The `attachment list` command, tabling the attachment parts of one
+//! The `attachment list` command, listing the attachment parts of one
 //! message.
 
 use std::fmt;
@@ -9,8 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,7 +19,6 @@ use crate::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::part::{self, PartRole},
-        table::style_from_preset,
     },
 };
 
@@ -44,7 +42,7 @@ pub struct AttachmentListCommand {
 }
 
 impl AttachmentListCommand {
-    /// Fetches the message and prints its attachment parts as a table.
+    /// Fetches the message and prints its attachment parts.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -61,34 +59,13 @@ impl AttachmentListCommand {
             .collect();
 
         let attachments = AttachmentListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
             with_inline: self.inline,
             with_path: false,
-            colors: AttachmentColors {
-                id: account.attachments_list_table_id_color(),
-                filename: account.attachments_list_table_filename_color(),
-                r#type: account.attachments_list_table_type_color(),
-                size: account.attachments_list_table_size_color(),
-                inline: account.attachments_list_table_inline_color(),
-                path: account.attachments_list_table_path_color(),
-            },
             attachments,
         };
 
         printer.out(attachments)
     }
-}
-
-/// Per-column colors of the attachments table.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AttachmentColors {
-    pub id: Color,
-    pub filename: Color,
-    pub r#type: Color,
-    pub size: Color,
-    pub inline: Color,
-    pub path: Color,
 }
 
 /// The attachment parts of a message, in part order, inline ones
@@ -142,81 +119,58 @@ impl Attachment {
     }
 }
 
-/// The `attachment list` output, a table of attachments.
+/// The `attachment list` output, the attachments of one message.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AttachmentListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
     /// Whether the INLINE column is drawn.
     #[serde(skip)]
     pub with_inline: bool,
     /// Whether the PATH column is drawn.
     #[serde(skip)]
     pub with_path: bool,
-    #[serde(skip)]
-    pub(crate) colors: AttachmentColors,
     /// The attachments, in part order.
     pub attachments: Vec<Attachment>,
 }
 
 impl fmt::Display for AttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        let mut header = vec![
-            Cell::new("ID"),
-            Cell::new("FILENAME"),
-            Cell::new("TYPE"),
-            Cell::new("SIZE"),
-        ];
+        // NOTE: a file name is free text, so it reads last, but for the
+        // path a download wrote it to, which ends with it.
+        let mut header = vec!["ID", "TYPE", "SIZE"];
         if self.with_inline {
-            header.push(Cell::new("INLINE"));
+            header.push("INLINE");
         }
+        header.push("FILENAME");
         if self.with_path {
-            header.push(Cell::new("PATH"));
+            header.push("PATH");
         }
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from(header))
-            .add_rows(self.attachments.iter().map(|a| {
-                let mut row = Row::new();
-                row.max_height(1);
-                row.add_cell(Cell::new(sanitize(&a.id)).fg(self.colors.id));
-                row.add_cell(
-                    Cell::new(sanitize(a.filename.as_deref().unwrap_or("")))
-                        .fg(self.colors.filename),
-                );
-                row.add_cell(
-                    Cell::new(sanitize(a.mime.as_deref().unwrap_or(""))).fg(self.colors.r#type),
-                );
-                row.add_cell(Cell::new(format_size(a.size, BINARY)).fg(self.colors.size));
-                if self.with_inline {
-                    row.add_cell(
-                        Cell::new(if a.role == PartRole::Inline {
-                            "yes"
-                        } else {
-                            "no"
-                        })
-                        .fg(self.colors.inline),
-                    );
-                }
-                if self.with_path {
-                    row.add_cell(
-                        Cell::new(sanitize(a.path.as_deref().unwrap_or(""))).fg(self.colors.path),
-                    );
-                }
-                row
-            }));
+        let mut columns = Columns::new(header);
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        for attachment in &self.attachments {
+            let text = |value: &Option<String>| {
+                sanitize::text(value.as_deref().unwrap_or_default()).into_owned()
+            };
+
+            let mut row = vec![
+                sanitize::text(&attachment.id).into_owned(),
+                text(&attachment.mime),
+                format_size(attachment.size, BINARY),
+            ];
+            if self.with_inline {
+                let inline = attachment.role == PartRole::Inline;
+                row.push(String::from(if inline { "yes" } else { "no" }));
+            }
+            row.push(text(&attachment.filename));
+            if self.with_path {
+                row.push(text(&attachment.path));
+            }
+
+            columns.push(row);
+        }
+
+        write!(f, "{columns}")
     }
 }
 
@@ -234,12 +188,12 @@ pub(super) fn mime_string(part: &MimeEntity) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_cli::table::{Color, ContentArrangement};
-
-    use super::{Attachment, AttachmentColors, AttachmentListOutput, attachments};
-    use crate::shared::message::{
-        part::{self, PartRole},
-        read::MessageReadOutput,
+    use crate::shared::{
+        attachment::list::{Attachment, AttachmentListOutput, attachments},
+        message::{
+            part::{self, PartRole},
+            read::MessageReadOutput,
+        },
     };
 
     #[test]
@@ -301,18 +255,8 @@ mod tests {
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
         let attachments = AttachmentListOutput {
-            preset: String::new(),
-            arrangement: ContentArrangement::Disabled,
             with_inline: false,
             with_path: true,
-            colors: AttachmentColors {
-                id: Color::Reset,
-                filename: Color::Reset,
-                r#type: Color::Reset,
-                size: Color::Reset,
-                inline: Color::Reset,
-                path: Color::Reset,
-            },
             attachments: vec![Attachment {
                 id: String::from("1"),
                 filename: Some(String::from("invoice\x1b]8;;https://example.org\x07.pdf")),

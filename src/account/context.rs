@@ -14,19 +14,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crossterm::style::Color;
 use dirs::download_dir;
-use pimalaya_cli::table::{Color as TableColor, ContentArrangement};
 
 #[cfg(any(backend, feature = "smtp"))]
 use crate::email::mailbox::Mailbox;
 use crate::{
-    config::{
-        AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
-        MailboxListTableConfig, PostingStyle, SaveCopyConfig, TableArrangementConfig,
-    },
+    config::{AccountConfig, Config, EnvelopeListTableConfig, PostingStyle, SaveCopyConfig},
     email::mailbox::MailboxRole,
-    shared::table::DEFAULT_PRESET,
 };
 
 /// chrono `strftime` format of the envelope DATE column.
@@ -57,10 +51,6 @@ pub struct Account {
     pub signature_delim: Option<String>,
     /// Directory attachments are downloaded to.
     pub downloads_dir: Option<PathBuf>,
-    /// `comfy_table` preset string every listing renders with.
-    pub table_preset: Option<String>,
-    /// `comfy_table` column arrangement every listing renders with.
-    pub table_arrangement: Option<TableArrangementConfig>,
     /// chrono `strftime` format of the envelope DATE column.
     pub datetime_fmt: Option<String>,
     /// Whether an envelope date is converted to the local timezone.
@@ -69,12 +59,8 @@ pub struct Account {
     pub datetime_relative: Option<bool>,
     /// Page size of `envelope list` when `-s/--page-size` is not passed.
     pub envelopes_list_page_size: Option<u32>,
-    /// Per-column colors and flag glyphs of `envelope list`.
+    /// Flag glyphs of `envelope list`.
     pub envelopes_list_table: EnvelopeListTableConfig,
-    /// Per-column colors of `mailbox list`.
-    pub mailboxes_list_table: MailboxListTableConfig,
-    /// Per-column colors of `attachment list`.
-    pub attachments_list_table: AttachmentListTableConfig,
     /// Mailbox aliases, keys lowercased, an account entry overwriting the
     /// global one of the same name.
     pub mailbox_alias: HashMap<String, String>,
@@ -101,8 +87,6 @@ impl Account {
             signature_delim: other.signature_delim.or(self.signature_delim),
 
             downloads_dir: other.downloads_dir.or(self.downloads_dir),
-            table_preset: other.table_preset.or(self.table_preset),
-            table_arrangement: other.table_arrangement.or(self.table_arrangement),
 
             datetime_fmt: other.datetime_fmt.or(self.datetime_fmt),
             datetime_local_tz: other.datetime_local_tz.or(self.datetime_local_tz),
@@ -110,18 +94,9 @@ impl Account {
             envelopes_list_page_size: other
                 .envelopes_list_page_size
                 .or(self.envelopes_list_page_size),
-
             envelopes_list_table: merge_envelope_table(
                 self.envelopes_list_table,
                 other.envelopes_list_table,
-            ),
-            mailboxes_list_table: merge_mailbox_table(
-                self.mailboxes_list_table,
-                other.mailboxes_list_table,
-            ),
-            attachments_list_table: merge_attachment_table(
-                self.attachments_list_table,
-                other.attachments_list_table,
             ),
 
             mailbox_alias,
@@ -210,19 +185,6 @@ impl Account {
             .clone()
             .or_else(download_dir)
             .unwrap_or_else(temp_dir)
-    }
-
-    /// `comfy_table` preset string, defaulting to `UTF8_FULL_CONDENSED`.
-    pub fn table_preset(&self) -> &str {
-        self.table_preset.as_deref().unwrap_or(DEFAULT_PRESET)
-    }
-
-    /// `comfy_table` content arrangement, defaulting to `Dynamic`.
-    pub fn table_arrangement(&self) -> ContentArrangement {
-        self.table_arrangement
-            .clone()
-            .unwrap_or(TableArrangementConfig::Dynamic)
-            .into()
     }
 
     /// chrono `strftime` format of the DATE column, defaulting to
@@ -316,129 +278,6 @@ impl Account {
             .attachment_char
             .unwrap_or(DEFAULT_ATTACHMENT_CHAR)
     }
-
-    /// Color of the ID column, defaulting to the v1.2.0 red.
-    pub fn envelopes_list_table_id_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.id_color, Color::Red)
-    }
-
-    /// Color of the FLAGS column, defaulting to the v1.2.0 neutral.
-    pub fn envelopes_list_table_flags_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.flags_color, Color::Reset)
-    }
-
-    /// Color of the ATT column, neutral for want of a v1.2.0 precedent:
-    /// the attachment glyph then lived inside FLAGS.
-    pub fn envelopes_list_table_att_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.att_color, Color::Reset)
-    }
-
-    /// Color of the SUBJECT column, defaulting to the v1.2.0 green.
-    pub fn envelopes_list_table_subject_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.subject_color, Color::Green)
-    }
-
-    /// Color of the FROM column, defaulting to the v1.2.0 blue.
-    pub fn envelopes_list_table_from_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.from_color, Color::Blue)
-    }
-
-    /// Color of the TO column, mirroring FROM for want of a v1.2.0
-    /// precedent.
-    pub fn envelopes_list_table_to_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.to_color, Color::Blue)
-    }
-
-    /// Color of the DATE column, defaulting to the v1.2.0 dark yellow.
-    pub fn envelopes_list_table_date_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.date_color, Color::DarkYellow)
-    }
-
-    /// Color of the SIZE column, neutral for want of a v1.2.0 precedent.
-    pub fn envelopes_list_table_size_color(&self) -> TableColor {
-        map_color_or(self.envelopes_list_table.size_color, Color::Reset)
-    }
-
-    /// Color of the ID column, neutral for want of a v1.2.0 precedent.
-    pub fn mailboxes_list_table_id_color(&self) -> TableColor {
-        map_color_or(self.mailboxes_list_table.id_color, Color::Reset)
-    }
-
-    /// Color of the NAME column, defaulting to the v1.2.0 blue.
-    pub fn mailboxes_list_table_name_color(&self) -> TableColor {
-        map_color_or(self.mailboxes_list_table.name_color, Color::Blue)
-    }
-
-    /// Color of the ROLE column, neutral for want of a v1.2.0 precedent.
-    pub fn mailboxes_list_table_role_color(&self) -> TableColor {
-        map_color_or(self.mailboxes_list_table.role_color, Color::Reset)
-    }
-
-    /// Color of the TOTAL column, neutral for want of a v1.2.0 precedent.
-    pub fn mailboxes_list_table_total_color(&self) -> TableColor {
-        map_color_or(self.mailboxes_list_table.total_color, Color::Reset)
-    }
-
-    /// Color of the UNREAD column, neutral for want of a v1.2.0 precedent.
-    pub fn mailboxes_list_table_unread_color(&self) -> TableColor {
-        map_color_or(self.mailboxes_list_table.unread_color, Color::Reset)
-    }
-
-    /// Color of the ID column, neutral for want of a v1.2.0 precedent.
-    pub fn attachments_list_table_id_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.id_color, Color::Reset)
-    }
-
-    /// Color of the FILENAME column, neutral like the whole listing.
-    pub fn attachments_list_table_filename_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.filename_color, Color::Reset)
-    }
-
-    /// Color of the TYPE column, neutral like the whole listing.
-    pub fn attachments_list_table_type_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.type_color, Color::Reset)
-    }
-
-    /// Color of the SIZE column, neutral like the whole listing.
-    pub fn attachments_list_table_size_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.size_color, Color::Reset)
-    }
-
-    /// Color of the INLINE column, neutral like the whole listing.
-    pub fn attachments_list_table_inline_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.inline_color, Color::Reset)
-    }
-
-    /// Color of the PATH column, neutral like the whole listing.
-    pub fn attachments_list_table_path_color(&self) -> TableColor {
-        map_color_or(self.attachments_list_table.path_color, Color::Reset)
-    }
-}
-
-/// Maps a TOML crossterm color into the comfy-table one the renderers
-/// take, substituting `fallback` when the field is unset.
-pub(crate) fn map_color_or(color: Option<Color>, fallback: Color) -> TableColor {
-    match color.unwrap_or(fallback) {
-        Color::Reset => TableColor::Reset,
-        Color::Black => TableColor::Black,
-        Color::DarkGrey => TableColor::DarkGrey,
-        Color::Red => TableColor::Red,
-        Color::DarkRed => TableColor::DarkRed,
-        Color::Green => TableColor::Green,
-        Color::DarkGreen => TableColor::DarkGreen,
-        Color::Yellow => TableColor::Yellow,
-        Color::DarkYellow => TableColor::DarkYellow,
-        Color::Blue => TableColor::Blue,
-        Color::DarkBlue => TableColor::DarkBlue,
-        Color::Magenta => TableColor::Magenta,
-        Color::DarkMagenta => TableColor::DarkMagenta,
-        Color::Cyan => TableColor::Cyan,
-        Color::DarkCyan => TableColor::DarkCyan,
-        Color::White => TableColor::White,
-        Color::Grey => TableColor::Grey,
-        Color::Rgb { r, g, b } => TableColor::Rgb { r, g, b },
-        Color::AnsiValue(n) => TableColor::AnsiValue(n),
-    }
 }
 
 fn merge_envelope_table(
@@ -450,41 +289,6 @@ fn merge_envelope_table(
         replied_char: over.replied_char.or(base.replied_char),
         flagged_char: over.flagged_char.or(base.flagged_char),
         attachment_char: over.attachment_char.or(base.attachment_char),
-        id_color: over.id_color.or(base.id_color),
-        flags_color: over.flags_color.or(base.flags_color),
-        att_color: over.att_color.or(base.att_color),
-        subject_color: over.subject_color.or(base.subject_color),
-        from_color: over.from_color.or(base.from_color),
-        to_color: over.to_color.or(base.to_color),
-        date_color: over.date_color.or(base.date_color),
-        size_color: over.size_color.or(base.size_color),
-    }
-}
-
-fn merge_mailbox_table(
-    base: MailboxListTableConfig,
-    over: MailboxListTableConfig,
-) -> MailboxListTableConfig {
-    MailboxListTableConfig {
-        id_color: over.id_color.or(base.id_color),
-        name_color: over.name_color.or(base.name_color),
-        role_color: over.role_color.or(base.role_color),
-        total_color: over.total_color.or(base.total_color),
-        unread_color: over.unread_color.or(base.unread_color),
-    }
-}
-
-fn merge_attachment_table(
-    base: AttachmentListTableConfig,
-    over: AttachmentListTableConfig,
-) -> AttachmentListTableConfig {
-    AttachmentListTableConfig {
-        id_color: over.id_color.or(base.id_color),
-        filename_color: over.filename_color.or(base.filename_color),
-        type_color: over.type_color.or(base.type_color),
-        size_color: over.size_color.or(base.size_color),
-        inline_color: over.inline_color.or(base.inline_color),
-        path_color: over.path_color.or(base.path_color),
     }
 }
 
@@ -510,17 +314,12 @@ impl From<Config> for Account {
             signature_delim: config.signature_delim,
 
             downloads_dir: config.downloads_dir,
-            table_preset: config.table.preset,
-            table_arrangement: config.table.arrangement,
 
             datetime_fmt: config.envelope.list.datetime_fmt,
             datetime_local_tz: config.envelope.list.datetime_local_tz,
             datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
-
             envelopes_list_table: config.envelope.list.table,
-            mailboxes_list_table: config.mailbox.list.table,
-            attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,
@@ -539,17 +338,12 @@ impl From<AccountConfig> for Account {
             signature_delim: config.signature_delim,
 
             downloads_dir: config.downloads_dir,
-            table_preset: config.table.preset,
-            table_arrangement: config.table.arrangement,
 
             datetime_fmt: config.envelope.list.datetime_fmt,
             datetime_local_tz: config.envelope.list.datetime_local_tz,
             datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
-
             envelopes_list_table: config.envelope.list.table,
-            mailboxes_list_table: config.mailbox.list.table,
-            attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
             save_copy: config.message.send.save_copy,
@@ -561,8 +355,7 @@ impl From<AccountConfig> for Account {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::MailboxConfig;
+    use crate::{account::context::*, config::MailboxConfig};
 
     fn account_with_aliases(pairs: &[(&str, &str)]) -> Account {
         let aliases = pairs
@@ -570,10 +363,7 @@ mod tests {
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect();
         let config = Config {
-            mailbox: MailboxConfig {
-                aliases,
-                ..MailboxConfig::default()
-            },
+            mailbox: MailboxConfig { aliases },
             ..Config::default()
         };
         Account::from(config)

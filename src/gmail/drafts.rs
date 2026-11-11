@@ -78,6 +78,6 @@ pub(crate) struct GmailDraftWriteOutput {
 
 impl fmt::Display for GmailDraftWriteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Gmail draft `{}` successfully {}", self.id, self.action)
+        writeln!(f, "Gmail draft `{}` successfully {}", self.id, self.action)
     }
 }

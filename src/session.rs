@@ -108,8 +108,7 @@ impl SessionAccount<'_> {
         let (account, client) = match slot.take() {
             Some(kept) => slot.insert(kept),
             None => {
-                let (config, name, account_config) =
-                    resolve_account(printer, self.config_paths, self.name)?;
+                let (config, name, account_config) = resolve_account(self.config_paths, self.name)?;
                 slot.insert(build(config, name, account_config)?)
             }
         };

@@ -8,7 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    msgraph::{client::MsgraphClient, mail_folders::list::folders_table},
+    msgraph::{client::MsgraphClient, mail_folders::list::MsgraphMailFolderListOutput},
 };
 
 /// Get one or more Microsoft Graph mail folders by id (`GET
@@ -21,11 +21,11 @@ pub struct MsgraphMailFolderGetCommand {
 }
 
 impl MsgraphMailFolderGetCommand {
-    /// Fetches the folders and tables them.
+    /// Fetches the folders and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let mut folders = Vec::with_capacity(self.ids.len());
@@ -34,6 +34,6 @@ impl MsgraphMailFolderGetCommand {
             folders.push(client.mail_folder_get(&id)?.response);
         }
 
-        printer.out(folders_table(account, folders))
+        printer.out(MsgraphMailFolderListOutput::new(folders))
     }
 }

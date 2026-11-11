@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::{GmailFilter, get::GmailFilterGet};
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -26,7 +26,7 @@ pub struct GmailSettingsFilterGetCommand {
 }
 
 impl GmailSettingsFilterGetCommand {
-    /// Fetches the filter and tables it.
+    /// Fetches the filter and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailFilterGet::new(&client.auth, &client.user_id, &self.id)?;
@@ -49,22 +49,23 @@ pub(crate) struct GmailSettingsFilterGetOutput(GmailFilter);
 
 impl fmt::Display for GmailSettingsFilterGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Id: {}", sanitize(&self.0.id))?;
+        let mut fields = Fields::default();
+        fields.push("Id", sanitize::text(&self.0.id));
 
         if let Some(criteria) = &self.0.criteria {
             let summary = criteria_summary(criteria);
             if !summary.is_empty() {
-                writeln!(f, "Criteria: {summary}")?;
+                fields.push("Criteria", summary);
             }
         }
 
         if let Some(action) = &self.0.action {
             let summary = action_summary(action);
             if !summary.is_empty() {
-                writeln!(f, "Action: {summary}")?;
+                fields.push("Action", summary);
             }
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

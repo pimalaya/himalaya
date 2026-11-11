@@ -1,6 +1,6 @@
 //! # Microsoft Graph mail folder list
 //!
-//! The `msgraph mail-folders list` command, tabling the folders of the
+//! The `msgraph mail-folders list` command, listing the folders of the
 //! mailbox.
 
 use std::fmt;
@@ -10,14 +10,11 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, msgraph::client::MsgraphClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, msgraph::client::MsgraphClient};
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).
 #[derive(Debug, Parser)]
@@ -38,11 +35,11 @@ pub struct MsgraphMailFolderListCommand {
 }
 
 impl MsgraphMailFolderListCommand {
-    /// Lists one page of folders and tables it.
+    /// Lists one page of folders and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
@@ -53,105 +50,45 @@ impl MsgraphMailFolderListCommand {
         };
         let folders = client.mail_folders_list(&params)?.response.value;
 
-        printer.out(folders_table(account, folders))
+        printer.out(MsgraphMailFolderListOutput::new(folders))
     }
 }
 
-/// Builds the renderable folders table with the account's mailbox-table
-/// colors and layout.
-pub(crate) fn folders_table(
-    account: &Account,
-    folders: Vec<MsgraphMailFolder>,
-) -> MsgraphMailFolderListOutput {
-    MsgraphMailFolderListOutput {
-        preset: account.table_preset().to_string(),
-        arrangement: account.table_arrangement(),
-        colors: MailFolderColors {
-            id: account.mailboxes_list_table_id_color(),
-            name: account.mailboxes_list_table_name_color(),
-            total: account.mailboxes_list_table_total_color(),
-            unread: account.mailboxes_list_table_unread_color(),
-        },
-        folders,
-    }
-}
-
-/// Per-column colors for the Microsoft Graph mail folders table.
-#[derive(Clone, Copy, Debug)]
-pub struct MailFolderColors {
-    /// Color of the ID column.
-    pub id: Color,
-    /// Color of the NAME column.
-    pub name: Color,
-    /// Color of the TOTAL column.
-    pub total: Color,
-    /// Color of the UNREAD column.
-    pub unread: Color,
-}
-
-impl Default for MailFolderColors {
-    fn default() -> Self {
-        Self {
-            id: Color::Reset,
-            name: Color::Reset,
-            total: Color::Reset,
-            unread: Color::Reset,
-        }
-    }
-}
-
-/// Renderable table of Microsoft Graph mail folders.
+/// The Microsoft Graph mail folders, as `list`, `get` and
+/// `child-folders` print them.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphMailFolderListOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
-    #[serde(skip)]
-    colors: MailFolderColors,
     folders: Vec<MsgraphMailFolder>,
+}
+
+impl MsgraphMailFolderListOutput {
+    /// Wraps the folders the server returned.
+    pub fn new(folders: Vec<MsgraphMailFolder>) -> Self {
+        Self { folders }
+    }
 }
 
 impl fmt::Display for MsgraphMailFolderListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a name is free text, so it reads last.
+        let mut columns = Columns::new(["ID", "TOTAL", "UNREAD", "CHILDREN", "NAME"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("NAME"),
-                Cell::new("TOTAL"),
-                Cell::new("UNREAD"),
-                Cell::new("CHILDREN"),
-            ]))
-            .add_rows(self.folders.iter().map(|folder| {
-                let total = folder
-                    .total_item_count
-                    .map(|n| n.to_string())
-                    .unwrap_or_default();
-                let unread = folder
-                    .unread_item_count
-                    .map(|n| n.to_string())
-                    .unwrap_or_default();
-                let children = folder
-                    .child_folder_count
-                    .map(|n| n.to_string())
-                    .unwrap_or_default();
+        for folder in &self.folders {
+            columns.push([
+                sanitize::text(&folder.id).into_owned(),
+                count(folder.total_item_count),
+                count(folder.unread_item_count),
+                count(folder.child_folder_count),
+                sanitize::text(&folder.display_name).into_owned(),
+            ]);
+        }
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(sanitize(&folder.id)).fg(self.colors.id))
-                    .add_cell(Cell::new(sanitize(&folder.display_name)).fg(self.colors.name))
-                    .add_cell(Cell::new(total).fg(self.colors.total))
-                    .add_cell(Cell::new(unread).fg(self.colors.unread))
-                    .add_cell(Cell::new(children));
-                row
-            }));
-
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
+}
+
+/// Renders a count, or an empty cell when Graph gave none.
+fn count(value: Option<impl ToString>) -> String {
+    value.map(|n| n.to_string()).unwrap_or_default()
 }

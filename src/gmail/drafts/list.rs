@@ -10,14 +10,11 @@ use io_gmail::v1::rest::drafts::{
     GmailDraft,
     list::{GmailDraftsList, GmailDraftsListParams},
 };
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
-use pimalaya_cli::{output::Paginated, printer::Printer};
+use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, gmail::client::GmailClient};
 
 /// List Gmail drafts (users.drafts.list).
 #[derive(Debug, Parser)]
@@ -39,11 +36,11 @@ pub struct GmailDraftsListCommand {
 }
 
 impl GmailDraftsListCommand {
-    /// Lists one page of drafts and tables it.
+    /// Lists one page of drafts and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -59,62 +56,43 @@ impl GmailDraftsListCommand {
         let response = out.response;
 
         let next_page = response.next_page_token;
-        let table = GmailDraftListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
+        let drafts = GmailDraftListOutput {
             drafts: response.drafts,
         };
 
         printer.out(Paginated {
-            inner: table,
+            inner: drafts,
             next_page,
         })
     }
 }
 
-/// Renders a list of Gmail drafts as a three-column table.
+/// The `gmail drafts list` output, the drafts of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailDraftListOutput {
-    #[serde(skip)]
-    /// The `comfy_table` preset string the table renders with.
-    pub preset: String,
-    #[serde(skip)]
-    /// The column arrangement the table renders with.
-    pub arrangement: ContentArrangement,
     /// The drafts of this page.
     pub drafts: Vec<GmailDraft>,
 }
 
 impl fmt::Display for GmailDraftListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["DRAFT ID", "MESSAGE ID", "THREAD ID"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("DRAFT ID"),
-                Cell::new("MESSAGE ID"),
-                Cell::new("THREAD ID"),
-            ]))
-            .add_rows(self.drafts.iter().map(|d| {
-                let message_id = d.message.as_ref().map(|m| m.id.as_str()).unwrap_or("");
-                let thread_id = d
-                    .message
-                    .as_ref()
-                    .and_then(|m| m.thread_id.as_deref())
-                    .unwrap_or("");
+        for draft in &self.drafts {
+            let message = draft.message.as_ref();
+            let message_id = message.map(|m| m.id.as_str()).unwrap_or_default();
+            let thread_id = message
+                .and_then(|m| m.thread_id.as_deref())
+                .unwrap_or_default();
 
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(&d.id).fg(Color::Reset))
-                    .add_cell(Cell::new(message_id).fg(Color::Reset))
-                    .add_cell(Cell::new(thread_id).fg(Color::Reset));
-                row
-            }));
+            columns.push([
+                sanitize::text(&draft.id),
+                sanitize::text(message_id),
+                sanitize::text(thread_id),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

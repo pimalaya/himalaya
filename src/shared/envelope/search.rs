@@ -3,10 +3,8 @@
 //! The `envelope search` command, listing a mailbox through the shared
 //! filter and sort query.
 
-use std::io::{IsTerminal, stdout};
-
 use anyhow::{Context, Result};
-use ariadne::{Color, Config, Label, Report, ReportKind, Source};
+use ariadne::{Config, Label, Report, ReportKind, Source};
 use clap::Parser;
 use pimalaya_cli::{
     clap::args::PageTokenArg, error::CodedError, output::Paginated, printer::Printer,
@@ -19,7 +17,7 @@ use crate::{
     error::ErrorCode,
     shared::{
         client::EmailClient,
-        envelope::list::{EnvelopeColors, EnvelopeListOutput, FlagChars},
+        envelope::list::{EnvelopeListOutput, FlagChars},
         mailbox::arg::MailboxArg,
     },
 };
@@ -50,10 +48,6 @@ pub struct EnvelopeSearchCommand {
     pub page_size: Option<u32>,
     #[command(flatten)]
     pub page_token: PageTokenArg,
-    /// Maximum width of the rendered table, in terminal columns.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(value_name = "COLUMNS")]
-    pub max_width: Option<u16>,
     /// Render recipients instead of senders.
     #[arg(long, short)]
     pub recipient: bool,
@@ -104,7 +98,7 @@ impl EnvelopeSearchCommand {
         Ok(capabilities)
     }
 
-    /// Searches the mailbox and prints one page of hits as a table.
+    /// Searches the mailbox and prints one page of hits.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -143,30 +137,12 @@ impl EnvelopeSearchCommand {
         };
 
         let envelopes = EnvelopeListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            max_width: self.max_width,
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
             datetime_relative: account.datetime_relative(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
-            chars: FlagChars {
-                unseen: account.envelopes_list_table_unseen_char(),
-                replied: account.envelopes_list_table_replied_char(),
-                flagged: account.envelopes_list_table_flagged_char(),
-                attachment: account.envelopes_list_table_attachment_char(),
-            },
-            colors: EnvelopeColors {
-                id: account.envelopes_list_table_id_color(),
-                flags: account.envelopes_list_table_flags_color(),
-                att: account.envelopes_list_table_att_color(),
-                subject: account.envelopes_list_table_subject_color(),
-                from: account.envelopes_list_table_from_color(),
-                to: account.envelopes_list_table_to_color(),
-                date: account.envelopes_list_table_date_color(),
-                size: account.envelopes_list_table_size_color(),
-            },
+            chars: FlagChars::of(account),
             envelopes,
         };
 
@@ -205,11 +181,12 @@ fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
 /// Renders a parse error with ariadne, one labelled report per inner
 /// error, into the string the caller raises through stdout.
 ///
-/// Color is dropped when stdout is not a terminal.
+/// Rendered without colour, the string landing in a JSON error as often
+/// as on a terminal.
 fn render_query_parse_error(err: &SearchQueryError) -> String {
     let SearchQueryError::ParseError(errs, src) = err;
     let source_name = "query";
-    let config = Config::default().with_color(stdout().is_terminal());
+    let config = Config::default().with_color(false);
     let mut buf = Vec::new();
 
     for inner in errs {
@@ -217,11 +194,7 @@ fn render_query_parse_error(err: &SearchQueryError) -> String {
         let _ = Report::build(ReportKind::Error, (source_name, range.clone()))
             .with_config(config)
             .with_message(err.to_string())
-            .with_label(
-                Label::new((source_name, range))
-                    .with_message(inner.reason().to_string())
-                    .with_color(Color::Red),
-            )
+            .with_label(Label::new((source_name, range)).with_message(inner.reason().to_string()))
             .finish()
             .write((source_name, Source::from(src.as_str())), &mut buf);
     }

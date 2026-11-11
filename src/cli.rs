@@ -3,19 +3,16 @@
 //! Top-level clap parser and subcommand dispatcher, running each command
 //! over the [`Session`] client it needs.
 
-use std::{
-    io::{IsTerminal, stdin},
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
-#[cfg(feature = "wizard")]
-use pimalaya_cli::prompt;
 use pimalaya_cli::{
     clap::{
         args::{AccountFlag, JsonFlag, LogFlags},
-        commands::{CompletionCommand, JsonSchemaCommand, ManualCommand},
+        commands::{
+            completion::CompletionCommand, json_schema::JsonSchemaCommand, manual::ManualCommand,
+        },
         parsers::path_parser,
     },
     footer, long_version,
@@ -54,8 +51,6 @@ use crate::shared::{client::EmailClient, message::cli::MessageCommand};
 use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
-#[cfg(feature = "wizard")]
-use crate::wizard::{self, configure::ConfigureCommand};
 use crate::{
     account::cli::AccountCommand,
     backend::Backend,
@@ -75,20 +70,11 @@ use crate::{
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
 #[command(author, version, about)]
-#[command(long_about = concat!(
-    "CLI to manage emails.\n\n",
-    "First time here? Run `himalaya` with no command: it offers to generate an ",
-    "account discovered from your email address, which `himalaya configure` does ",
-    "again later. Everything discovery does not cover is written by hand.",
-))]
 #[command(long_version = long_version!())]
 #[command(after_help = footer!())]
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
-    /// The subcommand to run.
-    ///
-    /// Omitted, a bare `himalaya` offers to generate a configuration when
-    /// it finds none, and shows this help otherwise.
+    /// The subcommand to run, a bare `himalaya` showing this help.
     #[command(subcommand)]
     pub cmd: Option<Command>,
     #[command(flatten)]
@@ -166,10 +152,6 @@ pub enum Command {
     Sieve(SieveCommand),
     Repl(ReplCommand),
     Mcp(McpCommand),
-    /// Configure an account interactively.
-    #[cfg(feature = "wizard")]
-    #[command(visible_alias = "wizard")]
-    Configure(ConfigureCommand),
     #[command(subcommand)]
     Account(AccountCommand),
     #[command(alias = "completions")]
@@ -205,74 +187,21 @@ pub struct ConfigPathsArg {
     pub paths: Vec<PathBuf>,
 }
 
-/// Welcomes, then offers to generate a first configuration, returning
-/// whether the wizard ran.
-///
-/// A hook rather than a gate: declining decides nothing, and what happens
-/// next is the business of the caller, a bare invocation or a command
-/// that needs an account.
-#[cfg(feature = "wizard")]
-pub fn offer_configuration(
-    printer: &mut impl Printer,
-    config_paths: &[PathBuf],
-    path: &Path,
-) -> Result<bool> {
-    wizard::configure::print_welcome(path);
-
-    if !prompt::bool("Create a configuration with a default account?", true)? {
-        return Ok(false);
-    }
-
-    ConfigureCommand.execute(printer, config_paths)?;
-
-    Ok(true)
-}
-
-/// Offers nothing in a build without the wizard, so the caller falls back
-/// to what it does when the offer is declined.
-#[cfg(not(feature = "wizard"))]
-pub fn offer_configuration(
-    _printer: &mut impl Printer,
-    _config_paths: &[PathBuf],
-    _path: &Path,
-) -> Result<bool> {
-    Ok(false)
-}
-
 /// Resolves the account a command runs against, returning the leftover
 /// global config, the account name and its config.
 ///
-/// A missing configuration is met with the wizard rather than an error, and
-/// the command carries on either way: accepting gives it a chance to work,
-/// declining leaves it to fail on the configuration it still has not got.
+/// A missing configuration fails naming the path looked at, which is where
+/// `-c` pointed, so a mistyped path shows up as itself.
 pub fn resolve_account(
-    printer: &mut impl Printer,
     config_paths: &[PathBuf],
     account_name: Option<&str>,
 ) -> Result<(Config, String, AccountConfig)> {
     let mut config = match Config::from_paths_or_default(config_paths)? {
         Some(config) => config,
-        None => {
-            // NOTE: the target path is where `-c` pointed, so a mistyped
-            // path shows up as itself rather than as a generic first run.
-            let path = Config::target_path(config_paths)?;
-
-            // NOTE: a script and a JSON consumer cannot answer a prompt, so
-            // both skip the offer and fail below.
-            if !printer.is_json() && stdin().is_terminal() {
-                offer_configuration(printer, config_paths, &path)?;
-            }
-
-            // NOTE: the wizard may print the account instead of writing it,
-            // so having run it proves nothing and the lookup runs again.
-            match Config::from_paths_or_default(config_paths)? {
-                Some(config) => config,
-                None => bail!(
-                    "No configuration found at {}, {NO_CONFIG_HINT}",
-                    path.display(),
-                ),
-            }
-        }
+        None => bail!(
+            "No configuration found at {}, {NO_CONFIG_HINT}",
+            Config::target_path(config_paths)?.display(),
+        ),
     };
 
     // NOTE: an empty name and `default` both mean the default account,
@@ -346,7 +275,7 @@ fn run_vacation<P: Printer>(
     command: VacationCommand,
 ) -> Result<()> {
     let account = session.account;
-    let (_, name, account_config) = resolve_account(printer, account.config_paths, account.name)?;
+    let (_, name, account_config) = resolve_account(account.config_paths, account.name)?;
     let resolution = Resolution::of(&name, &account_config, account.backend);
     resolution.require(&[Capability::Vacation])?;
 
@@ -499,8 +428,6 @@ impl Command {
 
             Self::Repl(cmd) => cmd.execute(printer, session),
             Self::Mcp(cmd) => cmd.execute(printer, session),
-            #[cfg(feature = "wizard")]
-            Self::Configure(cmd) => cmd.execute(printer, account.config_paths),
             Self::Account(cmd) => {
                 cmd.execute(printer, account.config_paths, account.name, account.backend)
             }
@@ -517,7 +444,7 @@ mod tests {
 
     use clap::Parser;
 
-    use super::{CONFIG_PATH_DELIMITER, Cli};
+    use crate::cli::{CONFIG_PATH_DELIMITER, Cli};
 
     /// A directory that is never created, so the paths below it keep the
     /// spelling they were given instead of being canonicalized.

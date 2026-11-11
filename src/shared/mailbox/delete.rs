@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -56,7 +56,7 @@ pub struct MailboxDeleteOutput {
 
 impl fmt::Display for MailboxDeleteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let id = sanitize(&self.id);
+        let id = sanitize::text(&self.id);
         if self.queued {
             return writeln!(f, "Deletion of mailbox `{id}` queued");
         }

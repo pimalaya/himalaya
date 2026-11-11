@@ -10,14 +10,11 @@ use io_gmail::v1::rest::threads::{
     GmailThreadSummary,
     list::{GmailThreadsList, GmailThreadsListParams},
 };
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table, sanitize};
-use pimalaya_cli::{output::Paginated, printer::Printer};
+use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, gmail::client::GmailClient};
 
 /// List Gmail threads matching the given query and labels
 /// (users.threads.list).
@@ -44,11 +41,11 @@ pub struct GmailThreadsListCommand {
 }
 
 impl GmailThreadsListCommand {
-    /// Lists one page of threads and tables it.
+    /// Lists one page of threads and prints it.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -65,55 +62,38 @@ impl GmailThreadsListCommand {
         let response = out.response;
 
         let next_page = response.next_page_token;
-        let table = GmailThreadListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
+        let threads = GmailThreadListOutput {
             threads: response.threads,
         };
 
         printer.out(Paginated {
-            inner: table,
+            inner: threads,
             next_page,
         })
     }
 }
 
-/// Renders a list of Gmail thread summaries as a three-column table.
+/// The `gmail threads list` output, the thread summaries of one page.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailThreadListOutput {
-    #[serde(skip)]
-    /// The `comfy_table` preset string the table renders with.
-    pub preset: String,
-    #[serde(skip)]
-    /// The column arrangement the table renders with.
-    pub arrangement: ContentArrangement,
     /// The threads of this page.
     pub threads: Vec<GmailThreadSummary>,
 }
 
 impl fmt::Display for GmailThreadListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: a snippet is free text, so it reads last.
+        let mut columns = Columns::new(["ID", "HISTORY ID", "SNIPPET"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("ID"),
-                Cell::new("SNIPPET"),
-                Cell::new("HISTORY ID"),
-            ]))
-            .add_rows(self.threads.iter().map(|t| {
-                let mut row = Row::new();
-                row.max_height(1)
-                    .add_cell(Cell::new(sanitize(&t.id)).fg(Color::Reset))
-                    .add_cell(Cell::new(sanitize(t.snippet.as_deref().unwrap_or(""))))
-                    .add_cell(Cell::new(sanitize(t.history_id.as_deref().unwrap_or(""))));
-                row
-            }));
+        for thread in &self.threads {
+            columns.push([
+                sanitize::text(&thread.id),
+                sanitize::text(thread.history_id.as_deref().unwrap_or_default()),
+                sanitize::text(thread.snippet.as_deref().unwrap_or_default()),
+            ]);
+        }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

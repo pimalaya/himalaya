@@ -12,15 +12,13 @@ use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     types::flag::{Flag, FlagPerm},
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::{
     account::context::Account,
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
-    shared::table::style_from_preset,
 };
 
 /// List the flags a mailbox allows (SELECT response, RFC 3501).
@@ -33,11 +31,11 @@ pub struct ImapFlagListCommand {
 }
 
 impl ImapFlagListCommand {
-    /// Selects the mailbox and tables the flags it reported.
+    /// Selects the mailbox and lists the flags it reported.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -47,31 +45,21 @@ impl ImapFlagListCommand {
             let flags = data.flags.unwrap_or_default();
             let permanent_flags = data.permanent_flags.unwrap_or_default();
 
-            let table = ImapFlagListOutput {
-                preset: account.table_preset().to_string(),
-                arrangement: account.table_arrangement(),
+            Ok(ImapFlagListOutput {
                 flags,
                 permanent_flags,
-            };
-
-            Ok(table)
+            })
         })();
 
         outcome::print(printer, result)
     }
 }
 
-/// The `imap flag` output, a table of the flags a mailbox allows and of
-/// the ones it keeps across sessions.
+/// The `imap flag` output, the flags a mailbox allows and the ones it
+/// keeps across sessions.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapFlagListOutput<'a> {
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     #[serde(serialize_with = "serialize_flags")]
     #[schemars(with = "Vec<String>")]
     flags: Vec<Flag<'a>>,
@@ -103,22 +91,13 @@ impl ImapFlagListOutput<'_> {
 
 impl fmt::Display for ImapFlagListOutput<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("FLAG"), Cell::new("PERMANENT")]));
+        let mut columns = Columns::new(["FLAG", "PERMANENT"]);
 
         for (flag, perm) in self.build_entries() {
-            table.add_row(Row::from([
-                Cell::new(&flag),
-                Cell::new(if perm { "true" } else { "" }),
-            ]));
+            columns.push([&*sanitize::text(&flag), if perm { "true" } else { "" }]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }
 

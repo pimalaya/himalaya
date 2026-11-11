@@ -61,7 +61,6 @@ an IMAP UID, `<NAME>` a mailbox name.
 | --- | --- |
 | base | `mailbox list` |
 | counts | `mailbox list --counts` (TOTAL/UNREAD columns) |
-| width | `mailbox list --max-width 30` |
 | json | `--json mailbox list` (+ `--counts`) |
 
 ### envelope list
@@ -230,7 +229,7 @@ verbatim, so the flags differ from the shared enum-driven ones.
 - **JMAP**: mailboxes are opaque ids; the shared layer resolves display
   names to ids (`JmapClient::resolve_mailbox_id`), so names work but the
   id is what reaches the wire.
-- **Flag rendering**: which symbol maps to which flag in the table
+- **Flag rendering**: which symbol maps to which flag in the list
   (e.g. `*` unseen, `!` flagged).
 
 ## Cleanup

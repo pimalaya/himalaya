@@ -7,7 +7,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_pimdir::client::producer::PimdirActionStatus;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -138,15 +138,15 @@ impl PimdirQueueShowOutput {
 impl fmt::Display for PimdirQueueShowOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = self.queue_id;
-        let collection = sanitize(self.collection.as_deref().unwrap_or_default());
-        let kind = sanitize(self.kind.as_deref().unwrap_or_default());
+        let collection = sanitize::text(self.collection.as_deref().unwrap_or_default());
+        let kind = sanitize::text(self.kind.as_deref().unwrap_or_default());
 
         match self.state {
             PimdirQueueState::Pending => {
                 writeln!(f, "Row {id} ({kind} in {collection}) is pending")
             }
             PimdirQueueState::Parked => {
-                let error = sanitize(self.error.as_deref().unwrap_or_default());
+                let error = sanitize::text(self.error.as_deref().unwrap_or_default());
                 writeln!(f, "Row {id} ({kind} in {collection}) is parked: {error}")
             }
             PimdirQueueState::Applied => {

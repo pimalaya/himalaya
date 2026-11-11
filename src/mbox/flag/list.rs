@@ -7,14 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, ContentArrangement, Row, Table},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, email::flag::IanaFlag, shared::table::style_from_preset};
+use crate::{account::context::Account, email::flag::IanaFlag};
 
 /// List the mbox flags.
 ///
@@ -24,8 +21,8 @@ use crate::{account::context::Account, email::flag::IanaFlag, shared::table::sty
 pub struct MboxFlagListCommand;
 
 impl MboxFlagListCommand {
-    /// Tables the six flags, their letters and headers.
-    pub fn execute(self, printer: &mut impl Printer, account: &mut Account) -> Result<()> {
+    /// Lists the six flags, their letters and headers.
+    pub fn execute(self, printer: &mut impl Printer, _account: &mut Account) -> Result<()> {
         let flag = |raw: &str, header: &str, name: &str, iana| FlagRow {
             raw: raw.into(),
             iana,
@@ -33,9 +30,7 @@ impl MboxFlagListCommand {
             name: name.into(),
         };
 
-        let table = MboxFlagListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
+        printer.out(MboxFlagListOutput {
             flags: vec![
                 flag("R", "Status", "Seen", Some(IanaFlag::Seen)),
                 flag("O", "Status", "Old", None),
@@ -44,27 +39,19 @@ impl MboxFlagListCommand {
                 flag("T", "X-Status", "Draft", Some(IanaFlag::Draft)),
                 flag("D", "X-Status", "Deleted", Some(IanaFlag::Deleted)),
             ],
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// Renderable table of the mbox flags.
+/// The `mbox flag list` output, the mbox flags.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxFlagListOutput {
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     flags: Vec<FlagRow>,
 }
 
-/// One row of the mbox flags table: the flag, as the shared flags print
-/// it, its letter as `raw`, and the header carrying the letter.
+/// One mbox flag: the flag, as the shared flags print it, its letter as
+/// `raw`, and the header carrying the letter.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlagRow {
@@ -82,26 +69,12 @@ pub struct FlagRow {
 
 impl fmt::Display for MboxFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([
-                Cell::new("CODE"),
-                Cell::new("HEADER"),
-                Cell::new("NAME"),
-            ]));
+        let mut columns = Columns::new(["CODE", "HEADER", "NAME"]);
 
         for flag in &self.flags {
-            table.add_row(Row::from([
-                Cell::new(&flag.raw),
-                Cell::new(&flag.header),
-                Cell::new(&flag.name),
-            ]));
+            columns.push([&flag.raw, &flag.header, &flag.name]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

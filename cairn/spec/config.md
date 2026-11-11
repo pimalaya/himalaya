@@ -23,12 +23,10 @@ Without `-c/--config`, the config SHALL load every existing canonical path as a 
 `-c/--config` SHALL replace the canonical paths entirely. Multiple `-c` paths MAY be passed, delimited like `$PATH` (`;` on Windows, `:` elsewhere) or repeated as flags: the first is the base and the rest are deep-merged on top.
 
 ### Requirement: Missing account is an error
-When the config exists but lacks the requested account, the command SHALL fail with a hard error, not fall back to the wizard. The wizard is proposed only when no config is found at all.
+When the config exists but lacks the requested account, the command SHALL fail with a hard error. When no configuration is found at all, a command needing one SHALL fail naming the path it looked at (the one `-c` or `HIMALAYA_CONFIG` gave, else the default location) and pointing at the documented sample, and a bare `himalaya` SHALL print the help. Himalaya SHALL NOT prompt to create a configuration.
 
 ### Requirement: One default account
 Resolving the default account SHALL fail, naming them, when several accounts are marked `default = true` once the configuration is loaded, layers and `-c` files merged. An account named with `-a` SHALL still resolve.
-
-The wizard SHALL check the name and the default of the account it generates against the merged configuration, not only against the file it appends to.
 
 ### Requirement: Account identity
 An account MAY declare the address it sends as, `email`, and the name that address carries, `display-name`. `display-name` MAY also be declared at the top level, where it applies to every account that does not override it. Neither is required, and neither is validated as an addr-spec: an account that never composes has no use for them.
@@ -44,7 +42,7 @@ An account MAY declare a `signature` and the `signature-delim` introducing it, a
 An account MAY map friendly mailbox names to backend-native ids under `[accounts.<name>.mailbox.alias]`. Alias names are case-insensitive on lookup and on storage. `-m/--mailbox` resolves an alias first, then a mailbox role, then passes the value verbatim; a role matching several mailboxes is an error. A shared command that omits `-m/--mailbox` resolves the `inbox` alias, else the `inbox` role. Account-level entries override same-named global entries, and ids are stored verbatim.
 
 ### Requirement: Config never written
-Himalaya SHALL NOT persist config itself. The wizard prints a ready-to-save fragment on stdout; the user redirects it into their config file.
+Himalaya SHALL NOT write a configuration file: the user writes it, from the documented sample.
 
 ### Requirement: The mbox block
 An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `inbox` (the spool), `format` (`mboxo`, `mboxrd` by default, `mboxcl`, `mboxcl2`, which also decides whether `Content-Length` is trusted on read), `thunderbird` (the `.sbd` layout, off by default) and `lock.dotlock`, `lock.fcntl` (both on by default) and `lock.timeout`.
@@ -79,3 +77,6 @@ Unknown keys SHALL stay tolerated, the file being shared with himalaya-tui. When
 
 ### Requirement: Posting styles are configured per account
 `message.reply.posting-style` and `message.forward.posting-style`, global or per account, SHALL take `top`, `bottom` or `none` and SHALL be the posting style `message reply` and `message forward` use when `--posting-style` is not passed. With neither, the style SHALL be `top`.
+
+### Requirement: No colour is configured
+The configuration SHALL hold no colour and no table shape: `*.list.table.*-color`, `table.preset` and `table.arrangement` are unknown keys, refused where their table denies unknown keys (`envelope.list.table`, `mailbox`) and ignored at the top level and the account level, which tolerate unknown keys for himalaya-tui. `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` SHALL keep naming the FLAGS and ATT glyphs, a FLAGS cell holding only the glyphs that apply.

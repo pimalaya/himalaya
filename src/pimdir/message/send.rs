@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -105,7 +105,7 @@ impl fmt::Display for PimdirMessageSendOutput {
         write!(
             f,
             "Message {} queued for sending as row {}",
-            sanitize(&self.message_id),
+            sanitize::text(&self.message_id),
             self.queue_id
         )?;
         if let Some(copy) = self.copy_queue_id {

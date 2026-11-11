@@ -15,8 +15,7 @@ use io_imap::{
         core::{IString, NString},
     },
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Row, Table, sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -24,7 +23,6 @@ use crate::{
     account::context::Account,
     config::ImapIdConfig,
     imap::{client::ImapClient, outcome},
-    shared::table::style_from_preset,
 };
 
 /// Exchange identification parameters with the server (ID, RFC 2971).
@@ -40,11 +38,11 @@ pub struct ImapIdCommand {
 }
 
 impl ImapIdCommand {
-    /// Sends the parameters and tables the ones the server answered.
+    /// Sends the parameters and prints the ones the server answered.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let mut params: HashMap<IString<'static>, NString<'static>> = HashMap::new();
@@ -63,7 +61,6 @@ impl ImapIdCommand {
             })?;
 
             let table = ImapIdOutput {
-                preset: account.table_preset().to_string(),
                 server_id: params
                     .unwrap_or_default()
                     .into_iter()
@@ -86,37 +83,31 @@ impl ImapIdCommand {
     }
 }
 
-/// The `imap id` output, a table of the parameters the server sent back.
+/// The `imap id` output, the parameters the server sent back.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapIdOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
     /// The parameters, a `NIL` value coming through as `None`.
     pub server_id: HashMap<String, Option<String>>,
 }
 
 impl fmt::Display for ImapIdOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        // NOTE: sorted by parameter, the map holding them in no order.
+        let mut params: Vec<_> = self
+            .server_id
+            .iter()
+            .map(|(key, val)| (sanitize::text(key), val.as_deref().map(sanitize::text)))
+            .collect();
+        params.sort();
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("PARAMETER"), Cell::new("VALUE")]));
+        let mut fields = Fields::default();
 
-        for (key, val) in &self.server_id {
-            table.add_row(Row::from([
-                Cell::new(sanitize(key)),
-                match val {
-                    Some(val) => Cell::new(sanitize(val)),
-                    None => Cell::new(""),
-                },
-            ]));
+        for (key, val) in &params {
+            fields.push(key, val.as_deref().unwrap_or_default());
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{fields}")
     }
 }
 

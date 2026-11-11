@@ -7,25 +7,22 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, shared::table::style_from_preset, sieve::client::SieveClient,
-};
+use crate::{account::context::Account, sieve::client::SieveClient};
 
 /// Query and print the server's current ManageSieve capabilities.
 #[derive(Debug, Parser)]
 pub struct SieveCapabilityListCommand;
 
 impl SieveCapabilityListCommand {
-    /// Reads the capabilities the server advertises and tables them.
+    /// Reads the capabilities the server advertises and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &Account,
+        _account: &Account,
         client: &mut SieveClient,
     ) -> Result<()> {
         let capabilities = client
@@ -38,11 +35,7 @@ impl SieveCapabilityListCommand {
             })
             .collect();
 
-        printer.out(SieveCapabilityOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
-            capabilities,
-        })
+        printer.out(SieveCapabilityOutput { capabilities })
     }
 }
 
@@ -56,36 +49,29 @@ pub struct SieveCapability {
     pub value: Option<String>,
 }
 
-/// The `sieve capability` output, a table of capabilities.
+/// The `sieve capability` output, the capabilities the server advertised.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SieveCapabilityOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The column arrangement the table renders with.
-    #[serde(skip)]
-    pub arrangement: ContentArrangement,
     /// The capabilities the server advertised.
     pub capabilities: Vec<SieveCapability>,
 }
 
 impl fmt::Display for SieveCapabilityOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("CAPABILITY"), Cell::new("VALUE")]));
+        let names: Vec<_> = self
+            .capabilities
+            .iter()
+            .map(|capability| sanitize::text(&capability.name))
+            .collect();
 
-        for capability in &self.capabilities {
-            table.add_row(Row::from([
-                Cell::new(&capability.name),
-                Cell::new(capability.value.as_deref().unwrap_or_default()),
-            ]));
+        let mut fields = Fields::default();
+
+        for (name, capability) in names.iter().zip(&self.capabilities) {
+            let value = capability.value.as_deref().unwrap_or_default();
+            fields.push(name, sanitize::text(value));
         }
 
-        writeln!(f)?;
-        write!(f, "{table}")
+        write!(f, "{fields}")
     }
 }

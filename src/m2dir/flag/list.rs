@@ -6,8 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -17,13 +16,12 @@ use crate::{
         arg::{M2dirNameFlag, MessageIdArg},
         client::M2dirClient,
     },
-    shared::table::style_from_preset,
 };
 
 /// List flags set on an m2dir message.
 ///
 /// Reads the `.meta/<id>.flags` metadata file and prints one flag per
-/// row. Returns an empty table when the file is missing.
+/// row. Returns an empty list when the file is missing.
 #[derive(Debug, Parser)]
 pub struct M2dirFlagListCommand {
     #[command(flatten)]
@@ -33,11 +31,11 @@ pub struct M2dirFlagListCommand {
 }
 
 impl M2dirFlagListCommand {
-    /// Reads the flags set on the message and tables them.
+    /// Reads the flags set on the message and lists them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
         let store = client.open_store()?;
@@ -45,43 +43,27 @@ impl M2dirFlagListCommand {
         let m2dir = client.open_m2dir(path)?;
         let flags = client.read_flags(&m2dir, &self.id.inner)?;
 
-        let table = M2dirFlagListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
+        printer.out(M2dirFlagListOutput {
             flags: flags.iter().map(str::to_owned).collect(),
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// Renderable table of flags set on an m2dir message.
+/// The `m2dir flag list` output, the flags set on an m2dir message.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct M2dirFlagListOutput {
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    preset: String,
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    arrangement: ContentArrangement,
     flags: Vec<String>,
 }
 
 impl fmt::Display for M2dirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("FLAG")]));
+        let mut columns = Columns::new(["FLAG"]);
 
         for flag in &self.flags {
-            table.add_row(Row::from([Cell::new(flag)]));
+            columns.push([sanitize::text(flag)]);
         }
 
-        writeln!(f)?;
-        writeln!(f, "{table}")
+        write!(f, "{columns}")
     }
 }

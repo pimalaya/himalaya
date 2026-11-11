@@ -24,7 +24,7 @@ use crate::{
     error::ErrorCode,
     mcp,
     shared::{
-        attachment::list::{self, AttachmentColors, AttachmentListOutput},
+        attachment::list::{self, AttachmentListOutput},
         client::EmailClient,
         mailbox::arg::MailboxArg,
         message::part::{self, PartRole},
@@ -73,7 +73,7 @@ impl AttachmentDownloadCommand {
         }
     }
 
-    /// Fetches the message, writes the wanted parts and tables what
+    /// Fetches the message, writes the wanted parts and lists what
     /// landed where.
     pub fn execute(
         self,
@@ -138,18 +138,8 @@ impl AttachmentDownloadCommand {
         }
 
         let attachments = AttachmentListOutput {
-            preset: account.table_preset().to_string(),
-            arrangement: account.table_arrangement(),
             with_inline: written.iter().any(|a| a.role == PartRole::Inline),
             with_path: true,
-            colors: AttachmentColors {
-                id: account.attachments_list_table_id_color(),
-                filename: account.attachments_list_table_filename_color(),
-                r#type: account.attachments_list_table_type_color(),
-                size: account.attachments_list_table_size_color(),
-                inline: account.attachments_list_table_inline_color(),
-                path: account.attachments_list_table_path_color(),
-            },
             attachments: written,
         };
 
@@ -157,7 +147,7 @@ impl AttachmentDownloadCommand {
     }
 }
 
-/// The `attachment download` output: the table of the parts written, or
+/// The `attachment download` output: the list of the parts written, or
 /// under `--stdout --json` the one part read.
 #[derive(Serialize, JsonSchema)]
 #[serde(untagged)]

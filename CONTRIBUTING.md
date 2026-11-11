@@ -17,14 +17,13 @@ Himalaya is the CLI front-end of the Pimalaya email stack, a thin shell driving 
 
 - IMAP, JMAP, Gmail, Microsoft Graph and SMTP wire semantics belong in [io-imap](https://github.com/pimalaya/io-imap), [io-jmap](https://github.com/pimalaya/io-jmap), [io-gmail](https://github.com/pimalaya/io-gmail), [io-msgraph](https://github.com/pimalaya/io-msgraph) and [io-smtp](https://github.com/pimalaya/io-smtp);
 - local storage semantics belong in [io-maildir](https://github.com/pimalaya/io-maildir), [io-m2dir](https://github.com/pimalaya/io-m2dir) and [io-mbox](https://github.com/pimalaya/io-mbox);
-- account discovery consumed by the wizard belongs in [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery);
-- the commands, rendering, composition, the wizard and the shared cross-protocol surface live here.
+- the commands, rendering, composition and the shared cross-protocol surface live here.
 
-The clap, printer, prompt and spinner primitives come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/main.rs header maps each backend to its crate.
+The clap, printer, plain text layout (columns and fields) and prompt primitives come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/main.rs header maps each backend to its crate.
 
 ## Feature matrix
 
-Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph` and `maildir` on by default, `m2dir`, `mbox` and `pimdir` off), the ManageSieve service protocol (`sieve`), the setup `wizard`, and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`). Build a reduced set to check the feature gates still hold when touching them:
+Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `mbox` and `pimdir` on by default, `m2dir` off), the ManageSieve service protocol (`sieve`, on by default), the bundled SQLite (`vendored`), and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`). Build a reduced set to check the feature gates still hold when touching them:
 
 ```sh
 cargo build --no-default-features --features imap,smtp,rustls-ring

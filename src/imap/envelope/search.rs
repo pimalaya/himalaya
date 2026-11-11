@@ -15,8 +15,7 @@ use io_imap::{
         search::SearchKey,
     },
 };
-use pimalaya_cli::printer::Printer;
-use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
+use pimalaya_cli::{columns::Columns, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -27,7 +26,6 @@ use crate::{
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
-    shared::table::style_from_preset,
 };
 
 /// Search messages (SEARCH, RFC 3501).
@@ -53,7 +51,7 @@ impl ImapEnvelopeSearchCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -66,15 +64,10 @@ impl ImapEnvelopeSearchCommand {
             let criteria = self.criteria.into_criteria()?;
             let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
 
-            let table = ImapSearchOutput {
-                preset: account.table_preset().to_string(),
-                arrangement: account.table_arrangement(),
-                id_color: account.envelopes_list_table_id_color(),
+            Ok(ImapSearchOutput {
                 ids: ids.into_iter().map(|id| id.get()).collect(),
                 uid_mode: !self.seq,
-            };
-
-            Ok(table)
+            })
         })();
 
         outcome::print(printer, result)
@@ -266,39 +259,22 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
     NaiveDate::try_from(date).map_err(|e| format!("invalid date `{s}`: {e}"))
 }
 
-/// The `imap search` output, a table of message ids.
+/// The `imap search` output, the message ids found.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapSearchOutput {
-    #[serde(skip)]
-    preset: String,
-    #[serde(skip)]
-    arrangement: ContentArrangement,
-    #[serde(skip)]
-    id_color: Color,
     uid_mode: bool,
     ids: Vec<u32>,
 }
 
 impl fmt::Display for ImapSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        let id_header = if self.uid_mode { "UID" } else { "SEQ" };
-
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new(id_header)]));
+        let mut columns = Columns::new([if self.uid_mode { "UID" } else { "SEQ" }]);
 
         for id in &self.ids {
-            table.add_row(Row::from([Cell::new(id).fg(self.id_color)]));
+            columns.push([id]);
         }
 
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        writeln!(f, "Found {} message(s)", self.ids.len())?;
-        Ok(())
+        write!(f, "{columns}")
     }
 }

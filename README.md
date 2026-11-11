@@ -37,21 +37,15 @@
   - [Rustls](https://crates.io/crates/rustls) with ring crypto
   - [Rustls](https://crates.io/crates/rustls) with aws crypto (requires `rustls-aws` feature)
   - [Native TLS](https://crates.io/crates/native-tls) (requires `native-tls` feature)
-- **Discovery** support:
-  - PACC <sup>[specs](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc)</sup>
-  - Autoconfiguration (Thunderbird) <sup>[specs](https://wiki.mozilla.org/Thunderbird:Autoconfiguration)</sup>
-  - SRV DNS lookups <sup>[rfc6186](https://datatracker.ietf.org/doc/html/rfc6186)</sup>
-  - JMAP session resolution <sup>[rfc8620](https://datatracker.ietf.org/doc/html/rfc8620)</sup>
 - **SOCKS5**, **HTTP** proxy support, per account or via `$ALL_PROXY` and `$HTTPS_PROXY`
 - **TOML configuration** with multi-account support
+- **Plain text** output: lists as aligned columns, records as `Label: value` lines, no border, no colour
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
 - **MCP server** via `himalaya mcp`, the shared API as tools, read-only by default
 
 > [!TIP]
 > Himalaya is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate backend support. The default feature set is declared in [Cargo.toml](./Cargo.toml).
->
-> The default `wizard` feature brings the interactive `configure`; leave it out of a scripted or embedded build that never prompts.
 >
 > The default `vendored` feature builds SQLite from source; leave it out (`--no-default-features --features …`) to link the system one.
 
@@ -168,9 +162,7 @@ The binary lands at `target/release/himalaya`.
 
 ## Configuration
 
-Run `himalaya`. With no configuration file on disk, the wizard asks for an email address and discovers the services reachable from it, probing PACC, Thunderbird Autoconfiguration, RFC 6186 SRV and RFC 8620 JMAP resolution in parallel.
-
-Each domain, mail and sending, gets the best option found without a question (a provider's own API first, then JMAP, then IMAP and SMTP), shown in a review where any pick can be changed, a custom server URL included. Then each sign-in runs once: a password is typed once, tested at once, and stored in an installed keyring (or kept raw, or read by your own command); OAuth 2.0 hands off to [Ortie](https://github.com/pimalaya/ortie) when it is installed. When discovery finds nothing, the wizard asks for the server URL (`imaps://`, `imap://` or `https://`, then `smtps://` or `smtp://` for sending). The account is then written to disk.
+Himalaya reads a TOML configuration you write: copy [config.sample.toml](./config.sample.toml) to `~/.config/himalaya/config.toml`, keep the blocks of the backends your account uses and fill them in. Himalaya never writes a configuration, and a command run without one fails, naming the path it looked at.
 
 A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
@@ -184,7 +176,7 @@ These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya
 
 Override those paths with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
 
-To add an account, run `himalaya configure`: the account is appended to your config file, or printed when stdout is redirected. There is no in-place edit subcommand; `himalaya account list` and `himalaya account check` inspect and validate the accounts already declared.
+To add an account, add an `[accounts.<name>]` table to your config file. `himalaya account list` and `himalaya account check` inspect and validate the accounts declared.
 
 ### Proton Mail
 
@@ -456,19 +448,6 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 </details>
 
 <details>
-  <summary>How does the wizard discover IMAP/SMTP/JMAP configs?</summary>
-
-  The wizard probes several discovery mechanisms in parallel on the email address domain, merges their results and ranks them per domain, implicit TLS before STARTTLS, unencrypted servers dropped:
-
-  - **PACC** <sup>[draft-ietf-mailmaint-pacc-02](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc-02)</sup>: well-known JSON, digest-verified against the `_ua-auto-config` TXT record.
-  - **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then the autoconfig of the provider the MX records name, then the `mailconf=<URL>` TXT redirect.
-  - **RFC 6186 SRV**: `_imap._tcp`, `_imaps._tcp`, `_submission._tcp` lookups assembled into a single report.
-  - **RFC 8620 JMAP**: the SRV record and the `/.well-known/jmap` session resource.
-
-  A final WWW-Authenticate probe refines the advertised auth schemes. A Google or Microsoft account, detected by its domain or its MX records, puts the Gmail API or Microsoft Graph first, IMAP and SMTP staying one change away. See [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery) for the full chain.
-</details>
-
-<details>
   <summary>How to debug Himalaya?</summary>
 
   Use `--log-level <level>` (alias `--log`) where `<level>` is one of `off`, `error`, `warn`, `info`, `debug`, `trace`:
@@ -493,9 +472,9 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 </details>
 
 <details>
-  <summary>How to disable color output?</summary>
+  <summary>How to read the text output from a script?</summary>
 
-  Set `NO_COLOR=1` in your environment.
+  A list prints a header of uppercase labels, then one item per line, its columns two spaces apart, an empty cell as `-`; the free-text column (a subject, a name) comes last. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.
 </details>
 
 ## License

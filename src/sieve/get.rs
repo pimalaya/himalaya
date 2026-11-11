@@ -47,6 +47,14 @@ pub struct SieveScriptOutput {
 
 impl fmt::Display for SieveScriptOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.script)
+        // NOTE: the script is printed as stored, a line break closing it
+        // only when it lacks one.
+        f.write_str(&self.script)?;
+
+        if !self.script.is_empty() && !self.script.ends_with('\n') {
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }

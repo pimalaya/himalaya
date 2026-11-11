@@ -1,22 +1,17 @@
 //! # mbox list
 //!
-//! The `mbox list` command, tabling the mbox files of the account.
+//! The `mbox list` command, listing the mbox files of the account.
 
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::mbox::Mbox;
-use pimalaya_cli::{
-    printer::Printer,
-    table::{Cell, Color, Row, Table},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, mbox::client::MboxClient, shared::table::style_from_preset,
-};
+use crate::{account::context::Account, mbox::client::MboxClient};
 
 /// List mbox files.
 ///
@@ -26,35 +21,25 @@ use crate::{
 pub struct MboxMailboxListCommand;
 
 impl MboxMailboxListCommand {
-    /// Lists the mbox files and tables them.
+    /// Lists the mbox files and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        account: &mut Account,
+        _account: &mut Account,
         client: &mut MboxClient,
     ) -> Result<()> {
         let mboxes = client.list_mboxes()?;
 
-        let table = MboxListOutput {
-            preset: account.table_preset().to_string(),
-            name_color: account.mailboxes_list_table_name_color(),
+        printer.out(MboxListOutput {
             rows: mboxes.into_iter().map(From::from).collect(),
-        };
-
-        printer.out(table)
+        })
     }
 }
 
-/// The `mbox list` output, a table of mbox files.
+/// The `mbox list` output, the mbox files of the account.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxListOutput {
-    /// The `comfy_table` preset string the table renders with.
-    #[serde(skip)]
-    pub preset: String,
-    /// The color of the NAME column.
-    #[serde(skip)]
-    pub name_color: Color,
     /// The mbox files found.
     #[serde(rename = "mboxes")]
     pub rows: Vec<MboxRow>,
@@ -62,29 +47,18 @@ pub struct MboxListOutput {
 
 impl fmt::Display for MboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
+        let mut columns = Columns::new(["NAME", "PATH"]);
 
-        table
-            .load_style(style_from_preset(&self.preset))
-            .set_header(Row::from([Cell::new("NAME"), Cell::new("PATH")]))
-            .add_rows(self.rows.iter().map(|m| {
-                let mut row = Row::new();
+        for mbox in &self.rows {
+            let path = mbox.path.display().to_string();
+            columns.push([sanitize::text(&mbox.name), sanitize::text(&path)]);
+        }
 
-                row.max_height(1)
-                    .add_cell(Cell::new(&m.name).fg(self.name_color))
-                    .add_cell(Cell::new(format!("{}", m.path.display())));
-
-                row
-            }));
-
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        write!(f, "{columns}")
     }
 }
 
-/// One row of the mbox table.
+/// One mbox file of the list.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxRow {

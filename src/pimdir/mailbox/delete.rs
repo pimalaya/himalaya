@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -65,8 +65,8 @@ impl fmt::Display for PimdirMailboxDeleteOutput {
         writeln!(
             f,
             "Mailbox {} queued for deletion by {} as row {}",
-            sanitize(&self.mailbox),
-            sanitize(&self.source),
+            sanitize::text(&self.mailbox),
+            sanitize::text(&self.source),
             self.queue_id
         )
     }

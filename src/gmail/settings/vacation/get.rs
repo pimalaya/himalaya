@@ -8,11 +8,14 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::{GmailVacationSettings, get_vacation::GmailVacationGet};
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::gmail::{client::GmailClient, settings::convert::yes_no};
+use crate::{
+    gmail::{client::GmailClient, settings::convert::yes_no},
+    shared::message::read::sanitize_body,
+};
 
 /// Get the Gmail vacation responder settings.
 #[derive(Debug, Parser)]
@@ -68,30 +71,32 @@ impl fmt::Display for GmailSettingsVacationGetOutput {
         } else {
             "disabled"
         };
-        writeln!(f, "Auto reply: {auto_reply}")?;
+
+        let mut fields = Fields::default();
+        fields.push("Auto reply", auto_reply);
 
         if let Some(subject) = &self.response_subject {
-            writeln!(f, "Subject: {}", sanitize(subject))?;
+            fields.push("Subject", sanitize::text(subject));
         }
         if let Some(body) = &self.response_body_plain_text {
-            writeln!(f, "Body: {body}")?;
+            fields.push("Body", sanitize_body(body));
         }
         if let Some(html) = &self.response_body_html {
-            writeln!(f, "HTML: {html}")?;
+            fields.push("HTML", sanitize_body(html));
         }
         if let Some(restrict) = self.restrict_to_contacts {
-            writeln!(f, "Restrict to contacts: {}", yes_no(restrict))?;
+            fields.push("Restrict to contacts", yes_no(restrict));
         }
         if let Some(restrict) = self.restrict_to_domain {
-            writeln!(f, "Restrict to domain: {}", yes_no(restrict))?;
+            fields.push("Restrict to domain", yes_no(restrict));
         }
         if let Some(start) = &self.start_time {
-            writeln!(f, "Start: {}", sanitize(start))?;
+            fields.push("Start", sanitize::text(start));
         }
         if let Some(end) = &self.end_time {
-            writeln!(f, "End: {}", sanitize(end))?;
+            fields.push("End", sanitize::text(end));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

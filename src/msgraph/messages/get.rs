@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::MsgraphMessage;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -55,33 +55,34 @@ pub(crate) struct MsgraphMessageGetOutput(MsgraphMessage);
 
 impl fmt::Display for MsgraphMessageGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Id: {}", self.0.id)?;
+        let mut fields = Fields::default();
+        fields.push("Id", sanitize::text(&self.0.id));
 
         if let Some(subject) = &self.0.subject {
-            writeln!(f, "Subject: {subject}")?;
+            fields.push("Subject", sanitize::text(subject));
         }
         if let Some(from) = self.0.from.as_ref().map(recipient) {
-            writeln!(f, "From: {from}")?;
+            fields.push("From", sanitize::text(&from));
         }
 
         let to: Vec<String> = self.0.to_recipients.iter().map(recipient).collect();
         if !to.is_empty() {
-            writeln!(f, "To: {}", to.join(", "))?;
+            fields.push("To", sanitize::text(&to.join(", ")));
         }
 
         if let Some(date) = &self.0.received_date_time {
-            writeln!(f, "Received: {date}")?;
+            fields.push("Received", date);
         }
         if let Some(is_read) = self.0.is_read {
-            writeln!(f, "Read: {is_read}")?;
+            fields.push("Read", is_read);
         }
         if let Some(folder) = &self.0.parent_folder_id {
-            writeln!(f, "Folder: {folder}")?;
+            fields.push("Folder", sanitize::text(folder));
         }
         if let Some(preview) = &self.0.body_preview {
-            writeln!(f, "Preview: {preview}")?;
+            fields.push("Preview", sanitize::text(preview));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }

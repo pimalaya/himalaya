@@ -8,11 +8,14 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, get::GmailSendAsGet};
-use pimalaya_cli::{printer::Printer, table::sanitize};
+use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::gmail::{client::GmailClient, settings::convert::verification_status_wire};
+use crate::{
+    gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    shared::message::read::sanitize_body,
+};
 
 /// Get one Gmail send-as alias by e-mail address (settings.sendAs.get).
 #[derive(Debug, Parser)]
@@ -23,7 +26,7 @@ pub struct GmailSettingsSendAsGetCommand {
 }
 
 impl GmailSettingsSendAsGetCommand {
-    /// Fetches the send-as alias and tables it.
+    /// Fetches the send-as alias and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailSendAsGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -45,30 +48,31 @@ pub(crate) struct GmailSettingsSendAsGetOutput(GmailSendAs);
 
 impl fmt::Display for GmailSettingsSendAsGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Email: {}", sanitize(&self.0.send_as_email))?;
+        let mut fields = Fields::default();
+        fields.push("Email", sanitize::text(&self.0.send_as_email));
 
         if let Some(display_name) = &self.0.display_name {
-            writeln!(f, "Name: {}", sanitize(display_name))?;
+            fields.push("Name", sanitize::text(display_name));
         }
         if let Some(reply_to_address) = &self.0.reply_to_address {
-            writeln!(f, "Reply-To: {}", sanitize(reply_to_address))?;
+            fields.push("Reply-To", sanitize::text(reply_to_address));
         }
         if let Some(signature) = &self.0.signature {
-            writeln!(f, "Signature: {signature}")?;
+            fields.push("Signature", sanitize_body(signature));
         }
         if let Some(is_primary) = self.0.is_primary {
-            writeln!(f, "Primary: {is_primary}")?;
+            fields.push("Primary", is_primary);
         }
         if let Some(is_default) = self.0.is_default {
-            writeln!(f, "Default: {is_default}")?;
+            fields.push("Default", is_default);
         }
         if let Some(treat_as_alias) = self.0.treat_as_alias {
-            writeln!(f, "Treat as alias: {treat_as_alias}")?;
+            fields.push("Treat as alias", treat_as_alias);
         }
         if let Some(status) = self.0.verification_status {
-            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+            fields.push("Verification", verification_status_wire(status));
         }
 
-        Ok(())
+        write!(f, "{fields}")
     }
 }
