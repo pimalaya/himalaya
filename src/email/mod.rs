@@ -14,5 +14,4 @@ pub mod mailbox;
 pub mod search;
 #[cfg(any(feature = "smtp", feature = "pimdir"))]
 pub mod submission;
-#[cfg(any(backend, feature = "smtp"))]
 pub mod vacation;

@@ -404,3 +404,16 @@ A JMAP send SHALL stage the message in the drafts mailbox with `$draft`, then su
 
 ### Requirement: Mailbox role
 A shared mailbox SHALL carry an optional role (inbox, all, archive, drafts, flagged, important, junk, sent, subscribed, trash, or a verbatim unknown one), shown by `mailbox list` in its text and JSON output. JMAP reads it from the mailbox `role`, Gmail from its fixed system-label ids, Microsoft Graph from its well-known folder names resolved to folder ids in one `$batch` request, pimdir from the role its sync engine recorded from the server (`collections.role`), and IMAP marks only `INBOX`, as mbox marks its spool when one is configured. Maildir and m2dir have no native role. On JMAP, Gmail, Graph and pimdir a role name addresses the mailbox carrying it. A `mailbox.alias.<role>` entry overrides the native role of the mailbox it names, and `message delete` takes its trash from that alias before the backend's trash role.
+
+### Requirement: Every backend builds alone
+`cargo clippy --all-targets -- -D warnings` SHALL pass with the default features; with `--all-features`; with `--no-default-features` and a TLS provider alone (`rustls-ring`); with a TLS provider and each backend feature alone (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `mbox`, `m2dir`, `sieve`, `pimdir`); with `native-tls,jmap`; and with the four local backends together (`maildir,mbox,m2dir,pimdir`). Code only some backends use SHALL be gated on the item with exactly those features, never allowed crate-wide. A configuration type only some backends read SHALL stay compiled in every build and be allowed to go unread in the builds without them, so every build parses and checks the same configuration, the blocks of the backends it leaves out included.
+
+#### Scenario: A Maildir-only build
+- GIVEN `--no-default-features --features rustls-ring,maildir`
+- WHEN `cargo clippy --all-targets -- -D warnings` runs
+- THEN it passes, where it reported the proxy, TLS, SASL and IMAP options of the configuration unread
+
+#### Scenario: A block for a compiled-out backend
+- GIVEN a Maildir-only build and an account whose `imap.sort` block carries an unknown key
+- WHEN `account list` reads the configuration
+- THEN it is refused naming that key, as a full build refuses it

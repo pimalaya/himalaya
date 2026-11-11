@@ -8,34 +8,37 @@
 //! baked in during the merge, so every field stays an `Option` and the two
 //! layers compose.
 
-use std::{
-    collections::HashMap,
-    env::temp_dir,
-    path::{Path, PathBuf},
-};
-
-use dirs::download_dir;
+use std::{collections::HashMap, path::PathBuf};
+#[cfg(any(backend, feature = "smtp"))]
+use std::{env::temp_dir, path::Path};
 
 #[cfg(any(backend, feature = "smtp"))]
-use crate::email::mailbox::Mailbox;
-use crate::{
-    config::{AccountConfig, Config, EnvelopeListTableConfig, PostingStyle, SaveCopyConfig},
-    email::mailbox::MailboxRole,
-};
+use dirs::download_dir;
+
+use crate::config::{AccountConfig, Config, EnvelopeListTableConfig, PostingStyle, SaveCopyConfig};
+#[cfg(any(backend, feature = "smtp"))]
+use crate::email::mailbox::{Mailbox, MailboxRole};
 
 /// chrono `strftime` format of the envelope DATE column.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
 /// Page size of `envelope list` when nothing names one.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
 /// RFC 3676 section 4.3 signature separator.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_SIGNATURE_DELIM: &str = "-- \n";
 /// FLAGS glyph of a message lacking `\Seen`.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_UNSEEN_CHAR: char = '*';
 /// FLAGS glyph of a message carrying `\Answered`.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_REPLIED_CHAR: char = 'R';
 /// FLAGS glyph of a message carrying `\Flagged`.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_FLAGGED_CHAR: char = '!';
 /// ATT glyph of a message carrying an attachment.
+#[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_ATTACHMENT_CHAR: char = '@';
 
 /// Merged runtime account settings consumed by every command.
@@ -105,7 +108,10 @@ impl Account {
             forward_posting_style: other.forward_posting_style.or(self.forward_posting_style),
         }
     }
+}
 
+#[cfg(any(backend, feature = "smtp"))]
+impl Account {
     /// Resolves the `From` header into an address and its name.
     ///
     /// The two are kept apart so the MIME builder does the quoting.
@@ -230,7 +236,6 @@ impl Account {
     /// An alias naming a listed mailbox id gives it the role and takes it
     /// from any other mailbox, so the configuration corrects a server
     /// that mislabels.
-    #[cfg(any(backend, feature = "smtp"))]
     pub fn apply_role_aliases(&self, mailboxes: &mut [Mailbox]) {
         for (key, id) in &self.mailbox_alias {
             let Some(role) = MailboxRole::known(key) else {
@@ -353,7 +358,7 @@ impl From<AccountConfig> for Account {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(backend, feature = "smtp")))]
 mod tests {
     use crate::{account::context::*, config::MailboxConfig};
 
@@ -369,7 +374,6 @@ mod tests {
         Account::from(config)
     }
 
-    #[cfg(any(backend, feature = "smtp"))]
     #[test]
     fn role_aliases_override_the_backend_roles() {
         let mailbox = |id: &str, role: Option<MailboxRole>| Mailbox {

@@ -14,6 +14,7 @@ pub mod attachment;
 pub mod base64;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod client;
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 pub mod crlf;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod envelope;
@@ -21,6 +22,7 @@ pub mod envelope;
 pub mod flag;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod mailbox;
+#[cfg(any(backend, feature = "smtp"))]
 pub mod message;
 #[cfg(any(feature = "gmail", feature = "msgraph"))]
 pub mod output;

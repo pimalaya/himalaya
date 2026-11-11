@@ -5,10 +5,25 @@
 //!
 //! Backend defaults are duplicated here rather than read from the io-*
 //! crates, so the schema compiles under any feature subset, none included.
+//!
+//! Every build parses the whole schema, the blocks of the backends it
+//! leaves out included. A type only some backends read is therefore
+//! allowed to go unread in the builds without them
+//! (`cfg_attr(not(..), allow(dead_code))`) rather than gated, which would
+//! change what a build accepts.
 
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Error, Result, anyhow, bail};
+use anyhow::{Error, anyhow};
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
+use anyhow::{Result, bail};
 use clap::ValueEnum;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 use io_sasl::{
@@ -83,6 +98,10 @@ pub(crate) fn default_jmap_alpn() -> Vec<String> {
 ///
 /// `deny_unknown_fields` is omitted so one file can be shared with
 /// himalaya-tui, whose own top-level fields are ignored here.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -185,6 +204,10 @@ impl AccountConfig {
 /// `deny_unknown_fields` is omitted so a block written for one binary
 /// loads in the other: the CLI-only sub-blocks have to be tolerated by
 /// himalaya-tui, which models the rest.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
@@ -270,6 +293,10 @@ pub struct AccountConfig {
 }
 
 /// Envelope-level rendering options.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeConfig {
@@ -279,6 +306,10 @@ pub struct EnvelopeConfig {
 }
 
 /// Mailbox aliases.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxConfig {
@@ -296,6 +327,10 @@ pub struct MailboxConfig {
 ///
 /// Unknown keys are accepted rather than denied, so the rest of a v1
 /// `[message]` table (`read`, `write`, `delete`...) keeps loading.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageConfig {
@@ -311,6 +346,10 @@ pub struct MessageConfig {
 }
 
 /// Quoting options under `message.reply.*` and `message.forward.*`.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageQuoteConfig {
@@ -334,6 +373,10 @@ pub enum PostingStyle {
 }
 
 /// Sending options under `message.send.*`.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageSendConfig {
@@ -345,6 +388,7 @@ pub struct MessageSendConfig {
 }
 
 /// The `message.send.save-copy` value.
+#[cfg_attr(not(any(backend, feature = "smtp")), allow(dead_code))]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum SaveCopyConfig {
@@ -355,6 +399,10 @@ pub enum SaveCopyConfig {
 }
 
 /// `envelope list` rendering options under `envelope.list.*`.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListConfig {
@@ -377,6 +425,10 @@ pub struct EnvelopeListConfig {
 }
 
 /// Flag glyph overrides of the listed envelopes.
+#[cfg_attr(
+    not(any(backend, feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListTableConfig {
@@ -470,6 +522,7 @@ pub struct ImapConfig {
 }
 
 /// Per-account `imap.sort.*` options.
+#[cfg_attr(not(feature = "imap"), allow(dead_code))]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapSortConfig {
@@ -482,6 +535,7 @@ pub struct ImapSortConfig {
 }
 
 /// Per-account `imap.id.*` quirks.
+#[cfg_attr(not(feature = "imap"), allow(dead_code))]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapIdConfig {
@@ -727,6 +781,17 @@ pub struct SieveConfig {
 /// `url` is a `socks5://`, `socks5h://` or `http://` proxy URL. Its user
 /// info authenticates too, but `username` and `password` keep the secret
 /// out of the URL.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    )),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ProxyConfig {
@@ -793,6 +858,17 @@ impl ProxyConfig {
 }
 
 /// SSL/TLS configuration.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    )),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TlsConfig {
@@ -817,6 +893,17 @@ pub enum TlsProviderConfig {
 }
 
 /// Rustls configuration.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    )),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RustlsConfig {
@@ -871,6 +958,10 @@ impl TlsConfig {
 ///
 /// Each variant carries only what its mechanism transmits, and serde picks
 /// it from the field name.
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum SaslConfig {
@@ -892,6 +983,10 @@ pub enum SaslConfig {
 /// SASL ANONYMOUS configuration <sup>[rfc4505]</sup>.
 ///
 /// [rfc4505]: https://www.iana.org/go/rfc4505
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslAnonymousConfig {
@@ -902,6 +997,10 @@ pub struct SaslAnonymousConfig {
 /// SASL LOGIN configuration <sup>[draft]</sup>.
 ///
 /// [draft]: https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslLoginConfig {
@@ -915,6 +1014,10 @@ pub struct SaslLoginConfig {
 /// SASL PLAIN configuration <sup>[rfc4616]</sup>.
 ///
 /// [rfc4616]: https://www.iana.org/go/rfc4616
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslPlainConfig {
@@ -935,6 +1038,10 @@ pub struct SaslPlainConfig {
 /// URL at connect time, so neither is configured here.
 ///
 /// [rfc7628]: https://www.iana.org/go/rfc7628
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslOauthbearerConfig {
@@ -948,6 +1055,10 @@ pub struct SaslOauthbearerConfig {
 /// SASL XOAUTH2 configuration, [Google's pre-standard scheme][xoauth2].
 ///
 /// [xoauth2]: https://developers.google.com/gmail/imap/xoauth2-protocol
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslXoauth2Config {
@@ -961,6 +1072,10 @@ pub struct SaslXoauth2Config {
 /// SASL SCRAM-SHA-256 configuration <sup>[rfc7677]</sup>.
 ///
 /// [rfc7677]: https://www.iana.org/go/rfc7677
+#[cfg_attr(
+    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
+    allow(dead_code)
+)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslScramSha256Config {

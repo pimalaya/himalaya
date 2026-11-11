@@ -55,7 +55,10 @@ use crate::{
             eval::{self, EnvelopeCopies},
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
-            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+            sort::{
+                eval::sort_envelopes,
+                query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+            },
         },
         submission::SubmissionEnvelope,
     },
@@ -449,7 +452,7 @@ impl PimdirClient {
             warn!("a row of `{collection}` is not filed under its date, searching it whole");
             return Ok(None);
         }
-        eval::sort_envelopes(&mut hits, sort);
+        sort_envelopes(&mut hits, sort);
         Ok(Some(paginate(hits, page, page_size)))
     }
 
@@ -470,7 +473,7 @@ impl PimdirClient {
                 hits.push(envelope);
             }
         }
-        eval::sort_envelopes(&mut hits, sort);
+        sort_envelopes(&mut hits, sort);
         Ok(paginate(hits, page, page_size))
     }
 

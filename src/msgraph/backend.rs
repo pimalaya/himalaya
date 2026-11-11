@@ -33,7 +33,7 @@ use crate::{
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
-        search::{eval::sort_envelopes, query::SearchEmailsQuery},
+        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
     msgraph::{client::MsgraphClient, search},
 };

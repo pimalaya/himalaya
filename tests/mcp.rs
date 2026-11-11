@@ -231,6 +231,7 @@ fn a_message_that_is_no_request_is_refused_and_the_server_goes_on() {
 }
 
 #[test]
+#[cfg(feature = "smtp")]
 fn write_and_send_tools_under_their_flags() {
     let dir = TempDir::new().unwrap();
     let config = account(dir.path());
@@ -356,6 +357,7 @@ fn account_with(dir: &Path, blocks: &str) -> PathBuf {
 }
 
 #[test]
+#[cfg(feature = "smtp")]
 fn a_tool_the_account_cannot_serve_is_not_listed() {
     let flags = ["--allow-write", "--allow-send"];
 

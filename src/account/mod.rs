@@ -6,5 +6,6 @@
 pub mod capability;
 pub mod check;
 pub mod cli;
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 pub mod context;
 pub mod list;

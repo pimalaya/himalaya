@@ -250,8 +250,7 @@ pub fn role(part: &MimeEntity) -> PartRole {
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox",
-    feature = "pimdir",
-    feature = "msgraph"
+    feature = "pimdir"
 ))]
 pub fn marks_attachment(
     mime: &str,
@@ -277,8 +276,7 @@ pub fn marks_attachment(
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox",
-    feature = "pimdir",
-    feature = "msgraph"
+    feature = "pimdir"
 ))]
 pub fn is_protocol_part(subtype: &[u8], position: usize) -> bool {
     subtype.eq_ignore_ascii_case(b"encrypted")
@@ -306,8 +304,7 @@ pub fn media_type(kind: &[u8], subtype: &[u8]) -> String {
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox",
-    feature = "pimdir",
-    feature = "msgraph"
+    feature = "pimdir"
 ))]
 pub fn has_attachment(message: &MimeCst) -> bool {
     part_has_attachment(&message.root, false)
@@ -318,8 +315,7 @@ pub fn has_attachment(message: &MimeCst) -> bool {
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox",
-    feature = "pimdir",
-    feature = "msgraph"
+    feature = "pimdir"
 ))]
 fn part_has_attachment(part: &MimeEntity, is_protocol: bool) -> bool {
     let MimeBodyNode::Multipart(multipart) = &part.body else {

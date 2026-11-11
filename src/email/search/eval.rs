@@ -1,16 +1,14 @@
 //! # Search evaluation
 //!
-//! Client-side evaluation of a shared search query against an
-//! [`Envelope`], for the backends that search locally.
+//! Client-side evaluation of a shared search filter against an
+//! [`Envelope`], for the backends that search locally, the sort chain
+//! then ordering the hits ([`crate::email::search::sort::eval`]).
 //!
 //! The filter is matched against each envelope, `body` clauses reaching
-//! for the raw bytes, then the sort chain orders the hits, `Date:`
-//! descending by default. Date clauses read the `Date:` header, as the
+//! for the raw bytes. Date clauses read the `Date:` header, as the
 //! server-side backends do. The copy recipients, which an envelope does not
 //! carry, come from [`EnvelopeCopies`] when the caller has them, else from
 //! the raw headers, read only when a clause needs them.
-
-use std::cmp::Ordering;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use mime::{
@@ -22,10 +20,7 @@ use crate::{
     email::{
         address::{self, Address},
         envelope::Envelope,
-        search::{
-            filter::query::SearchEmailsFilterQuery,
-            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
-        },
+        search::filter::query::SearchEmailsFilterQuery,
     },
     shared::message::part,
 };
@@ -85,15 +80,6 @@ pub fn matches_filter(
     };
 
     matches(envelope, copies, raw, filter)
-}
-
-/// Sorts envelopes by the given chain, or by `Date:` descending when the
-/// query carries no sort clause.
-pub fn sort_envelopes(envelopes: &mut [Envelope], sort: Option<&[SearchEmailsSorter]>) {
-    match sort {
-        Some(chain) if !chain.is_empty() => envelopes.sort_by(|a, b| compare_with(a, b, chain)),
-        _ => envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date)),
-    }
 }
 
 fn matches(
@@ -204,42 +190,14 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
     haystack.to_lowercase().contains(&needle.to_lowercase())
 }
 
-fn compare_with(left: &Envelope, right: &Envelope, sort: &[SearchEmailsSorter]) -> Ordering {
-    for SearchEmailsSorter(kind, order) in sort {
-        let cmp = match kind {
-            SearchEmailsSorterKind::Date => left.date.cmp(&right.date),
-            SearchEmailsSorterKind::From => {
-                first_addr_key(&left.from).cmp(&first_addr_key(&right.from))
-            }
-            SearchEmailsSorterKind::To => first_addr_key(&left.to).cmp(&first_addr_key(&right.to)),
-            SearchEmailsSorterKind::Subject => left.subject.cmp(&right.subject),
-        };
-        let cmp = match order {
-            SearchEmailsSorterOrder::Ascending => cmp,
-            SearchEmailsSorterOrder::Descending => cmp.reverse(),
-        };
-        if cmp != Ordering::Equal {
-            return cmp;
-        }
-    }
-    Ordering::Equal
-}
-
-fn first_addr_key(addrs: &[Address]) -> Option<String> {
-    addrs.first().map(|a| {
-        a.name
-            .as_deref()
-            .map(str::to_lowercase)
-            .unwrap_or_else(|| a.email.to_lowercase())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
 
-    use super::*;
-    use crate::email::flag::{Flag, IanaFlag};
+    use crate::email::{
+        flag::{Flag, IanaFlag},
+        search::eval::*,
+    };
 
     fn envelope() -> Envelope {
         Envelope {
@@ -360,18 +318,6 @@ mod tests {
             &raw,
             &SearchEmailsFilterQuery::Flag(Flag::from_iana(IanaFlag::Flagged))
         ));
-    }
-
-    #[test]
-    fn sort_by_date_descending_returns_newer_first() {
-        let mut older = envelope();
-        older.date = DateTime::parse_from_rfc3339("2026-01-01T00:00:00+00:00").ok();
-        let newer = envelope();
-        let sort = vec![SearchEmailsSorter(
-            SearchEmailsSorterKind::Date,
-            SearchEmailsSorterOrder::Descending,
-        )];
-        assert_eq!(compare_with(&newer, &older, &sort), Ordering::Less);
     }
 
     #[test]

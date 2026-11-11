@@ -109,6 +109,7 @@ mod backend;
 mod capability;
 mod cli;
 mod config;
+#[cfg(any(backend, feature = "smtp"))]
 mod email;
 mod error;
 #[cfg(feature = "gmail")]
@@ -201,6 +202,10 @@ fn execute(
         return cli::meet_bare_invocation(account.config_paths);
     };
 
+    #[cfg_attr(
+        not(any(backend, feature = "smtp", feature = "sieve")),
+        allow(clippy::needless_update)
+    )]
     let mut session = Session {
         account,
         ..Default::default()

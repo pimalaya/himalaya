@@ -12,9 +12,12 @@
 
 use std::path::PathBuf;
 
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 use anyhow::Result;
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 use pimalaya_cli::printer::Printer;
 
+use crate::backend::Backend;
 #[cfg(feature = "gmail")]
 use crate::gmail::client::GmailClient;
 #[cfg(feature = "imap")]
@@ -37,9 +40,9 @@ use crate::shared::client::EmailClient;
 use crate::sieve::client::SieveClient;
 #[cfg(feature = "smtp")]
 use crate::smtp::client::SmtpClient;
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 use crate::{
     account::context::Account,
-    backend::Backend,
     cli::resolve_account,
     config::{AccountConfig, Config},
 };
@@ -95,6 +98,7 @@ pub struct SessionAccount<'a> {
     pub backend: Backend,
 }
 
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 impl SessionAccount<'_> {
     /// Runs a command over the client in `slot`, building it with `build`
     /// when the slot is empty, and emptying the slot when the command
@@ -124,7 +128,7 @@ impl SessionAccount<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(backend, feature = "smtp", feature = "sieve")))]
 mod tests {
     use std::{cell::Cell, fs};
 

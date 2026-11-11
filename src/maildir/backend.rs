@@ -20,7 +20,7 @@ use crate::{
         envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, child_path, renamed_path},
-        search::{eval, query::SearchEmailsQuery},
+        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
     maildir::client::{MaildirClient, validate_maildir_name},
 };
@@ -87,7 +87,7 @@ impl MaildirClient {
             }
         }
 
-        eval::sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
+        sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
         Ok(paginate(hits, page, page_size))
     }
 

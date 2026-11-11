@@ -212,6 +212,7 @@ impl McpCommand {
 
 /// Whether a local file path given as command input must be taken as the
 /// input itself, as it is inside an MCP server.
+#[cfg(any(backend, feature = "smtp"))]
 pub fn paths_closed() -> bool {
     PATHS_CLOSED.load(Ordering::Relaxed)
 }
@@ -907,9 +908,11 @@ fn embedded_part(mut part: Value, uri: String) -> Option<(Value, Value)> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(backend, feature = "smtp"))]
     use std::slice;
 
     use clap::CommandFactory;
+    #[cfg(any(backend, feature = "smtp"))]
     use pimalaya_cli::{
         mcp::{Incoming, read},
         printer::Printer,

@@ -10,11 +10,9 @@
 //!
 //! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::json_schema::JsonSchemaCommand
 
-use pimalaya_cli::{
-    clap::commands::json_schema::JsonSchemaRegistry,
-    error::ErrorReport,
-    output::{Bytes, Paginated},
-};
+#[cfg(any(backend, feature = "smtp"))]
+use pimalaya_cli::output::{Bytes, Paginated};
+use pimalaya_cli::{clap::commands::json_schema::JsonSchemaRegistry, error::ErrorReport};
 use schemars::JsonSchema;
 
 use crate::error::ErrorCode;
@@ -27,7 +25,15 @@ use crate::error::ErrorCode;
     feature = "m2dir",
     feature = "sieve"
 ))]
-use crate::shared::receipt::{IdReceipt, IdsReceipt};
+use crate::shared::receipt::IdReceipt;
+#[cfg(any(
+    feature = "gmail",
+    feature = "jmap",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "m2dir"
+))]
+use crate::shared::receipt::IdsReceipt;
 
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
