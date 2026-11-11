@@ -1189,7 +1189,10 @@ pub struct MsgraphAuthConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::env::var;
+    use std::{env::var, fs, io::Write};
+
+    use pimalaya_config::sample::{Variant, variants};
+    use tempfile::NamedTempFile;
 
     use crate::config::*;
 
@@ -1463,5 +1466,61 @@ inbox = "~/spool""#,
         let url = parse_server("https://example.com/jmap/session", "https", &["https"]).unwrap();
         assert_eq!(url.scheme(), "https");
         assert_eq!(url.path(), "/jmap/session");
+    }
+
+    /// The sections of config.sample.toml, one of which a user
+    /// uncomments.
+    const SECTIONS: [&str; 11] = [
+        "# IMAP and SMTP",
+        "# ManageSieve",
+        "# JMAP",
+        "# Gmail",
+        "# Microsoft Graph",
+        "# Microsoft IMAP and SMTP",
+        "# Fastmail",
+        "# Maildir",
+        "# m2dir",
+        "# mbox",
+        "# pimdir",
+    ];
+
+    /// Checks config.sample.toml: one `[accounts.example]` table and no
+    /// other, its sections each parsed through the loader `-c` uses with
+    /// every variant on top, `example` resolving as the default account
+    /// and declaring a backend.
+    #[test]
+    fn the_sample_configuration_parses_with_each_variant() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config.sample.toml");
+        let sample = fs::read_to_string(&path).unwrap();
+        let headers: Vec<_> = sample.lines().filter(|l| l.starts_with('[')).collect();
+        assert_eq!(headers, ["[accounts.example]"]);
+
+        for Variant { name, text } in variants(&sample, &SECTIONS) {
+            let context = format!("config.sample.toml with {name} uncommented");
+
+            let mut file = NamedTempFile::new().unwrap();
+            file.write_all(text.as_bytes()).unwrap();
+
+            let mut config = Config::load(&[file.path().to_path_buf()])
+                .unwrap_or_else(|err| panic!("{context}: {err:?}"));
+            let (account, account_config) = config
+                .take_account(None)
+                .unwrap_or_else(|err| panic!("{context}: {err:?}"));
+
+            let blocks = [
+                account_config.imap.is_some(),
+                account_config.jmap.is_some(),
+                account_config.gmail.is_some(),
+                account_config.msgraph.is_some(),
+                account_config.maildir.is_some(),
+                account_config.m2dir.is_some(),
+                account_config.mbox.is_some(),
+                account_config.pimdir.is_some(),
+                account_config.sieve.is_some(),
+            ];
+
+            assert_eq!(account, "example", "{context}");
+            assert!(blocks.contains(&true), "{context}: no backend declared");
+        }
     }
 }

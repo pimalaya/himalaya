@@ -162,7 +162,11 @@ The binary lands at `target/release/himalaya`.
 
 ## Configuration
 
-Himalaya reads a TOML configuration you write: copy [config.sample.toml](./config.sample.toml) to `~/.config/himalaya/config.toml`, keep the blocks of the backends your account uses and fill them in. Himalaya never writes a configuration. Run without one at a terminal, it welcomes you with the commands creating it from the sample and the first command to run; under `--json` or in a script, it fails naming the path it looked at.
+Himalaya reads a TOML configuration you write, and never writes one. [config.sample.toml](./config.sample.toml) holds one account: the options every account shares with their values, then one commented section per backend or provider, yours to uncomment: IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox and pimdir. The OAuth 2.0 sections read their token from [Ortie](https://github.com/pimalaya/ortie), whose sample has the matching sections. Releases and packages ship it as share/doc/himalaya/config.sample.toml. Run without a configuration at a terminal, Himalaya welcomes you with the commands copying the sample in place, or downloading it, and the first command to run; under `--json` or in a script, it fails naming the path it looked at.
+
+The `imap`, `smtp` and `sieve` blocks take one SASL mechanism, or none to skip authentication: `plain`, `login` and `scram-sha-256` with a `username` and a `password`, `oauthbearer` and `xoauth2` with a `username` and a `token`, `anonymous` with an optional `message`. `jmap.auth` takes `basic` (`username` and `password`), `bearer` (`token`) or `header`, a whole `Authorization` value. A secret is given as `raw` or as `command`, a shell string or an argument list printing it.
+
+`display-name`, `signature`, `signature-delim`, `downloads-dir` and the `message`, `envelope` and `mailbox` options may also sit at the top level, before any table, as the fallback of every account not setting them: drop the sample's default lines from an account for the top level to apply.
 
 A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
@@ -172,7 +176,7 @@ A persistent configuration is loaded from every existing path among the followin
 
 At most one account may be marked `default = true` across them: an rc file moving the default sets `default = false` on the account the other file marks.
 
-These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
+These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors.
 
 Override those paths with `-c <PATH>`. Repeat it to merge several files, such as `-c public.toml -c private.toml`: the first one is the base and the next ones are deep-merged on top. Each `-c` takes one path, never split, and no environment variable is read: write `-c "$HIMALAYA_CONFIG"` where `HIMALAYA_CONFIG` used to be enough.
 
@@ -263,7 +267,7 @@ Labels become mailboxes here too, but they carry the API's opaque label ids; add
 
 ### Outlook
 
-Microsoft has retired basic authentication: use OAuth 2.0 via `oauthbearer` or `xoauth2`, with the access token supplied by an external helper such as [ortie](https://github.com/pimalaya/ortie).
+Microsoft has retired basic authentication: use OAuth 2.0 via `xoauth2`, Exchange refusing `oauthbearer`, with the access token supplied by an external helper such as [ortie](https://github.com/pimalaya/ortie).
 
 ```toml
 [accounts.outlook]

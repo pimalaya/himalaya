@@ -22,3 +22,6 @@ The binary manifest SHALL carry the shared release profile (`lto = "fat"`, `code
 
 ### Requirement: Licence
 Himalaya SHALL be dual-licensed MIT OR Apache-2.0, with no per-file headers.
+
+### Requirement: The sample ships beside the binary
+The Nix package SHALL install config.sample.toml as share/doc/himalaya/config.sample.toml, the release archives SHALL carry it with the share/ of the build they come from, and install.sh SHALL copy it to the same path under its prefix when the downloaded archive holds it, so the first-run welcome copies it rather than downloading it.

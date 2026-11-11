@@ -38,6 +38,7 @@ panic = "abort"
 pimalaya-cli = { version = "0.3", default-features = false, features = ["build"] }
 
 [dev-dependencies]
+pimalaya-config = { version = "0.3", default-features = false, features = ["sample"] }
 rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
 tempfile = "3"
 

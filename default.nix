@@ -76,6 +76,7 @@ pimalaya.mkDefault (
             in
             ''
               mkdir -p $out/share/{completions,man,schemas}
+              install -Dm644 config.sample.toml "$out"/share/doc/himalaya/config.sample.toml
               ${exe} completion -d "$out"/share/completions bash elvish fish powershell zsh
               ${exe} manual -d "$out"/share/man
               ${exe} json-schema -d "$out"/share/schemas

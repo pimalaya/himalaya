@@ -54,4 +54,12 @@ tar -xzf "$tmpdir/himalaya.tgz" -C "$tmpdir"
 mkdir -p "$PREFIX/bin"
 cp -f -- "$tmpdir/$binary" "$PREFIX/bin/$binary"
 
-die "$("$PREFIX/bin/$binary" --version) installed!" 0
+sample=share/doc/himalaya/config.sample.toml
+
+if [ -f "$tmpdir/$sample" ]; then
+    echo "Installing sample configuration…"
+    mkdir -p "$PREFIX/share/doc/himalaya"
+    cp -f -- "$tmpdir/$sample" "$PREFIX/$sample"
+fi
+
+die"$("$PREFIX/bin/$binary" --version) installed!" 0
