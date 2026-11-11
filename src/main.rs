@@ -73,7 +73,10 @@
 //! fails on it. A one-shot run uses a fresh session for its single command;
 //! the [`repl`] keeps one across the lines of its stdin, so each client
 //! connects once for the whole session. The [`mcp`] server keeps one the
-//! same way, each tool call parsed back into a shared API command.
+//! same way, each tool call parsed back into a shared API command. Both
+//! run on pimalaya-cli's shared core (its `repl` loop, its `mcp` protocol
+//! answers and tool grammar), which claims stdin, so a command reading
+//! its input there is refused under `stdin-taken`.
 //!
 //! ## Configuration and output
 //!
@@ -93,8 +96,9 @@
 //!
 //! Output follows the Pimalaya rule: data and errors go to stdout through
 //! the printer, `--json` switching every command to JSON, and stderr
-//! carries the logs, the welcome and the failures of the MCP server,
-//! whose stdout is the protocol's. Text output is plain text, with no
+//! carries the logs, the welcome, the REPL's prompt and its help in a
+//! JSON session, and the failures of the MCP server, whose stdout is the
+//! protocol's. Text output is plain text, with no
 //! border, no colour and nothing sized to the terminal: a list prints as
 //! aligned columns, a record as aligned `Label: value` lines. Each
 //! command's doc comment is its `--help`, so `himalaya <command> --help`

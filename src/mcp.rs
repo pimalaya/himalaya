@@ -3,46 +3,64 @@
 //! The `mcp` subcommand, a Model Context Protocol server over stdin and
 //! stdout exposing the shared API as tools, one per leaf command.
 //!
-//! A tool's input schema is generated from its clap command, and a call is
-//! turned back into an argv parsed by that same command, so the CLI, the
+//! pimalaya-cli's [`mcp`] module answers the protocol and checks each call
+//! against its tool's input schema; this one lists the tools and runs the
+//! calls. A tool's input is its clap command's [`Grammar`], and a call
+//! turns back into an argv parsed by that same command, so the CLI, the
 //! [`crate::repl`] and MCP share one grammar. Commands run over the
-//! [`Session`] the server keeps, and print into an [`McpPrinter`] whose one
-//! JSON value becomes the call's structured result.
+//! [`Session`] the server keeps and print into a [`CapturePrinter`], whose
+//! one JSON value becomes the call's structured result.
 //!
 //! A tool may also take a [`ServerArg`], an input the CLI says another
 //! way (a path the server keeps closed): declared on the tool in
 //! [`TOOLS`], taken off the call before the argv is rebuilt, validated
 //! here, and handed to the parsed command through a field clap skips.
 //!
-//! Refs: <https://modelcontextprotocol.io/specification/2025-06-18>
+//! [`mcp`]: pimalaya_cli::mcp
 
-use std::{
-    fmt,
-    io::{self, BufRead, Write},
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use anyhow::{Context, Result, anyhow};
-use clap::{Arg, ArgAction, CommandFactory, Parser, ValueHint};
+use anyhow::{Result, anyhow};
+use clap::{CommandFactory, Parser};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use pimalaya_cli::{
-    error::{ErrorReport, partial_outcome_of},
-    output::Bytes,
-    printer::Printer,
+    mcp::{ServerInfo, ToolCall, ToolResult, grammar::Grammar, serve, tool_output_schema},
+    printer::CapturePrinter,
 };
-use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
     capability::{self, Capability, Resolution, Support},
     cli::{Cli, Command, resolve_account},
     error::ErrorCode,
-    json_schema, repl,
+    json_schema,
     session::Session,
 };
 
-/// The protocol revision the server speaks.
-const PROTOCOL_VERSION: &str = "2025-06-18";
+/// What the server tells the agent at initialization.
+const INFO: ServerInfo = ServerInfo {
+    name: "himalaya",
+    version: env!("CARGO_PKG_VERSION"),
+    instructions: Some(INSTRUCTIONS),
+};
+
+/// How to use the tools, for the client to hand its model.
+const INSTRUCTIONS: &str = "Reads, and when the server allows it changes \
+and sends, the mail of one account. Find a mailbox with mailbox_list and \
+pass its name, alias or role as `mailbox`, the inbox when left out. List \
+its envelopes with envelope_list, or search them with envelope_search, \
+whose `query` takes Himalaya's query language (`from alice and subject \
+report order by date desc`) and whose description says which clauses this \
+account's backend answers. An envelope's `id` names its message, in that \
+mailbox, for message_read, attachment_list and the other message tools. \
+attachment_download reads one part, its bytes coming as an embedded \
+resource rather than as a file. message_compose, message_reply and \
+message_forward print the message they compose, or save or send it when \
+given `save` or `send`, and attach files given inline as `attach-data`, \
+never by path. The tools and arguments that change the store are listed \
+only when the server runs with --allow-write, those that send mail only \
+with --allow-send. A failed call answers isError with a himalaya-error \
+object, its `code` naming the failure when it has one.";
 
 /// The shared API leaves exposed as tools, with what each may do.
 ///
@@ -137,15 +155,16 @@ pub struct McpCommand {
     /// List the tools that change the store too.
     ///
     /// Adds the mailbox create, rename and delete tools, the flag, add,
-    /// copy, move and delete tools, and the `save` argument of the
-    /// composers and of `message_send`.
+    /// copy, move and delete tools, the `save` argument of the composers
+    /// and of `message_send`, and the `seen` argument of `message_read`.
     #[arg(long)]
     pub allow_write: bool,
     /// List the tools that send mail too.
     ///
     /// Adds `message_send`, `vacation_set`, an auto-reply answering mail,
-    /// and the `send` argument of the composers and of `message_add`. An agent reading mail can be told by a message
-    /// to send mail, so sending is never on by default.
+    /// and the `send` argument of the composers and of `message_add`. An
+    /// agent reading mail can be told by a message to send mail, so
+    /// sending is never on by default.
     #[arg(long)]
     pub allow_send: bool,
     /// Largest attachment a tool takes or reads, in bytes.
@@ -161,45 +180,33 @@ pub struct McpCommand {
 impl McpCommand {
     /// Serves JSON-RPC requests off stdin until EOF, answering each on
     /// stdout.
-    pub fn execute(self, _printer: &mut impl Printer, session: &mut Session) -> Result<()> {
+    pub fn execute(self, session: &mut Session) -> Result<()> {
         let account = session.account;
 
-        // NOTE: resolved once up front, so a missing configuration or
-        // account fails the server rather than its first call, and the
-        // tools listed are the ones the account's backends serve.
+        // Resolved once up front, so a missing configuration or account
+        // fails the server rather than its first call, and the tools
+        // listed are the ones the account's backends serve.
         let (_, name, account_config) = resolve_account(account.config_paths, account.name)?;
         let resolution = Resolution::of(&name, &account_config, account.backend);
 
-        repl::claim_stdin();
+        // Set before the tools are built, the download tool's
+        // description naming the cap.
         PATHS_CLOSED.store(true, Ordering::Relaxed);
         ATTACHMENT_CAP.store(self.max_attachment_size, Ordering::Relaxed);
+
+        let tools = McpToolSpec::all(self.allow_write, self.allow_send, Some(&resolution));
+        let definitions: Vec<Value> = tools.iter().map(|tool| tool.definition.clone()).collect();
 
         let mut server = McpServer {
             session,
             account: name,
-            tools: McpToolSpec::all(self.allow_write, self.allow_send, Some(&resolution)),
+            tools,
             limits: McpLimits {
                 max_attachment_size: self.max_attachment_size,
             },
         };
 
-        let mut stdout = io::stdout();
-
-        for line in io::stdin().lock().lines() {
-            let line = line.context("Cannot read a request from stdin")?;
-
-            if line.trim().is_empty() {
-                continue;
-            }
-
-            if let Some(response) = server.answer(&line) {
-                serde_json::to_writer(&mut stdout, &response)?;
-                writeln!(stdout)?;
-                stdout.flush()?;
-            }
-        }
-
-        Ok(())
+        serve(&INFO, &definitions, |call| server.call(call))
     }
 }
 
@@ -327,38 +334,14 @@ impl McpTool {
     const fn part(self) -> Self {
         Self { part: true, ..self }
     }
-
-    /// Whether `arg` is set by one of the fixed arguments.
-    fn fixes(&self, arg: &Arg) -> bool {
-        arg.get_long().is_some_and(|long| {
-            self.fixed.iter().any(|fixed| {
-                fixed
-                    .strip_prefix("--")
-                    .and_then(|fixed| fixed.split('=').next())
-                    == Some(long)
-            })
-        })
-    }
 }
 
-/// A listed tool: its definition and the arguments a call maps onto.
+/// A listed tool: its definition and the grammar a call maps onto.
 struct McpToolSpec {
-    group: &'static str,
-    leaf: &'static str,
-    args: Vec<McpToolArg>,
+    grammar: Grammar,
     server: &'static [ServerArg],
-    fixed: &'static [&'static str],
     part: bool,
     definition: Value,
-}
-
-/// One argument of a tool, and how it goes back into an argv.
-struct McpToolArg {
-    name: String,
-    long: Option<String>,
-    index: Option<usize>,
-    boolean: bool,
-    multiple: bool,
 }
 
 impl McpToolSpec {
@@ -374,6 +357,11 @@ impl McpToolSpec {
 
         let schemas = json_schema::registry().schemas;
         let mut tools = Vec::new();
+
+        let gated = |name: &str| {
+            (SEND_ARGS.contains(&name) && !allow_send)
+                || (WRITE_ARGS.contains(&name) && !allow_write)
+        };
 
         for tool in TOOLS {
             let listed = match tool.kind {
@@ -401,77 +389,22 @@ impl McpToolSpec {
                 continue;
             };
 
-            let mut args = Vec::new();
-            let mut properties = Map::new();
-            let mut required = Vec::new();
+            let grammar = Grammar::new(&[tool.group, tool.leaf], cmd)
+                .retain(|name| !gated(name) && !tool.without.contains(&name))
+                .fixed(tool.fixed)
+                .one(tool.one);
 
-            for arg in cmd.get_arguments() {
-                // NOTE: named as the CLI spells it, the long flag or the
-                // value name of a positional, never clap's field id.
-                let name = match arg.get_long() {
-                    Some(long) => long.to_string(),
-                    None => arg
-                        .get_value_names()
-                        .and_then(|names| names.first())
-                        .map(|name| name.as_str().to_lowercase())
-                        .unwrap_or_else(|| arg.get_id().to_string()),
-                };
+            let mut input_schema = grammar.input_schema();
 
-                let gated = (SEND_ARGS.contains(&name.as_str()) && !allow_send)
-                    || (WRITE_ARGS.contains(&name.as_str()) && !allow_write);
-
-                if gated
-                    || tool.without.contains(&name.as_str())
-                    || tool.fixes(arg)
-                    || !exposes(arg)
-                {
-                    continue;
-                }
-
-                let spec = McpToolArg {
-                    name,
-                    long: arg.get_long().map(ToString::to_string),
-                    index: arg.get_index(),
-                    boolean: matches!(arg.get_action(), ArgAction::SetTrue | ArgAction::Count),
-                    multiple: matches!(arg.get_action(), ArgAction::Append)
-                        || arg.get_num_args().is_some_and(|n| n.max_values() > 1),
-                };
-
-                let one = spec.multiple && tool.one.contains(&spec.name.as_str());
-                let mut schema = spec.schema(arg);
-
-                if one {
-                    schema["minItems"] = Value::from(1);
-                    schema["maxItems"] = Value::from(1);
-                }
-
-                properties.insert(spec.name.clone(), schema);
-
-                // NOTE: a positional taking at least one value is required
-                // without being marked so.
-                let at_least_one =
-                    arg.is_positional() && arg.get_num_args().is_some_and(|n| n.min_values() > 0);
-
-                if arg.is_required_set() || at_least_one || one {
-                    required.push(Value::from(spec.name.as_str()));
-                }
-
-                args.push(spec);
-            }
-
-            // NOTE: what the grammar does not say, declared on the tool.
+            // What the grammar does not say, declared on the tool.
             for arg in tool.server {
-                properties.insert(arg.name.to_string(), (arg.schema)());
+                input_schema["properties"][arg.name] = (arg.schema)();
             }
 
-            let writes = |arg: &McpToolArg| {
-                WRITE_ARGS.contains(&arg.name.as_str()) || SEND_ARGS.contains(&arg.name.as_str())
-            };
-            let read_only = tool.kind == McpToolKind::Read && !args.iter().any(writes);
+            let writes = |name: &str| WRITE_ARGS.contains(&name) || SEND_ARGS.contains(&name);
+            let read_only = tool.kind == McpToolKind::Read && !grammar.names().any(writes);
             let sends = tool.kind == McpToolKind::Send
-                || args
-                    .iter()
-                    .any(|arg| SEND_ARGS.contains(&arg.name.as_str()));
+                || grammar.names().any(|name| SEND_ARGS.contains(&name));
 
             let mut description = cmd
                 .get_long_about()
@@ -500,12 +433,7 @@ impl McpToolSpec {
             let mut definition = json!({
                 "name": format!("{}_{}", tool.group, tool.leaf),
                 "description": description,
-                "inputSchema": {
-                    "type": "object",
-                    "properties": properties,
-                    "required": required,
-                    "additionalProperties": false,
-                },
+                "inputSchema": input_schema,
                 "annotations": {
                     "readOnlyHint": read_only,
                     "destructiveHint": tool.destructive,
@@ -513,13 +441,12 @@ impl McpToolSpec {
                 },
             });
 
-            // NOTE: MCP wants an object root, which a tagged or untagged
-            // enum payload would not have. A part tool prints one shape of
-            // its two, the part, `data` moved out of it.
+            // A part tool prints one shape of its two, the part, `data`
+            // moved out of it.
             let schema = schemas.get(&format!("himalaya-{}-{}", tool.group, tool.leaf));
             let output_schema = match schema {
                 Some(schema) if tool.part => part_schema(schema),
-                Some(schema) if tool.typed && schema["type"] == "object" => Some(schema.clone()),
+                Some(schema) if tool.typed => tool_output_schema(schema).cloned(),
                 _ => None,
             };
 
@@ -528,11 +455,8 @@ impl McpToolSpec {
             }
 
             tools.push(Self {
-                group: tool.group,
-                leaf: tool.leaf,
-                args,
+                grammar,
                 server: tool.server,
-                fixed: tool.fixed,
                 part: tool.part,
                 definition,
             });
@@ -561,114 +485,6 @@ impl McpToolSpec {
 
         (grammar, server)
     }
-
-    /// Turns a call's arguments back into the argv of the command,
-    /// refusing a key the tool does not take.
-    ///
-    /// Option values are glued to their flag and positionals follow a
-    /// `--`, so a value starting with a dash is never read as a flag.
-    fn argv(&self, arguments: &Map<String, Value>) -> Result<Vec<String>> {
-        if let Some(key) = arguments
-            .keys()
-            .find(|key| !self.args.iter().any(|arg| &arg.name == *key))
-        {
-            let known: Vec<&str> = self
-                .args
-                .iter()
-                .map(|arg| arg.name.as_str())
-                .chain(self.server.iter().map(|arg| arg.name))
-                .collect();
-            return Err(anyhow!(
-                "Unknown argument `{key}`, expected one of: {}",
-                known.join(", ")
-            ));
-        }
-
-        let mut argv = vec![self.group.to_string(), self.leaf.to_string()];
-        let mut positionals = Vec::new();
-
-        for arg in &self.args {
-            let Some(value) = arguments.get(&arg.name).filter(|value| !value.is_null()) else {
-                continue;
-            };
-
-            if arg.boolean {
-                let enabled = value
-                    .as_bool()
-                    .ok_or_else(|| anyhow!("Argument `{}` must be a boolean", arg.name))?;
-
-                if enabled && let Some(long) = &arg.long {
-                    argv.push(format!("--{long}"));
-                }
-
-                continue;
-            }
-
-            let values = match value {
-                Value::Array(items) if arg.multiple => items.iter().map(scalar).collect(),
-                value if !arg.multiple => scalar(value).map(|value| vec![value]),
-                _ => None,
-            };
-
-            let Some(values) = values else {
-                let expected = if arg.multiple {
-                    "an array of strings"
-                } else {
-                    "a string"
-                };
-                return Err(anyhow!("Argument `{}` must be {expected}", arg.name));
-            };
-
-            match (&arg.long, arg.index) {
-                (Some(long), _) => {
-                    argv.extend(values.iter().map(|value| format!("--{long}={value}")))
-                }
-                (None, Some(index)) => positionals.push((index, values)),
-                (None, None) => (),
-            }
-        }
-
-        // NOTE: before the `--`, after which a flag would be a value.
-        argv.extend(self.fixed.iter().map(ToString::to_string));
-
-        if !positionals.is_empty() {
-            positionals.sort_by_key(|(index, _)| *index);
-            argv.push(String::from("--"));
-            argv.extend(positionals.into_iter().flat_map(|(_, values)| values));
-        }
-
-        Ok(argv)
-    }
-}
-
-impl McpToolArg {
-    /// The JSON Schema of the argument's property.
-    fn schema(&self, arg: &Arg) -> Value {
-        let enumerated: Vec<Value> = arg
-            .get_possible_values()
-            .iter()
-            .filter(|value| !value.is_hide_set())
-            .map(|value| Value::from(value.get_name()))
-            .collect();
-
-        let mut item = json!({ "type": "string" });
-
-        if !enumerated.is_empty() {
-            item["enum"] = Value::Array(enumerated);
-        }
-
-        let mut schema = match (self.boolean, self.multiple) {
-            (true, _) => json!({ "type": "boolean" }),
-            (false, true) => json!({ "type": "array", "items": item }),
-            (false, false) => item,
-        };
-
-        if let Some(help) = arg.get_long_help().or(arg.get_help()) {
-            schema["description"] = Value::from(help.to_string());
-        }
-
-        schema
-    }
 }
 
 /// The server: the tools it lists and the session they run over.
@@ -681,71 +497,24 @@ struct McpServer<'a, 'b> {
 }
 
 impl McpServer<'_, '_> {
-    /// Answers one JSON-RPC message, `None` for a notification or a
-    /// response.
-    fn answer(&mut self, line: &str) -> Option<Value> {
-        let message: Value = match serde_json::from_str(line) {
-            Ok(message) => message,
-            Err(err) => return Some(failure(Value::Null, -32700, format!("Parse error: {err}"))),
-        };
-
-        let id = message.get("id").cloned();
-        let params = message.get("params").cloned().unwrap_or(Value::Null);
-
-        let Some(method) = message.get("method").and_then(Value::as_str) else {
-            // NOTE: a response to a request the server never sends.
-            return id.map(|id| failure(id, -32600, String::from("Invalid request")));
-        };
-
-        let id = id?;
-
-        let result = match method {
-            "initialize" => Ok(json!({
-                "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": { "tools": { "listChanged": false } },
-                "serverInfo": { "name": "himalaya", "version": env!("CARGO_PKG_VERSION") },
-            })),
-            "ping" => Ok(json!({})),
-            "tools/list" => {
-                let tools: Vec<&Value> = self.tools.iter().map(|tool| &tool.definition).collect();
-                Ok(json!({ "tools": tools }))
-            }
-            "tools/call" => self.call(&params),
-            method => Err((-32601, format!("Method not found: {method}"))),
-        };
-
-        Some(match result {
-            Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-            Err((code, message)) => failure(id, code, message),
-        })
-    }
-
-    /// Runs a tool call, a failure of the command being a result with
-    /// `isError` rather than a protocol error, so the caller reads it.
-    fn call(&mut self, params: &Value) -> Result<Value, (i64, String)> {
-        let name = params
-            .get("name")
-            .and_then(Value::as_str)
-            .ok_or((-32602, String::from("Missing tool name")))?;
-
-        let tool = self
+    /// Runs a tool call, listed and holding only the arguments its tool
+    /// declares, a failure being a result with `isError` rather than a
+    /// protocol error, so the caller reads it.
+    fn call(&mut self, call: &ToolCall) -> ToolResult {
+        let Some(tool) = self
             .tools
             .iter()
-            .find(|tool| tool.definition["name"] == name)
-            .ok_or_else(|| (-32602, format!("Unknown tool: {name}")))?;
-
-        let empty = Map::new();
-        let arguments = match params.get("arguments") {
-            None | Some(Value::Null) => &empty,
-            Some(Value::Object(arguments)) => arguments,
-            Some(_) => return Err((-32602, String::from("Arguments must be an object"))),
+            .find(|tool| tool.definition["name"] == *call.name)
+        else {
+            return ToolResult::error::<ErrorCode>(anyhow!("Unknown tool: {}", call.name));
         };
 
-        let mut printer = McpPrinter::default();
-        let (grammar, server) = tool.split(arguments);
+        let mut printer = CapturePrinter::default();
+        let (grammar, server) = tool.split(&call.arguments);
         let limits = &self.limits;
 
         let result = tool
+            .grammar
             .argv(&grammar)
             .and_then(|argv| Ok(McpLine::try_parse_from(argv)?))
             .and_then(|mut line| {
@@ -756,84 +525,59 @@ impl McpServer<'_, '_> {
             })
             .and_then(|line| line.cmd.execute(&mut printer, self.session));
 
-        // NOTE: a partial outcome printed its result, which stays the tool
-        // result, flagged as an error.
-        let partial = match result {
-            Err(err) if partial_outcome_of(&err).is_some() => true,
-            Err(err) => {
-                let report = serde_json::to_value(ErrorReport::<ErrorCode>::from(err))
-                    .unwrap_or_else(|err| Value::from(err.to_string()));
-
-                return Ok(json!({
-                    "content": [{ "type": "text", "text": report.to_string() }],
-                    "isError": true,
-                }));
-            }
-            Ok(()) => false,
-        };
-
-        let mut values = printer.values;
-
-        let Some(value) = values.pop().filter(|_| values.is_empty()) else {
-            let message = format!("The command printed {} values, one expected", values.len());
-            return Ok(json!({
-                "content": [{ "type": "text", "text": message }],
-                "isError": true,
-            }));
-        };
-
-        // NOTE: the events a command printed come first, one text content
-        // each, the result last.
-        let mut content: Vec<Value> = printer
-            .events
-            .iter()
-            .map(|event| json!({ "type": "text", "text": event.to_string() }))
-            .collect();
-
-        // NOTE: a part's bytes travel once, as an embedded resource after
-        // the part's JSON, never also as its `data`.
-        let (value, resource) = if tool.part {
-            let uri = part_uri(
-                &self.account,
-                arguments
-                    .get("mailbox")
-                    .and_then(Value::as_str)
-                    .unwrap_or("inbox"),
-                arguments
-                    .get("message-id")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-                value["id"].as_str().unwrap_or_default(),
-            );
-
-            let Some((value, resource)) = embedded_part(value, uri) else {
-                let message = "The command printed no part to embed";
-                return Ok(json!({
-                    "content": [{ "type": "text", "text": message }],
-                    "isError": true,
-                }));
-            };
-
-            (value, Some(resource))
-        } else {
-            (value, None)
-        };
-
-        content.push(json!({ "type": "text", "text": value.to_string() }));
-        content.extend(resource);
-
-        let mut result = json!({ "content": content });
-
-        if value.is_object() {
-            result["structuredContent"] = value;
-        }
-
-        if partial {
-            result["isError"] = Value::Bool(true);
-        }
-
-        Ok(result)
+        tool_result(tool, &self.account, &call.arguments, printer, result)
     }
+}
+
+/// The result of a call to `tool` with `arguments`, from what its command
+/// printed into `printer` and how it ended.
+///
+/// The bytes of the part a part tool printed leave its JSON for an
+/// embedded resource, whose URI names the `account`, then the mailbox and
+/// the message of the call.
+fn tool_result(
+    tool: &McpToolSpec,
+    account: &str,
+    arguments: &Map<String, Value>,
+    printer: CapturePrinter,
+    result: Result<()>,
+) -> ToolResult {
+    let mut result = ToolResult::printed::<ErrorCode>(printer, result);
+
+    if !tool.part || result.is_error {
+        return result;
+    }
+
+    let embedded = result.structured_content.take().and_then(|part| {
+        let uri = part_uri(
+            account,
+            arguments
+                .get("mailbox")
+                .and_then(Value::as_str)
+                .unwrap_or("inbox"),
+            arguments
+                .get("message-id")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+            part["id"].as_str().unwrap_or_default(),
+        );
+
+        embedded_part(part, uri)
+    });
+
+    let Some((part, resource)) = embedded else {
+        return ToolResult::error::<ErrorCode>(anyhow!("The command printed no part to embed"));
+    };
+
+    // The bytes travel once, as an embedded resource after the part's
+    // JSON, which takes the place of the printed one.
+    result.content.pop();
+    result
+        .content
+        .push(json!({ "type": "text", "text": part.to_string() }));
+    result.content.push(resource);
+    result.structured_content = Some(part);
+    result
 }
 
 /// One tool call parsed back, the CLI grammar minus the binary name and the
@@ -843,63 +587,6 @@ impl McpServer<'_, '_> {
 struct McpLine {
     #[command(subcommand)]
     cmd: Command,
-}
-
-/// A [`Printer`] keeping each value and event a command prints as JSON.
-#[derive(Default)]
-struct McpPrinter {
-    values: Vec<Value>,
-    events: Vec<Value>,
-}
-
-impl Printer for McpPrinter {
-    fn out<T: fmt::Display + Serialize>(&mut self, data: T) -> Result<()> {
-        self.values.push(serde_json::to_value(&data)?);
-        Ok(())
-    }
-
-    fn event<T: fmt::Display + Serialize>(&mut self, event: T) -> Result<()> {
-        self.events.push(serde_json::to_value(&event)?);
-        Ok(())
-    }
-
-    fn out_bytes(&mut self, bytes: Bytes) -> Result<()> {
-        self.out(bytes)
-    }
-
-    fn is_json(&self) -> bool {
-        true
-    }
-}
-
-/// Whether an argument becomes a tool property: not a global flag, not
-/// help or version, not hidden, and not a path read from or written to.
-fn exposes(arg: &Arg) -> bool {
-    let builtin = matches!(
-        arg.get_action(),
-        ArgAction::Help | ArgAction::HelpShort | ArgAction::HelpLong | ArgAction::Version
-    );
-
-    let path = matches!(
-        arg.get_value_hint(),
-        ValueHint::FilePath | ValueHint::DirPath | ValueHint::AnyPath | ValueHint::ExecutablePath
-    ) || arg
-        .get_value_names()
-        .is_some_and(|names| names.iter().any(|name| name.as_str() == "PATH"));
-
-    let reachable = arg.get_long().is_some() || arg.is_positional();
-
-    !builtin && !path && reachable && !arg.is_global_set() && !arg.is_hide_set()
-}
-
-/// A JSON scalar as the word an argv carries.
-fn scalar(value: &Value) -> Option<String> {
-    match value {
-        Value::String(value) => Some(value.clone()),
-        Value::Number(value) => Some(value.to_string()),
-        Value::Bool(value) => Some(value.to_string()),
-        _ => None,
-    }
 }
 
 /// What the account's backend answers of the query language, appended to
@@ -1225,14 +912,15 @@ fn embedded_part(mut part: Value, uri: String) -> Option<(Value, Value)> {
     Some((part, resource))
 }
 
-/// A JSON-RPC error response.
-fn failure(id: Value, code: i64, message: String) -> Value {
-    json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
-}
-
 #[cfg(test)]
 mod tests {
+    use std::slice;
+
     use clap::CommandFactory;
+    use pimalaya_cli::{
+        mcp::{Incoming, read},
+        printer::Printer,
+    };
 
     use crate::{cli::Cli, mcp::*};
 
@@ -1290,15 +978,16 @@ mod tests {
             let properties = &tool.definition["inputSchema"]["properties"];
 
             assert_eq!(properties["attach-data"], attach_data_schema(), "{name}");
-            assert!(tool.args.iter().all(|arg| arg.name != "attach-data"));
+            assert!(tool.grammar.names().all(|name| name != "attach-data"));
         }
 
         for tool in McpToolSpec::all(true, true, None) {
+            let name = &tool.definition["name"];
             let declared = tool.server.iter().any(|arg| arg.name == "attach-data");
-            let composer = (tool.group, tool.leaf) == ("message", "compose")
-                || (tool.group, tool.leaf) == ("message", "reply")
-                || (tool.group, tool.leaf) == ("message", "forward");
-            assert_eq!(declared, composer, "{}", tool.definition["name"]);
+            let composer = ["message_compose", "message_reply", "message_forward"]
+                .iter()
+                .any(|composer| name == composer);
+            assert_eq!(declared, composer, "{name}");
         }
     }
 
@@ -1317,7 +1006,7 @@ mod tests {
         assert!(grammar.get("attach-data").is_none());
         assert_eq!(server.len(), 1);
 
-        let argv = tool.argv(&grammar).unwrap();
+        let argv = tool.grammar.argv(&grammar).unwrap();
         assert!(
             argv.iter().all(|word| !word.contains("attach-data")),
             "{argv:?}"
@@ -1343,8 +1032,8 @@ mod tests {
             }]
         );
 
-        // NOTE: the argv alone, as a command line would carry it, is
-        // refused by clap.
+        // The argv alone, as a command line would carry it, is refused by
+        // clap.
         let refused = McpLine::try_parse_from(["message", "compose", "--attach-data=x"]);
         assert!(refused.is_err());
     }
@@ -1359,7 +1048,7 @@ mod tests {
             "attachment-id": ["3"],
         });
 
-        let argv = tool.argv(arguments.as_object().unwrap()).unwrap();
+        let argv = tool.grammar.argv(arguments.as_object().unwrap()).unwrap();
         assert_eq!(
             argv,
             [
@@ -1377,7 +1066,9 @@ mod tests {
         assert!(properties.get("stdout").is_none(), "{properties}");
         assert!(properties.get("dir").is_none(), "{properties}");
 
-        let refused = tool.argv(json!({ "stdout": true }).as_object().unwrap());
+        let refused = tool
+            .grammar
+            .argv(json!({ "stdout": true }).as_object().unwrap());
         assert!(refused.unwrap_err().to_string().contains("`stdout`"));
     }
 
@@ -1413,6 +1104,57 @@ mod tests {
                 .unwrap()
                 .contains(&json!("data"))
         );
+    }
+
+    /// The result of tool `name` having printed `values`, as the client
+    /// reads it.
+    #[cfg(any(backend, feature = "smtp"))]
+    fn printed(name: &str, values: &[Value]) -> Value {
+        let tool = spec(name);
+        let mut printer = CapturePrinter::default();
+
+        for value in values {
+            printer.out(value).unwrap();
+        }
+
+        let result = tool_result(&tool, "a", &Map::new(), printer, Ok(()));
+        serde_json::to_value(result).unwrap()
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_wrong_count_of_values_is_the_typed_failure_object() {
+        let one = json!({ "envelopes": [] });
+
+        for (name, values, error) in [
+            (
+                "envelope_list",
+                vec![],
+                "The command printed 0 values, one expected",
+            ),
+            (
+                "envelope_list",
+                vec![one.clone(), one.clone()],
+                "The command printed 2 values, one expected",
+            ),
+            (
+                "attachment_download",
+                vec![json!({ "id": "3" })],
+                "The command printed no part to embed",
+            ),
+        ] {
+            let result = printed(name, &values);
+            assert_eq!(result["isError"], true, "{result}");
+            assert!(result.get("structuredContent").is_none(), "{result}");
+
+            let text = result["content"][0]["text"].as_str().unwrap();
+            let report: Value =
+                serde_json::from_str(text).unwrap_or_else(|err| panic!("{err}: {text}"));
+            assert_eq!(report["error"], error, "{report}");
+        }
+
+        let result = printed("envelope_list", slice::from_ref(&one));
+        assert_eq!(result["structuredContent"], one);
     }
 
     #[test]
@@ -1459,13 +1201,40 @@ mod tests {
     #[cfg(any(backend, feature = "smtp"))]
     #[test]
     fn an_unknown_key_names_the_server_only_arguments_too() {
-        let tool = spec("message_compose");
-        let arguments = json!({ "attachments": [] });
-        let (grammar, _) = tool.split(arguments.as_object().unwrap());
-        let err = tool.argv(&grammar).unwrap_err().to_string();
+        let tools: Vec<Value> = McpToolSpec::all(true, true, None)
+            .into_iter()
+            .map(|tool| tool.definition)
+            .collect();
+        let call = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": { "name": "message_compose", "arguments": { "attachments": [] } },
+        });
 
-        assert!(err.contains("Unknown argument `attachments`"), "{err}");
-        assert!(err.contains("attach-data"), "{err}");
+        let Incoming::Reply(reply) = read(call.to_string().as_bytes(), &INFO, &tools) else {
+            panic!("not refused");
+        };
+        let text = reply["result"]["content"][0]["text"].as_str().unwrap();
+
+        assert_eq!(reply["result"]["isError"], true, "{reply}");
+        assert!(text.contains("Unknown argument `attachments`"), "{text}");
+        assert!(text.contains("`attach-data`"), "{text}");
+    }
+
+    /// Every tool the instructions name is one the server may list.
+    #[test]
+    fn the_instructions_name_existing_tools() {
+        let words = INSTRUCTIONS
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .filter(|word| word.contains('_'));
+
+        for word in words {
+            let known = TOOLS
+                .iter()
+                .any(|tool| word == format!("{}_{}", tool.group, tool.leaf));
+            assert!(known, "{word}");
+        }
     }
 
     #[cfg(any(backend, feature = "smtp"))]

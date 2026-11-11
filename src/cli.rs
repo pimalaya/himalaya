@@ -418,11 +418,11 @@ impl Command {
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
 
-            Self::Repl(cmd) => cmd.execute(printer, session),
+            Self::Repl(cmd) => cmd.execute(&*printer, session),
             Self::Mcp(cmd) => {
                 // stdout carries protocol messages only, so a failure goes
                 // to stderr, a person missing a configuration aside.
-                match cmd.execute(printer, session) {
+                match cmd.execute(session) {
                     Err(err) if err.is::<ConfigMissingError>() && is_wanted(&*printer) => Err(err),
                     result => {
                         exit_on_failure::<ErrorCode, _>(result);

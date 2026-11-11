@@ -12,12 +12,12 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, session::check_stdin};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    repl,
+    error::ErrorCode,
     shared::{
         attachment::download::PartBytes,
         message::{part, read::MessageReadOutput},
@@ -101,7 +101,7 @@ impl MessageParseCommand {
                 (raw, source)
             }
             path => {
-                repl::check_stdin()?;
+                check_stdin(ErrorCode::StdinTaken)?;
 
                 // NOTE: a bare `message parse` at a prompt would wait for
                 // a message nobody announced, where `-` asks for it.

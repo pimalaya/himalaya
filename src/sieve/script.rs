@@ -10,8 +10,9 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
+use pimalaya_cli::session::check_stdin;
 
-use crate::repl;
+use crate::error::ErrorCode;
 
 /// Sieve source shared by `put` and `check`.
 #[derive(Debug, Parser)]
@@ -37,7 +38,7 @@ impl SieveScriptArg {
             return Ok(self.script.join(" ").into_bytes());
         }
 
-        repl::check_stdin()?;
+        check_stdin(ErrorCode::StdinTaken)?;
 
         if !stdin().is_terminal() {
             let mut script = Vec::new();

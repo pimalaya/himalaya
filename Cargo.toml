@@ -69,7 +69,7 @@ mime-rs = { version = "0.1", optional = true }
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"
-pimalaya-cli = { version = "0.3", default-features = false, features = ["mcp", "prompt", "terminal"] }
+pimalaya-cli = { version = "0.3", default-features = false, features = ["mcp", "prompt", "repl", "terminal"] }
 pimalaya-config = { version = "0.3", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }
@@ -78,7 +78,6 @@ secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 sha2 = { version = "0.11", optional = true }
-shlex = "2"
 toml = "1.1"
 url = { version = "2.2", features = ["serde"] }
 

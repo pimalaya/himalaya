@@ -2,8 +2,10 @@
 //!
 //! `himalaya repl` run as the built binary against a Maildir, fed a piped
 //! session, asserting that every line gets exactly one answer, that a
-//! failing line leaves the session running, and that a command reading its
-//! input off stdin is refused rather than swallowing the lines after it.
+//! failing line leaves the session running, that a command reading its
+//! input off stdin is refused rather than swallowing the lines after it,
+//! and that a line's `--json`, its comment, a session flag it sets and the
+//! help it asks for are answered as pimalaya-cli's shared loop says.
 
 #![cfg(all(backend, feature = "maildir"))]
 
@@ -42,12 +44,14 @@ fn account(dir: &Path) -> PathBuf {
     config
 }
 
-/// Runs a piped `--json` session over `lines` and returns one JSON value
-/// per output line.
-fn session(dir: &Path, lines: &str) -> Vec<Value> {
+/// Runs a piped session started with `flags` over `lines` and returns
+/// its stdout and stderr.
+fn run(dir: &Path, flags: &[&str], lines: &str) -> (String, String) {
     let config = account(dir);
     let mut child = Command::new(env!("CARGO_BIN_EXE_himalaya"))
-        .args(["-c", config.to_str().unwrap(), "--json", "repl"])
+        .args(["-c", config.to_str().unwrap()])
+        .args(flags)
+        .arg("repl")
         .env("HOME", dir)
         .env("XDG_CONFIG_HOME", dir)
         .env_remove("XDG_CONFIG_DIRS")
@@ -65,17 +69,24 @@ fn session(dir: &Path, lines: &str) -> Vec<Value> {
         .unwrap();
 
     let output = child.wait_with_output().unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr),
-    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(output.status.success(), "{stderr}");
 
-    String::from_utf8(output.stdout)
-        .unwrap()
+    (String::from_utf8(output.stdout).unwrap(), stderr)
+}
+
+/// The JSON values of a piped session's stdout, one per line.
+fn values(stdout: &str) -> Vec<Value> {
+    stdout
         .lines()
-        .map(|line| serde_json::from_str(line).unwrap())
+        .map(|line| serde_json::from_str(line).unwrap_or_else(|err| panic!("{err}: {line}")))
         .collect()
+}
+
+/// Runs a piped `--json` session over `lines` and returns one JSON value
+/// per output line.
+fn session(dir: &Path, lines: &str) -> Vec<Value> {
+    values(&run(dir, &["--json"], lines).0)
 }
 
 #[test]
@@ -121,4 +132,83 @@ fn a_session_refuses_input_from_stdin() {
     assert_eq!(answers[0]["code"], "stdin-taken");
     assert_eq!(answers[1]["code"], "stdin-taken");
     assert_eq!(answers[2]["envelopes"][0]["id"], "m1");
+}
+
+#[test]
+fn a_line_json_flag_switches_that_line_alone() {
+    let dir = TempDir::new().unwrap();
+    let (stdout, _) = run(
+        dir.path(),
+        &[],
+        "envelope list --json\n\
+         envelope list\n",
+    );
+    let mut lines = stdout.lines();
+
+    let json: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
+    assert_eq!(json["envelopes"][0]["id"], "m1", "{stdout}");
+
+    // The text list follows, nothing added between the two answers.
+    assert!(lines.next().unwrap().starts_with("ID "), "{stdout}");
+    assert!(lines.next().unwrap().starts_with("m1 "), "{stdout}");
+    assert_eq!(lines.next(), None, "{stdout}");
+}
+
+#[test]
+fn a_session_flag_is_refused_by_name() {
+    let dir = TempDir::new().unwrap();
+    let answers = session(
+        dir.path(),
+        "envelope list -a other\n\
+         envelope list -b maildir\n\
+         envelope list --backend=imap\n\
+         envelope list -c other.toml\n",
+    );
+
+    assert_eq!(answers.len(), 4, "{answers:#?}");
+
+    for (answer, flag) in answers.iter().zip(["-a", "-b", "--backend", "-c"]) {
+        let message =
+            format!("Cannot set `{flag}` inside a session, start a new session with it instead");
+        assert_eq!(answer["error"], message, "{answer}");
+    }
+}
+
+#[test]
+fn a_comment_line_is_skipped() {
+    let dir = TempDir::new().unwrap();
+    let answers = session(
+        dir.path(),
+        "# envelope list\n\
+         \x20  # flag add --flag flagged m1\n\
+         envelope list # all of them\n",
+    );
+
+    assert_eq!(answers.len(), 1, "{answers:#?}");
+    assert_eq!(answers[0]["envelopes"][0]["id"], "m1");
+}
+
+#[test]
+fn help_goes_to_stderr_in_a_json_session() {
+    let dir = TempDir::new().unwrap();
+    let (stdout, stderr) = run(
+        dir.path(),
+        &["--json"],
+        "help\n\
+         envelope list --help\n\
+         envelope list\n",
+    );
+
+    let answers = values(&stdout);
+    assert_eq!(answers.len(), 1, "{stdout}");
+    assert_eq!(answers[0]["envelopes"][0]["id"], "m1");
+
+    assert!(
+        stderr.contains("Usage: himalaya [OPTIONS] <COMMAND>"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("Usage: envelope list [OPTIONS]"),
+        "{stderr}"
+    );
 }

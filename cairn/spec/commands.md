@@ -70,7 +70,7 @@ The active account context SHALL be threaded as a sibling argument through every
 - THEN its BACKENDS cell reads `pimdir,smtp`
 
 ### Requirement: Output discipline
-Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs, the welcome a person meets without a configuration (cairn/spec/config.md), and the failures of `mcp`, whose stdout carries protocol messages only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
+Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs, the welcome a person meets without a configuration (cairn/spec/config.md), the REPL's prompt and its help in a JSON session, and the failures of `mcp`, whose stdout carries protocol messages only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
 
 ### Requirement: Text output is plain text
 A text output SHALL be plain text: no border, no colour, nothing sized to or truncated for the terminal, and it SHALL end with a newline, the explicitly requested raw bytes (`message read --raw`, `attachment download --stdout`, `message parse --part` and `--section`) staying byte-exact.

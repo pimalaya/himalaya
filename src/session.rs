@@ -5,9 +5,10 @@
 //!
 //! A one-shot invocation runs a single command over a fresh [`Session`],
 //! so it builds exactly the client that command needs. The [`crate::repl`]
-//! keeps its session across lines, so each client connects once. A command
-//! that fails drops the client it ran on, its connection being possibly dead
-//! or left mid-exchange, and the next command builds it again.
+//! keeps its session across lines and the [`crate::mcp`] server across
+//! tool calls, so each client connects once. A command that fails drops
+//! the client it ran on, its connection being possibly dead or left
+//! mid-exchange, and the next command builds it again.
 
 use std::path::PathBuf;
 

@@ -30,10 +30,10 @@ use mime::{
         message_id::MimeMessageId,
     },
 };
+use pimalaya_cli::session::in_session;
 
 use crate::{
     config::PostingStyle,
-    repl,
     shared::message::{header, part},
 };
 
@@ -433,7 +433,7 @@ fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
 
     // NOTE: inside a session stdin carries the commands, so a body given
     // nowhere is empty, as it is at a terminal.
-    if !stdin().is_terminal() && !repl::in_session() {
+    if !stdin().is_terminal() && !in_session() {
         let mut buf = String::new();
         stdin().read_to_string(&mut buf)?;
         return Ok(buf);

@@ -14,9 +14,9 @@ use std::{
 
 use anyhow::{Context, bail};
 use clap::Parser;
-use pimalaya_cli::clap::parsers::path_parser;
+use pimalaya_cli::{clap::parsers::path_parser, session::check_stdin};
 
-use crate::{mcp, repl, shared::crlf};
+use crate::{error::ErrorCode, mcp, shared::crlf};
 
 /// Trailing positional resolving to a raw RFC 5322 message.
 ///
@@ -72,7 +72,7 @@ impl MessageArg {
             return Ok(crlf::normalize(mime.as_bytes()));
         }
 
-        repl::check_stdin()?;
+        check_stdin(ErrorCode::StdinTaken)?;
 
         if !stdin().is_terminal() {
             let mut contents = Vec::new();

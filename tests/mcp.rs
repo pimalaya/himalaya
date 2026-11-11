@@ -1,14 +1,15 @@
 //! # MCP
 //!
 //! `himalaya mcp` run as the built binary against a Maildir, fed JSON-RPC
-//! requests on stdin, asserting the tools each gate lists, that a call
-//! answers the command's payload, that an unknown argument or a failing
-//! command is a tool error the caller reads, that a path given as a
-//! message is never read from disk, that the composers' inline
-//! attachments, a server-only argument, are stored byte for byte, refused
-//! with their codes, and capped before they are decoded, and that an
-//! attachment is read as an embedded resource, bounded by the server,
-//! without writing a file.
+//! requests on stdin, asserting the instructions `initialize` gives, that
+//! a line that is no JSON-RPC 2.0 request is refused while the server
+//! reads on, the tools each gate lists, that a call answers the command's
+//! payload, that an unknown argument or a failing command is a tool error
+//! the caller reads, that a path given as a message is never read from
+//! disk, that the composers' inline attachments, a server-only argument,
+//! are stored byte for byte, refused with their codes, and capped before
+//! they are decoded, and that an attachment is read as an embedded
+//! resource, bounded by the server, without writing a file.
 
 #![cfg(all(backend, feature = "maildir"))]
 
@@ -48,9 +49,9 @@ fn account(dir: &Path) -> PathBuf {
     config
 }
 
-/// Runs a server with the given flags over `requests`, and returns its
-/// responses in order.
-fn serve(config: &Path, flags: &[&str], requests: &[Value]) -> Vec<Value> {
+/// Runs a server with the given flags over the bytes of `input`, and
+/// returns its responses in order, each one line of stdout.
+fn serve_bytes(config: &Path, flags: &[&str], input: &[u8]) -> Vec<Value> {
     let dir = config.parent().unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_himalaya"))
         .args(["-c", config.to_str().unwrap(), "mcp"])
@@ -65,9 +66,7 @@ fn serve(config: &Path, flags: &[&str], requests: &[Value]) -> Vec<Value> {
         .unwrap();
 
     let mut stdin = child.stdin.take().unwrap();
-    for request in requests {
-        writeln!(stdin, "{request}").unwrap();
-    }
+    stdin.write_all(input).unwrap();
     drop(stdin);
 
     let output = child.wait_with_output().unwrap();
@@ -80,8 +79,19 @@ fn serve(config: &Path, flags: &[&str], requests: &[Value]) -> Vec<Value> {
     String::from_utf8(output.stdout)
         .unwrap()
         .lines()
-        .map(|line| serde_json::from_str(line).unwrap())
+        .map(|line| serde_json::from_str(line).unwrap_or_else(|err| panic!("{err}: {line}")))
         .collect()
+}
+
+/// Runs a server with the given flags over `requests`, and returns its
+/// responses in order.
+fn serve(config: &Path, flags: &[&str], requests: &[Value]) -> Vec<Value> {
+    let input: String = requests
+        .iter()
+        .map(|request| format!("{request}\n"))
+        .collect();
+
+    serve_bytes(config, flags, input.as_bytes())
 }
 
 fn call(id: u32, name: &str, arguments: Value) -> Value {
@@ -142,6 +152,67 @@ fn reading_tools_only_without_flags() {
             assert_eq!(schema["type"], "object", "{tool}");
         }
     }
+}
+
+#[test]
+fn initialize_tells_the_agent_how_to_use_the_tools() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let responses = serve(
+        &config,
+        &[],
+        &[json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": { "protocolVersion": "2025-06-18" },
+        })],
+    );
+
+    let result = &responses[0]["result"];
+    assert_eq!(result["serverInfo"]["name"], "himalaya");
+
+    let instructions = result["instructions"].as_str().unwrap_or_default();
+    for word in [
+        "envelope_list",
+        "envelope_search",
+        "attachment_download",
+        "--allow-write",
+        "--allow-send",
+    ] {
+        assert!(instructions.contains(word), "{word}: {instructions}");
+    }
+}
+
+#[test]
+fn a_message_that_is_no_request_is_refused_and_the_server_goes_on() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let mut input = Vec::new();
+    input.extend_from_slice(br#"[{"jsonrpc":"2.0","id":1,"method":"ping"}]"#);
+    input.extend_from_slice(b"\n{\"jsonrpc\":\"2.0\",\"id\":\"\xff\",\"method\":\"ping\"}\n");
+    input.extend_from_slice(br#"{"id":3,"method":"ping"}"#);
+    input.extend_from_slice(b"\n");
+    input.extend_from_slice(br#"{"jsonrpc":"2.0","id":4,"method":"ping"}"#);
+    input.extend_from_slice(b"\n");
+
+    let responses = serve_bytes(&config, &[], &input);
+    assert_eq!(responses.len(), 4, "{responses:#?}");
+
+    // A batch, then bytes that are not UTF-8, both without an id to keep.
+    assert_eq!(responses[0]["error"]["code"], -32600, "{}", responses[0]);
+    assert_eq!(responses[0]["id"], Value::Null);
+    assert_eq!(responses[1]["error"]["code"], -32700, "{}", responses[1]);
+    assert_eq!(responses[1]["id"], Value::Null);
+
+    // A request without `jsonrpc: "2.0"`, which keeps its id.
+    assert_eq!(responses[2]["error"]["code"], -32600, "{}", responses[2]);
+    assert_eq!(responses[2]["id"], 3);
+
+    assert_eq!(
+        responses[3],
+        json!({ "jsonrpc": "2.0", "id": 4, "result": {} })
+    );
 }
 
 #[test]
@@ -498,10 +569,14 @@ fn the_download_tool_takes_exactly_one_part_id() {
         ],
     );
 
-    for refused in &responses[..2] {
-        let text = refused["result"]["content"][0]["text"].as_str().unwrap();
-        assert_eq!(refused["result"]["isError"], true, "{refused}");
-        assert!(text.contains("exactly one attachment id"), "{text}");
+    // Two ids are refused by the tool's grammar, none by the command.
+    let refusals = [
+        "Argument `attachment-id` takes exactly one value",
+        "`--stdout` takes exactly one attachment id",
+    ];
+
+    for (refused, error) in responses.iter().zip(refusals) {
+        assert_eq!(refusal(refused)["error"], error, "{refused}");
     }
 
     let text = responses[2]["result"]["content"][0]["text"]

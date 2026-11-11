@@ -15,8 +15,9 @@ use std::io::{IsTerminal, Read, stdin};
 
 use anyhow::{Context, bail};
 use clap::Parser;
+use pimalaya_cli::session::check_stdin;
 
-use crate::{repl, shared::crlf};
+use crate::{error::ErrorCode, shared::crlf};
 
 /// Trailing positional resolving to a raw protocol command.
 ///
@@ -53,7 +54,7 @@ impl RawCommandArg {
             return Ok(crlf::normalize(command.as_bytes()));
         }
 
-        repl::check_stdin()?;
+        check_stdin(ErrorCode::StdinTaken)?;
 
         if !stdin().is_terminal() {
             let mut contents = Vec::new();

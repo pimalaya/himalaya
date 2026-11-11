@@ -14,12 +14,12 @@ use io_jmap::{
     rfc8620::{JMAP_CORE_CAPABILITY, request::JmapRequest},
     rfc8621::JMAP_MAIL_CAPABILITY,
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, session::check_stdin};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{jmap::client::JmapClient, repl};
+use crate::{error::ErrorCode, jmap::client::JmapClient};
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
@@ -46,7 +46,7 @@ impl JmapQueryCommand {
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")
         {
-            repl::check_stdin()?;
+            check_stdin(ErrorCode::StdinTaken)?;
 
             stdin()
                 .lock()
