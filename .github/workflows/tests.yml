@@ -47,3 +47,39 @@ jobs:
           HIMALAYA_MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
           HIMALAYA_MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
         run: 'nix develop -c cargo test --test microsoft -- --ignored credentialed::'
+  features:
+    # Each backend builds alone, so clippy runs over every feature set a
+    # packager may pick, one cache for all.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v17
+        with:
+          name: soywod
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: nix-community
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy over every feature set
+        run: |
+          set -e
+          sets=(
+            ""
+            "--all-features"
+            "--no-default-features --features rustls-ring"
+            "--no-default-features --features native-tls,jmap"
+            "--no-default-features --features rustls-ring,maildir,mbox,m2dir,pimdir"
+          )
+          for backend in imap smtp jmap gmail msgraph maildir mbox m2dir sieve pimdir; do
+            sets+=("--no-default-features --features rustls-ring,$backend")
+          done
+          for set in "${sets[@]}"; do
+            echo "::group::clippy $set"
+            read -ra flags <<< "$set"
+            nix develop -c cargo clippy --locked --all-targets "${flags[@]}" -- -D warnings
+            echo "::endgroup::"
+          done
+      - name: Test a build without SMTP
+        run: nix develop -c cargo test --locked --no-default-features --features rustls-ring,maildir
