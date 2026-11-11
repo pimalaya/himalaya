@@ -1,4 +1,4 @@
-# compose / reply / forward — test report
+# compose / reply / forward: test report
 
 Unlike the per-provider reports, the built-in `compose`, `reply` and
 `forward` composers are **provider-independent** and were validated with
@@ -16,14 +16,14 @@ All three subcommands collapse into one pure assembler,
 
 - `BuilderArgs` is plain in-memory data (from/to/cc/bcc, subject, body,
   attachments, signature).
-- `SourceArgs.raw` — the message being replied to / forwarded — is just
+- `SourceArgs.raw`: the message being replied to / forwarded: is just
   `&[u8]`. Production *fetches* those bytes from a backend, but the
   assembler only reads them, so any raw RFC 5322 fixture drives it.
 - The output is raw RFC 5322 bytes, re-parsable with mime-rs to
   assert on.
 
-The only provider-dependent parts are *outside* the builder — fetching
-the source (`reply`/`forward`) and sending / `--save` — and those are
+The only provider-dependent parts are *outside* the builder: fetching
+the source (`reply`/`forward`) and sending / `--save`: and those are
 covered by the per-provider reports (IMAP/JMAP/Gmail/Graph send).
 
 ## Coverage (10 tests)
@@ -40,7 +40,7 @@ covered by the per-provider reports (IMAP/JMAP/Gmail/Graph send).
 
 ## Findings
 
-- **Bug — `has_prefix` matched on letters only, dropping real prefixes.
+- **Bug: `has_prefix` matched on letters only, dropping real prefixes.
   FIXED.** It trimmed the colon off the prefix before comparing, so any
   subject starting with the letters `Re`/`Fwd` (`Ready to ship`,
   `Review`, `Forwarding note`) was treated as already prefixed, and the

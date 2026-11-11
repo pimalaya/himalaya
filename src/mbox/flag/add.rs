@@ -18,7 +18,8 @@ use crate::{
 
 /// Add mbox flag(s) to message(s).
 ///
-/// Adds the given flags to the status headers of each message identified by the given id(s), in one rewrite of the file.
+/// Adds the given flags to the status headers of each message identified by
+/// the given id(s), in one rewrite of the file.
 #[derive(Debug, Parser)]
 pub struct MboxFlagAddCommand {
     #[command(flatten)]

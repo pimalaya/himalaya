@@ -15,7 +15,7 @@ each variant, and fill in the report template at the end.
 - **Fake mailboxes only.** Always create a throwaway mailbox and operate
   inside it. NEVER reuse an existing mailbox: some accounts are shared
   test inboxes, others hold real mail.
-- **Two fake mailboxes** are needed — `copy`/`move` want a distinct
+- **Two fake mailboxes** are needed: `copy`/`move` want a distinct
   source and destination.
 - **Clean up.** Delete the fake mailboxes at the end. For SMTP `send`,
   address the message to the account itself, then move the delivered
@@ -33,7 +33,7 @@ each variant, and fill in the report template at the end.
 ## Fixtures
 
 Create two fake mailboxes and populate the first with messages that
-differ across every axis a command might key on — sender, subject, date,
+differ across every axis a command might key on: sender, subject, date,
 flags, recipients, and one multipart message with an attachment:
 
 ```bash
@@ -43,7 +43,7 @@ $H imap create "$A"; $H imap create "$B"   # protocol-specific create
 
 Add ~6 messages via `message add` (this doubles as the `message add`
 test). Give each a distinct `Subject`, `From`, and `Date` header (use a
-**correct weekday** — a wrong one is a good negative test, see report
+**correct weekday**: a wrong one is a good negative test, see report
 notes), set flags on some via `-f`, and include one `multipart/mixed`
 message carrying a small text attachment for the `attachment` commands.
 
@@ -73,7 +73,7 @@ an IMAP UID, `<NAME>` a mailbox name.
 | attachment column | `envelope list -m "$A" --has-attachment` (ATT `@`) |
 | json | `--json envelope list -m "$A"` |
 | empty mailbox | `envelope list -m "$B"` |
-| default mailbox | `envelope list` (no `-m` — see default-mailbox note) |
+| default mailbox | `envelope list` (no `-m`: see default-mailbox note) |
 
 ### envelope search
 
@@ -88,7 +88,7 @@ Run every condition, combinator, and sort key of the query DSL:
   --has-attachment --json`)
 
 Verify **which date field** `date`/`after` target (Date header vs server
-arrival) and whether text matching is **substring or word-based** — both
+arrival) and whether text matching is **substring or word-based**: both
 are server-defined; record them.
 
 ### message add
@@ -134,7 +134,7 @@ are server-defined; record them.
 | move | `message move -f "$A" -t "$B" <ID>` (gone from source) |
 | error: no `--to` | `message copy -f "$A" <ID>` |
 | non-existent id | `message copy -f "$A" -t "$B" 999` (watch the message!) |
-| default source | `message copy -t "$B" <ID>` (no `-f` — see note) |
+| default source | `message copy -t "$B" <ID>` (no `-f`: see note) |
 
 ### attachment list / download
 
@@ -163,7 +163,7 @@ the delivered inbox copy to Trash during cleanup.
 
 ## Protocol-specific API (per backend)
 
-After the shared commands, exercise the backend's raw API — for IMAP/SMTP
+After the shared commands, exercise the backend's raw API: for IMAP/SMTP
 that is `himalaya imap …` / `himalaya smtp …`. These expose the protocol
 verbatim, so the flags differ from the shared enum-driven ones.
 
@@ -171,7 +171,7 @@ verbatim, so the flags differ from the shared enum-driven ones.
   `create`/`delete`/`rename`/`subscribe`/`unsubscribe`;
   `list` (default `LSUB` = subscribed only, `-A` = `LIST` all, `-p`
   pattern); `status`; `flags`; `select`/`close`/`unselect`
-  (`close`/`unselect` need a live selection — expect an error one-shot);
+  (`close`/`unselect` need a live selection: expect an error one-shot);
   `append <mbox> -f <flag> -- <msg>`; `fetch <seq> --envelope
   --structure --flags --internal-date --size [--seq]`; `search` (every
   `--from/--subject/--since/--larger/--seen/…` key, plus `--seq`);
@@ -192,7 +192,7 @@ verbatim, so the flags differ from the shared enum-driven ones.
   `email get/query/read/update/delete/export/import/parse` (`update
   --add/remove-keyword|--add/remove-mailbox`); `thread get`; `identity
   get/create/update/delete` (clean up created identities!);
-  `submission create --identity-id --mail-from --rcpt-to` (real send —
+  `submission create --identity-id --mail-from --rcpt-to` (real send:
   the object may be transient, verify by inbox delivery);
   `vacation-response get/set` (may be `403`/unsupported per provider).
   Mailboxes are opaque ids: get them from `mailbox list --json` or
@@ -207,12 +207,12 @@ verbatim, so the flags differ from the shared enum-driven ones.
   (`get --format metadata|raw|full`; `modify --add/remove-label`);
   `attachments get <msg> <attachmentId> -o` (needs the raw id from
   `messages get --format full`; small attachments are inlined and have
-  none — use the shared `attachment download`); `drafts
+  none: use the shared `attachment download`); `drafts
   create/list/get/update/send/delete`; `threads
   list/get/modify/trash/untrash/delete`; `history list
   --start-history-id`; `settings <imap|pop|language|vacation|
   auto-forwarding> get`, `settings <send-as|filters|
-  forwarding-addresses|delegates> list` (writes mutate the account —
+  forwarding-addresses|delegates> list` (writes mutate the account:
   test with care). Labels are opaque ids: `mailbox list` /
   `gmail labels list`. Shared `-m` currently needs the label **id**, not
   its name; `message add` / `envelope search` are unsupported.
@@ -245,7 +245,7 @@ $H imap delete "$A"; $H imap delete "$B"
 Copy this into `cairn/spec/testing/<backend>-<provider>.md`:
 
 ```markdown
-# <BACKEND> on <PROVIDER> — shared-command test report
+# <BACKEND> on <PROVIDER>: shared-command test report
 
 - himalaya: <version + build rev>
 - account: <name> (<backend blocks>)

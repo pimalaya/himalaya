@@ -16,7 +16,9 @@ use crate::{
 
 /// Move mbox message(s) to another mbox.
 ///
-/// Appends each message identified by the given id(s) to the target, then removes it from the source. An interruption leaves the messages in both files, never in neither.
+/// Appends each message identified by the given id(s) to the target, then
+/// removes it from the source. An interruption leaves the messages in both
+/// files, never in neither.
 #[derive(Debug, Parser)]
 pub struct MboxMessageMoveCommand {
     #[command(flatten)]

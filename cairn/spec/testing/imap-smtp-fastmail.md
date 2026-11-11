@@ -1,4 +1,4 @@
-# IMAP + SMTP on Fastmail — shared-command test report
+# IMAP + SMTP on Fastmail: shared-command test report
 
 - himalaya: `v2.0.0-alpha.1 +imap +smtp +rustls-ring` (rev `1dddbe8`,
   working tree with the shared-JMAP / CRLF / date fixes applied)
@@ -37,14 +37,14 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
 
 ### Bugs / issues
 
-- **F1 — empty message is not validated client-side. FIXED.**
+- **F1: empty message is not validated client-side. FIXED.**
   `message add -m "$A" -- ''` used to reach the server and fail with
   `IMAP APPEND failed: NO Zero-length message literal`. `MessageArg`
   now resolves the message first and rejects an empty result uniformly
   (positional `''`, empty file, empty stdin) with `Error: Message is
   empty`; a TTY with no input gives `No message provided: …`.
 
-- **F2 — no-op copy/move reported success. FIXED.** IMAP `UID COPY`/
+- **F2: no-op copy/move reported success. FIXED.** IMAP `UID COPY`/
   `UID MOVE` of a UID that does not exist is a server no-op that returns
   `OK`, so himalaya used to print `Message(s) successfully copied/moved`
   although nothing moved. `copy_messages`/`move_messages` now return the
@@ -55,12 +55,12 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
   the requested count); JMAP uses `Email/set.updated`; the other
   backends error per id, so their success count equals the request.
   - Sub-fix in **io-imap**: MOVE's `COPYUID` arrives in an *untagged*
-    `OK` (RFC 6851 §4.4), which the coroutine ignored — it only read the
-    tagged reply — so every successful move reported `0`. `move.rs` now
+    `OK` (RFC 6851 §4.4), which the coroutine ignored: it only read the
+    tagged reply: so every successful move reported `0`. `move.rs` now
     also scans untagged codes (+ a regression test). himalaya
     path-patches io-imap until a release >0.2.0 ships this.
 
-- **F3 — inconsistent default-mailbox resolution across shared
+- **F3: inconsistent default-mailbox resolution across shared
   commands. FIXED.** `copy`/`move` used to hardcode
   `#[arg(default_value = "Inbox")]` on `--from`, silently selecting the
   literal INBOX, while `envelope list`/`search` required
@@ -73,15 +73,15 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
 
 ### Provider-specific behaviour (not bugs)
 
-- **P1 — Fastmail search is word/token-based, not substring.**
+- **P1: Fastmail search is word/token-based, not substring.**
   `from ali`, `subject nline`, single letters `subject e` / `subject a`
   all return 0; whole words (`from alice`, `subject inline`,
   `subject Eta`) match. The trace shows himalaya issues the correct
   `SEARCH SUBJECT "e"` (inside a UID `SORT`); Fastmail's full-text index
-  decides matching. Users expecting substring search will be surprised —
+  decides matching. Users expecting substring search will be surprised:
   worth documenting per provider (Dovecot-based servers may differ).
 
-- **P2 — `date`/`after` target the `Date:` header (sent date), not
+- **P2: `date`/`after` target the `Date:` header (sent date), not
   server arrival.** Freshly-appended messages (all with today's
   INTERNALDATE) still filtered by their `Date:` header:
   `after 2026-07-16` returned only the 17th-dated messages,
@@ -89,7 +89,7 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
   RFC 2822 date parser (and the wrong-weekday tolerance fix) load-bearing
   for search correctness.
 
-- **P3 — omitting `-m` needs `mailbox.alias.inbox`.** By design there is
+- **P3: omitting `-m` needs `mailbox.alias.inbox`.** By design there is
   no universal inbox default (JMAP's inbox is an opaque id), so the
   fallback requires an explicit alias; without it the error is clear and
   actionable. Set `mailbox.alias.inbox = "Inbox"` to use bare `-m`-less
@@ -97,15 +97,15 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
 
 ### Observations
 
-- **O1 — `message read --json`** emits the raw `mail_parser` `Message`
+- **O1: `message read --json`** emits the raw `mail_parser` `Message`
   structure (byte offsets, nested `parts`), which is low-level compared
   to the clean `envelope list --json` shape. Fine for machine use, but
   not an obvious public contract.
-- `message read` uses `BODY.PEEK[]` — reading does not set `\Seen`.
+- `message read` uses `BODY.PEEK[]`: reading does not set `\Seen`.
 - `attachment download` de-duplicates filename collisions on disk
   (`note.txt` → `note (1).txt`).
 - `forward` quotes the original body with `> …` (like a reply) rather
-  than a `-------- Forwarded message --------` block — a stylistic
+  than a `-------- Forwarded message --------` block: a stylistic
   choice, flagged for awareness.
 - Flag table symbols: `*` = unseen, `!` = flagged, blank = seen.
 

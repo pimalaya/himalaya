@@ -1,8 +1,8 @@
-# IMAP on iCloud — test report
+# IMAP on iCloud: test report
 
 Shared cross-protocol commands (and IMAP-specific spot-checks) on the
 IMAP backend against **iCloud** (`imaps://imap.mail.me.com`, app-specific
-password). The account is **IMAP-only** — no SMTP block is configured —
+password). The account is **IMAP-only**: no SMTP block is configured:
 so `compose`/`send`/`reply`/`forward` were out of scope for this run.
 
 - himalaya: 2.0.0-alpha.1 (rev fcf5b76)
@@ -22,7 +22,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
 | `envelope list` (default) | no `-m` | pass (clear error: no `mailbox.alias.inbox`) |
 | `envelope search` | `from/to/subject/body/flag/date/after` | pass |
 | `envelope search` | `and/or/not`, `( … )` grouping | pass (see grouping note) |
-| `envelope search` | `order by …` | **FAIL** — sorting ignored (see Bugs) |
+| `envelope search` | `order by …` | **FAIL**: sorting ignored (see Bugs) |
 | `message add` | inline, file, stdin, flags, `--json`, errors | pass |
 | `message read` | pretty, multipart, `--raw`, `--json`, error, PEEK | pass |
 | `flag add/set/remove` | multi-flag, multi-id, set-replaces, errors | pass |
@@ -30,31 +30,31 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
 | `attachment list/download` | multipart, none, download, `--json` | pass |
 | `imap` specific | `id`, `fetch`, `search`, `store` (keyword), `create/delete` | pass |
 | `imap thread` | `-A references` | fail by design (no THREAD capability) |
-| SMTP (`compose/send/reply/forward`) | — | not tested (no SMTP configured) |
+| SMTP (`compose/send/reply/forward`) | - | not tested (no SMTP configured) |
 
 ## Findings
 
 ### Bugs / issues
 
-- **`order by` / `imap sort` is silently ignored — iCloud's server SORT is
+- **`order by` / `imap sort` is silently ignored: iCloud's server SORT is
   a no-op (provider bug).** iCloud advertises `SORT ESORT CONTEXT=SORT`,
   so himalaya's default policy (`sort_fallback = !has(SORT)`) trusts it and
   issues a server `SORT`. The wire trace shows himalaya sending a correct
   `UID SORT (REVERSE DATE) UTF-8 ALL` and iCloud replying `* SORT 1 2 3 4 5
-  6` — i.e. plain UID-ascending order, **ignoring both the key and
+  6`: i.e. plain UID-ascending order, **ignoring both the key and
   REVERSE** (`-S subject` likewise came back in UID order, not
   alphabetical). himalaya relays the server order faithfully; the fault is
   iCloud's. Every sort key/direction therefore returns the same UID order.
 
 - **The client-side sort fallback mis-ordered the `date` key (io-imap
-  bug — now FIXED).** Under `imap.sort.fallback = true` himalaya sorts
+  bug: now FIXED).** Under `imap.sort.fallback = true` himalaya sorts
   locally (SEARCH + FETCH + sort). Subject ordering was already correct,
   but **date** ordering came back by **weekday name, lexically** (`Fri,
   Mon, Sat, Thu, Tue, Wed`): `io_imap::rfc5256::sort::cmp_fetch_items`
   compared the **raw `Date:` header** (`envelope.date`, a byte string)
   rather than a parsed instant. Fixed by parsing the header through
   `chrono::DateTime::parse_from_rfc2822` (new `date_sort_key` helper;
-  unparsable/absent dates sort first). Arrival was never affected — its
+  unparsable/absent dates sort first). Arrival was never affected: its
   `InternalDate` is already a `chrono::DateTime`. Verified against iCloud
   after the fix: `order by date asc` → chronological `1 2 3 4 5 6`, `desc`
   → `6 5 4 3 2 1`, subject unchanged. The default `envelope list` was
@@ -66,7 +66,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
   `\Deleted` + EXPUNGE fallback; the move succeeded and the source UID was
   gone afterwards, with an accurate `1 message successfully moved`.
 - **No THREAD capability.** `imap thread` fails with `BAD Parse Error`
-  (iCloud rejects the command) — expected, not a himalaya fault.
+  (iCloud rejects the command): expected, not a himalaya fault.
 - **Custom keywords are accepted.** Raw `imap store <id> --action add -f
   keywordtest` succeeded and the keyword showed up in `fetch --flags`. (The
   *shared* `flag` command still rejects non-standard flags at the CLI enum,
@@ -76,7 +76,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
   than assuming a literal `INBOX`.
 - **`date` search targets the `Date:` header** (SENTON), not arrival: a
   message appended today but dated 2026-07-15 matched `date 2026-07-15`.
-- **`after`** is strict — `after 2026-07-16` excluded the message dated
+- **`after`** is strict: `after 2026-07-16` excluded the message dated
   2026-07-16 (matched only later ones).
 - **`envelope search` grouping requires glued parens.** `(from a or from
   b)` parses; `( from a or from b )` (a bare `(` argv token, which himalaya
@@ -100,7 +100,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
 ## Verdict
 
 The IMAP backend is **functionally solid on iCloud** for the whole shared
-surface — list, search (conditions/combinators/grouping), add, read,
+surface: list, search (conditions/combinators/grouping), add, read,
 flags, copy, the MOVE-less move fallback, and attachments all behave
 correctly. **Sorting** needed one config knob plus one code fix:
 

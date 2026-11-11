@@ -60,7 +60,7 @@ all tracked for release; everything else was himalaya-side.
 
 The iCloud run ([imap-icloud.md](imap-icloud.md)) surfaced two sort
 issues: iCloud's server SORT is a no-op (advertised but ignores key +
-REVERSE — a provider bug; workaround `imap.sort.fallback = true`), and the
+REVERSE: a provider bug; workaround `imap.sort.fallback = true`), and the
 io-imap client-side sort fallback ordered the `date` key by the raw
 `Date:` header string lexically instead of chronologically. The latter is
 **fixed** in io-imap (`cmp_fetch_items` now parses the header via

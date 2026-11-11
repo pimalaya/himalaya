@@ -1,4 +1,4 @@
-# JMAP on Fastmail — shared-command test report
+# JMAP on Fastmail: shared-command test report
 
 Shared cross-protocol commands on the JMAP backend. Companion:
 [jmap-specific-fastmail.md](jmap-specific-fastmail.md) (the `jmap …` raw
@@ -39,21 +39,21 @@ by their display **name** and resolve to the opaque id transparently.
 
 ### Behaviour / config (not bugs)
 
-- **J1 — `envelope search` attached short flags land in the query.**
+- **J1: `envelope search` attached short flags land in the query.**
   `envelope search -m A -s20 order by date asc` fails with `cannot parse
   search emails query \`-s20\``: the trailing `[QUERY]...` positional
   swallows the attached `-s20`. The spaced `-s 20` and `--page-size 20`
   both work. Inconsistent with `envelope list` (no trailing positional),
-  where `-s20` is fine — worth documenting, and a candidate for a clap
+  where `-s20` is fine: worth documenting, and a candidate for a clap
   tweak. Not a JMAP/logic bug: sort + pagination work with the spaced
   form.
 
-- **J2 — copy/move counts, bogus ids.** F2 counts work on JMAP
+- **J2: copy/move counts, bogus ids.** F2 counts work on JMAP
   (`Email/set.updated`): `1 message successfully copied`, etc. A bogus id
   **errors** (`Email/set failed for: <id>`, via `bail_on_not_updated`)
-  rather than the IMAP no-op — stricter, and fine.
+  rather than the IMAP no-op: stricter, and fine.
 
-- **J3 — JMAP send config is now auto-discovered. FIXED.** `message
+- **J3: JMAP send config is now auto-discovered. FIXED.** `message
   send` / `compose --send` used to fail with `JMAP \`identity_id\` is
   required to send` because this account sets only server + token. The
   JMAP backend now falls back when those config fields are omitted: the
@@ -79,6 +79,6 @@ by their display **name** and resolve to the opaque id transparently.
 Shared commands on JMAP are **solid and release-ready**: every command
 and flag works, addressing mailboxes by name via the id resolver, table
 + JSON output correct, errors clean. No functional blocker. J1 is a
-minor CLI-ergonomics nit (left in docs); J3 is **fixed** — JMAP send now
+minor CLI-ergonomics nit (left in docs); J3 is **fixed**: JMAP send now
 works from a minimal server + token account by auto-discovering the
 identity and drafts mailbox.

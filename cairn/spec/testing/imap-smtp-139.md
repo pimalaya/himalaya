@@ -1,10 +1,10 @@
-# IMAP + SMTP on 139 Mail — test report
+# IMAP + SMTP on 139 Mail: test report
 
 Shared cross-protocol commands on the IMAP/SMTP backend against **139 Mail**
 (China Mobile). Method: [provider-test-plan.md](provider-test-plan.md).
 
 - himalaya: `v2.2.1 +imap +smtp +native-tls` (rev `4df380b`)
-- account: `mobile` — IMAP `imaps://imap.139.com:993`, SMTP
+- account: `mobile`: IMAP `imaps://imap.139.com:993`, SMTP
   `smtps://smtp.139.com:465`, SASL LOGIN with authorization code
 - date: 2026-10-18
 - server: China Mobile Mail; Chinese mailbox names (草稿箱, 已发送, 已删除,
@@ -52,11 +52,11 @@ smtp.sasl.login.password.raw = "***"
 
 ### Bugs / issues
 
-*(none confirmed — all failures are transient or provider-specific)*
+*(none confirmed: all failures are transient or provider-specific)*
 
 ### Provider-specific behaviour (not bugs)
 
-- **P1 — TLS compatibility.** `imap.139.com:993` fails TLS handshake with
+- **P1: TLS compatibility.** `imap.139.com:993` fails TLS handshake with
   `rustls-ring` (himalaya's default TLS provider). The exact error:
 
   ```
@@ -84,37 +84,37 @@ smtp.sasl.login.password.raw = "***"
   - `rustls-ring`: IMAP FAIL (`HandshakeFailure`), SMTP OK
   - `native-tls`: IMAP OK, SMTP OK
 
-- **P2 — Mailbox counts not supported.** `mailbox list --counts` shows empty
+- **P2: Mailbox counts not supported.** `mailbox list --counts` shows empty
   TOTAL and UNREAD columns for all folders. The 139 server likely does not
   support the IMAP STATUS command or returns empty values. The envelope list
   and other commands work normally.
 
-- **P3 — Text search ignores criteria.** `envelope search -- subject "Test"`
+- **P3: Text search ignores criteria.** `envelope search -- subject "Test"`
   returns all messages in the mailbox, not just those matching the subject.
   The search criteria appears to be silently ignored. Flag-based search
   (`-- flag seen`) works correctly. This differs from QQ and 163 Mail, where
   text search returns 0 results; on 139, it returns everything.
 
-- **P4 — Transient COPY error.** One `message move` operation failed with
+- **P4: Transient COPY error.** One `message move` operation failed with
   `IMAP COPY failed: NO COPY errno:1407, user maillist null`. This appears to
   be a server-side transient error. The message was still removed from the
   source folder on retry.
 
-- **P5 — Transient FETCH error on reply.** The first `message reply` attempt
+- **P5: Transient FETCH error on reply.** The first `message reply` attempt
   failed with `FETCH returned no body for the requested message`. The same
   message was readable via `message read`, and `message forward` on the same
   message succeeded. A retry of `message reply` succeeded. This suggests a
   server-side transient issue, possibly related to session state or caching.
 
-- **P6 — Chinese mailbox names.** 139 Mail uses Chinese names for default
+- **P6: Chinese mailbox names.** 139 Mail uses Chinese names for default
   folders: 草稿箱 (Drafts), 已发送 (Sent), 已删除 (Trash), 垃圾邮件 (Junk).
   Modified UTF-7 encoding is handled correctly.
 
-- **P7 — APPEND preserves flags.** Unlike QQ Mail (which auto-sets `\Seen` on
+- **P7: APPEND preserves flags.** Unlike QQ Mail (which auto-sets `\Seen` on
   APPEND), 139 Mail correctly preserves the requested flags. Messages added
   with `-f seen` show as seen; messages added without flags show as unseen.
 
-- **P8 — Non-sequential UIDs.** The server assigns UIDs with gaps (e.g. 10150,
+- **P8: Non-sequential UIDs.** The server assigns UIDs with gaps (e.g. 10150,
   10152, 10154). This is valid IMAP behaviour but differs from other providers
   that assign sequential UIDs.
 

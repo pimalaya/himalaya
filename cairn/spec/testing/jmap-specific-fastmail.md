@@ -1,7 +1,7 @@
-# JMAP *specific* API on Fastmail — test report
+# JMAP *specific* API on Fastmail: test report
 
 Companion to [jmap-fastmail.md](jmap-fastmail.md) (shared commands). This
-exercises `himalaya jmap …` — the raw JMAP method surface.
+exercises `himalaya jmap …`: the raw JMAP method surface.
 
 - himalaya: `v2.0.0-alpha.1 +jmap +rustls-ring` (working tree)
 - account: `fastmail-jmap`
@@ -33,7 +33,7 @@ exercises `himalaya jmap …` — the raw JMAP method surface.
 | `jmap identity create/update/delete` | round-trip | ✅ |
 | `jmap submission create` | `--identity-id --mail-from --rcpt-to` → send | ✅ delivered (K2) |
 | `jmap submission get/query/cancel` | by id / filter | ✅ but transient (K2) |
-| `jmap vacation-response get/set` | — | ⚠️ 403 on Fastmail (K3) |
+| `jmap vacation-response get/set` | - | ⚠️ 403 on Fastmail (K3) |
 
 JMAP send genuinely works via `jmap submission create` using the account
 identity (id `178831439`, `pimalaya@fastmail.org`): status `final`, the
@@ -44,7 +44,7 @@ shared `message send` that J3 (shared report) blocks on missing config.
 
 ### Behaviour (not bugs)
 
-- **K1 — `jmap mailbox query` defaulted to subscribed-only. FIXED.**
+- **K1: `jmap mailbox query` defaulted to subscribed-only. FIXED.**
   himalaya (not JMAP) was sending `isSubscribed: true` unless `--all`, so
   `--name Himalaya` returned `{"mailboxes":[]}` for the unsubscribed fake
   mailboxes while the raw `Mailbox/query {filter:{name:"Himalaya"}}`
@@ -54,22 +54,22 @@ shared `message send` that J3 (shared report) blocks on missing config.
   (`--all` removed). Verified: `--name X` now matches unsubscribed
   mailboxes; `--name X --subscribed` correctly excludes them.
 
-- **K2 — Fastmail does not retain EmailSubmission objects.**
+- **K2: Fastmail does not retain EmailSubmission objects.**
   `submission create` succeeds and delivers, returning the object with a
   short id (e.g. `S39`), `undoStatus: final`, and `emailId`/`identityId`
   echoed as `null` (Fastmail's `EmailSubmission/set` create response only
-  returns server-set fields — hence the blank columns). A *later*
+  returns server-set fields: hence the blank columns). A *later*
   `submission get <id>` / `query` (a separate JMAP session) returns
   `{"submissions":[]}`, and `cancel` → `notFound`. This is **not** a
   consequence of the CLI running one operation per invocation: JMAP
-  objects normally persist across sessions and could be fetched later —
+  objects normally persist across sessions and could be fetched later:
   Fastmail simply discards the submission once it reaches `final`. And
   `cancel` needs `undoStatus: pending` (a send-undo window), which
   Fastmail's immediate send never provides. On a server with delayed
   send + retention, `get`/`cancel` across invocations would work. The
   send itself is confirmed by inbox delivery.
 
-- **K3 — vacation response unsupported on Fastmail.**
+- **K3: vacation response unsupported on Fastmail.**
   `jmap vacation-response get/set` → `Vacation response is not supported
   by the server`; the raw `VacationResponse/get` returns `HTTP 403`.
   Fastmail does not grant the `urn:ietf:params:jmap:vacationresponse`
@@ -89,7 +89,7 @@ shared `message send` that J3 (shared report) blocks on missing config.
 The raw JMAP surface is **complete and works end-to-end** on Fastmail:
 mailbox/email/thread/identity/submission methods all behave per RFC 8620/
 8621, including real message submission. K1 (subscribed default) is
-**fixed** — `jmap mailbox query` now mirrors native `Mailbox/query` and
+**fixed**: `jmap mailbox query` now mirrors native `Mailbox/query` and
 lists all by default. K2/K3 are Fastmail-side behaviours handled
 cleanly. `email copy` (cross-account) is the only untested cell, for
 lack of a second account. No functional blocker.

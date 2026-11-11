@@ -18,7 +18,8 @@ use crate::{
 
 /// Remove mbox flag(s) from message(s).
 ///
-/// Removes the given flags from the status headers of each message identified by the given id(s), in one rewrite of the file.
+/// Removes the given flags from the status headers of each message
+/// identified by the given id(s), in one rewrite of the file.
 #[derive(Debug, Parser)]
 pub struct MboxFlagRemoveCommand {
     #[command(flatten)]

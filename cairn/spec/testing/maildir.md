@@ -1,4 +1,4 @@
-# Maildir (local) — shared-command test report
+# Maildir (local): shared-command test report
 
 Shared cross-protocol commands on the Maildir backend. Companion:
 [maildir-specific.md](maildir-specific.md) (the `maildir …` raw API).
@@ -39,7 +39,7 @@ throwaway Maildir tree in `/tmp`.
 
 ### Bugs
 
-- **D1 — the mailbox id from `mailbox list` (and an absolute `inbox`
+- **D1: the mailbox id from `mailbox list` (and an absolute `inbox`
   alias) were not usable as a selector. FIXED.** `mailbox list` prints
   each mailbox id as its absolute path, but feeding one back
   (`envelope list -m /tmp/himalaya-maildir/Archive`) failed `path
@@ -63,11 +63,11 @@ throwaway Maildir tree in `/tmp`.
   Gmail and Graph backends which bail.
 - The root maildir is INBOX; `mailbox list` shows its `name` as the root
   directory's basename (e.g. `himalaya-maildir`). Select it by the
-  `inbox` alias, by `.`, or by its full path — not by that basename
+  `inbox` alias, by `.`, or by its full path: not by that basename
   (there is no `<root>/<basename>` folder). Subfolders are addressed by
   their relative name (`-m Archive`, `-m Projects/Work`).
 - `message send` bails with `No send-capable backend (JMAP/Gmail/Graph)
-  or SMTP is configured` — correct: Maildir cannot send, and the fixture
+  or SMTP is configured`: correct: Maildir cannot send, and the fixture
   has no `[smtp]` block. Add `[smtp]` to send from a Maildir account.
 - `flag`/`copy`/`move` write straight to the Maildir filename info
   section (`:2,` + `S`/`R`/`F`/`D`/`T`/`P`) and re-deliver copied/moved

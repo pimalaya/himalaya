@@ -1,7 +1,7 @@
-# Microsoft Graph *specific* API on Outlook — test report
+# Microsoft Graph *specific* API on Outlook: test report
 
 Companion to [msgraph.md](msgraph.md) (shared commands). Exercises
-`himalaya msgraph …` — the raw Microsoft Graph mail surface (profile,
+`himalaya msgraph …`: the raw Microsoft Graph mail surface (profile,
 mail folders, messages, attachments).
 
 - himalaya: `v2.0.0-alpha.1 +msgraph +rustls-ring` (working tree)
@@ -33,28 +33,28 @@ mail folders, messages, attachments).
 | `attachments get` | `<msg> <att-id> -o` | ✅ |
 
 Not separately exercised here: `mail-folders child-folders`, `copy`,
-`move` (folder-level), and `attachments create`/`delete` — same request
+`move` (folder-level), and `attachments create`/`delete`: same request
 shapes as the verified verbs.
 
 ## Findings
 
 ### Behaviour / usability
 
-- **M2 — `msgraph profile get --json` is now structured. FIXED.** It
+- **M2: `msgraph profile get --json` is now structured. FIXED.** It
   used to emit `{"message":"Id: …\n…"}` because the command formatted a
   plain `String` into a `Message` (which serializes as `{"message":
-  …}`) — the same shape Gmail's `profile get` had before its fix. A
+  …}`): the same shape Gmail's `profile get` had before its fix. A
   dedicated `MsgraphProfileOutput { id, display-name, mail,
   user-principal-name }` (Display + Serialize) replaces it, so `--json`
   now emits
   `{"id":"…","display-name":"…","mail":"…","user-principal-name":"…"}`
   and the text output is unchanged.
 
-- **M3 — moving a *just-copied* message can 405.** `msgraph messages move
+- **M3: moving a *just-copied* message can 405.** `msgraph messages move
   <id> <dest>` on the id returned directly by `msgraph messages copy`
   fails `HTTP 405 (ErrorInvalidRequest): The OData request is not
   supported`. The command is byte-identical to the shared `message move`
-  (both call `message_move`) and works on any settled message id — the
+  (both call `message_move`) and works on any settled message id: the
   405 comes from Graph itself, whose `copy` is **asynchronous**: the id
   it returns points at a copy still materialising and is not yet
   operable. Not a himalaya bug; re-list the destination folder to get the
@@ -62,7 +62,7 @@ shapes as the verified verbs.
 
 - `msgraph messages create --folder` and `messages list --folder` take a
   raw folder id or a Graph *well-known* name (`inbox`, `drafts`, …), not
-  a display name — the specific commands mirror the REST path and do not
+  a display name: the specific commands mirror the REST path and do not
   run the shared name→id resolver (that is `msgraph.md`'s M1, a
   shared-layer convenience). This is the established raw-vs-shared split;
   the friendly path is the shared `envelope list -m <name>`.

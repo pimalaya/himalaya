@@ -1,4 +1,4 @@
-# Microsoft Graph on Outlook — shared-command test report
+# Microsoft Graph on Outlook: shared-command test report
 
 Shared cross-protocol commands on the Microsoft Graph backend.
 Companion: [msgraph-specific.md](msgraph-specific.md) (the `msgraph …`
@@ -8,7 +8,7 @@ inside a throwaway Graph mail folder.
 - himalaya: `v2.0.0-alpha.1 +msgraph +rustls-ring` (working tree)
 - account: `msgraph` (Microsoft Graph REST API, OAuth via `ortie token
   show -a msgraph`; a bearer token scoped to `https://graph.microsoft.com`
-  mail permissions — `Mail.ReadWrite`, `Mail.Send`)
+  mail permissions: `Mail.ReadWrite`, `Mail.Send`)
 - date: 2026-07-18
 - account locale: French (folder display names are localised, e.g.
   `Boîte de réception` for the inbox), which makes the name→id issue easy
@@ -26,8 +26,8 @@ inside a throwaway Graph mail folder.
 | --- | --- | --- |
 | `mailbox list` | base (folders + counts) | ✅ |
 | `envelope list` | by folder **name**, by id, well-known name, `-s`, `--json` | ✅ (name resolves, M1 fixed) |
-| `envelope search` | — | ⚪ Graph has no shared search (bails cleanly) |
-| `message add` | — | ⚪ Graph has no append (bails cleanly) |
+| `envelope search` | - | ⚪ Graph has no shared search (bails cleanly) |
+| `message add` | - | ⚪ Graph has no append (bails cleanly) |
 | `message read` | pretty, `--json` (folder ignored) | ✅ |
 | `flag add/set/remove` | seen/flagged/importance → Graph scalar fields | ✅ |
 | `message copy` / `move` | `--from`/`--to` by name, F2 counts | ✅ |
@@ -38,7 +38,7 @@ inside a throwaway Graph mail folder.
 
 ### Bugs
 
-- **M1 — shared `-m <folder-name>` now resolves to a folder id. FIXED.**
+- **M1: shared `-m <folder-name>` now resolves to a folder id. FIXED.**
   `envelope list -m "Boîte de réception"` (a localised display name) used
   to fail `HTTP 400 (ErrorInvalidIdMalformed): Id is malformed`; only the
   opaque id or an English well-known name (`inbox`) worked. Graph mail
@@ -57,7 +57,7 @@ inside a throwaway Graph mail folder.
   JMAP `get_message` and the Gmail backend).
 - `message add` and `envelope search` bail with clear messages
   (`Microsoft Graph does not support adding messages` / `… the shared
-  envelope search`) — Graph has no MIME append and no server-side
+  envelope search`): Graph has no MIME append and no server-side
   shared-query search (its own `$search`/`$filter` live on the specific
   `msgraph messages list`).
 - `flag`/`copy`/`move` map onto Graph's model: `seen` = `isRead`,

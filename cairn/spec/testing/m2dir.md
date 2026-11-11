@@ -1,4 +1,4 @@
-# m2dir (local) — shared-command test report
+# m2dir (local): shared-command test report
 
 Shared cross-protocol commands on the m2dir backend. Companion:
 [m2dir-specific.md](m2dir-specific.md) (the `m2dir …` raw API). Method:
@@ -42,7 +42,7 @@ m2store in `/tmp`.
 
 ### Bugs
 
-- **E1 — shared `-m <folder-name>` did not resolve. FIXED.**
+- **E1: shared `-m <folder-name>` did not resolve. FIXED.**
   `envelope list -m Inbox` failed `path Inbox is not a directory`; only
   the absolute path from `mailbox list` (`-m /tmp/himalaya-m2dir/Inbox`)
   worked. io-m2dir's `open_m2dir` takes a filesystem path as-is, and the
@@ -67,10 +67,10 @@ m2store in `/tmp`.
 - Flags live in the `.meta/<id>.flags` sidecar, one per line; removing
   the last flag deletes the sidecar. The shared layer writes the IANA
   spelling (`\Seen`, `\Flagged`), while the raw `m2dir flag` command
-  writes the bare token (`seen`) — both are valid arbitrary-string m2dir
+  writes the bare token (`seen`): both are valid arbitrary-string m2dir
   flags.
 - `message send` bails with `No send-capable backend (JMAP/Gmail/Graph)
-  or SMTP is configured` — correct: m2dir cannot send. Add `[smtp]` to
+  or SMTP is configured`: correct: m2dir cannot send. Add `[smtp]` to
   send from an m2dir account.
 
 ## Verdict

@@ -1,4 +1,4 @@
-# IMAP + SMTP *specific* API on Fastmail — test report
+# IMAP + SMTP *specific* API on Fastmail: test report
 
 Companion to [imap-smtp-fastmail.md](imap-smtp-fastmail.md) (which covers
 the shared commands). This one exercises the raw protocol commands under
@@ -42,7 +42,7 @@ the shared commands). This one exercises the raw protocol commands under
 
 ### Bugs / issues
 
-- **G1 — `imap append`/`imap store` `-f` takes *raw* flag tokens, not
+- **G1: `imap append`/`imap store` `-f` takes *raw* flag tokens, not
   the shared `seen|answered|flagged|draft` enum.** `imap append -f seen`
   stores a **keyword** `seen`, not the system flag `\Seen`; likewise
   `-f flagged` → keyword `flagged`. Consequences verified:
@@ -54,13 +54,13 @@ the shared commands). This one exercises the raw protocol commands under
   **footgun**: the flag *names* collide with the shared `-f` enum
   (`message add -f seen` → `\Seen`) while the *meaning* differs, and the
   `--help` listed no possible values and gave no warning. **Resolved by
-  documentation** (per owner decision — it is deliberately the raw API,
+  documentation** (per owner decision: it is deliberately the raw API,
   not the shared one): the `-f` help on `imap append` and `imap store`
   now states that flags are raw IMAP tokens, that a bare word becomes a
   keyword, that system flags need the backslash (`-f '\Seen'`), and
   points to the shared `message add`/`flag add` for the enum behaviour.
 
-- **F2 (inherited) — raw `imap copy`/`move` of a non-existent UID
+- **F2 (inherited): raw `imap copy`/`move` of a non-existent UID
   reported success. FIXED at the shared layer** (see the shared report's
   F2), including the io-imap untagged-MOVE-`COPYUID` sub-fix. The raw
   `imap copy`/`move` still print the generic `Message(s) successfully …`,
@@ -69,16 +69,16 @@ the shared commands). This one exercises the raw protocol commands under
 
 ### Provider / protocol behaviour (not bugs)
 
-- **B1 — `imap list` defaults to `LSUB` (subscribed mailboxes only);
+- **B1: `imap list` defaults to `LSUB` (subscribed mailboxes only);
   `-A` switches to `LIST` (all).** A freshly `create`d mailbox is not
   auto-subscribed, so it is invisible to bare `imap list` until
   `imap subscribe`; `imap list -A` always shows it. The trace confirms
   `Lsub{…}` vs `List{…}`.
-- **B2 — `imap close` / `imap unselect` error** `BAD Please select a
+- **B2: `imap close` / `imap unselect` error** `BAD Please select a
   mailbox first`. Each CLI invocation is its own connection with nothing
   selected, so these mid-session commands have no state to act on.
   Expected.
-- **B3 — `imap search --before/--since/--on` use `INTERNALDATE`
+- **B3: `imap search --before/--since/--on` use `INTERNALDATE`
   (arrival)**, whereas the *shared* `envelope search` `date`/`after`
   target the `Date:` header (sent date). The raw command mirrors RFC
   3501 `SINCE/ON/BEFORE`; the shared DSL deliberately maps to
@@ -89,7 +89,7 @@ the shared commands). This one exercises the raw protocol commands under
 
 - `imap fetch` renders a readable per-message block (flags, internal
   date, size, envelope fields, and an indented MIME structure tree).
-- `imap raw` prints the server's untagged + tagged responses verbatim —
+- `imap raw` prints the server's untagged + tagged responses verbatim:
   useful for probing extensions.
 - `imap sort -S date` places a message with no parseable `Date:` first.
 

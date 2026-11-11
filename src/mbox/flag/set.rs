@@ -18,7 +18,8 @@ use crate::{
 
 /// Set mbox flag(s) on message(s).
 ///
-/// Replaces the flags of each message identified by the given id(s) with the given ones, custom keywords included, in one rewrite of the file.
+/// Replaces the flags of each message identified by the given id(s) with
+/// the given ones, custom keywords included, in one rewrite of the file.
 #[derive(Debug, Parser)]
 pub struct MboxFlagSetCommand {
     #[command(flatten)]

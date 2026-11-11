@@ -1,4 +1,4 @@
-# Gmail REST on Google — shared-command test report
+# Gmail REST on Google: shared-command test report
 
 Shared cross-protocol commands on the Gmail REST backend. Companion:
 [gmail-specific.md](gmail-specific.md) (the `gmail …` raw API). Method:
@@ -19,8 +19,8 @@ label.
 | --- | --- | --- |
 | `mailbox list` | base (labels) | ✅ |
 | `envelope list` | by label **id**, paging, `-r`, `--json` | ✅ by id; **by name fails** (G1) |
-| `envelope search` | — | ⚪ Gmail has no shared search (bails cleanly) |
-| `message add` | — | ⚪ Gmail has no append (bails cleanly) |
+| `envelope search` | - | ⚪ Gmail has no shared search (bails cleanly) |
+| `message add` | - | ⚪ Gmail has no append (bails cleanly) |
 | `message read` | pretty, `--raw`, `--json` | ✅ (label ignored) |
 | `flag add/set/remove` | seen/flagged → Gmail labels | ✅ |
 | `message copy` / `move` | label add / add+remove, F2 counts | ✅ |
@@ -31,7 +31,7 @@ label.
 
 ### Bugs
 
-- **G1 — shared `-m <label-name>` now resolves to a label id. FIXED.**
+- **G1: shared `-m <label-name>` now resolves to a label id. FIXED.**
   `envelope list -m Himalaya-Test` used to fail `HTTP 400: Invalid
   label`; only `-m Label_7` (the opaque id) worked. Gmail labels are
   opaque-id + display-name like JMAP mailboxes, so `GmailClient` now
@@ -46,14 +46,14 @@ label.
   fetches by the globally-unique message id and ignores the `-m` label
   (like JMAP `get_message`).
 - `message add` and `envelope search` bail with clear messages (`Gmail
-  does not support adding messages` / `… the shared envelope search`) —
+  does not support adding messages` / `… the shared envelope search`):
   Gmail has no append and no server-side shared-query search.
 - `flag`/`copy`/`move` map onto Gmail labels (seen = absence of
   `UNREAD`, flagged = `STARRED`; copy = add label, move = add + remove).
 
 ### Observation
 
-- `message read` renders an empty `Received:` header line — Gmail stamps
+- `message read` renders an empty `Received:` header line: Gmail stamps
   a `Received` header on inserted/sent messages that parses to empty.
 
 ## Verdict
