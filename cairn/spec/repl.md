@@ -42,4 +42,4 @@ A line clap cannot parse that sets a flag the session fixes when it starts, `-a`
 - THEN it answers the failure object ``Cannot set `-b` inside a session, start a new session with it instead``
 
 ### Requirement: Help keeps JSON lines whole
-A line asking for help SHALL print clap's text on stdout in a text session, and on stderr when the session's `--json` or a `--json` word of the line before any `--` is set, so stdout keeps one JSON value per line.
+A line asking for help SHALL print clap's text on stdout in a text session, and on stderr when the session's `--json` or a `--json` word of the line before any `--` is set, so stdout keeps one JSON value per line. Its usage line SHALL name the binary before the command, as `Usage: himalaya envelope list [OPTIONS]`. A failing line SHALL hint at restarting the session with `--log-level` for more verbose logs, the flag being fixed for the session.

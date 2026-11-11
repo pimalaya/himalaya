@@ -24,7 +24,7 @@ use anyhow::{Result, anyhow};
 use clap::{CommandFactory, Parser};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use pimalaya_cli::{
-    mcp::{ServerInfo, ToolCall, ToolResult, grammar::Grammar, serve, tool_output_schema},
+    mcp::{ServerInfo, ToolCall, ToolResult, grammar::Grammar, serve, text, tool_output_schema},
     printer::CapturePrinter,
 };
 use serde_json::{Map, Value, json};
@@ -572,9 +572,7 @@ fn tool_result(
     // The bytes travel once, as an embedded resource after the part's
     // JSON, which takes the place of the printed one.
     result.content.pop();
-    result
-        .content
-        .push(json!({ "type": "text", "text": part.to_string() }));
+    result.content.push(text(part.to_string()));
     result.content.push(resource);
     result.structured_content = Some(part);
     result

@@ -208,7 +208,7 @@ fn help_goes_to_stderr_in_a_json_session() {
         "{stderr}"
     );
     assert!(
-        stderr.contains("Usage: envelope list [OPTIONS]"),
+        stderr.contains("Usage: himalaya envelope list [OPTIONS]"),
         "{stderr}"
     );
 }
