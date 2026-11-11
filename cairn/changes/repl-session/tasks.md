@@ -19,5 +19,5 @@ Task 1 of the 2027 NLnet plan, "Pimalaya CLI: REPL and MCP".
 
 ## Later
 
-- [ ] pimalaya-cli: the loop made generic (splitting, TTY versus piped, quit, failure printed and loop continued), then himalaya and ortie on it
+- [x] ~~pimalaya-cli: the loop made generic (splitting, TTY versus piped, quit, failure printed and loop continued), then himalaya and ortie on it~~ Done: the-shared-repl-and-mcp (2026-11-11), Ortie already on it.
 - [ ] sirup: a client queued behind another gets an immediate refusal instead of hanging; keepalive while an attached client is idle

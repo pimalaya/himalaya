@@ -23,6 +23,6 @@ Task 1 of the 2027 NLnet plan, "Pimalaya CLI: REPL and MCP", over cairn/changes/
 
 ## Later
 
-- [ ] pimalaya-cli: the generic part (clap tree as tools, argv, capture printer, loop), with the REPL loop
+- [x] ~~pimalaya-cli: the generic part (clap tree as tools, argv, capture printer, loop), with the REPL loop~~ Done: the-shared-repl-and-mcp (2026-11-11) runs the server on pimalaya-cli's `mcp` core and the REPL on its `repl` loop.
 - [ ] `search` tool over io-pimdir's index (after Task 2), with the embedding index's `mode`
-- [ ] `attachment download` bounded to a configured directory
+- [x] ~~`attachment download` bounded to a configured directory~~ Superseded by mcp-attachment-read (2026-11-06): the tool hands back the part's bytes, a directory being a path the agent may not reach.

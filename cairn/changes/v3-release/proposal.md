@@ -14,7 +14,8 @@ Master breaks the v2 contract already: every `--json` key is camelCase, `message
 ## What
 
 - **The JSON shapes are reviewed with the maintainer before anything is cut**, every schema `json-schema` writes, since v3 fixes them for the whole major.
-- **The git dependencies are released last**, by the maintainer: the eight `[patch.crates-io]` entries (pimalaya-cli and pimalaya-config, io-http, io-imap, io-jmap, io-msgraph, io-pimdir, ical-rs) published, the requirements raised to them, the patch table removed and deny.toml tightened.
+- **The git dependencies are released last**, by the maintainer: the six `[patch.crates-io]` entries published, the requirements raised to them, the patch table removed and deny.toml tightened. pimalaya-cli and pimalaya-config are being prepared as 0.4 in their checkouts, which Himalaya patches by path; io-http, io-jmap, io-msgraph and io-pimdir are pinned by git rev and need releases before Himalaya can drop their patches. io-imap (0.8) and ical-rs (no longer a dependency) have left the table.
+- **Himalaya releases with the family**: Ortie and Himalaya release together with pimalaya-cli and pimalaya-config 0.4, once the owner validates the whole family.
 - **Then the release itself**: the version bumped to 3.0.0, which moves every schema `$id` to `v3` (pimalaya-cli derives it from the major), the CHANGELOG `[Unreleased]` dated, MIGRATION.md's v2 to v3 section final, the provider reports under cairn/spec/testing run on the test accounts, tag and publish.
 
 v2-release (2026-07-25), whose release shipped as 2.0.0 on 2026-07-26, is closed into this one: its open tasks were the same release plumbing.

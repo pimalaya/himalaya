@@ -16,5 +16,5 @@ change: mcp-inline-attachments
 
 ## Later
 
-- [ ] Dedupe `--max-attachment-size` and `attachment-too-large` with himalaya#805, whichever lands second
+- [x] ~~Dedupe `--max-attachment-size` and `attachment-too-large` with himalaya#805, whichever lands second~~ Done when #805 landed second (6284d2f, 2026-11-08): one flag and one code serve both.
 - [ ] `--max-message-size`, if the per-attachment cap proves too loose

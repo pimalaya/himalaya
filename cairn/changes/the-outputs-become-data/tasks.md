@@ -18,5 +18,5 @@ change: the-outputs-become-data
 - [x] Registry: every command described, `OneOf`, events, check test
 - [x] MCP and REPL handle events and partial outcomes
 - [x] delta.md, spec fold, MIGRATION.md, CHANGELOG, log
-- [ ] Pin pimalaya-cli by git rev once its commit lands
+- [x] ~~Pin pimalaya-cli by git rev once its commit lands~~ Superseded: pimalaya-cli 0.3 was released and required instead (8196891, 2026-11-03).
 - [ ] Left for later: `imap fetch` streaming one event per message through `ImapMessageFetchStreamBatch`; MCP progress notifications for events; Graph `$search` pages (resumed by `$skiptoken`) refused by `--page-token`; raw-faithful passthrough of the Gmail and Graph `get` outputs still designed

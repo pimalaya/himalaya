@@ -13,5 +13,5 @@ change: maildir-custom-keywords
 - [x] Test what is left here: the flag mapping both ways, and the envelope carrying what the entry was read with. The keyword resolution itself is tested upstream.
 - [x] Build/test/fmt/clippy, including the reduced feature builds.
 - [x] Fold into cairn/spec/backends.md; log; land.
-- [ ] Publish io-maildir 0.3 (prepared), then drop the `[patch.crates-io]` block standing in for it.
-- [ ] himalaya-tui reads entries through the same API: bump it once 0.3 is out.
+- [x] ~~Publish io-maildir 0.3 (prepared), then drop the `[patch.crates-io]` block standing in for it.~~ Done: io-maildir 0.3 comes from crates.io (0.3.1 locked), no patch left.
+- [x] ~~himalaya-tui reads entries through the same API: bump it once 0.3 is out.~~ Done: himalaya-tui requires io-maildir 0.3.

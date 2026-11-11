@@ -27,5 +27,5 @@ change: capability-shared-api
 ## Follow-ups
 
 - [ ] pimalaya-cli: render each leaf's `after_long_help` in the manual pages
-- [ ] The registry rows of the inventory's protocol-only verbs, each with its shared verb (`mailbox.create`, `mailbox.rename`, `thread`, `vacation`)
+- [x] ~~The registry rows of the inventory's protocol-only verbs, each with its shared verb (`mailbox.create`, `mailbox.rename`, `thread`, `vacation`)~~ Done for `mailbox.create`, `mailbox.rename` and `vacation` (the-union-gains-its-verbs, 2026-11-03); `thread` is that change's follow-up.
 - [ ] Gmail and Graph file every sent message themselves, so `message send --save` there files a second copy; declare `submit.copy` with that detail and skip the add
