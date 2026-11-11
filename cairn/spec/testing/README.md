@@ -14,6 +14,8 @@ created for the run, never on existing data**.
 
 Method: [provider-test-plan.md](provider-test-plan.md).
 
+The automated counterpart is the live suites, tests/google.rs, tests/microsoft.rs and tests/fastmail.rs (cairn/spec/packaging.md, "Live provider suites"): read-only checks on the test accounts, run with `cargo test --test <provider> -- --ignored`.
+
 Every report pairs a **shared** run (the cross-protocol `mailbox` /
 `envelope` / `flag` / `message` / `attachment` commands) with a
 **specific** run (the raw `himalaya <proto> …` surface), except where a
@@ -24,7 +26,6 @@ single combined report sufficed.
 | Backend | Provider | Shared | Specific |
 | --- | --- | --- | --- |
 | IMAP + SMTP | Fastmail | [imap-smtp-fastmail.md](imap-smtp-fastmail.md) | [imap-smtp-specific-fastmail.md](imap-smtp-specific-fastmail.md) |
-| IMAP + SMTP | Posteo | [imap-smtp-posteo.md](imap-smtp-posteo.md) | *(combined)* |
 | IMAP + SMTP | QQ Mail (Tencent) | [imap-smtp-qq.md](imap-smtp-qq.md) | *(combined)* |
 | IMAP + SMTP | 163 Mail (NetEase) | [imap-smtp-163.md](imap-smtp-163.md) | *(combined)* |
 | IMAP + SMTP | 139 Mail (China Mobile) | [imap-smtp-139.md](imap-smtp-139.md) | *(combined)* |
