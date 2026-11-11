@@ -61,10 +61,6 @@ use url::Url;
 
 use crate::backend::Backend;
 
-/// How to get a configuration, for the errors meeting none.
-pub const NO_CONFIG_HINT: &str = "write one by hand from the sample: \
-     https://github.com/pimalaya/himalaya/blob/master/config.sample.toml";
-
 // NOTE: these mirror the io-* crates' own `default_alpn()`, kept local so
 // the schema depends on no backend crate.
 pub(crate) fn default_imap_alpn() -> Vec<String> {
@@ -120,56 +116,19 @@ impl TomlConfig for Config {
         env!("CARGO_PKG_NAME")
     }
 
+    fn sample_url() -> &'static str {
+        "https://github.com/pimalaya/himalaya/blob/master/config.sample.toml"
+    }
+
+    fn accounts(&self) -> impl Iterator<Item = (&str, bool)> {
+        let accounts = self.accounts.iter();
+        accounts.map(|(name, account)| (name.as_str(), account.default))
+    }
+
     fn take_named_account(&mut self, name: &str) -> Option<(String, Self::Account)> {
         let (name, mut account) = self.accounts.remove_entry(name)?;
         account.inherit_proxy();
         Some((name, account))
-    }
-
-    fn take_default_account(&mut self) -> Option<(String, Self::Account)> {
-        let name = self
-            .accounts
-            .iter()
-            .find_map(|(name, account)| account.default.then(|| name.clone()))?;
-
-        self.take_named_account(&name)
-    }
-
-    /// Takes the account as the trait does, refusing first to pick the
-    /// default among several.
-    ///
-    /// `accounts` is a `HashMap`, so which of several defaults
-    /// [`take_default_account`] finds first changes from run to run. The
-    /// config layers make the case easy to reach, an rc file marking one
-    /// account the default while the platform file marks another.
-    ///
-    /// [`take_default_account`]: TomlConfig::take_default_account
-    fn take_account(&mut self, name: Option<&str>) -> Result<Option<(String, Self::Account)>> {
-        match name {
-            Some("default") | Some("") | None => {
-                let mut defaults: Vec<&str> = self
-                    .accounts
-                    .iter()
-                    .filter(|(_, account)| account.default)
-                    .map(|(name, _)| name.as_str())
-                    .collect();
-
-                if defaults.len() > 1 {
-                    defaults.sort_unstable();
-                    bail!(
-                        "Several accounts are marked default ({}), keep `default = true` \
-                         on one, or name one with `-a <NAME>`",
-                        defaults.join(", "),
-                    );
-                }
-
-                Ok(self.take_default_account())
-            }
-            Some(name) => match self.take_named_account(name) {
-                None => bail!("Get account `{name}` error"),
-                account => Ok(account),
-            },
-        }
     }
 }
 
@@ -1259,7 +1218,7 @@ mod tests {
         assert!(err.to_string().starts_with("Several accounts"), "{err}");
 
         let mut config: Config = toml::from_str(toml).unwrap();
-        let (name, _) = config.take_account(Some("spare")).unwrap().unwrap();
+        let (name, _) = config.take_account(Some("spare")).unwrap();
         assert_eq!(name, "spare");
     }
 

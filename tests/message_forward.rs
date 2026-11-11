@@ -127,7 +127,6 @@ fn forward(config: &Path, home: &Path, flags: &[&str]) -> String {
         .args(["--body", "ok", "src"])
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home)
-        .env_remove("HIMALAYA_CONFIG")
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::null())
         .output()

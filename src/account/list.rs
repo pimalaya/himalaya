@@ -12,7 +12,7 @@ use pimalaya_config::toml::TomlConfig;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::config::{AccountConfig, Config, NO_CONFIG_HINT};
+use crate::config::{AccountConfig, Config};
 
 /// List all accounts declared in the configuration.
 ///
@@ -22,9 +22,10 @@ use crate::config::{AccountConfig, Config, NO_CONFIG_HINT};
 pub struct AccountListCommand;
 
 impl AccountListCommand {
-    /// Loads the configuration and prints its accounts as a list.
+    /// Loads the configuration, taking no account, and prints its
+    /// accounts as a list.
     pub fn execute(self, printer: &mut impl Printer, config_paths: &[PathBuf]) -> Result<()> {
-        let config = load_config(config_paths)?;
+        let config = Config::load(config_paths)?;
 
         let mut accounts: Vec<AccountRow> = config
             .accounts
@@ -34,15 +35,6 @@ impl AccountListCommand {
         accounts.sort_by(|a, b| a.name.cmp(&b.name));
 
         printer.out(AccountListOutput { accounts })
-    }
-}
-
-/// Loads the merged configuration, pointing at the sample when there is
-/// none to load.
-fn load_config(paths: &[PathBuf]) -> Result<Config> {
-    match Config::from_paths_or_default(paths)? {
-        Some(config) => Ok(config),
-        None => anyhow::bail!("No configuration found, {NO_CONFIG_HINT}"),
     }
 }
 
@@ -83,6 +75,9 @@ impl AccountRow {
         if account.mbox.is_some() {
             backends.push("mbox");
         }
+        if account.pimdir.is_some() {
+            backends.push("pimdir");
+        }
         if account.smtp.is_some() {
             backends.push("smtp");
         }
@@ -119,5 +114,46 @@ impl fmt::Display for AccountListOutput {
         }
 
         write!(f, "{columns}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, process};
+
+    use pimalaya_cli::{clap::args::JsonFlag, printer::StdoutPrinter};
+    use pimalaya_config::toml::ConfigMissingError;
+
+    use crate::{account::list::*, config::Config};
+
+    #[test]
+    fn a_pimdir_block_is_listed_among_the_backends() {
+        let toml = "[accounts.a]\npimdir.root = \"/nonexistent\"\n\
+                    smtp.server = \"smtp.example.org\"\n";
+        let config: Config = toml::from_str(toml).unwrap();
+        let row = AccountRow::from_account("a", &config.accounts["a"]);
+        assert_eq!(row.backends, ["pimdir", "smtp"]);
+
+        let output = AccountListOutput {
+            accounts: vec![row],
+        };
+        assert!(output.to_string().contains("  pimdir,smtp  "), "{output}");
+    }
+
+    /// Listing takes no account, but a missing configuration still names
+    /// the path it looked at.
+    #[test]
+    fn a_missing_configuration_names_the_path() {
+        let dir = env::temp_dir().join(format!("himalaya-account-list-{}", process::id()));
+        let paths = [dir.join("config.toml")];
+        let mut printer = StdoutPrinter::new(&JsonFlag::default());
+
+        let err = AccountListCommand
+            .execute(&mut printer, &paths)
+            .unwrap_err();
+
+        let missing = err.downcast_ref::<ConfigMissingError>().unwrap();
+        assert_eq!(missing.path, paths[0]);
+        assert!(err.to_string().contains(&paths[0].display().to_string()));
     }
 }

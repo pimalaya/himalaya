@@ -47,7 +47,7 @@ ariadne = "0.6"
 base64 = "0.23"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 chumsky = { version = "0.13", default-features = false }
-clap = { version = "4.4", default-features = false, features = ["derive", "env", "error-context", "help", "std", "suggestions", "usage"] }
+clap = { version = "4.4", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage"] }
 convert_case = { version = "0.12", optional = true }
 dirs = "7"
 gethostname = "1"
@@ -69,7 +69,7 @@ mime-rs = { version = "0.1", optional = true }
 mime_guess = "2"
 open = "5"
 percent-encoding = "2"
-pimalaya-cli = { version = "0.3", default-features = false, features = ["terminal", "prompt"] }
+pimalaya-cli = { version = "0.3", default-features = false, features = ["mcp", "prompt", "terminal"] }
 pimalaya-config = { version = "0.3", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }
@@ -91,3 +91,4 @@ io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "919eab465ab620b3
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "2ae26370aefa671c16316dbad98107634436bce6" }
 io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "5c18a026b9c85b470984192452c2aa66e060a3fe" }
 pimalaya-cli = { path = "../cli" }
+pimalaya-config = { path = "../config" }

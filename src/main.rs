@@ -78,22 +78,27 @@
 //! ## Configuration and output
 //!
 //! Config is loaded by pimalaya-config from every existing canonical path
-//! (the rc file last), or the `-c` override, later paths deep-merged on
-//! top. The schema
-//! ([`config`]) is multi-account: a top-level block plus named account
-//! blocks carrying optional per-backend sub-blocks.
+//! (the rc file last), or the `-c` paths, one per flag, later paths
+//! deep-merged on top. The schema ([`config`]) is multi-account: a
+//! top-level block plus named account blocks carrying optional
+//! per-backend sub-blocks. pimalaya-config also takes the account `-a`
+//! names or the default one, its typed errors naming what is missing.
 //!
 //! Himalaya never writes a configuration: a person writes it from the
-//! documented sample, and a command finding none fails pointing at it. A
-//! config that exists but lacks the requested account is a hard error too.
+//! documented sample. A person running Himalaya without one meets the
+//! welcome ([`cli::welcome`], pimalaya-cli's in Himalaya's words), which
+//! creates it from the sample shipped beside the binary or downloads it;
+//! a script or a JSON caller gets the error instead. A bare `himalaya`
+//! prints the help when a configuration exists.
 //!
 //! Output follows the Pimalaya rule: data and errors go to stdout through
 //! the printer, `--json` switching every command to JSON, and stderr
-//! carries logs only. Text output is plain text, with no border, no
-//! colour and nothing sized to the terminal: a list prints as aligned
-//! columns, a record as aligned `Label: value` lines. Each command's doc
-//! comment is its `--help`, so `himalaya <command> --help` is the
-//! canonical usage reference.
+//! carries the logs, the welcome and the failures of the MCP server,
+//! whose stdout is the protocol's. Text output is plain text, with no
+//! border, no colour and nothing sized to the terminal: a list prints as
+//! aligned columns, a record as aligned `Label: value` lines. Each
+//! command's doc comment is its `--help`, so `himalaya <command> --help`
+//! is the canonical usage reference.
 
 mod account;
 mod backend;
@@ -128,12 +133,21 @@ mod sieve;
 #[cfg(feature = "smtp")]
 mod smtp;
 
+use std::process;
+
 use anyhow::Result;
-use clap::{CommandFactory, Parser};
-use pimalaya_cli::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
+use clap::Parser;
+use pimalaya_cli::{
+    clap::args::LogFlags,
+    error::{EXIT_FAILURE, ErrorReport},
+    log::Logger,
+    printer::StdoutPrinter,
+    welcome::{is_wanted, shipped_sample},
+};
+use pimalaya_config::toml::ConfigMissingError;
 
 use crate::{
-    cli::Cli,
+    cli::{Cli, Command},
     error::ErrorCode,
     session::{Session, SessionAccount},
 };
@@ -141,27 +155,45 @@ use crate::{
 fn main() {
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(&cli.json);
-    let result = execute(cli, &mut printer);
+
+    let account = SessionAccount {
+        config_paths: &cli.config.paths,
+        name: cli.account.name.as_deref(),
+        backend: cli.backend,
+    };
+
+    let result = execute(cli.cmd, &cli.log, account, &mut printer);
+
+    // A person missing a configuration meets the welcome, a script or a
+    // JSON caller the error.
+    if let Err(err) = &result
+        && let Some(missing) = err.downcast_ref::<ConfigMissingError>()
+        && is_wanted(&printer)
+    {
+        let sample = shipped_sample("himalaya");
+        let welcome = cli::welcome(&missing.path, account.config_paths, sample.as_deref());
+        eprint!("{welcome}");
+        process::exit(EXIT_FAILURE);
+    }
+
     ErrorReport::<ErrorCode>::eval_coded(&mut printer, result);
 }
 
-fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
-    Logger::try_init(&cli.log)?;
-    let config = cli.config.paths.as_ref();
-    let account = cli.account.name.as_deref();
-    let backend = cli.backend;
+/// Runs the subcommand over a fresh session, or meets a bare `himalaya`.
+fn execute(
+    cmd: Option<Command>,
+    log: &LogFlags,
+    account: SessionAccount,
+    printer: &mut StdoutPrinter,
+) -> Result<()> {
+    Logger::try_init(log)?;
 
-    let Some(cmd) = cli.cmd else {
-        Cli::command().print_help()?;
-        return Ok(());
+    let Some(cmd) = cmd else {
+        return cli::meet_bare_invocation(account.config_paths);
     };
 
     let mut session = Session {
-        account: SessionAccount {
-            config_paths: config,
-            name: account,
-            backend,
-        },
+        account,
         ..Default::default()
     };
 

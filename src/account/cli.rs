@@ -18,8 +18,8 @@ use crate::{
 /// Manage accounts defined in the TOML configuration file.
 ///
 /// An account is a named group of backend settings. These subcommands
-/// inspect them and validate their connection; creating one is bare
-/// `himalaya`.
+/// inspect them and validate their connection; creating one means adding
+/// an `[accounts.<name>]` table, as config.sample.toml shows.
 #[derive(Debug, Subcommand)]
 pub enum AccountCommand {
     #[command(visible_alias = "ls")]

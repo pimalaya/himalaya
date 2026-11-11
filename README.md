@@ -162,7 +162,7 @@ The binary lands at `target/release/himalaya`.
 
 ## Configuration
 
-Himalaya reads a TOML configuration you write: copy [config.sample.toml](./config.sample.toml) to `~/.config/himalaya/config.toml`, keep the blocks of the backends your account uses and fill them in. Himalaya never writes a configuration, and a command run without one fails, naming the path it looked at.
+Himalaya reads a TOML configuration you write: copy [config.sample.toml](./config.sample.toml) to `~/.config/himalaya/config.toml`, keep the blocks of the backends your account uses and fill them in. Himalaya never writes a configuration. Run without one at a terminal, it welcomes you with the commands creating it from the sample and the first command to run; under `--json` or in a script, it fails naming the path it looked at.
 
 A persistent configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides the others (a path naming a file already loaded, such as a symlinked rc file, is skipped):
 
@@ -174,7 +174,7 @@ At most one account may be marked `default = true` across them: an rc file movin
 
 These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
 
-Override those paths with `-c <PATH>`; multiple paths can be passed at once, separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or by repeating `-c`. The first one is the base and the rest are deep-merged on top.
+Override those paths with `-c <PATH>`. Repeat it to merge several files, such as `-c public.toml -c private.toml`: the first one is the base and the next ones are deep-merged on top. Each `-c` takes one path, never split, and no environment variable is read: write `-c "$HIMALAYA_CONFIG"` where `HIMALAYA_CONFIG` used to be enough.
 
 To add an account, add an `[accounts.<name>]` table to your config file. `himalaya account list` and `himalaya account check` inspect and validate the accounts declared.
 

@@ -50,7 +50,6 @@ fn session(dir: &Path, lines: &str) -> Vec<Value> {
         .args(["-c", config.to_str().unwrap(), "--json", "repl"])
         .env("HOME", dir)
         .env("XDG_CONFIG_HOME", dir)
-        .env_remove("HIMALAYA_CONFIG")
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

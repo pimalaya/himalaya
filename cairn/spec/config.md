@@ -20,10 +20,31 @@ A mechanism disclosing a reusable credential SHALL be refused over a cleartext c
 ### Requirement: Config loading and merge
 Without `-c/--config`, the config SHALL load every existing canonical path as a layer, in this order: `$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, `$HOME/.himalayarc`. Each layer SHALL be deep-merged on top of the ones before, so `$HOME/.himalayarc` overrides. Paths naming the same file SHALL be read once.
 
-`-c/--config` SHALL replace the canonical paths entirely. Multiple `-c` paths MAY be passed, delimited like `$PATH` (`;` on Windows, `:` elsewhere) or repeated as flags: the first is the base and the rest are deep-merged on top.
+`-c/--config` SHALL replace the canonical paths entirely. It MAY be repeated: the first path is the base and the next ones are deep-merged on top, in order. Each occurrence SHALL be one path, never split on a delimiter, and no environment variable SHALL be read for it.
+
+#### Scenario: A Windows path is read whole
+- GIVEN `-c C:\Users\me\config.toml`
+- WHEN the configuration is loaded
+- THEN it is read from that one path, not from `C` and `\Users\me\config.toml`
 
 ### Requirement: Missing account is an error
-When the config exists but lacks the requested account, the command SHALL fail with a hard error. When no configuration is found at all, a command needing one SHALL fail naming the path it looked at (the one `-c` or `HIMALAYA_CONFIG` gave, else the default location) and pointing at the documented sample, and a bare `himalaya` SHALL print the help. Himalaya SHALL NOT prompt to create a configuration.
+When the config exists but lacks the requested account, the command SHALL fail naming it and listing the accounts the configuration holds, sorted. When no account is named and none is marked default, it SHALL fail naming both ways of picking one. When no configuration is found at all, a command needing one SHALL fail naming the path it looked at (the first `-c` path, else the default location) and pointing at the documented sample, unless a person meets the welcome instead. Himalaya SHALL NOT prompt to create a configuration.
+
+### Requirement: A missing configuration meets a person with the welcome
+When no configuration exists at the first `-c` path or the default location, and stderr is a terminal with `--json` off, a bare `himalaya`, every command resolving an account (`repl` and `mcp` included) and `account list` SHALL print the welcome on stderr and exit 1, printing nothing on stdout. The welcome SHALL frame Himalaya in one sentence, name the missing path, give the commands creating it from config.sample.toml, invite the reader to edit it and uncomment the options they need, and give the `envelope list` command carrying the `-c` paths. When share/doc/himalaya/config.sample.toml exists under the prefix holding the binary's directory or under that directory itself, symlinks resolved, the commands SHALL copy it there with a writable mode, after creating the missing directory; otherwise they SHALL download the raw config.sample.toml with `curl --create-dirs`. Every path SHALL be quoted for the platform's shells, so each command runs as printed. Otherwise the missing-configuration error SHALL stand, as the failure object under `--json`.
+
+#### Scenario: A first run
+- GIVEN no file at $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml or $HOME/.himalayarc
+- WHEN `himalaya envelope list` runs in a terminal
+- THEN the welcome names $XDG_CONFIG_HOME/himalaya/config.toml, the `curl` command downloading config.sample.toml there and `himalaya envelope list`, and the exit status is 1
+
+#### Scenario: A script
+- GIVEN no configuration
+- WHEN `himalaya --json envelope list` runs
+- THEN stdout carries the failure object naming the path looked at and the sample, stderr carries no welcome, and the exit status is 1
+
+### Requirement: A bare invocation shows the help
+A bare `himalaya` SHALL print the help when a configuration exists, a broken one included, its error left to the first command reading it. Without one it SHALL fail as a command resolving an account does, the welcome or the error. Nothing prompts.
 
 ### Requirement: One default account
 Resolving the default account SHALL fail, naming them, when several accounts are marked `default = true` once the configuration is loaded, layers and `-c` files merged. An account named with `-a` SHALL still resolve.

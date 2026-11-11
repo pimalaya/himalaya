@@ -79,7 +79,6 @@ fn search(config: &Path, home: &Path, query: &[&str]) -> (bool, Value) {
         .args(query)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home)
-        .env_remove("HIMALAYA_CONFIG")
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::null())
         .output()

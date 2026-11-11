@@ -5,10 +5,9 @@
 
 use std::{fmt, path::PathBuf};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
-use pimalaya_config::toml::TomlConfig;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -17,7 +16,7 @@ use crate::pimdir::client::PimdirClient;
 use crate::{
     backend::Backend,
     capability::{self, Resolution, StoreSupport},
-    config::{Config, NO_CONFIG_HINT},
+    cli::resolve_account,
 };
 
 /// List what the account serves of the shared API.
@@ -40,15 +39,7 @@ impl AccountCapabilityCommand {
         account_name: Option<&str>,
         backend: Backend,
     ) -> Result<()> {
-        let mut config = match Config::from_paths_or_default(config_paths)? {
-            Some(config) => config,
-            None => bail!("No configuration found, {NO_CONFIG_HINT}"),
-        };
-
-        let (name, account_config) = config
-            .take_account(account_name)?
-            .ok_or_else(|| anyhow!("Cannot find account"))?;
-
+        let (_, name, account_config) = resolve_account(config_paths, account_name)?;
         let resolution = Resolution::of(&name, &account_config, backend);
 
         // NOTE: the store is opened as a reader, a local read writing

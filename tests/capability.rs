@@ -41,7 +41,6 @@ fn himalaya(home: &Path, config: &Path, args: &[&str]) -> std::process::Output {
         .args(args)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home)
-        .env_remove("HIMALAYA_CONFIG")
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::null())
         .output()

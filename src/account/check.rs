@@ -8,20 +8,18 @@
 use std::fs::File;
 use std::{fmt, path::PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
+#[cfg(any(feature = "maildir", feature = "mbox", feature = "m2dir"))]
+use anyhow::bail;
 use clap::Parser;
 use pimalaya_cli::{error::PartialOutcome, fields::Fields, printer::Printer};
-use pimalaya_config::{secret::SecretResolver, toml::TomlConfig};
+use pimalaya_config::secret::SecretResolver;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 #[cfg(feature = "imap")]
 use crate::config::ImapConfig;
-use crate::{
-    backend::Backend,
-    config::{Config, NO_CONFIG_HINT},
-    error::ErrorCode,
-};
+use crate::{backend::Backend, cli::resolve_account, error::ErrorCode};
 
 /// Validate the account configuration.
 ///
@@ -45,14 +43,7 @@ impl AccountCheckCommand {
         account_name: Option<&str>,
         backend: Backend,
     ) -> Result<()> {
-        let mut config = match Config::from_paths_or_default(config_paths)? {
-            Some(config) => config,
-            None => bail!("No configuration found, {NO_CONFIG_HINT}"),
-        };
-
-        let (name, account_config) = config
-            .take_account(account_name)?
-            .ok_or_else(|| anyhow::anyhow!("Cannot find account"))?;
+        let (_, name, account_config) = resolve_account(config_paths, account_name)?;
 
         #[cfg_attr(
             not(any(

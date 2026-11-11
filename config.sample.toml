@@ -1,14 +1,14 @@
 # ================================================================================
 # `himalaya` configuration file.
 #
-# Loaded from the first valid path among:
+# Loaded from every existing path among the following, each one deep-merged on
+# top of the ones before, so $HOME/.himalayarc overrides:
 #   - $XDG_CONFIG_HOME/himalaya/config.toml
 #   - $HOME/.config/himalaya/config.toml
 #   - $HOME/.himalayarc
 #
-# Override with `himalaya -c <PATH>`. Multiple paths can be passed at once,
-# separated by `;` on Windows and `:` elsewhere, as `$PATH` separates them, or
-# by repeating `-c`; the first one is the base and the rest are deep-merged on
+# Override with `himalaya -c <PATH>`, one path per flag. Repeat it to merge
+# several files: the first one is the base and the next ones are deep-merged on
 # top of it.
 #
 # Himalaya never writes this file: copy it to one of the paths above, keep the

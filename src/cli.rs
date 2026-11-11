@@ -1,24 +1,26 @@
 //! # Parser
 //!
 //! Top-level clap parser and subcommand dispatcher, running each command
-//! over the [`Session`] client it needs.
+//! over the [`Session`] client it needs, and the account resolution and
+//! first-run welcome every command starts from.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_cli::{
     clap::{
-        args::{AccountFlag, JsonFlag, LogFlags},
+        args::{AccountFlag, ConfigFlags, JsonFlag, LogFlags},
         commands::{
             completion::CompletionCommand, json_schema::JsonSchemaCommand, manual::ManualCommand,
         },
-        parsers::path_parser,
     },
     footer, long_version,
+    mcp::exit_on_failure,
     printer::Printer,
+    welcome::{Welcome, is_wanted},
 };
-use pimalaya_config::toml::TomlConfig;
+use pimalaya_config::toml::{ConfigMissingError, TomlConfig};
 
 #[cfg(feature = "gmail")]
 use crate::gmail::{cli::GmailCommand, client::build_gmail_client};
@@ -54,7 +56,8 @@ use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 use crate::{
     account::cli::AccountCommand,
     backend::Backend,
-    config::{AccountConfig, Config, NO_CONFIG_HINT},
+    config::{AccountConfig, Config},
+    error::ErrorCode,
     json_schema,
     mcp::McpCommand,
     repl::ReplCommand,
@@ -65,6 +68,10 @@ use crate::{
     account::context::Account,
     capability::{self, Capability, Resolution},
 };
+
+/// The sample configuration as a raw file, for `curl` to fetch.
+const SAMPLE_RAW_URL: &str =
+    "https://raw.githubusercontent.com/pimalaya/himalaya/master/config.sample.toml";
 
 /// Top-level command-line interface parser.
 #[derive(Parser, Debug)]
@@ -78,7 +85,7 @@ pub struct Cli {
     #[command(subcommand)]
     pub cmd: Option<Command>,
     #[command(flatten)]
-    pub config: ConfigPathsArg,
+    pub config: ConfigFlags,
     #[command(flatten)]
     pub account: AccountFlag,
     /// Force a specific backend for cross-protocol commands.
@@ -162,69 +169,54 @@ pub enum Command {
     JsonSchema(JsonSchemaCommand),
 }
 
-/// The character separating several configuration paths, `$PATH`'s own: `;`
-/// on Windows, where a colon belongs to the drive letter of an absolute path,
-/// and `:` elsewhere.
-#[cfg(windows)]
-const CONFIG_PATH_DELIMITER: char = ';';
-#[cfg(not(windows))]
-const CONFIG_PATH_DELIMITER: char = ':';
-
-/// Path(s) to the TOML configuration file(s).
-///
-/// Declared here rather than taken from pimalaya-cli, so the environment
-/// variable carries this product's name.
-#[derive(Debug, Default, Parser)]
-pub struct ConfigPathsArg {
-    /// Override the default configuration file path.
-    ///
-    /// Paths are shell-expanded then canonicalized, and several may be given
-    /// at once, delimited like `$PATH` (`;` on Windows, `:` elsewhere). The
-    /// first is the base and the rest are merged on top, which is how a public
-    /// configuration stays separate from the private ones.
-    #[arg(long = "config", short = 'c', global = true, env = "HIMALAYA_CONFIG")]
-    #[arg(name = "config_paths", value_name = "PATH", value_parser = path_parser, value_delimiter = CONFIG_PATH_DELIMITER)]
-    pub paths: Vec<PathBuf>,
-}
-
 /// Resolves the account a command runs against, returning the leftover
 /// global config, the account name and its config.
 ///
-/// A missing configuration fails naming the path looked at, which is where
-/// `-c` pointed, so a mistyped path shows up as itself.
+/// A missing configuration fails with a [`ConfigMissingError`] naming the
+/// path looked at, which is where `-c` pointed, so a mistyped path shows
+/// up as itself and `main` can meet a person with the welcome.
 pub fn resolve_account(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
 ) -> Result<(Config, String, AccountConfig)> {
-    let mut config = match Config::from_paths_or_default(config_paths)? {
-        Some(config) => config,
-        None => bail!(
-            "No configuration found at {}, {NO_CONFIG_HINT}",
-            Config::target_path(config_paths)?.display(),
-        ),
-    };
+    let mut config = Config::load(config_paths)?;
+    let (name, account_config) = config.take_account(account_name)?;
+    Ok((config, name, account_config))
+}
 
-    // NOTE: an empty name and `default` both mean the default account,
-    // which is the next block's business.
-    let named = account_name.filter(|name| !name.is_empty() && *name != "default");
-
-    if let Some(name) = named.filter(|name| !config.accounts.contains_key(*name)) {
-        let mut names: Vec<&str> = config.accounts.keys().map(String::as_str).collect();
-        names.sort_unstable();
-
-        bail!(
-            "Account `{name}` not found, the configuration holds: {}",
-            names.join(", "),
-        );
+/// Meets a bare `himalaya`: the help when a configuration exists, the
+/// missing configuration otherwise, which a person meets as the welcome.
+pub fn meet_bare_invocation(config_paths: &[PathBuf]) -> Result<()> {
+    // NOTE: a broken file counts as a configuration, its error left to
+    // the first command reading it.
+    if let Err(err) = Config::load(config_paths)
+        && err.is::<ConfigMissingError>()
+    {
+        return Err(err);
     }
 
-    let Some((name, account_config)) = config.take_account(account_name)? else {
-        bail!(
-            "No default account found, name one with `-a <NAME>` or mark one with `default = true`"
-        );
-    };
+    Cli::command().print_help()?;
+    Ok(())
+}
 
-    Ok((config, name, account_config))
+/// The welcome a person meets when no configuration exists at `path`:
+/// the commands creating it from `sample`, the shipped sample
+/// configuration, or downloading it without one, then `envelope list`.
+pub fn welcome<'a>(
+    path: &'a Path,
+    config_paths: &'a [PathBuf],
+    sample: Option<&'a Path>,
+) -> Welcome<'a> {
+    Welcome {
+        bin: "himalaya",
+        intro: "Welcome to Himalaya, the CLI to manage emails.",
+        path,
+        config_paths,
+        sample,
+        sample_url: SAMPLE_RAW_URL,
+        next: "Edit it and uncomment the options you need, then list your envelopes:",
+        command: "envelope list",
+    }
 }
 
 /// Runs a shared command over the session's email client, refusing it
@@ -427,7 +419,17 @@ impl Command {
             ),
 
             Self::Repl(cmd) => cmd.execute(printer, session),
-            Self::Mcp(cmd) => cmd.execute(printer, session),
+            Self::Mcp(cmd) => {
+                // stdout carries protocol messages only, so a failure goes
+                // to stderr, a person missing a configuration aside.
+                match cmd.execute(printer, session) {
+                    Err(err) if err.is::<ConfigMissingError>() && is_wanted(&*printer) => Err(err),
+                    result => {
+                        exit_on_failure::<ErrorCode, _>(result);
+                        Ok(())
+                    }
+                }
+            }
             Self::Account(cmd) => {
                 cmd.execute(printer, account.config_paths, account.name, account.backend)
             }
@@ -440,11 +442,13 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::PathBuf, process};
+    use std::{env, fs, path::PathBuf, process};
 
     use clap::Parser;
+    use pimalaya_config::toml::{AccountError, ConfigMissingError};
+    use tempfile::TempDir;
 
-    use crate::cli::{CONFIG_PATH_DELIMITER, Cli};
+    use crate::cli::{Cli, resolve_account};
 
     /// A directory that is never created, so the paths below it keep the
     /// spelling they were given instead of being canonicalized.
@@ -459,6 +463,14 @@ mod tests {
             .paths
     }
 
+    /// Writes `toml` as the only configuration file of a fresh directory.
+    fn config(toml: &str) -> (TempDir, Vec<PathBuf>) {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, toml).unwrap();
+        (dir, vec![path])
+    }
+
     #[test]
     fn a_config_path_is_never_split() {
         // NOTE: an absolute Windows path holds a colon of its own, so splitting
@@ -471,26 +483,62 @@ mod tests {
         );
     }
 
+    /// A value is one path whatever it holds, `$PATH`'s delimiters
+    /// included; several paths take one `-c` each.
     #[test]
-    fn several_config_paths_split_on_the_platform_delimiter() {
+    fn a_delimited_config_value_stays_one_path() {
         let dir = absent_dir();
-        let (one, two) = (dir.join("one.toml"), dir.join("two.toml"));
-        let given = format!(
-            "{}{}{}",
-            one.display(),
-            CONFIG_PATH_DELIMITER,
-            two.display()
-        );
+        let given = dir.join("one.toml:two.toml;three.toml");
+        let args = ["-c", given.to_str().unwrap(), "account", "list"];
+        assert_eq!(paths(&args), [given]);
 
-        assert_eq!(paths(&["-c", &given, "account", "list"]), [one, two]);
+        let (one, two) = (dir.join("one.toml"), dir.join("two.toml"));
+        let (one_str, two_str) = (one.to_str().unwrap(), two.to_str().unwrap());
+        let args = ["-c", one_str, "-c", two_str, "account", "list"];
+        assert_eq!(paths(&args), [one, two]);
+    }
+
+    /// `main` meets a person with the welcome by downcasting this error,
+    /// so it has to come typed, naming the path `-c` gave.
+    #[test]
+    fn a_missing_configuration_is_typed_for_the_welcome() {
+        let paths = [absent_dir().join("config.toml")];
+        let err = resolve_account(&paths, None).unwrap_err();
+        let missing = err.downcast_ref::<ConfigMissingError>().unwrap();
+        assert_eq!(missing.path, paths[0]);
     }
 
     #[test]
-    fn the_delimiter_is_the_platform_one() {
-        // NOTE: `$PATH` separates with `;` on Windows, where a colon belongs to
-        // the drive letter of an absolute path, and with `:` elsewhere.
-        let expected = if cfg!(windows) { ';' } else { ':' };
+    fn an_unknown_account_lists_the_held_ones() {
+        let (_dir, paths) = config("[accounts.work]\n[accounts.perso]\n");
+        let err = resolve_account(&paths, Some("nope")).unwrap_err();
 
-        assert_eq!(CONFIG_PATH_DELIMITER, expected);
+        match err.downcast_ref::<AccountError>() {
+            Some(AccountError::Missing { name, names }) => {
+                assert_eq!(name, "nope");
+                assert_eq!(names, &["perso", "work"]);
+            }
+            _ => panic!("{err:?}"),
+        }
+
+        let message = err.to_string();
+        assert!(message.ends_with("holds: perso, work"), "{message}");
+    }
+
+    /// The config layers make the case easy to reach, an rc file marking
+    /// one account the default while the platform file marks another.
+    #[test]
+    fn several_default_accounts_are_refused_naming_them() {
+        let account = |name: &str| format!("[accounts.{name}]\ndefault = true\n");
+        let (_dir, paths) = config(&(account("work") + &account("perso")));
+        let err = resolve_account(&paths, None).unwrap_err();
+
+        match err.downcast_ref::<AccountError>() {
+            Some(AccountError::SeveralDefaults(names)) => assert_eq!(names, &["perso", "work"]),
+            _ => panic!("{err:?}"),
+        }
+
+        let (_, name, _) = resolve_account(&paths, Some("work")).unwrap();
+        assert_eq!(name, "work");
     }
 }

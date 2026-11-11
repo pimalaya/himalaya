@@ -61,8 +61,16 @@ The active account context SHALL be threaded as a sibling argument through every
 ### Requirement: account check covers every declared backend
 `account check` SHALL check every backend the account declares and `--backend` allows, and print the report whole, one row `{backend, ok, code, error}` per backend, `code` and `error` `null` when the backend answered. When any fails, it SHALL exit 2 after the report, so a script reads the outcome from the exit code and each backend's code from its row. A pimdir block SHALL be checked by opening the store as a reader, listing its mailboxes, then opening a producer and probing it (`PimdirProducer::probe`), which takes and releases the staging lock without waiting and the database's write lock, writing nothing into the store, so an account declaring only a pimdir block is checked rather than refused as declaring no backend, and a store a write cannot reach fails the check rather than the first write: a collector holding the staging lock fails it at once with `store-busy`, and the check leaves nothing in objects/.
 
+### Requirement: An account list names every block
+`account list` SHALL print one row per account, `{name, default, backends}`, sorted by name, `backends` naming each block the account declares among `imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`, `mbox`, `pimdir`, `smtp` and `sieve`, in that order, whichever backends the build compiles. It SHALL load the configuration without taking an account.
+
+#### Scenario: A pimdir store
+- GIVEN an account declaring a `pimdir` block and an `smtp` block
+- WHEN `account list` runs
+- THEN its BACKENDS cell reads `pimdir,smtp`
+
 ### Requirement: Output discipline
-Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
+Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs, the welcome a person meets without a configuration (cairn/spec/config.md), and the failures of `mcp`, whose stdout carries protocol messages only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
 
 ### Requirement: Text output is plain text
 A text output SHALL be plain text: no border, no colour, nothing sized to or truncated for the terminal, and it SHALL end with a newline, the explicitly requested raw bytes (`message read --raw`, `attachment download --stdout`, `message parse --part` and `--section`) staying byte-exact.

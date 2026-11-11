@@ -80,7 +80,6 @@ impl Himalaya {
         cmd.args(args)
             .env("HOME", self.home.path())
             .env("XDG_CONFIG_HOME", self.home.path())
-            .env_remove("HIMALAYA_CONFIG")
             .env_remove("XDG_CONFIG_DIRS")
             .stdin(Stdio::null());
         cmd

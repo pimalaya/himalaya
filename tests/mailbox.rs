@@ -30,7 +30,6 @@ fn himalaya(dir: &Path, root: &Path, args: &[&str]) -> Value {
         .args(args)
         .env("HOME", dir)
         .env("XDG_CONFIG_HOME", dir)
-        .env_remove("HIMALAYA_CONFIG")
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::null())
         .output()
