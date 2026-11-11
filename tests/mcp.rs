@@ -349,6 +349,7 @@ fn a_path_given_as_a_message_is_not_read_from_disk() {
 }
 
 /// A configuration whose one account holds `blocks` alone.
+#[cfg(feature = "smtp")]
 fn account_with(dir: &Path, blocks: &str) -> PathBuf {
     let config = dir.join("config.toml");
     let account = format!("[accounts.a]\ndefault = true\nemail = \"a@example.org\"\n{blocks}");
