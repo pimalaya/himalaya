@@ -55,8 +55,8 @@ const WELL_KNOWN_FOLDERS: [(&str, MailboxRole); 6] = [
 
 impl MsgraphClient {
     /// Lists every Graph mail folder as a mailbox. Graph carries counts
-    /// inline, so `with_counts` is ignored.
-    pub fn list_mailboxes(&mut self, _with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// inline, kept only with `with_counts` as the other backends do.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         let params = MsgraphMailFoldersListParams {
             top: Some(100),
             ..Default::default()
@@ -71,7 +71,12 @@ impl MsgraphClient {
                     .iter()
                     .find(|(id, _)| *id == folder.id)
                     .map(|(_, role)| role.clone());
-                mailbox_from(folder, role)
+                let mut mailbox = mailbox_from(folder, role);
+                if !with_counts {
+                    mailbox.total = None;
+                    mailbox.unread = None;
+                }
+                mailbox
             })
             .collect())
     }
@@ -321,7 +326,7 @@ fn mailbox_from(folder: MsgraphMailFolder, role: Option<MailboxRole>) -> Mailbox
 
 /// Folds a Graph message into the shared [`Envelope`] shape. `size` is
 /// left `0`: the listing selection does not expose a raw size.
-fn envelope_from(message: MsgraphMessage) -> Envelope {
+pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     let flags = flags_from_message(&message);
     let message_id = message
         .internet_message_id

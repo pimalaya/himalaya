@@ -8,13 +8,15 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, list::GmailSendAsList};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    listing::Listing,
 };
 
 /// List all Gmail send-as aliases (settings.sendAs.list).
@@ -26,7 +28,7 @@ impl GmailSettingsSendAsListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -35,6 +37,7 @@ impl GmailSettingsSendAsListCommand {
         };
 
         printer.out(GmailSettingsSendAsListOutput {
+            account: account.name().to_string(),
             send_as: out.response.send_as,
         })
     }
@@ -44,17 +47,19 @@ impl GmailSettingsSendAsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsSendAsListOutput {
+    #[serde(skip)]
+    account: String,
     send_as: Vec<GmailSendAs>,
 }
 
 impl fmt::Display for GmailSettingsSendAsListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // NOTE: a display name is free text, so it reads last.
-        let mut columns = Columns::new(["EMAIL", "DEFAULT", "VERIFICATION", "NAME"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
 
         for send_as in &self.send_as {
             let default = if send_as.is_default == Some(true) {
-                "yes"
+                "default"
             } else {
                 ""
             };
@@ -64,14 +69,14 @@ impl fmt::Display for GmailSettingsSendAsListOutput {
                 .unwrap_or_default();
             let name = send_as.display_name.as_deref().unwrap_or_default();
 
-            columns.push([
-                &*sanitize::text(&send_as.send_as_email),
+            listing.items.push([
                 default,
                 status,
+                &*sanitize::text(&send_as.send_as_email),
                 &*sanitize::text(name),
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

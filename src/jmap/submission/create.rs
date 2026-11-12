@@ -44,7 +44,7 @@ impl JmapSubmissionCreateCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         // NOTE: the JMAP envelope is all or nothing, mail_from being
@@ -90,6 +90,8 @@ impl JmapSubmissionCreateCommand {
         }
 
         printer.out(JmapSubmissionQueryOutput {
+            account: account.name().to_string(),
+            page: None,
             submissions: output.created.into_values().collect(),
         })
     }

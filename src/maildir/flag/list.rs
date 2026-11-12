@@ -72,7 +72,7 @@ impl FlagRow {
 
 impl fmt::Display for MaildirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["CODE", "NAME"]);
+        let mut columns = Columns::default();
 
         for flag in &self.flags {
             columns.push([&flag.raw, &flag.name]);

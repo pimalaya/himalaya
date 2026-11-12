@@ -25,7 +25,7 @@ impl MsgraphMailFolderGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let mut folders = Vec::with_capacity(self.ids.len());
@@ -34,6 +34,6 @@ impl MsgraphMailFolderGetCommand {
             folders.push(client.mail_folder_get(&id)?.response);
         }
 
-        printer.out(MsgraphMailFolderListOutput::new(folders))
+        printer.out(MsgraphMailFolderListOutput::new(account, folders))
     }
 }

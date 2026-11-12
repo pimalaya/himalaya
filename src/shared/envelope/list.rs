@@ -7,7 +7,7 @@ use std::{collections::BTreeSet, fmt};
 use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
-use pimalaya_cli::{clap::args::PageTokenArg, columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,6 +15,7 @@ use crate::{
     account::context::Account,
     backend::Backend,
     email::{address::Address, envelope::Envelope, flag::Flag},
+    listing::{Listing, ListingPage},
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
 
@@ -138,107 +139,60 @@ pub struct EnvelopeListOutput {
     pub next_page: Option<String>,
 }
 
-impl EnvelopeListOutput {
-    /// The fields above the envelopes: the account with its backend, the
-    /// mailbox and the search query.
-    fn header(&self) -> Vec<(&'static str, String)> {
-        let mut account = sanitize::text(&self.account).into_owned();
-
-        if let Some(backend) = self.backend {
-            account.push_str(&format!(" ({backend})"));
-        }
-
-        let mut fields = vec![
-            ("Account", account),
-            ("Mailbox", sanitize::text(&self.mailbox).into_owned()),
-        ];
-
-        if let Some(query) = &self.query {
-            fields.push(("Query", sanitize::text(query).into_owned()));
-        }
-
-        fields
-    }
-
-    /// The fields under the envelopes: the page with the envelopes it
-    /// holds, and the flag reaching the next page.
-    fn footer(&self) -> Vec<(&'static str, String)> {
-        let mut fields = Vec::new();
-        let count = self.envelopes.len() as u64;
-        let (page, first) = match (self.page, self.page_size) {
-            (Some(page), Some(size)) => {
-                let first = u64::from(page - 1) * u64::from(size) + 1;
-                (page.to_string(), first)
-            }
-            _ => (String::from("all"), 1),
-        };
-
-        let range = match count {
-            0 => String::from("empty"),
-            1 => format!("envelope {first}"),
-            n => format!("envelopes {first} to {}", first + n - 1),
-        };
-
-        let last = match (self.page, &self.next_page) {
-            (Some(_), None) if count > 0 => ", the last",
-            _ => "",
-        };
-
-        fields.push(("Page", format!("{page}, {range}{last}")));
-
-        if let Some(token) = &self.next_page {
-            fields.push(("Next page", format!("--page {}", sanitize::text(token))));
-        }
-
-        fields
-    }
-}
-
-/// Writes `Label:  value` lines, values in one column on every page: two
-/// spaces after the longest label, `Next page:`.
-fn write_fields(f: &mut fmt::Formatter<'_>, fields: &[(&str, String)]) -> fmt::Result {
-    const WIDTH: usize = "Next page:".len() + 2;
-
-    for (label, value) in fields {
-        let label = format!("{label}:");
-        writeln!(f, "{label:<WIDTH$}{value}")?;
-    }
-
-    Ok(())
-}
-
 impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::default();
+        let mut listing = Listing::new(&self.account, self.backend);
+        listing.head("Mailbox", &self.mailbox);
+
+        if let Some(query) = &self.query {
+            listing.head("Query", query);
+        }
 
         for env in &self.envelopes {
-            let names = match self.recipient {
-                true if env.to.is_empty() => String::new(),
-                true => format!("to {}", format_names(&env.to)),
-                false => format_names(&env.from),
-            };
+            let fmt = &self.datetime_fmt;
+            let [id, flags, date, mut names, subject] =
+                envelope_cells(env, fmt, self.datetime_local_tz);
 
-            columns.push([
-                sanitize::text(&env.id).into_owned(),
-                format_flags(&env.flags, env.has_attachment),
-                format_date(env.date, &self.datetime_fmt, self.datetime_local_tz),
-                sanitize::text(&names).into_owned(),
-                sanitize::text(&env.subject).into_owned(),
-            ]);
+            if self.recipient {
+                names = match env.to.is_empty() {
+                    true => String::new(),
+                    false => sanitize::text(&format!("to {}", format_names(&env.to))).into_owned(),
+                };
+            }
+
+            listing.items.push([id, flags, date, names, subject]);
         }
 
-        write_fields(f, &self.header())?;
-        writeln!(f)?;
+        let page = match (self.page, self.page_size) {
+            (Some(page), Some(size)) => ListingPage::Numbered {
+                page: page.into(),
+                size: size.into(),
+            },
+            _ => ListingPage::All,
+        };
 
-        let rows = columns.to_string();
+        let count = self.envelopes.len();
+        listing.page(
+            page,
+            count,
+            ["envelope", "envelopes"],
+            self.next_page.as_deref(),
+        );
 
-        if !rows.is_empty() {
-            f.write_str(&rows)?;
-            writeln!(f)?;
-        }
-
-        write_fields(f, &self.footer())
+        write!(f, "{listing}")
     }
+}
+
+/// The cells of an envelope's line, sanitized: its id, its flags, its date,
+/// its senders' names and its subject.
+pub fn envelope_cells(env: &Envelope, datetime_fmt: &str, local_tz: bool) -> [String; 5] {
+    [
+        sanitize::text(&env.id).into_owned(),
+        format_flags(&env.flags, env.has_attachment),
+        format_date(env.date, datetime_fmt, local_tz),
+        sanitize::text(&format_names(&env.from)).into_owned(),
+        sanitize::text(&env.subject).into_owned(),
+    ]
 }
 
 /// Renders the flags of a message as four fixed columns: `*` when unread,
@@ -273,33 +227,9 @@ pub fn format_names(addrs: &[Address]) -> String {
         .join(", ")
 }
 
-/// Renders the state words of a message: `unread`, `answered`, `flagged`
-/// and `attachment`, in that order, each only when it applies.
-///
-/// An unknown attachment says nothing.
-#[cfg(feature = "pimdir")]
-pub fn format_state(flags: &BTreeSet<Flag>, has_attachment: Option<bool>) -> Vec<String> {
-    let mut state = Vec::new();
-
-    if !flags.iter().any(Flag::is_seen) {
-        state.push(String::from("unread"));
-    }
-    if flags.iter().any(Flag::is_answered) {
-        state.push(String::from("answered"));
-    }
-    if flags.iter().any(Flag::is_flagged) {
-        state.push(String::from("flagged"));
-    }
-    if has_attachment == Some(true) {
-        state.push(String::from("attachment"));
-    }
-
-    state
-}
-
 /// Renders addresses as a comma-separated list of `Name <email>`, or the
 /// bare email when it has no name.
-#[cfg(any(feature = "imap", feature = "pimdir"))]
+#[cfg(feature = "imap")]
 pub fn format_addresses(addrs: &[Address]) -> String {
     addrs
         .iter()
@@ -375,7 +305,7 @@ mod tests {
 
     /// One aligned line per envelope: the id, the flags, the date, the
     /// sender's name, then the subject, `-` standing for an empty value,
-    /// between the account and mailbox above and the page under.
+    /// under the account, the mailbox and the page.
     #[test]
     fn an_envelope_prints_on_one_line() {
         let mut envelopes = envelopes();
@@ -398,21 +328,19 @@ mod tests {
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
+Page:       1, envelopes 1 to 3, the last
 
 42  * !@  2026-11-11 10:00  Alice            Lunch on Friday?
 41   R    2026-11-11 10:00  bob@example.org  Re: the report
 40        -                 Carol            -
-
-Page:       1, envelopes 1 to 3, the last
 ";
         assert_eq!(envelopes.to_string(), expected);
     }
 
-    /// The footer names the envelopes the page holds, then the flag
-    /// reaching the next page while one follows, its values in the column
-    /// of the header's.
+    /// The header names the envelopes the page holds, then the flag
+    /// reaching the next page while one follows, its values in one column.
     #[test]
-    fn the_footer_tells_where_the_page_stands() {
+    fn the_header_tells_where_the_page_stands() {
         let mut envelopes = envelopes();
         envelopes.page = Some(2);
         envelopes.page_size = Some(2);
@@ -427,12 +355,11 @@ Page:       1, envelopes 1 to 3, the last
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
+Page:       2, envelopes 3 to 4
+Next page:  --page 3
 
 4        2026-11-11 10:00  Alice  Hi
 3        2026-11-11 10:00  Alice  Re: Hi
-
-Page:       2, envelopes 3 to 4
-Next page:  --page 3
 ";
         assert_eq!(envelopes.to_string(), expected);
 
@@ -443,10 +370,9 @@ Next page:  --page 3
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
+Page:       3, envelope 5, the last
 
 4        2026-11-11 10:00  Alice  Hi
-
-Page:       3, envelope 5, the last
 ";
         assert_eq!(envelopes.to_string(), expected);
 
@@ -456,7 +382,6 @@ Page:       3, envelope 5, the last
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
-
 Page:       4, empty
 ";
         assert_eq!(envelopes.to_string(), expected);
@@ -472,7 +397,6 @@ Page:       4, empty
 Account:    work (imap)
 Mailbox:    INBOX
 Query:      from alice order by date asc
-
 Page:       1, empty
 ";
         assert_eq!(envelopes.to_string(), expected);
@@ -496,11 +420,10 @@ Page:       1, empty
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
+Page:       1, envelopes 1 to 2, the last
 
 2        2026-11-11 10:00  to Bob  Hi
 1        -                 -       Notes
-
-Page:       1, envelopes 1 to 2, the last
 ";
         assert_eq!(envelopes.to_string(), expected);
     }

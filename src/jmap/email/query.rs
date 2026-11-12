@@ -10,22 +10,26 @@ use clap::{Parser, ValueEnum};
 use io_jmap::{
     rfc8620::filter::JmapFilter,
     rfc8621::email::{
-        JmapEmail, JmapEmailAddress,
+        JmapEmail,
         query::{
             JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
         },
     },
 };
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::jmap::client::JmapClient;
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    jmap::{
+        backend::{envelope_from, parse_rfc3339},
+        client::JmapClient,
+    },
+    listing::{Listing, ListingPage},
+    shared::envelope::list::envelope_cells,
+};
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -87,7 +91,14 @@ pub struct JmapEmailQueryCommand {
 
 impl JmapEmailQueryCommand {
     /// Queries the emails and prints the page it returned.
-    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
+        let mailbox = self.mailbox.clone();
+
         let filter = {
             let f = JmapEmailFilter {
                 in_mailbox: self.mailbox,
@@ -147,9 +158,9 @@ impl JmapEmailQueryCommand {
             ..Default::default()
         })?;
 
-        let emails = JmapEmailQueryOutput {
-            emails: output.emails,
-        };
+        let mut emails = JmapEmailQueryOutput::new(account, output.emails);
+        emails.mailbox = mailbox;
+        emails.page = Some((self.page.max(1), self.page_size));
 
         printer.out(emails)
     }
@@ -159,50 +170,64 @@ impl JmapEmailQueryCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapEmailQueryOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The chrono `strftime` format of a date.
+    #[serde(skip)]
+    pub datetime_fmt: String,
+    /// Whether a date is converted to the local timezone first.
+    #[serde(skip)]
+    pub datetime_local_tz: bool,
+    /// The mailbox id the query filtered on, if any.
+    #[serde(skip)]
+    pub mailbox: Option<String>,
+    /// The page listed and its size, `None` for a get.
+    #[serde(skip)]
+    pub page: Option<(u64, u64)>,
     /// The emails, in the order the server returned them.
     pub emails: Vec<JmapEmail>,
 }
 
+impl JmapEmailQueryOutput {
+    /// The emails of `account`, neither filtered nor paged.
+    pub fn new(account: &Account, emails: Vec<JmapEmail>) -> Self {
+        Self {
+            account: account.name().to_string(),
+            datetime_fmt: account.datetime_fmt().to_string(),
+            datetime_local_tz: account.datetime_local_tz(),
+            mailbox: None,
+            page: None,
+            emails,
+        }
+    }
+}
+
 impl fmt::Display for JmapEmailQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
 
-        for e in &self.emails {
-            let keyword = |name: &str| {
-                let keywords = e.keywords.as_ref();
-                keywords.and_then(|k| k.get(name)).copied().unwrap_or(false)
-            };
-
-            let mut state = Vec::new();
-            if !keyword("$seen") {
-                state.push(String::from("unread"));
-            }
-            if keyword("$answered") {
-                state.push(String::from("answered"));
-            }
-            if keyword("$flagged") {
-                state.push(String::from("flagged"));
-            }
-            if e.has_attachment == Some(true) {
-                state.push(String::from("attachment"));
-            }
-
-            let from = format_addresses(e.from.as_deref().unwrap_or_default());
-            let date = e.received_at.as_deref().unwrap_or_default();
-
-            let mut fields = Fields::default();
-            fields.push("From", sanitize::text(&from));
-            fields.push("Date", sanitize::text(date));
-
-            records.push(Record {
-                title: sanitize::text(e.id.as_deref().unwrap_or_default()).into_owned(),
-                state,
-                fields,
-                body: sanitize::text(e.subject.as_deref().unwrap_or_default()).into_owned(),
-            });
+        if let Some(mailbox) = &self.mailbox {
+            listing.head("Mailbox", mailbox);
         }
 
-        write!(f, "{records}")
+        for email in &self.emails {
+            let mut envelope = envelope_from(email.clone());
+            envelope.date = email.received_at.as_deref().and_then(parse_rfc3339);
+
+            let fmt = &self.datetime_fmt;
+            let cells = envelope_cells(&envelope, fmt, self.datetime_local_tz);
+            listing.items.push(cells);
+        }
+
+        if let Some((page, size)) = self.page {
+            let count = self.emails.len();
+            let next = (count as u64 >= size).then(|| (page + 1).to_string());
+            let page = ListingPage::Numbered { page, size };
+            listing.page(page, count, ["email", "emails"], next.as_deref());
+        }
+
+        write!(f, "{listing}")
     }
 }
 
@@ -253,17 +278,4 @@ impl From<SortArg> for JmapEmailSortProperty {
             SortArg::HasAttachment => JmapEmailSortProperty::HasAttachment,
         }
     }
-}
-
-/// Renders addresses as a comma-separated list of `Name <email>`, or the
-/// bare email when it has no name.
-fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
-    addrs
-        .iter()
-        .map(|a| match &a.name {
-            Some(name) if !name.is_empty() => format!("{name} <{}>", a.email),
-            _ => a.email.clone(),
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
 }

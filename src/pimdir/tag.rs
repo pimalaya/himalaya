@@ -7,22 +7,21 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    email::flag::Flag,
+    listing::Listing,
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
-        index::{PimdirMailCoverage, PimdirTagged, local_clock, parse_query},
+        index::{PimdirMailCoverage, PimdirTagStatus, PimdirTagged, local_clock, parse_query},
     },
+    shared::envelope::list::format_flags,
 };
 
 /// Add or remove flags on every message a query matches.
@@ -61,7 +60,7 @@ impl PimdirTagCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
         let add = flags(&self.add)?;
@@ -70,6 +69,8 @@ impl PimdirTagCommand {
 
         let tag = client.tag_mail(query, &add, &remove, self.dry_run, &local_clock())?;
         printer.out(PimdirTagOutput {
+            account: account.name().to_string(),
+            query: self.query.join(" "),
             tagged: tag.tagged,
             coverage: tag.coverage,
         })
@@ -93,6 +94,12 @@ fn flags(values: &[String]) -> Result<Vec<String>> {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirTagOutput {
+    /// The name of the account tagged.
+    #[serde(skip)]
+    pub account: String,
+    /// The query, its words joined by spaces.
+    #[serde(skip)]
+    pub query: String,
     /// One entry per mailbox holding each matched message.
     pub tagged: Vec<PimdirTagged>,
     /// What the query could not see: the tag reaches only what it found.
@@ -101,25 +108,33 @@ pub struct PimdirTagOutput {
 
 impl fmt::Display for PimdirTagOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        listing.head("Query", &self.query);
 
         for tagged in &self.tagged {
-            let mut fields = Fields::default();
-            fields.push("Mailbox", sanitize::text(&tagged.mailbox));
-            fields.push("Flags", sanitize::text(&tagged.flags.join(", ")));
+            // A placement whose flags were never read shows no flag.
+            let flags = match tagged.status {
+                PimdirTagStatus::UnknownFlags => String::from("    "),
+                _ => {
+                    let flags = tagged.flags.iter().map(Flag::from_raw).collect();
+                    format_flags(&flags, None)
+                }
+            };
 
-            if let Some(row) = tagged.queue_id {
-                fields.push("Row", row);
-            }
+            let row = tagged.queue_id.map(|row| row.to_string());
 
-            records.push(Record {
-                title: sanitize::text(&tagged.id).into_owned(),
-                state: vec![tagged.status.to_string()],
-                fields,
-                body: sanitize::text(&tagged.subject).into_owned(),
-            });
+            listing.items.push([
+                sanitize::text(&tagged.id).into_owned(),
+                flags,
+                tagged.status.to_string(),
+                sanitize::text(&tagged.mailbox).into_owned(),
+                row.unwrap_or_default(),
+                sanitize::text(&tagged.subject).into_owned(),
+            ]);
         }
 
-        self.coverage.write_under(f, &records)
+        self.coverage.note(&mut listing);
+
+        write!(f, "{listing}")
     }
 }

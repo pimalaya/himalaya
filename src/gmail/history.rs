@@ -25,11 +25,11 @@ impl GmailHistoryCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

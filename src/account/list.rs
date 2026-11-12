@@ -17,7 +17,7 @@ use crate::config::{AccountConfig, Config};
 /// List all accounts declared in the configuration.
 ///
 /// Each row shows the account name, the backends with a config block,
-/// and whether it is the default account.
+/// and `default` on the default account.
 #[derive(Debug, Parser)]
 pub struct AccountListCommand;
 
@@ -103,13 +103,13 @@ pub struct AccountListOutput {
 
 impl fmt::Display for AccountListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["NAME", "BACKENDS", "DEFAULT"]);
+        let mut columns = Columns::default();
 
         for account in &self.accounts {
             columns.push([
                 account.name.clone(),
                 account.backends.join(","),
-                String::from(if account.default { "yes" } else { "" }),
+                String::from(if account.default { "default" } else { "" }),
             ]);
         }
 

@@ -9,17 +9,14 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    listing::Listing,
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -63,7 +60,15 @@ impl AttachmentListCommand {
             .filter(|attachment| self.inline || attachment.role != PartRole::Inline)
             .collect();
 
-        printer.out(AttachmentListOutput { attachments })
+        let resolution = client.resolution();
+
+        printer.out(AttachmentListOutput {
+            account: resolution.account.clone(),
+            backend: resolution.storage,
+            mailbox,
+            message: self.message_id,
+            attachments,
+        })
     }
 }
 
@@ -122,42 +127,49 @@ impl Attachment {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AttachmentListOutput {
+    /// The name of the account read.
+    #[serde(skip)]
+    pub account: String,
+    /// The storage backend the account resolved to.
+    #[serde(skip)]
+    pub backend: Option<Backend>,
+    /// The mailbox of the message, its alias resolved.
+    #[serde(skip)]
+    pub mailbox: String,
+    /// The id of the message.
+    #[serde(skip)]
+    pub message: String,
     /// The attachments, in part order.
     pub attachments: Vec<Attachment>,
 }
 
 impl fmt::Display for AttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, self.backend);
+        listing.head("Mailbox", &self.mailbox);
+        listing.head("Message", &self.message);
+        listing.empty = Some("No attachments");
 
         for attachment in &self.attachments {
-            let text = |value: &Option<String>| {
-                sanitize::text(value.as_deref().unwrap_or_default()).into_owned()
+            let inline = match attachment.role {
+                PartRole::Inline => "inline",
+                _ => "",
             };
 
-            let mut state = Vec::new();
-            if attachment.role == PartRole::Inline {
-                state.push(String::from("inline"));
-            }
+            let size = format_size(attachment.size, BINARY.space_after_value(false));
+            let mime = attachment.mime.as_deref().unwrap_or_default();
+            let name = attachment.path.as_ref().or(attachment.filename.as_ref());
 
-            let mut fields = Fields::default();
-            fields.push("Filename", text(&attachment.filename));
-            fields.push("Type", text(&attachment.mime));
-            fields.push("Size", format_size(attachment.size, BINARY));
-
-            if attachment.path.is_some() {
-                fields.push("Path", text(&attachment.path));
-            }
-
-            records.push(Record {
-                title: sanitize::text(&attachment.id).into_owned(),
-                state,
-                fields,
-                body: String::new(),
-            });
+            listing.items.push([
+                sanitize::text(&attachment.id).into_owned(),
+                String::from(inline),
+                size,
+                sanitize::text(mime).into_owned(),
+                sanitize::text(name.map_or("", String::as_str)).into_owned(),
+            ]);
         }
 
-        write!(f, "{records}")
+        write!(f, "{listing}")
     }
 }
 
@@ -175,11 +187,14 @@ pub(super) fn mime_string(part: &MimeEntity) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::shared::{
-        attachment::list::{Attachment, AttachmentListOutput, attachments},
-        message::{
-            part::{self, PartRole},
-            read::MessageReadOutput,
+    use crate::{
+        backend::Backend,
+        shared::{
+            attachment::list::{Attachment, AttachmentListOutput, attachments},
+            message::{
+                part::{self, PartRole},
+                read::MessageReadOutput,
+            },
         },
     };
 
@@ -239,10 +254,10 @@ mod tests {
         );
     }
 
-    /// The list prints as records: the id with `inline` when the part is
-    /// one, the filename, type and size, and the path once downloaded.
+    /// One line per part: the id, `inline` when the part is one, the size,
+    /// the type, then the filename, or the path once downloaded.
     #[test]
-    fn the_list_prints_as_records() {
+    fn an_attachment_prints_on_one_line() {
         let attachment = |id: &str, name: &str, mime: &str, role, path: Option<&str>| Attachment {
             id: String::from(id),
             filename: Some(String::from(name)),
@@ -253,6 +268,10 @@ mod tests {
             path: path.map(String::from),
         };
         let attachments = AttachmentListOutput {
+            account: String::from("work"),
+            backend: Some(Backend::Imap),
+            mailbox: String::from("INBOX"),
+            message: String::from("42"),
             attachments: vec![
                 attachment("2", "logo.png", "image/png", PartRole::Inline, None),
                 attachment(
@@ -266,16 +285,33 @@ mod tests {
         };
 
         let expected = "\
-2 (inline)
-Filename:  logo.png
-Type:      image/png
-Size:      1 KiB
+Account:    work (imap)
+Mailbox:    INBOX
+Message:    42
 
-5
-Filename:  report.pdf
-Type:      application/pdf
-Size:      1 KiB
-Path:      /tmp/report.pdf
+2  inline  1KiB  image/png        logo.png
+5  -       1KiB  application/pdf  /tmp/report.pdf
+";
+        assert_eq!(attachments.to_string(), expected);
+    }
+
+    /// A message without attachments says so under the header.
+    #[test]
+    fn no_attachment_is_stated() {
+        let attachments = AttachmentListOutput {
+            account: String::from("work"),
+            backend: Some(Backend::Imap),
+            mailbox: String::from("INBOX"),
+            message: String::from("42"),
+            attachments: Vec::new(),
+        };
+
+        let expected = "\
+Account:    work (imap)
+Mailbox:    INBOX
+Message:    42
+
+No attachments
 ";
         assert_eq!(attachments.to_string(), expected);
     }
@@ -283,6 +319,10 @@ Path:      /tmp/report.pdf
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
         let attachments = AttachmentListOutput {
+            account: String::from("work"),
+            backend: None,
+            mailbox: String::from("INBOX"),
+            message: String::from("1"),
             attachments: vec![Attachment {
                 id: String::from("1"),
                 filename: Some(String::from("invoice\x1b]8;;https://example.org\x07.pdf")),

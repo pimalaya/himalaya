@@ -26,7 +26,7 @@ impl JmapMailboxGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let output = client.mailbox_get(JmapMailboxGetOptions {
@@ -39,6 +39,8 @@ impl JmapMailboxGetCommand {
         }
 
         printer.out(JmapMailboxQueryOutput {
+            account: account.name().to_string(),
+            page: None,
             mailboxes: output.mailboxes,
         })
     }

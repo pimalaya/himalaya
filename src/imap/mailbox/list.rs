@@ -8,14 +8,16 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     email::mailbox::MailboxRole,
     imap::{client::ImapClient, outcome},
+    listing::Listing,
 };
 
 /// List mailboxes (LIST and LSUB, RFC 3501).
@@ -40,7 +42,7 @@ impl ImapMailboxListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
         let reference = self.reference.try_into()?;
@@ -54,6 +56,7 @@ impl ImapMailboxListCommand {
             };
 
             Ok(ImapMailboxListOutput {
+                account: account.name().to_string(),
                 mailboxes: mailboxes.into_iter().map(From::from).collect(),
             })
         })();
@@ -66,15 +69,18 @@ impl ImapMailboxListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapMailboxListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<MailboxRow>,
 }
 
 impl fmt::Display for ImapMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last, and the attributes
-        // join without a blank, so each line still splits on blanks.
-        let mut columns = Columns::new(["DELIMITER", "ROLE", "ATTRIBUTES", "NAME"]);
+        // NOTE: the attributes join without a blank, so a line still splits
+        // on blanks.
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
 
         for mbox in &self.mailboxes {
             let role = mbox
@@ -86,7 +92,7 @@ impl fmt::Display for ImapMailboxListOutput {
                 })
                 .unwrap_or_default();
 
-            columns.push([
+            listing.items.push([
                 sanitize::text(&mbox.delimiter).into_owned(),
                 role,
                 sanitize::text(&mbox.attributes.join(",")).into_owned(),
@@ -94,7 +100,7 @@ impl fmt::Display for ImapMailboxListOutput {
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 

@@ -121,7 +121,10 @@ impl EmailClient {
             return Err(account_config.no_backend_error(name, backend, &supported));
         }
 
-        let account = Account::from(config).merge(Account::from(account_config));
+        let account = Account {
+            name: Some(name.to_string()),
+            ..Account::from(config).merge(Account::from(account_config))
+        };
 
         Ok((
             account,

@@ -300,7 +300,10 @@ pub fn build_pimdir_client(
         .pimdir
         .take()
         .ok_or_else(|| anyhow!("pimdir config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(account_config));
+    let account = Account {
+        name: Some(name.to_string()),
+        ..Account::from(config).merge(Account::from(account_config))
+    };
     Ok((account, PimdirClient::new(pimdir_config)?))
 }
 

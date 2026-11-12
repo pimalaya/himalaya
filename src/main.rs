@@ -100,11 +100,11 @@
 //! carries the logs, the welcome, the REPL's prompt and its help in a
 //! JSON session, and the failures of the MCP server, whose stdout is the
 //! protocol's. Text output is plain text, with no border, no colour and
-//! nothing sized to the terminal: a list of short rows prints as aligned
-//! columns, a wide one as records the way `git log` prints commits, and a
-//! record as aligned `Label: value` lines. Each command's doc comment is
-//! its `--help`, so `himalaya <command> --help` is the canonical usage
-//! reference.
+//! nothing sized to the terminal: a list prints one item per line as
+//! aligned columns between the fields placing it (the account above, the
+//! page under), and a record as aligned `Label: value` lines. Each
+//! command's doc comment is its `--help`, so `himalaya <command> --help`
+//! is the canonical usage reference.
 
 mod account;
 mod backend;
@@ -121,6 +121,7 @@ mod imap;
 #[cfg(feature = "jmap")]
 mod jmap;
 mod json_schema;
+mod listing;
 #[cfg(feature = "m2dir")]
 mod m2dir;
 #[cfg(feature = "maildir")]

@@ -136,7 +136,10 @@ pub fn build_imap_client(
         .imap
         .take()
         .ok_or_else(|| anyhow!("IMAP config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(account_config));
+    let account = Account {
+        name: Some(name.to_string()),
+        ..Account::from(config).merge(Account::from(account_config))
+    };
     let client = ImapClient::new(imap_config)?;
     Ok((account, client))
 }

@@ -7,11 +7,16 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::{GmailLabel, GmailLabelType};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::client::GmailClient,
+    listing::{self, Listing},
+};
 
 /// List all Gmail labels (users.labels.list).
 #[derive(Debug, Parser)]
@@ -22,12 +27,12 @@ impl GmailLabelsListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let labels = client.labels_list()?.response.labels;
 
-        printer.out(GmailLabelListOutput::new(labels))
+        printer.out(GmailLabelListOutput::new(account, labels))
     }
 }
 
@@ -35,40 +40,39 @@ impl GmailLabelsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailLabelListOutput {
+    #[serde(skip)]
+    account: String,
     labels: Vec<GmailLabel>,
 }
 
 impl GmailLabelListOutput {
-    /// Wraps the labels, shared by the `list` and `get` commands.
-    pub fn new(labels: Vec<GmailLabel>) -> Self {
-        Self { labels }
+    /// Wraps the labels of `account`, shared by the `list` and `get`
+    /// commands.
+    pub fn new(account: &Account, labels: Vec<GmailLabel>) -> Self {
+        Self {
+            account: account.name().to_string(),
+            labels,
+        }
     }
 }
 
 impl fmt::Display for GmailLabelListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut columns = Columns::new(["ID", "TYPE", "TOTAL", "UNREAD", "NAME"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
 
         for label in &self.labels {
             let label_type = label.label_type.map(label_type_wire).unwrap_or_default();
 
-            columns.push([
+            listing.items.push([
                 sanitize::text(&label.id).into_owned(),
                 label_type.to_string(),
-                count(label.messages_total),
-                count(label.messages_unread),
+                listing::counts(label.messages_unread, label.messages_total),
                 sanitize::text(&label.name).into_owned(),
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
-}
-
-/// Renders a count, or an empty cell when Gmail gave none.
-fn count(value: Option<impl ToString>) -> String {
-    value.map(|n| n.to_string()).unwrap_or_default()
 }
 
 /// Map a label type to its Gmail wire spelling for display.

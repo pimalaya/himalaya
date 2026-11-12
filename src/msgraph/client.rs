@@ -104,7 +104,10 @@ pub fn build_msgraph_client(
         .msgraph
         .take()
         .ok_or_else(|| anyhow!("Microsoft Graph config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(account_config));
+    let account = Account {
+        name: Some(name.to_string()),
+        ..Account::from(config).merge(Account::from(account_config))
+    };
     let client = MsgraphClient::new(msgraph_config)?;
     Ok((account, client))
 }

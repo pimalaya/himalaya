@@ -10,17 +10,16 @@ use io_gmail::v1::rest::history::{
     GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
 };
-use pimalaya_cli::{
-    fields::Fields,
-    output::Paginated,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::gmail::client::GmailClient;
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::client::GmailClient,
+    listing::{Listing, ListingPage},
+};
 
 /// List the changes applied to the mailbox since a given history id.
 ///
@@ -49,7 +48,12 @@ pub struct GmailHistoryListCommand {
 
 impl GmailHistoryListCommand {
     /// Lists one page of history records and prints it.
-    pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut GmailClient,
+    ) -> Result<()> {
         let types: Vec<GmailHistoryType> =
             self.history_types.iter().copied().map(Into::into).collect();
 
@@ -73,13 +77,12 @@ impl GmailHistoryListCommand {
             .map(GmailHistoryRecordOutput::from)
             .collect();
 
-        let output = GmailHistoryListOutput {
+        printer.out(GmailHistoryListOutput {
+            account: account.name().to_string(),
+            since: self.start_history_id,
+            label: self.label_id,
             history_id: resp.history_id,
             history,
-        };
-
-        printer.out(Paginated {
-            inner: output,
             next_page: resp.next_page_token,
         })
     }
@@ -115,57 +118,69 @@ impl From<HistoryTypeArg> for GmailHistoryType {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryListOutput {
+    #[serde(skip)]
+    account: String,
+    #[serde(skip)]
+    since: String,
+    #[serde(skip)]
+    label: Option<String>,
     history_id: Option<String>,
     history: Vec<GmailHistoryRecordOutput>,
+    next_page: Option<String>,
 }
 
 impl fmt::Display for GmailHistoryListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut fields = Fields::default();
-        let history_id = self.history_id.as_deref().unwrap_or_default();
-        fields.push("New history id", sanitize::text(history_id));
-        write!(f, "{fields}")?;
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        listing.head("Since", &self.since);
 
-        let ids = |ids: &[String]| sanitize::text(&ids.join(", ")).into_owned();
-        let labels = |changes: &[GmailHistoryLabelOutput]| {
-            changes
-                .iter()
-                .map(|change| format!("{} ({})", change.message_id, change.label_ids.join(", ")))
-                .map(|line| sanitize::text(&line).into_owned())
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
-
-        let mut records = Records::default();
+        if let Some(label) = &self.label {
+            listing.head("Label", label);
+        }
 
         for record in &self.history {
-            let changes = [
-                ("Added", ids(&record.messages_added)),
-                ("Deleted", ids(&record.messages_deleted)),
-                ("Labeled", labels(&record.labels_added)),
-                ("Unlabeled", labels(&record.labels_removed)),
-            ];
+            let id = sanitize::text(&record.id).into_owned();
+            let line = |change: &str, message: &str, labels: &[String]| {
+                [
+                    id.clone(),
+                    String::from(change),
+                    sanitize::text(message).into_owned(),
+                    sanitize::text(&labels.join(",")).into_owned(),
+                ]
+            };
 
-            let mut fields = Fields::default();
-            for (label, value) in changes {
-                if !value.is_empty() {
-                    fields.push(label, value);
-                }
+            for message in &record.messages_added {
+                listing.items.push(line("added", message, &[]));
             }
 
-            records.push(Record {
-                title: sanitize::text(&record.id).into_owned(),
-                state: Vec::new(),
-                fields,
-                body: String::new(),
-            });
+            for message in &record.messages_deleted {
+                listing.items.push(line("deleted", message, &[]));
+            }
+
+            for change in &record.labels_added {
+                let labels = &change.label_ids;
+                listing
+                    .items
+                    .push(line("labeled", &change.message_id, labels));
+            }
+
+            for change in &record.labels_removed {
+                let labels = &change.label_ids;
+                listing
+                    .items
+                    .push(line("unlabeled", &change.message_id, labels));
+            }
         }
 
-        if !records.items.is_empty() {
-            writeln!(f)?;
-        }
+        let count = self.history.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["record", "records"], next);
 
-        write!(f, "{records}")
+        let history_id = self.history_id.as_deref().unwrap_or_default();
+        let history_id = sanitize::text(history_id).into_owned();
+        listing.header.push(("History id", history_id));
+
+        write!(f, "{listing}")
     }
 }
 

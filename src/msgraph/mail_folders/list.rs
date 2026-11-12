@@ -10,16 +10,16 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    listing::{self, Listing},
+    msgraph::client::MsgraphClient,
+};
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).
 #[derive(Debug, Parser)]
@@ -44,7 +44,7 @@ impl MsgraphMailFolderListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
@@ -55,7 +55,7 @@ impl MsgraphMailFolderListCommand {
         };
         let folders = client.mail_folders_list(&params)?.response.value;
 
-        printer.out(MsgraphMailFolderListOutput::new(folders))
+        printer.out(MsgraphMailFolderListOutput::new(account, folders))
     }
 }
 
@@ -64,36 +64,35 @@ impl MsgraphMailFolderListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphMailFolderListOutput {
+    #[serde(skip)]
+    account: String,
     folders: Vec<MsgraphMailFolder>,
 }
 
 impl MsgraphMailFolderListOutput {
-    /// Wraps the folders the server returned.
-    pub fn new(folders: Vec<MsgraphMailFolder>) -> Self {
-        Self { folders }
+    /// Wraps the folders the server returned for `account`.
+    pub fn new(account: &Account, folders: Vec<MsgraphMailFolder>) -> Self {
+        Self {
+            account: account.name().to_string(),
+            folders,
+        }
     }
 }
 
 impl fmt::Display for MsgraphMailFolderListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
 
         for folder in &self.folders {
-            let mut fields = Fields::default();
-            fields.push("Name", sanitize::text(&folder.display_name));
-            fields.push("Total", count(folder.total_item_count));
-            fields.push("Unread", count(folder.unread_item_count));
-            fields.push("Children", count(folder.child_folder_count));
-
-            records.push(Record {
-                title: sanitize::text(&folder.id).into_owned(),
-                state: Vec::new(),
-                fields,
-                body: String::new(),
-            });
+            listing.items.push([
+                sanitize::text(&folder.id).into_owned(),
+                listing::counts(folder.unread_item_count, folder.total_item_count),
+                count(folder.child_folder_count),
+                sanitize::text(&folder.display_name).into_owned(),
+            ]);
         }
 
-        write!(f, "{records}")
+        write!(f, "{listing}")
     }
 }
 

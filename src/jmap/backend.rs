@@ -691,7 +691,7 @@ fn compute_position_limit(page: Option<u32>, page_size: Option<u32>) -> (Option<
 }
 
 /// Folds a JMAP email object into the shared [`Envelope`] shape.
-fn envelope_from(email: JmapEmail) -> Envelope {
+pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
     let id = email.id.unwrap_or_default();
     let flags = email
         .keywords
@@ -751,7 +751,7 @@ fn address_from(addr: JmapEmailAddress) -> Address {
     }
 }
 
-fn parse_rfc3339(raw: &str) -> Option<DateTime<FixedOffset>> {
+pub(crate) fn parse_rfc3339(raw: &str) -> Option<DateTime<FixedOffset>> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;

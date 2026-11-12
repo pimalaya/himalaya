@@ -12,13 +12,15 @@ use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     types::flag::{Flag, FlagPerm},
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
+    listing::Listing,
 };
 
 /// List the flags a mailbox allows (SELECT response, RFC 3501).
@@ -35,9 +37,10 @@ impl ImapFlagListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
+        let name = self.mailbox_name.inner.clone();
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -46,6 +49,8 @@ impl ImapFlagListCommand {
             let permanent_flags = data.permanent_flags.unwrap_or_default();
 
             Ok(ImapFlagListOutput {
+                account: account.name().to_string(),
+                mailbox: name,
                 flags,
                 permanent_flags,
             })
@@ -60,6 +65,12 @@ impl ImapFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapFlagListOutput<'a> {
+    /// The name of the account listed.
+    #[serde(skip)]
+    account: String,
+    /// The mailbox selected.
+    #[serde(skip)]
+    mailbox: String,
     #[serde(serialize_with = "serialize_flags")]
     #[schemars(with = "Vec<String>")]
     flags: Vec<Flag<'a>>,
@@ -91,13 +102,15 @@ impl ImapFlagListOutput<'_> {
 
 impl fmt::Display for ImapFlagListOutput<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["FLAG", "PERMANENT"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+        listing.head("Mailbox", &self.mailbox);
 
         for (flag, perm) in self.build_entries() {
-            columns.push([&*sanitize::text(&flag), if perm { "true" } else { "" }]);
+            let perm = if perm { "permanent" } else { "" };
+            listing.items.push([&*sanitize::text(&flag), perm]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 

@@ -153,10 +153,9 @@ fn a_line_json_flag_switches_that_line_alone() {
     let expected = [
         "Account:    a (maildir)",
         "Mailbox:    inbox",
+        "Page:       1, envelope 1, the last",
         "",
         "m1        -  a@example.org  Hello there",
-        "",
-        "Page:       1, envelope 1, the last",
     ];
     assert_eq!(text, expected, "{stdout}");
 }

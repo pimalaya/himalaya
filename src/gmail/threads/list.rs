@@ -10,11 +10,16 @@ use io_gmail::v1::rest::threads::{
     GmailThreadSummary,
     list::{GmailThreadsList, GmailThreadsListParams},
 };
-use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::client::GmailClient,
+    listing::{Listing, ListingPage},
+};
 
 /// List Gmail threads matching the given query and labels
 /// (users.threads.list).
@@ -45,7 +50,7 @@ impl GmailThreadsListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -61,14 +66,12 @@ impl GmailThreadsListCommand {
         };
         let response = out.response;
 
-        let next_page = response.next_page_token;
-        let threads = GmailThreadListOutput {
+        printer.out(GmailThreadListOutput {
+            account: account.name().to_string(),
+            query: self.query,
+            labels: self.labels,
             threads: response.threads,
-        };
-
-        printer.out(Paginated {
-            inner: threads,
-            next_page,
+            next_page: response.next_page_token,
         })
     }
 }
@@ -77,23 +80,46 @@ impl GmailThreadsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailThreadListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The search query, if any.
+    #[serde(skip)]
+    pub query: Option<String>,
+    /// The label ids every thread carries.
+    #[serde(skip)]
+    pub labels: Vec<String>,
     /// The threads of this page.
     pub threads: Vec<GmailThreadSummary>,
+    /// The cursor of the next page, `null` once the listing is complete,
+    /// given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl fmt::Display for GmailThreadListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a snippet is free text, so it reads last.
-        let mut columns = Columns::new(["ID", "HISTORY ID", "SNIPPET"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+
+        if !self.labels.is_empty() {
+            listing.head("Labels", &self.labels.join(", "));
+        }
+
+        if let Some(query) = &self.query {
+            listing.head("Query", query);
+        }
 
         for thread in &self.threads {
-            columns.push([
+            listing.items.push([
                 sanitize::text(&thread.id),
                 sanitize::text(thread.history_id.as_deref().unwrap_or_default()),
                 sanitize::text(thread.snippet.as_deref().unwrap_or_default()),
             ]);
         }
 
-        write!(f, "{columns}")
+        let count = self.threads.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["thread", "threads"], next);
+
+        write!(f, "{listing}")
     }
 }

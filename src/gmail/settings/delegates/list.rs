@@ -10,13 +10,15 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::list::{
     GmailDelegatesList, GmailDelegatesListResponse,
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    listing::Listing,
 };
 
 /// List all Gmail delegates (users.settings.delegates.list).
@@ -28,7 +30,7 @@ impl GmailSettingsDelegatesListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -37,7 +39,10 @@ impl GmailSettingsDelegatesListCommand {
         };
         let resp = out.response;
 
-        printer.out(GmailSettingsDelegateListOutput { response: resp })
+        printer.out(GmailSettingsDelegateListOutput {
+            account: account.name().to_string(),
+            response: resp,
+        })
     }
 }
 
@@ -45,13 +50,15 @@ impl GmailSettingsDelegatesListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsDelegateListOutput {
+    #[serde(skip)]
+    account: String,
     #[serde(flatten)]
     response: GmailDelegatesListResponse,
 }
 
 impl fmt::Display for GmailSettingsDelegateListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["EMAIL", "VERIFICATION"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
 
         for delegate in &self.response.delegates {
             let status = delegate
@@ -59,9 +66,11 @@ impl fmt::Display for GmailSettingsDelegateListOutput {
                 .map(verification_status_wire)
                 .unwrap_or_default();
 
-            columns.push([&*sanitize::text(&delegate.delegate_email), status]);
+            listing
+                .items
+                .push([status, &*sanitize::text(&delegate.delegate_email)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

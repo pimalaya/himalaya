@@ -7,12 +7,14 @@ use std::{collections::HashMap, fmt};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    listing::Listing,
     pimdir::{
         client::PimdirClient,
         index::{PimdirListStyle, PimdirMailThread},
@@ -44,6 +46,7 @@ impl PimdirThreadCommand {
     ) -> Result<()> {
         let thread = client.mail_thread(&self.id)?;
         printer.out(PimdirThreadOutput {
+            account: account.name().to_string(),
             style: PimdirListStyle::new(account),
             thread,
         })
@@ -54,6 +57,9 @@ impl PimdirThreadCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirThreadOutput {
+    /// The name of the account read.
+    #[serde(skip)]
+    pub account: String,
     /// How the list renders.
     #[serde(skip)]
     pub style: PimdirListStyle,
@@ -64,7 +70,11 @@ pub struct PimdirThreadOutput {
 
 impl fmt::Display for PimdirThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+
+        if let Some(thread) = &self.thread.thread {
+            listing.head("Thread", thread);
+        }
 
         for (i, depth) in self.reply_order() {
             let hit = &self.thread.hits[i];
@@ -72,7 +82,7 @@ impl fmt::Display for PimdirThreadOutput {
             let indent = "  ".repeat(depth);
             let subject = sanitize::text(&envelope.subject);
 
-            columns.push([
+            listing.items.push([
                 sanitize::text(&envelope.id).into_owned(),
                 format_flags(&envelope.flags, envelope.has_attachment),
                 self.style.date(envelope.date),
@@ -82,7 +92,7 @@ impl fmt::Display for PimdirThreadOutput {
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 
@@ -191,6 +201,7 @@ mod tests {
     #[test]
     fn replies_follow_their_parent() {
         let output = PimdirThreadOutput {
+            account: String::from("work"),
             style: PimdirListStyle {
                 datetime_fmt: String::from("%F %R"),
                 datetime_local_tz: false,
@@ -210,6 +221,9 @@ mod tests {
         };
 
         let expected = "\
+Account:    work (pimdir)
+Thread:     t1
+
 1        2026-11-11 10:00  INBOX          Me     Lunch
 2  *     2026-11-11 10:00  INBOX,Archive  Alice    Re: Lunch
 3        2026-11-11 10:00  Sent           Me         Re: Lunch

@@ -10,11 +10,16 @@ use io_gmail::v1::rest::drafts::{
     GmailDraft,
     list::{GmailDraftsList, GmailDraftsListParams},
 };
-use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::client::GmailClient,
+    listing::{Listing, ListingPage},
+};
 
 /// List Gmail drafts (users.drafts.list).
 #[derive(Debug, Parser)]
@@ -40,7 +45,7 @@ impl GmailDraftsListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -55,14 +60,11 @@ impl GmailDraftsListCommand {
         };
         let response = out.response;
 
-        let next_page = response.next_page_token;
-        let drafts = GmailDraftListOutput {
+        printer.out(GmailDraftListOutput {
+            account: account.name().to_string(),
+            query: self.query,
             drafts: response.drafts,
-        };
-
-        printer.out(Paginated {
-            inner: drafts,
-            next_page,
+            next_page: response.next_page_token,
         })
     }
 }
@@ -71,13 +73,26 @@ impl GmailDraftsListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailDraftListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The search query, if any.
+    #[serde(skip)]
+    pub query: Option<String>,
     /// The drafts of this page.
     pub drafts: Vec<GmailDraft>,
+    /// The cursor of the next page, `null` once the listing is complete,
+    /// given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl fmt::Display for GmailDraftListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["DRAFT ID", "MESSAGE ID", "THREAD ID"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+
+        if let Some(query) = &self.query {
+            listing.head("Query", query);
+        }
 
         for draft in &self.drafts {
             let message = draft.message.as_ref();
@@ -86,13 +101,17 @@ impl fmt::Display for GmailDraftListOutput {
                 .and_then(|m| m.thread_id.as_deref())
                 .unwrap_or_default();
 
-            columns.push([
+            listing.items.push([
                 sanitize::text(&draft.id),
                 sanitize::text(message_id),
                 sanitize::text(thread_id),
             ]);
         }
 
-        write!(f, "{columns}")
+        let count = self.drafts.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["draft", "drafts"], next);
+
+        write!(f, "{listing}")
     }
 }

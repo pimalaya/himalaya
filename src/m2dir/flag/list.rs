@@ -6,12 +6,14 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    listing::Listing,
     m2dir::{
         arg::{M2dirNameFlag, MessageIdArg},
         client::M2dirClient,
@@ -35,7 +37,7 @@ impl M2dirFlagListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
         let store = client.open_store()?;
@@ -44,6 +46,9 @@ impl M2dirFlagListCommand {
         let flags = client.read_flags(&m2dir, &self.id.inner)?;
 
         printer.out(M2dirFlagListOutput {
+            account: account.name().to_string(),
+            m2dir: self.m2dir.inner,
+            message: self.id.inner,
             flags: flags.iter().map(str::to_owned).collect(),
         })
     }
@@ -53,17 +58,28 @@ impl M2dirFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct M2dirFlagListOutput {
+    /// The name of the account read.
+    #[serde(skip)]
+    account: String,
+    /// The folder of the message.
+    #[serde(skip)]
+    m2dir: String,
+    /// The id of the message.
+    #[serde(skip)]
+    message: String,
     flags: Vec<String>,
 }
 
 impl fmt::Display for M2dirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["FLAG"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::M2dir));
+        listing.head("Mailbox", &self.m2dir);
+        listing.head("Message", &self.message);
 
         for flag in &self.flags {
-            columns.push([sanitize::text(flag)]);
+            listing.items.push([sanitize::text(flag)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

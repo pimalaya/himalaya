@@ -137,7 +137,13 @@ impl AttachmentDownloadCommand {
             );
         }
 
+        let resolution = client.resolution();
+
         let attachments = AttachmentListOutput {
+            account: resolution.account.clone(),
+            backend: resolution.storage,
+            mailbox,
+            message: self.message_id,
             attachments: written,
         };
 

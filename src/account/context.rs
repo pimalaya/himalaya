@@ -32,6 +32,8 @@ const DEFAULT_SIGNATURE_DELIM: &str = "-- \n";
 /// Merged runtime account settings consumed by every command.
 #[derive(Debug, Default)]
 pub struct Account {
+    /// Name of the account, from its `[accounts.<name>]` block.
+    pub name: Option<String>,
     /// Address the account sends as.
     pub email: Option<String>,
     /// Name that address carries.
@@ -68,6 +70,8 @@ impl Account {
         mailbox_alias.extend(other.mailbox_alias);
 
         Self {
+            name: other.name.or(self.name),
+
             email: other.email.or(self.email),
             display_name: other.display_name.or(self.display_name),
             signature: other.signature.or(self.signature),
@@ -86,6 +90,12 @@ impl Account {
             reply_posting_style: other.reply_posting_style.or(self.reply_posting_style),
             forward_posting_style: other.forward_posting_style.or(self.forward_posting_style),
         }
+    }
+
+    /// Name of the account, empty until the dispatch names it.
+    #[cfg(any(backend, feature = "sieve"))]
+    pub fn name(&self) -> &str {
+        self.name.as_deref().unwrap_or_default()
     }
 }
 
@@ -244,6 +254,8 @@ fn lowercase_alias_keys(aliases: HashMap<String, String>) -> HashMap<String, Str
 impl From<Config> for Account {
     fn from(config: Config) -> Self {
         Self {
+            name: None,
+
             // NOTE: the address is per-account by nature, so only the
             // name it carries has a global default.
             email: None,
@@ -268,6 +280,8 @@ impl From<Config> for Account {
 impl From<AccountConfig> for Account {
     fn from(config: AccountConfig) -> Self {
         Self {
+            name: None,
+
             email: config.email,
             display_name: config.display_name,
             signature: config.signature,

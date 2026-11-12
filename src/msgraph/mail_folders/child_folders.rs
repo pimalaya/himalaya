@@ -40,7 +40,7 @@ impl MsgraphChildFoldersListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
@@ -54,6 +54,6 @@ impl MsgraphChildFoldersListCommand {
             .response
             .value;
 
-        printer.out(MsgraphMailFolderListOutput::new(folders))
+        printer.out(MsgraphMailFolderListOutput::new(account, folders))
     }
 }

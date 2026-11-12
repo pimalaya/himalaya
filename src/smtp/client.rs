@@ -114,7 +114,10 @@ pub fn build_smtp_client(
         .smtp
         .take()
         .ok_or_else(|| anyhow!("SMTP config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(account_config));
+    let account = Account {
+        name: Some(name.to_string()),
+        ..Account::from(config).merge(Account::from(account_config))
+    };
     let client = SmtpClient::new(smtp_config)?;
     Ok((account, client))
 }

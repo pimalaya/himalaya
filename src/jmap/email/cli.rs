@@ -6,13 +6,17 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{
-    client::JmapClient,
-    email::{
-        copy::JmapEmailCopyCommand, delete::JmapEmailDestroyCommand,
-        export::JmapEmailExportCommand, get::JmapEmailGetCommand, import::JmapEmailImportCommand,
-        parse::JmapEmailParseCommand, query::JmapEmailQueryCommand, read::JmapEmailReadCommand,
-        update::JmapEmailUpdateCommand,
+use crate::{
+    account::context::Account,
+    jmap::{
+        client::JmapClient,
+        email::{
+            copy::JmapEmailCopyCommand, delete::JmapEmailDestroyCommand,
+            export::JmapEmailExportCommand, get::JmapEmailGetCommand,
+            import::JmapEmailImportCommand, parse::JmapEmailParseCommand,
+            query::JmapEmailQueryCommand, read::JmapEmailReadCommand,
+            update::JmapEmailUpdateCommand,
+        },
     },
 };
 
@@ -44,10 +48,15 @@ pub enum JmapEmailCommand {
 
 impl JmapEmailCommand {
     /// Runs the subcommand against the account's JMAP client.
-    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.execute(printer, client),
-            Self::Query(cmd) => cmd.execute(printer, client),
+            Self::Get(cmd) => cmd.execute(printer, account, client),
+            Self::Query(cmd) => cmd.execute(printer, account, client),
             Self::Read(cmd) => cmd.execute(printer, client),
             Self::Update(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),

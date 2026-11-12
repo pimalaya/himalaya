@@ -102,7 +102,7 @@ The configuration SHALL hold no colour, no table shape and no glyph: `*.list.tab
 #### Scenario: A v2 glyph key
 - GIVEN an account setting `envelope.list.table.unseen-char = "N"`
 - WHEN `envelope list` runs
-- THEN the configuration loads and an unread message reads `unread` among its state words
+- THEN the configuration loads and an unread message shows `*` in its first flag column
 
 #### Scenario: A typo under envelope.list
 - GIVEN an account setting `envelope.list.datetime-fnt`

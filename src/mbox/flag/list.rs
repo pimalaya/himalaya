@@ -69,7 +69,7 @@ pub struct FlagRow {
 
 impl fmt::Display for MboxFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["CODE", "HEADER", "NAME"]);
+        let mut columns = Columns::default();
 
         for flag in &self.flags {
             columns.push([&flag.raw, &flag.header, &flag.name]);

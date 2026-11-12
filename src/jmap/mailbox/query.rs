@@ -14,11 +14,16 @@ use io_jmap::rfc8621::mailbox::{
         JmapMailboxSortProperty,
     },
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, jmap::client::JmapClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    jmap::client::JmapClient,
+    listing::{self, Listing, ListingPage},
+};
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
 ///
@@ -63,7 +68,7 @@ impl JmapMailboxQueryCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
@@ -98,6 +103,8 @@ impl JmapMailboxQueryCommand {
         })?;
 
         printer.out(JmapMailboxQueryOutput {
+            account: account.name().to_string(),
+            page: Some((self.page.max(1), self.page_size)),
             mailboxes: output.mailboxes,
         })
     }
@@ -108,15 +115,19 @@ impl JmapMailboxQueryCommand {
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapMailboxQueryOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The page listed and its size, `None` for a get.
+    #[serde(skip)]
+    pub page: Option<(u64, u64)>,
     /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<JmapMailbox>,
 }
 
 impl fmt::Display for JmapMailboxQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let header = ["ID", "ROLE", "TOTAL", "UNREAD", "SUBSCRIBED", "NAME"];
-        let mut columns = Columns::new(header);
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
 
         for mailbox in &self.mailboxes {
             let text = |value: &Option<String>| {
@@ -124,17 +135,30 @@ impl fmt::Display for JmapMailboxQueryOutput {
             };
             let role = mailbox.role.as_ref().map(ToString::to_string);
 
-            columns.push([
+            listing.items.push([
                 text(&mailbox.id),
                 role.unwrap_or_default(),
-                mailbox.total_emails.to_string(),
-                mailbox.unread_emails.to_string(),
-                String::from(if mailbox.is_subscribed { "yes" } else { "" }),
+                listing::counts(
+                    Some(u64::from(mailbox.unread_emails)),
+                    Some(u64::from(mailbox.total_emails)),
+                ),
+                String::from(if mailbox.is_subscribed {
+                    "subscribed"
+                } else {
+                    ""
+                }),
                 text(&mailbox.name),
             ]);
         }
 
-        write!(f, "{columns}")
+        if let Some((page, size)) = self.page {
+            let count = self.mailboxes.len();
+            let next = (count as u64 >= size).then(|| (page + 1).to_string());
+            let page = ListingPage::Numbered { page, size };
+            listing.page(page, count, ["mailbox", "mailboxes"], next.as_deref());
+        }
+
+        write!(f, "{listing}")
     }
 }
 

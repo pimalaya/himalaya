@@ -7,11 +7,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, sieve::client::SieveClient};
+use crate::{
+    account::context::Account, backend::Backend, listing::Listing, sieve::client::SieveClient,
+};
 
 /// List all server-side Sieve scripts and mark the active script.
 #[derive(Debug, Parser)]
@@ -22,7 +24,7 @@ impl SieveScriptListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &Account,
+        account: &Account,
         client: &mut SieveClient,
     ) -> Result<()> {
         let scripts = client
@@ -34,7 +36,10 @@ impl SieveScriptListCommand {
             })
             .collect();
 
-        printer.out(SieveListOutput { scripts })
+        printer.out(SieveListOutput {
+            account: account.name().to_string(),
+            scripts,
+        })
     }
 }
 
@@ -52,20 +57,22 @@ pub struct SieveScript {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SieveListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The scripts the account holds, the active one marked.
     pub scripts: Vec<SieveScript>,
 }
 
 impl fmt::Display for SieveListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut columns = Columns::new(["ACTIVE", "NAME"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Sieve));
 
         for script in &self.scripts {
-            let active = if script.active { "yes" } else { "" };
-            columns.push([active, &*sanitize::text(&script.name)]);
+            let active = if script.active { "active" } else { "" };
+            listing.items.push([active, &*sanitize::text(&script.name)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

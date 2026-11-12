@@ -15,18 +15,20 @@ use io_imap::{
         extensions::sort::{SortCriterion, SortKey},
     },
 };
-use pimalaya_cli::{columns::Columns, printer::Printer};
+use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     imap::{
         client::ImapClient,
         envelope::search::SearchCriteriaArgs,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
+    listing::Listing,
 };
 
 /// Sort messages (SORT, RFC 5256).
@@ -57,9 +59,10 @@ impl ImapEnvelopeSortCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut ImapClient,
     ) -> Result<()> {
+        let selected = (!self.mailbox_no_select.inner).then(|| self.mailbox_name.inner.clone());
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -84,6 +87,8 @@ impl ImapEnvelopeSortCommand {
             )?;
 
             Ok(ImapSortOutput {
+                account: account.name().to_string(),
+                mailbox: selected,
                 uid_mode: !self.seq,
                 ids: ids.into_iter().map(|id| id.get()).collect(),
             })
@@ -132,18 +137,28 @@ impl From<SortKeyArg> for SortKey {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapSortOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    account: String,
+    /// The mailbox selected, `None` under `--no-select`.
+    #[serde(skip)]
+    mailbox: Option<String>,
     uid_mode: bool,
     ids: Vec<u32>,
 }
 
 impl fmt::Display for ImapSortOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new([if self.uid_mode { "UID" } else { "SEQ" }]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
 
-        for id in &self.ids {
-            columns.push([id]);
+        if let Some(mailbox) = &self.mailbox {
+            listing.head("Mailbox", mailbox);
         }
 
-        write!(f, "{columns}")
+        for id in &self.ids {
+            listing.items.push([id]);
+        }
+
+        write!(f, "{listing}")
     }
 }

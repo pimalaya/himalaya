@@ -10,13 +10,15 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::list::{
     GmailForwardingAddressesList, GmailForwardingAddressesListResponse,
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    listing::Listing,
 };
 
 /// List all Gmail forwarding addresses
@@ -29,7 +31,7 @@ impl GmailSettingsForwardingAddressesListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -38,7 +40,10 @@ impl GmailSettingsForwardingAddressesListCommand {
         };
         let resp = out.response;
 
-        printer.out(GmailSettingsForwardingAddressListOutput { response: resp })
+        printer.out(GmailSettingsForwardingAddressListOutput {
+            account: account.name().to_string(),
+            response: resp,
+        })
     }
 }
 
@@ -47,13 +52,15 @@ impl GmailSettingsForwardingAddressesListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsForwardingAddressListOutput {
+    #[serde(skip)]
+    account: String,
     #[serde(flatten)]
     response: GmailForwardingAddressesListResponse,
 }
 
 impl fmt::Display for GmailSettingsForwardingAddressListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["EMAIL", "VERIFICATION"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
 
         for address in &self.response.forwarding_addresses {
             let status = address
@@ -61,9 +68,11 @@ impl fmt::Display for GmailSettingsForwardingAddressListOutput {
                 .map(verification_status_wire)
                 .unwrap_or_default();
 
-            columns.push([&*sanitize::text(&address.forwarding_email), status]);
+            listing
+                .items
+                .push([status, &*sanitize::text(&address.forwarding_email)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

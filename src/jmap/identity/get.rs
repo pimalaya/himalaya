@@ -8,11 +8,13 @@ use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use log::warn;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, jmap::client::JmapClient};
+use crate::{
+    account::context::Account, backend::Backend, jmap::client::JmapClient, listing::Listing,
+};
 
 /// Get JMAP identities (Identity/get).
 ///
@@ -30,7 +32,7 @@ impl JmapIdentityGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
         let output = client.identity_get(JmapIdentityGetOptions { ids: self.ids })?;
@@ -40,6 +42,7 @@ impl JmapIdentityGetCommand {
         }
 
         printer.out(JmapIdentityGetOutput {
+            account: account.name().to_string(),
             identities: output.identities,
         })
     }
@@ -49,23 +52,25 @@ impl JmapIdentityGetCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapIdentityGetOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The identities, in the order the server returned them.
     pub identities: Vec<JmapIdentity>,
 }
 
 impl fmt::Display for JmapIdentityGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut columns = Columns::new(["ID", "EMAIL", "NAME"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
 
         for identity in &self.identities {
-            columns.push([
+            listing.items.push([
                 sanitize::text(&identity.id),
                 sanitize::text(&identity.email),
                 sanitize::text(&identity.name),
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

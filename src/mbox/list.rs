@@ -7,11 +7,13 @@ use std::{fmt, path::PathBuf};
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::mbox::Mbox;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, mbox::client::MboxClient};
+use crate::{
+    account::context::Account, backend::Backend, listing::Listing, mbox::client::MboxClient,
+};
 
 /// List mbox files.
 ///
@@ -25,12 +27,13 @@ impl MboxMailboxListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MboxClient,
     ) -> Result<()> {
         let mboxes = client.list_mboxes()?;
 
         printer.out(MboxListOutput {
+            account: account.name().to_string(),
             rows: mboxes.into_iter().map(From::from).collect(),
         })
     }
@@ -40,6 +43,9 @@ impl MboxMailboxListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The mbox files found.
     #[serde(rename = "mboxes")]
     pub rows: Vec<MboxRow>,
@@ -47,14 +53,16 @@ pub struct MboxListOutput {
 
 impl fmt::Display for MboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["NAME", "PATH"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Mbox));
 
         for mbox in &self.rows {
             let path = mbox.path.display().to_string();
-            columns.push([sanitize::text(&mbox.name), sanitize::text(&path)]);
+            listing
+                .items
+                .push([sanitize::text(&mbox.name), sanitize::text(&path)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 

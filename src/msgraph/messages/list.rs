@@ -8,20 +8,19 @@ use std::fmt;
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_msgraph::v1::rest::users::messages::{
-    MsgraphFlagStatus, MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
+    MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
-use pimalaya_cli::{
-    clap::args::PageTokenArg,
-    fields::Fields,
-    output::Paginated,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    listing::{Listing, ListingPage},
+    msgraph::{backend::envelope_from, client::MsgraphClient},
+    shared::envelope::list::envelope_cells,
+};
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
@@ -66,7 +65,7 @@ impl MsgraphMessageListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let search = self.search.as_deref();
@@ -111,12 +110,14 @@ impl MsgraphMessageListCommand {
         let next_page = response
             .next_link
             .map(|link| skip_of(&link).map_or(link, |skip| skip.to_string()));
-        let messages = MsgraphMessageListOutput {
+        printer.out(MsgraphMessageListOutput {
+            account: account.name().to_string(),
+            datetime_fmt: account.datetime_fmt().to_string(),
+            datetime_local_tz: account.datetime_local_tz(),
+            folder: self.folder,
+            search: self.search,
+            filter: self.filter,
             messages: response.value,
-        };
-
-        printer.out(Paginated {
-            inner: messages,
             next_page,
         })
     }
@@ -136,44 +137,52 @@ pub(crate) fn recipient(recipient: &MsgraphRecipient) -> String {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphMessageListOutput {
+    #[serde(skip)]
+    account: String,
+    #[serde(skip)]
+    datetime_fmt: String,
+    #[serde(skip)]
+    datetime_local_tz: bool,
+    #[serde(skip)]
+    folder: Option<String>,
+    #[serde(skip)]
+    search: Option<String>,
+    #[serde(skip)]
+    filter: Option<String>,
     messages: Vec<MsgraphMessage>,
+    /// The cursor of the next page, `null` once the listing is complete,
+    /// given back through `--page-token`.
+    next_page: Option<String>,
 }
 
 impl fmt::Display for MsgraphMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
 
-        for msg in &self.messages {
-            let mut state = Vec::new();
-            if msg.is_read == Some(false) {
-                state.push(String::from("unread"));
+        let heads = [
+            ("Folder", &self.folder),
+            ("Search", &self.search),
+            ("Filter", &self.filter),
+        ];
+
+        for (label, value) in heads {
+            if let Some(value) = value {
+                listing.head(label, value);
             }
-            if msg.flag.as_ref().and_then(|flag| flag.flag_status)
-                == Some(MsgraphFlagStatus::Flagged)
-            {
-                state.push(String::from("flagged"));
-            }
-            if msg.has_attachments == Some(true) {
-                state.push(String::from("attachment"));
-            }
-
-            let from = msg.from.as_ref().map(recipient).unwrap_or_default();
-            let received = msg.received_date_time.as_deref().unwrap_or_default();
-            let subject = msg.subject.as_deref().unwrap_or_default();
-
-            let mut fields = Fields::default();
-            fields.push("From", sanitize::text(&from));
-            fields.push("Received", sanitize::text(received));
-
-            records.push(Record {
-                title: sanitize::text(&msg.id).into_owned(),
-                state,
-                fields,
-                body: sanitize::text(subject).into_owned(),
-            });
         }
 
-        write!(f, "{records}")
+        for message in &self.messages {
+            let envelope = envelope_from(message.clone());
+            let fmt = &self.datetime_fmt;
+            let cells = envelope_cells(&envelope, fmt, self.datetime_local_tz);
+            listing.items.push(cells);
+        }
+
+        let count = self.messages.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["message", "messages"], next);
+
+        write!(f, "{listing}")
     }
 }
 

@@ -7,11 +7,13 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, maildir::client::MaildirClient};
+use crate::{
+    account::context::Account, backend::Backend, listing::Listing, maildir::client::MaildirClient,
+};
 
 /// List Maildir folders.
 ///
@@ -25,12 +27,13 @@ impl MaildirMailboxListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MaildirClient,
     ) -> Result<()> {
         let maildirs = client.list_maildirs()?;
 
         let table = MaildirListOutput {
+            account: account.name().to_string(),
             rows: maildirs
                 .into_iter()
                 .map(|maildir| MaildirRow {
@@ -48,6 +51,9 @@ impl MaildirMailboxListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The Maildirs found under the store root.
     #[serde(rename = "maildirs")]
     pub rows: Vec<MaildirRow>,
@@ -55,14 +61,16 @@ pub struct MaildirListOutput {
 
 impl fmt::Display for MaildirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["NAME", "PATH"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Maildir));
 
         for maildir in &self.rows {
             let path = maildir.path.display().to_string();
-            columns.push([sanitize::text(&maildir.name), sanitize::text(&path)]);
+            listing
+                .items
+                .push([sanitize::text(&maildir.name), sanitize::text(&path)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 

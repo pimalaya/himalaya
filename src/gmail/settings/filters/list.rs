@@ -8,21 +8,18 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::list::{GmailFiltersList, GmailFiltersListResponse};
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     gmail::{
         client::GmailClient,
         settings::filters::summary::{action_summary, criteria_summary},
     },
+    listing::Listing,
 };
 
 /// List all Gmail filters (users.settings.filters.list).
@@ -34,7 +31,7 @@ impl GmailSettingsFiltersListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let out = {
@@ -43,7 +40,10 @@ impl GmailSettingsFiltersListCommand {
         };
         let resp = out.response;
 
-        printer.out(GmailSettingsFilterListOutput { response: resp })
+        printer.out(GmailSettingsFilterListOutput {
+            account: account.name().to_string(),
+            response: resp,
+        })
     }
 }
 
@@ -51,39 +51,27 @@ impl GmailSettingsFiltersListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailSettingsFilterListOutput {
+    #[serde(skip)]
+    account: String,
     #[serde(flatten)]
     response: GmailFiltersListResponse,
 }
 
 impl fmt::Display for GmailSettingsFilterListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
 
         for filter in &self.response.filter {
-            let mut fields = Fields::default();
+            let criteria = filter.criteria.as_ref().map(criteria_summary);
+            let action = filter.action.as_ref().map(action_summary);
 
-            if let Some(criteria) = &filter.criteria {
-                let summary = criteria_summary(criteria);
-                if !summary.is_empty() {
-                    fields.push("Criteria", summary);
-                }
-            }
-
-            if let Some(action) = &filter.action {
-                let summary = action_summary(action);
-                if !summary.is_empty() {
-                    fields.push("Action", summary);
-                }
-            }
-
-            records.push(Record {
-                title: sanitize::text(&filter.id).into_owned(),
-                state: Vec::new(),
-                fields,
-                body: String::new(),
-            });
+            listing.items.push([
+                sanitize::text(&filter.id).into_owned(),
+                criteria.unwrap_or_default(),
+                action.unwrap_or_default(),
+            ]);
         }
 
-        write!(f, "{records}")
+        write!(f, "{listing}")
     }
 }

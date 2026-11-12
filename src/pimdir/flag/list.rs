@@ -7,12 +7,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, pimdir::client::PimdirClient, shared::mailbox::arg::MailboxArg,
+    account::context::Account, backend::Backend, listing::Listing, pimdir::client::PimdirClient,
+    shared::mailbox::arg::MailboxArg,
 };
 
 /// List the flags a pimdir message carries, one raw spelling per row.
@@ -46,7 +47,12 @@ impl PimdirFlagListCommand {
             );
         }
 
-        printer.out(PimdirFlagListOutput { flags })
+        printer.out(PimdirFlagListOutput {
+            account: account.name().to_string(),
+            mailbox,
+            message: self.id,
+            flags,
+        })
     }
 }
 
@@ -54,6 +60,15 @@ impl PimdirFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirFlagListOutput {
+    /// The name of the account read.
+    #[serde(skip)]
+    account: String,
+    /// The mailbox of the message, its alias resolved.
+    #[serde(skip)]
+    mailbox: String,
+    /// The id of the message.
+    #[serde(skip)]
+    message: String,
     /// The raw spellings, sorted, or `null` when the sync engine never
     /// read the message's flags.
     flags: Option<Vec<String>>,
@@ -61,13 +76,15 @@ pub struct PimdirFlagListOutput {
 
 impl fmt::Display for PimdirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["FLAG"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        listing.head("Mailbox", &self.mailbox);
+        listing.head("Message", &self.message);
 
         for flag in self.flags.iter().flatten() {
-            columns.push([sanitize::text(flag)]);
+            listing.items.push([sanitize::text(flag)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 
@@ -76,7 +93,12 @@ mod tests {
     use crate::pimdir::flag::list::PimdirFlagListOutput;
 
     fn list(flags: Option<Vec<String>>) -> PimdirFlagListOutput {
-        PimdirFlagListOutput { flags }
+        PimdirFlagListOutput {
+            account: String::from("work"),
+            mailbox: String::from("INBOX"),
+            message: String::from("7"),
+            flags,
+        }
     }
 
     #[test]
@@ -93,9 +115,11 @@ mod tests {
     }
 
     #[test]
-    fn the_list_names_one_flag_per_row() {
+    fn the_list_names_one_flag_per_line() {
+        let head = "Account:    work (pimdir)\nMailbox:    INBOX\nMessage:    7\n";
+
         let known = list(Some(vec!["\\Seen".into(), "act".into()]));
-        assert_eq!(known.to_string(), "FLAG\n\\Seen\nact\n");
-        assert_eq!(list(None).to_string(), "FLAG\n");
+        assert_eq!(known.to_string(), format!("{head}\n\\Seen\nact\n"));
+        assert_eq!(list(None).to_string(), head);
     }
 }

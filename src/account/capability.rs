@@ -7,7 +7,7 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -17,6 +17,7 @@ use crate::{
     backend::Backend,
     capability::{self, Resolution, StoreSupport},
     cli::resolve_account,
+    listing::Listing,
 };
 
 /// List what the account serves of the unified API.
@@ -109,10 +110,10 @@ pub struct AccountCapability {
 
 impl fmt::Display for AccountCapabilityOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["CAPABILITY", "BACKEND", "LEVEL", "DETAIL"]);
+        let mut listing = Listing::new(&self.account, None);
 
         for capability in &self.capabilities {
-            columns.push([
+            listing.items.push([
                 capability.name.as_str(),
                 capability.backend.as_deref().unwrap_or_default(),
                 capability.level.as_str(),
@@ -120,6 +121,6 @@ impl fmt::Display for AccountCapabilityOutput {
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }

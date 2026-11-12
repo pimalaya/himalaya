@@ -7,11 +7,16 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessageId, list::GmailMessagesListParams};
-use pimalaya_cli::{columns::Columns, output::Paginated, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::client::GmailClient,
+    listing::{Listing, ListingPage},
+};
 
 /// List Gmail message ids matching the given query and labels
 /// (users.messages.list).
@@ -42,7 +47,7 @@ impl GmailMessagesListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let params = GmailMessagesListParams {
@@ -54,14 +59,12 @@ impl GmailMessagesListCommand {
         };
         let response = client.messages_list(&params)?.response;
 
-        let next_page = response.next_page_token;
-        let messages = GmailMessageListOutput {
+        printer.out(GmailMessageListOutput {
+            account: account.name().to_string(),
+            query: self.query,
+            labels: self.labels,
             messages: response.messages,
-        };
-
-        printer.out(Paginated {
-            inner: messages,
-            next_page,
+            next_page: response.next_page_token,
         })
     }
 }
@@ -70,21 +73,45 @@ impl GmailMessagesListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailMessageListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The search query, if any.
+    #[serde(skip)]
+    pub query: Option<String>,
+    /// The label ids every message carries.
+    #[serde(skip)]
+    pub labels: Vec<String>,
     /// The messages of this page, each named by its id and thread id.
     pub messages: Vec<GmailMessageId>,
+    /// The cursor of the next page, `null` once the listing is complete,
+    /// given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl fmt::Display for GmailMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["ID", "THREAD ID"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+
+        if !self.labels.is_empty() {
+            listing.head("Labels", &self.labels.join(", "));
+        }
+
+        if let Some(query) = &self.query {
+            listing.head("Query", query);
+        }
 
         for message in &self.messages {
-            columns.push([
+            listing.items.push([
                 sanitize::text(&message.id),
                 sanitize::text(message.thread_id.as_deref().unwrap_or_default()),
             ]);
         }
 
-        write!(f, "{columns}")
+        let count = self.messages.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["message", "messages"], next);
+
+        write!(f, "{listing}")
     }
 }

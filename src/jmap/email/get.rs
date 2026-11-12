@@ -7,7 +7,10 @@ use clap::Parser;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
-use crate::jmap::{client::JmapClient, email::query::JmapEmailQueryOutput};
+use crate::{
+    account::context::Account,
+    jmap::{client::JmapClient, email::query::JmapEmailQueryOutput},
+};
 
 /// Get JMAP emails by ID (Email/get).
 ///
@@ -21,17 +24,18 @@ pub struct JmapEmailGetCommand {
 
 impl JmapEmailGetCommand {
     /// Fetches the emails and lists their envelopes.
-    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let output = client.email_get(self.ids.clone(), Default::default())?;
 
         for id in output.not_found {
             warn!("email `{id}` not found, ignoring it");
         }
 
-        let emails = JmapEmailQueryOutput {
-            emails: output.emails,
-        };
-
-        printer.out(emails)
+        printer.out(JmapEmailQueryOutput::new(account, output.emails))
     }
 }

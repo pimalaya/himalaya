@@ -24,7 +24,7 @@ impl GmailLabelGetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
         let mut labels = Vec::with_capacity(self.ids.len());
@@ -33,6 +33,6 @@ impl GmailLabelGetCommand {
             labels.push(client.label_get(&id)?.response);
         }
 
-        printer.out(GmailLabelListOutput::new(labels))
+        printer.out(GmailLabelListOutput::new(account, labels))
     }
 }

@@ -102,7 +102,10 @@ pub fn build_gmail_client(
         .gmail
         .take()
         .ok_or_else(|| anyhow!("Gmail config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(account_config));
+    let account = Account {
+        name: Some(name.to_string()),
+        ..Account::from(config).merge(Account::from(account_config))
+    };
     let client = GmailClient::new(gmail_config)?;
     Ok((account, client))
 }

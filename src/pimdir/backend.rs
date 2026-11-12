@@ -252,10 +252,23 @@ impl PimdirClient {
 
     /// Lists the account's mail collections, each addressed by its collection
     /// id and named by the collection row's own name, sorted by id.
-    /// `with_counts` fills `total` with the live item count.
+    /// `with_counts` fills `total` with the live item count and `unread`
+    /// as [`Self::list_covered_mailboxes`] counts it.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+        let collections = self.mail_collections()?;
+
+        let unread = if with_counts {
+            let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
+            self.store
+                .count_unread(&ids, None, None)
+                .map_err(pimdir_error)
+                .context("Count unread pimdir mail")?
+        } else {
+            Default::default()
+        };
+
         let mut mailboxes = Vec::new();
-        for collection in self.mail_collections()? {
+        for collection in collections {
             let total = if with_counts {
                 Some(
                     self.store
@@ -266,12 +279,13 @@ impl PimdirClient {
             } else {
                 None
             };
+            let unread = with_counts.then(|| unread.get(&collection.id).copied().unwrap_or(0));
             mailboxes.push(Mailbox {
                 id: collection.id,
                 name: collection.name,
                 role: collection.role.as_deref().map(MailboxRole::parse),
                 total,
-                unread: None,
+                unread,
             });
         }
         mailboxes.sort_by(|a, b| a.id.cmp(&b.id));

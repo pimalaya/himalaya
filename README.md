@@ -47,7 +47,7 @@ Himalaya is a low-level CLI: plain text for a human to glance at, JSON for scrip
   - [Native TLS](https://crates.io/crates/native-tls) (requires `native-tls` feature)
 - **SOCKS5**, **HTTP** proxy support, per account or via `$ALL_PROXY` and `$HTTPS_PROXY`
 - **TOML configuration** with multi-account support
-- **Plain text** output: envelopes and threads one line each the way `mscan` prints a mailbox, other wide lists as records the way `git log` prints commits, short ones as aligned columns, records as `Label: value` lines, no border, no colour
+- **Plain text** output: every list one item per line the way `mscan` prints a mailbox, under the account it read, records as `Label: value` lines, no border, no colour
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
 - **MCP server** via `himalaya mcp`, the unified API as tools, read-only by default
@@ -380,7 +380,7 @@ ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port
 
 `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw` are available, and `put` and `check` accept a script file, inline text or stdin.
 
-On a pimdir account, `pimdir search`, `pimdir count`, `pimdir thread` and `pimdir tag` ask the store's search index in the [pimdir query language](https://github.com/pimalaya/pimdir/blob/master/SEARCH.md): words, phrases, `field:value` terms, `and`, `or`, `not` and parentheses, over the account's mail. The store's sync engine builds the index and refreshes it after each run; Himalaya only reads it, so a message shows once it is synced and indexed, and a line under the results says what they could not see (bodies not downloaded, mail older than what the store holds, the index lagging the store). `pimdir tag` queues one flag change per matched message for the sync engine to apply.
+On a pimdir account, `pimdir search`, `pimdir count`, `pimdir thread` and `pimdir tag` ask the store's search index in the [pimdir query language](https://github.com/pimalaya/pimdir/blob/master/SEARCH.md): words, phrases, `field:value` terms, `and`, `or`, `not` and parentheses, over the account's mail. The store's sync engine builds the index and refreshes it after each run; Himalaya only reads it, so a message shows once it is synced and indexed, and a line above the results says what they could not see (bodies not downloaded, mail older than what the store holds, the index lagging the store). `pimdir tag` queues one flag change per matched message for the sync engine to apply.
 
 ### Composing messages
 
@@ -488,7 +488,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How to read the text output from a script?</summary>
 
-  An envelope list prints one envelope per line: its id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment), the date, the senders and the subject, two spaces apart, between an `Account:` and `Mailbox:` header and a `Page:` footer, each a blank line away. Another wide list (attachments, search hits) prints each item as a record, the way `git log` prints a commit: its id and its state words in parentheses (`42 (unread, flagged)`), one `Label: value` line per property, then its subject indented by four spaces, a blank line between items. Any other list prints a header of uppercase labels, then one item per line, its columns two spaces apart, an empty cell as `-`; the free-text column (a name) comes last. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.
+  Every list prints one item per line, its cells two spaces apart with no header row, an empty cell as `-` and the free text (a subject, a name) last, under a header naming the account, what it lists and, for a paged list, the `Page:` it holds, a blank line away. An envelope list prints the id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment), the date, the senders and the subject; so does every other list of messages. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.
 </details>
 
 ## License

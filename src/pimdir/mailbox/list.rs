@@ -8,13 +8,15 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_pimdir::{client::reader::PimdirRoundState, collection::PimdirCoverage};
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     email::mailbox::{Mailbox, MailboxRole},
+    listing::{self, Listing},
     pimdir::{backend::PimdirCoveredMailbox, client::PimdirClient},
 };
 
@@ -44,6 +46,7 @@ impl PimdirMailboxListCommand {
         account.apply_role_aliases(&mut mailboxes);
 
         printer.out(PimdirMailboxListOutput {
+            account: account.name().to_string(),
             mailboxes: mailboxes
                 .into_iter()
                 .zip(rest)
@@ -142,17 +145,16 @@ impl From<PimdirCoveredMailbox> for PimdirMailbox {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The mailboxes, sorted by id.
     pub mailboxes: Vec<PimdirMailbox>,
 }
 
 impl fmt::Display for PimdirMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let header = [
-            "ID", "ROLE", "TOTAL", "UNREAD", "COVERED", "SYNCING", "NAME",
-        ];
-        let mut columns = Columns::new(header);
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
 
         for mailbox in &self.mailboxes {
             let role = mailbox.role.as_ref().map(ToString::to_string);
@@ -161,24 +163,18 @@ impl fmt::Display for PimdirMailboxListOutput {
             let syncing = mailbox.round.as_ref();
             let syncing = syncing.map(|r| span(r.since.as_deref(), r.until.as_deref()));
 
-            columns.push([
+            listing.items.push([
                 sanitize::text(&mailbox.id).into_owned(),
                 role.unwrap_or_default(),
-                count(mailbox.total),
-                count(mailbox.unread),
+                listing::counts(mailbox.unread, mailbox.total),
                 covered.unwrap_or_default(),
                 syncing.unwrap_or_default(),
                 sanitize::text(&mailbox.name).into_owned(),
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
-}
-
-/// A count, or an empty cell when there is none.
-fn count(value: Option<u64>) -> String {
-    value.map(|n| n.to_string()).unwrap_or_default()
 }
 
 /// A scope as its dates read: `since 2026-09-07`, `2026-01-01 to

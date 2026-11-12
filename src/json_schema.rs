@@ -12,8 +12,6 @@
 
 #[cfg(any(backend, feature = "smtp"))]
 use pimalaya_cli::output::Bytes;
-#[cfg(any(feature = "gmail", feature = "msgraph"))]
-use pimalaya_cli::output::Paginated;
 use pimalaya_cli::{clap::commands::json_schema::JsonSchemaRegistry, error::ErrorReport};
 use schemars::JsonSchema;
 
@@ -40,10 +38,9 @@ use crate::shared::receipt::IdsReceipt;
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
 /// Each value describes the type the command hands to the printer, and
-/// `himalaya-error` the failure object every command prints instead.
-/// The Gmail and Graph listings use the `Paginated<T>` wrapper, so the
-/// extra `nextPage` field is described too, and a command printing one of
-/// two types is described by both, through `OneOf`.
+/// `himalaya-error` the failure object every command prints instead. A
+/// command printing one of two types is described by both, through
+/// `OneOf`.
 pub fn registry() -> JsonSchemaRegistry {
     let mut registry = JsonSchemaRegistry::new("himalaya", env!("CARGO_PKG_VERSION"));
 
@@ -284,7 +281,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-messages-list",
-            Paginated<crate::gmail::messages::list::GmailMessageListOutput>
+            crate::gmail::messages::list::GmailMessageListOutput
         );
         insert!(
             "himalaya-gmail-messages-get",
@@ -292,7 +289,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-drafts-list",
-            Paginated<crate::gmail::drafts::list::GmailDraftListOutput>
+            crate::gmail::drafts::list::GmailDraftListOutput
         );
         insert!(
             "himalaya-gmail-drafts-get",
@@ -308,7 +305,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-threads-list",
-            Paginated<crate::gmail::threads::list::GmailThreadListOutput>
+            crate::gmail::threads::list::GmailThreadListOutput
         );
         insert!(
             "himalaya-gmail-threads-get",
@@ -316,7 +313,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-history-list",
-            Paginated<crate::gmail::history::list::GmailHistoryListOutput>
+            crate::gmail::history::list::GmailHistoryListOutput
         );
         insert!(
             "himalaya-gmail-settings-filters-list",
@@ -392,7 +389,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-msgraph-messages-list",
-            Paginated<crate::msgraph::messages::list::MsgraphMessageListOutput>
+            crate::msgraph::messages::list::MsgraphMessageListOutput
         );
         insert!(
             "himalaya-msgraph-messages-get",

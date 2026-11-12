@@ -33,12 +33,7 @@ use io_pimdir::{
 };
 use jiff::tz::TimeZone;
 use log::warn;
-use pimalaya_cli::{
-    error::CodedError,
-    fields::Fields,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::error::CodedError;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -46,12 +41,12 @@ use crate::{
     account::context::Account,
     email::envelope::Envelope,
     error::{ErrorCode, pimdir_error},
+    listing::Listing,
     pimdir::{
         backend::{envelope, envelope_from_item},
         client::PimdirClient,
         mailbox::list::span,
     },
-    shared::envelope::list::{format_addresses, format_state},
 };
 
 impl PimdirClient {
@@ -513,9 +508,9 @@ impl fmt::Display for PimdirTagStatus {
             Self::Planned => "planned",
             Self::Queued => "queued",
             Self::Unchanged => "unchanged",
-            Self::UnknownFlags => "flags unknown",
-            Self::AmbiguousSource => "several sources",
-            Self::Unsynced => "not synced",
+            Self::UnknownFlags => "flags-unknown",
+            Self::AmbiguousSource => "several-sources",
+            Self::Unsynced => "not-synced",
             Self::Unsupported => "unsupported",
         })
     }
@@ -567,10 +562,9 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
     }
 }
 
-/// The line under a list, naming what the answer could not see; nothing
-/// when it is complete.
-impl fmt::Display for PimdirMailCoverage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl PimdirMailCoverage {
+    /// What the answer could not see, `None` when it is complete.
+    pub fn summary(&self) -> Option<String> {
         let mut parts = Vec::new();
         if self.bodiless > 0 {
             parts.push(format!(
@@ -600,25 +594,26 @@ impl fmt::Display for PimdirMailCoverage {
             ));
         }
 
-        if !parts.is_empty() {
-            writeln!(f, "Incomplete: {}", parts.join("; "))?;
+        (!parts.is_empty()).then(|| parts.join("; "))
+    }
+
+    /// Adds the `Incomplete:` field above the items of `listing`, when the
+    /// answer is not whole.
+    pub fn note(&self, listing: &mut Listing) {
+        if let Some(summary) = self.summary() {
+            listing.header.push(("Incomplete", summary));
         }
-        Ok(())
     }
 }
 
-impl PimdirMailCoverage {
-    /// Writes `records`, then this line a blank line under them.
-    pub fn write_under(&self, f: &mut fmt::Formatter<'_>, records: &Records) -> fmt::Result {
-        let line = self.to_string();
-
-        write!(f, "{records}")?;
-
-        if !records.items.is_empty() && !line.is_empty() {
-            writeln!(f)?;
+/// The line under a count, naming what the answer could not see; nothing
+/// when it is complete.
+impl fmt::Display for PimdirMailCoverage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.summary() {
+            Some(summary) => writeln!(f, "Incomplete: {summary}"),
+            None => Ok(()),
         }
-
-        f.write_str(&line)
     }
 }
 
@@ -640,46 +635,6 @@ impl PimdirListStyle {
         }
     }
 
-    /// The hits as records: the id a follow-up command takes and its
-    /// state, the sender, date, mailboxes and what matched, then the
-    /// subject and the snippet.
-    pub fn hits(&self, hits: &[PimdirMailHit]) -> Records<'static> {
-        let mut records = Records::default();
-
-        for hit in hits {
-            let mut fields = Fields::default();
-            let from = format_addresses(&hit.envelope.from);
-            fields.push("From", sanitize::text(&from));
-            fields.push("Date", self.date(hit.envelope.date));
-            fields.push("Mailbox", sanitize::text(&hit.mailboxes.join(", ")));
-
-            match hit.matched {
-                Some(PimdirMailMatched::Body) => fields.push("Matched", "body"),
-                Some(PimdirMailMatched::Summary) => fields.push("Matched", "headers"),
-                None => (),
-            }
-
-            let snippet = one_line(hit.snippet.as_deref());
-            let body = [
-                sanitize::text(&hit.envelope.subject),
-                sanitize::text(&snippet),
-            ]
-            .into_iter()
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-            records.push(Record {
-                title: sanitize::text(&hit.envelope.id).into_owned(),
-                state: format_state(&hit.envelope.flags, hit.envelope.has_attachment),
-                fields,
-                body,
-            });
-        }
-
-        records
-    }
-
     /// A date in the account's format, nothing without one.
     pub fn date(&self, date: Option<DateTime<FixedOffset>>) -> String {
         match date {
@@ -691,14 +646,6 @@ impl PimdirListStyle {
             Some(date) => date.format(&self.datetime_fmt).to_string(),
         }
     }
-}
-
-/// A passage on one line, its whitespace runs collapsed.
-fn one_line(text: Option<&str>) -> String {
-    text.unwrap_or_default()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 #[cfg(test)]

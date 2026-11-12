@@ -7,20 +7,26 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, email::mailbox::Mailbox, shared::client::EmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    email::mailbox::Mailbox,
+    listing::{self, Listing},
+    shared::client::EmailClient,
+};
 
 /// List the mailboxes of the active account.
 #[derive(Debug, Parser)]
 pub struct MailboxListCommand {
-    /// Fill the TOTAL and UNREAD columns.
+    /// Print the unread and total counts before the name, as `3/120`.
     ///
-    /// JMAP returns the counts in the same response, but IMAP issues one
-    /// extra `STATUS` per mailbox, which is slow on an account with many.
-    /// Maildir does not implement counts at all.
+    /// JMAP and Graph return the counts in the same response, but IMAP
+    /// issues one extra `STATUS` per mailbox, which is slow on an account
+    /// with many. Maildir and m2dir do not implement counts at all.
     #[arg(long)]
     pub counts: bool,
 }
@@ -36,12 +42,14 @@ impl MailboxListCommand {
         let mut mailboxes = client.list_mailboxes(self.counts)?;
         account.apply_role_aliases(&mut mailboxes);
 
-        let mailboxes = MailboxListOutput {
+        let resolution = client.resolution();
+
+        printer.out(MailboxListOutput {
+            account: resolution.account.clone(),
+            backend: resolution.storage,
             with_counts: self.counts,
             mailboxes,
-        };
-
-        printer.out(mailboxes)
+        })
     }
 }
 
@@ -49,7 +57,13 @@ impl MailboxListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MailboxListOutput {
-    /// Whether the count columns are drawn.
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The storage backend the account resolved to.
+    #[serde(skip)]
+    pub backend: Option<Backend>,
+    /// Whether the counts are printed.
     #[serde(skip)]
     pub with_counts: bool,
     /// The mailboxes, in the order the backend returned them.
@@ -58,14 +72,7 @@ pub struct MailboxListOutput {
 
 impl fmt::Display for MailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a name is free text, so it reads last.
-        let mut header = vec!["ID", "ROLE"];
-        if self.with_counts {
-            header.extend(["TOTAL", "UNREAD"]);
-        }
-        header.push("NAME");
-
-        let mut columns = Columns::new(header);
+        let mut listing = Listing::new(&self.account, self.backend);
 
         for mailbox in &self.mailboxes {
             let mut row = vec![
@@ -77,18 +84,58 @@ impl fmt::Display for MailboxListOutput {
                     .unwrap_or_default(),
             ];
             if self.with_counts {
-                row.push(count(mailbox.total));
-                row.push(count(mailbox.unread));
+                row.push(listing::counts(mailbox.unread, mailbox.total));
             }
             row.push(sanitize::text(&mailbox.name).into_owned());
-            columns.push(row);
+            listing.items.push(row);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 
-/// Renders a count, or an empty cell when the backend gave none.
-fn count(value: Option<u64>) -> String {
-    value.map(|n| n.to_string()).unwrap_or_default()
+#[cfg(test)]
+mod tests {
+    use crate::{
+        email::mailbox::{Mailbox, MailboxRole},
+        shared::mailbox::list::MailboxListOutput,
+    };
+
+    /// The counts print as one `unread/total` cell, and only with
+    /// `--counts`.
+    #[test]
+    fn counts_print_as_unread_over_total() {
+        let mailbox = |id: &str, role, counts: Option<(u64, u64)>| Mailbox {
+            id: id.into(),
+            name: id.into(),
+            role,
+            unread: counts.map(|(unread, _)| unread),
+            total: counts.map(|(_, total)| total),
+        };
+        let output = |with_counts| MailboxListOutput {
+            account: "work".into(),
+            backend: None,
+            with_counts,
+            mailboxes: vec![
+                mailbox("INBOX", Some(MailboxRole::Inbox), Some((3, 120))),
+                mailbox("Lists", None, None),
+            ],
+        };
+
+        let expected = "\
+Account:    work
+
+INBOX  inbox  3/120  INBOX
+Lists  -      -      Lists
+";
+        assert_eq!(output(true).to_string(), expected);
+
+        let expected = "\
+Account:    work
+
+INBOX  inbox  INBOX
+Lists  -      Lists
+";
+        assert_eq!(output(false).to_string(), expected);
+    }
 }

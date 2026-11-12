@@ -8,25 +8,22 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    listing::{Listing, ListingPage},
     pimdir::{
         client::PimdirClient,
         index::{
-            PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailThread, local_clock,
-            parse_query,
+            PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched,
+            PimdirMailThread, local_clock, parse_query,
         },
     },
-    shared::envelope::list::format_addresses,
+    shared::envelope::list::{envelope_cells, format_names},
 };
 
 /// Search the account's messages with the pimdir query language.
@@ -40,10 +37,10 @@ use crate::{
 ///
 /// The answer comes from the store's search index, which the sync engine
 /// builds and refreshes after each run: a message is found once it is
-/// synced and indexed, and a queued write shows in no answer. A line
-/// under the list says what the answer could not see: messages whose
-/// body is not local, mail outside what the store holds, the index lagging
-/// the store.
+/// synced and indexed, and a queued write shows in no answer. An
+/// `Incomplete:` line above the list says what the answer could not see:
+/// messages whose body is not local, mail outside what the store holds,
+/// the index lagging the store.
 #[derive(Debug, Parser)]
 pub struct PimdirSearchCommand {
     /// Page number, starting at 1.
@@ -81,6 +78,7 @@ impl PimdirSearchCommand {
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
+        let words = self.query.join(" ");
         let query = parse_query(&self.query, printer.is_json())?;
         let limit = self
             .page_size
@@ -92,9 +90,17 @@ impl PimdirSearchCommand {
             offset: self.page.saturating_sub(1).saturating_mul(limit),
             clock: local_clock(),
         };
+        let place = PimdirSearchPlace {
+            account: account.name().to_string(),
+            query: words,
+            page: self.page.max(1) as u64,
+            size: limit as u64,
+        };
+
         if self.threads {
             let page = client.search_mail_threads(query, &options)?;
             return printer.out(PimdirSearchThreadsOutput {
+                place,
                 threads: page.threads,
                 more: page.more,
                 coverage: page.coverage,
@@ -103,6 +109,7 @@ impl PimdirSearchCommand {
 
         let page = client.search_mail(query, &options)?;
         printer.out(PimdirSearchOutput {
+            place,
             style: PimdirListStyle::new(account),
             hits: page.hits,
             more: page.more,
@@ -137,6 +144,9 @@ impl From<PimdirSearchSortArg> for PimdirSearchSort {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirSearchOutput {
+    /// Where the page stands.
+    #[serde(skip)]
+    pub place: PimdirSearchPlace,
     /// How the list renders.
     #[serde(skip)]
     pub style: PimdirListStyle,
@@ -150,8 +160,35 @@ pub struct PimdirSearchOutput {
 
 impl fmt::Display for PimdirSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hits = self.style.hits(&self.hits);
-        self.coverage.write_under(f, &hits)
+        let mut listing = self.place.listing();
+        let matched = self.hits.iter().any(|hit| hit.matched.is_some());
+
+        for hit in &self.hits {
+            let fmt = &self.style.datetime_fmt;
+            let local_tz = self.style.datetime_local_tz;
+            let [id, flags, date, names, subject] = envelope_cells(&hit.envelope, fmt, local_tz);
+            let mailboxes = sanitize::text(&hit.mailboxes.join(",")).into_owned();
+
+            let mut line = vec![id, flags, date, mailboxes];
+
+            if matched {
+                line.push(String::from(match hit.matched {
+                    Some(PimdirMailMatched::Body) => "body",
+                    Some(PimdirMailMatched::Summary) => "headers",
+                    None => "",
+                }));
+            }
+
+            line.extend([names, subject]);
+            listing.items.push(line);
+        }
+
+        let nouns = ["message", "messages"];
+        self.place
+            .end(&mut listing, self.hits.len(), nouns, self.more);
+        self.coverage.note(&mut listing);
+
+        write!(f, "{listing}")
     }
 }
 
@@ -159,6 +196,9 @@ impl fmt::Display for PimdirSearchOutput {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirSearchThreadsOutput {
+    /// Where the page stands.
+    #[serde(skip)]
+    pub place: PimdirSearchPlace,
     /// The threads of this page, in the order of their first message.
     pub threads: Vec<PimdirMailThread>,
     /// Whether threads follow this page.
@@ -169,7 +209,7 @@ pub struct PimdirSearchThreadsOutput {
 
 impl fmt::Display for PimdirSearchThreadsOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = self.place.listing();
 
         for thread in &self.threads {
             let first = thread.hits.first();
@@ -178,8 +218,8 @@ impl fmt::Display for PimdirSearchThreadsOutput {
                 .as_deref()
                 .map(|last| last.get(..10).unwrap_or(last))
                 .unwrap_or_default();
-            let from = first
-                .map(|hit| format_addresses(&hit.envelope.from))
+            let names = first
+                .map(|hit| format_names(&hit.envelope.from))
                 .unwrap_or_default();
             let subject = first
                 .map(|hit| hit.envelope.subject.as_str())
@@ -190,23 +230,57 @@ impl fmt::Display for PimdirSearchThreadsOutput {
                 .map(|hit| hit.envelope.id.as_str())
                 .collect();
 
-            let mut fields = Fields::default();
-            fields.push("Messages", thread.count);
-            fields.push("Last", sanitize::text(last));
-            fields.push("Hits", sanitize::text(&ids.join(", ")));
-            fields.push("From", sanitize::text(&from));
-
-            let title = thread.thread.as_deref().unwrap_or("-");
-
-            records.push(Record {
-                title: sanitize::text(title).into_owned(),
-                state: Vec::new(),
-                fields,
-                body: sanitize::text(subject).into_owned(),
-            });
+            listing.items.push([
+                sanitize::text(thread.thread.as_deref().unwrap_or_default()).into_owned(),
+                thread.count.to_string(),
+                sanitize::text(last).into_owned(),
+                sanitize::text(&ids.join(",")).into_owned(),
+                sanitize::text(&names).into_owned(),
+                sanitize::text(subject).into_owned(),
+            ]);
         }
 
-        self.coverage.write_under(f, &records)
+        let nouns = ["thread", "threads"];
+        self.place
+            .end(&mut listing, self.threads.len(), nouns, self.more);
+        self.coverage.note(&mut listing);
+
+        write!(f, "{listing}")
+    }
+}
+
+/// Where a page of `pimdir search` stands: the account, the query and the
+/// page.
+#[derive(Clone, Debug, Default)]
+pub struct PimdirSearchPlace {
+    /// The name of the account searched.
+    pub account: String,
+    /// The query, its words joined by spaces.
+    pub query: String,
+    /// The page listed, from 1.
+    pub page: u64,
+    /// The size of a page.
+    pub size: u64,
+}
+
+impl PimdirSearchPlace {
+    /// A listing headed by the account and the query.
+    fn listing(&self) -> Listing {
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        listing.head("Query", &self.query);
+        listing
+    }
+
+    /// Adds to `listing` the page the `count` items fill, then the flag
+    /// reaching the next while `more` follow.
+    fn end(&self, listing: &mut Listing, count: usize, nouns: [&str; 2], more: bool) {
+        let page = ListingPage::Numbered {
+            page: self.page,
+            size: self.size,
+        };
+
+        let next = more.then(|| (self.page + 1).to_string());
+        listing.page(page, count, nouns, next.as_deref());
     }
 }
 
@@ -216,14 +290,15 @@ mod tests {
         email::{address::Address, envelope::Envelope},
         pimdir::{
             index::{PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched},
-            search::PimdirSearchOutput,
+            search::{PimdirSearchOutput, PimdirSearchPlace},
         },
     };
 
-    /// A hit prints as a record, its subject then its snippet as the body,
-    /// and what the answer could not see a blank line under the records.
+    /// A hit prints on one line, its mailboxes and what matched before the
+    /// sender, under the account and the query; the page and what the
+    /// answer could not see print under the hits.
     #[test]
-    fn hits_print_as_records_above_the_coverage() {
+    fn a_hit_prints_on_one_line() {
         let envelope = Envelope {
             id: String::from("7"),
             message_id: None,
@@ -240,6 +315,12 @@ mod tests {
             has_attachment: Some(true),
         };
         let output = PimdirSearchOutput {
+            place: PimdirSearchPlace {
+                account: String::from("work"),
+                query: String::from("report"),
+                page: 1,
+                size: 25,
+            },
             style: PimdirListStyle {
                 datetime_fmt: String::from("%F"),
                 datetime_local_tz: false,
@@ -258,17 +339,12 @@ mod tests {
         };
 
         let expected = "\
-7 (unread, attachment)
-From:     Alice <alice@example.org>
-Date:
-Mailbox:  imap/INBOX, imap/Archive
-Matched:  body
-
-    Quarterly report
-
-    the figures are in
-
+Account:    work (pimdir)
+Query:      report
+Page:       1, message 1, the last
 Incomplete: 1 message(s) have no local body and matched on their headers alone
+
+7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
 ";
         assert_eq!(output.to_string(), expected);
     }

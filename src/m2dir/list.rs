@@ -6,11 +6,13 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, m2dir::client::M2dirClient};
+use crate::{
+    account::context::Account, backend::Backend, listing::Listing, m2dir::client::M2dirClient,
+};
 
 /// List m2dir folders found under the store root.
 #[derive(Debug, Parser)]
@@ -21,7 +23,7 @@ impl M2dirMailboxListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
         let store = client.open_store()?;
@@ -38,7 +40,10 @@ impl M2dirMailboxListCommand {
             })
             .collect();
 
-        printer.out(M2dirListOutput { rows })
+        printer.out(M2dirListOutput {
+            account: account.name().to_string(),
+            rows,
+        })
     }
 }
 
@@ -46,6 +51,9 @@ impl M2dirMailboxListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct M2dirListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
     /// The folders found under the store root.
     #[serde(rename = "m2dirs")]
     pub rows: Vec<M2dirRow>,
@@ -53,13 +61,15 @@ pub struct M2dirListOutput {
 
 impl fmt::Display for M2dirListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::new(["NAME", "PATH"]);
+        let mut listing = Listing::new(&self.account, Some(Backend::M2dir));
 
         for m2dir in &self.rows {
-            columns.push([sanitize::text(&m2dir.name), sanitize::text(&m2dir.path)]);
+            listing
+                .items
+                .push([sanitize::text(&m2dir.name), sanitize::text(&m2dir.path)]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 

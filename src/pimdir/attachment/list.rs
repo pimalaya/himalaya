@@ -11,17 +11,14 @@ use chrono::{DateTime, Local};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use io_pimdir::client::reader::PimdirAccountAttachment;
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    backend::Backend,
+    listing::{Listing, ListingPage},
     pimdir::{
         attachment::{AttachmentQuery, PimdirAttachmentPage, page_token, parse_page_token},
         client::PimdirClient,
@@ -85,6 +82,8 @@ impl PageArgs {
         let page = client.list_attachments(after.as_ref(), limit, query)?;
 
         let mut output = PimdirAttachmentListOutput::from(page);
+        output.account = account.name().to_string();
+        output.query = query.map(|query| query.words.join(" "));
         output.datetime_fmt = account.datetime_fmt().to_string();
         output.datetime_local_tz = account.datetime_local_tz();
         printer.out(output)
@@ -154,6 +153,12 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirAttachmentListOutput {
+    /// The name of the account listed.
+    #[serde(skip)]
+    pub account: String,
+    /// The words searched, `None` for a listing.
+    #[serde(skip)]
+    pub query: Option<String>,
     /// The chrono `strftime` format of a date.
     #[serde(skip)]
     pub datetime_fmt: String,
@@ -170,6 +175,8 @@ pub struct PimdirAttachmentListOutput {
 impl From<PimdirAttachmentPage> for PimdirAttachmentListOutput {
     fn from(page: PimdirAttachmentPage) -> Self {
         Self {
+            account: String::new(),
+            query: None,
             datetime_fmt: String::new(),
             datetime_local_tz: false,
             attachments: page.attachments.into_iter().map(Into::into).collect(),
@@ -194,45 +201,40 @@ impl PimdirAttachmentListOutput {
 
 impl fmt::Display for PimdirAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+
+        if let Some(query) = &self.query {
+            listing.head("Query", query);
+        }
 
         for file in &self.attachments {
             let text = |value: Option<&str>| sanitize::text(value.unwrap_or_default()).into_owned();
-            let size = file.size.map(|size| format_size(size, BINARY));
+            let size = file
+                .size
+                .map(|size| format_size(size, BINARY.space_after_value(false)));
             let date = file.date.as_deref().map(|date| self.format_date(date));
-            let from = match (file.sender_name.as_deref(), file.sender.as_deref()) {
-                (Some(name), Some(email)) if !name.is_empty() => format!("{name} <{email}>"),
-                (name, email) => email.or(name).unwrap_or_default().to_owned(),
+            let from = match file.sender_name.as_deref() {
+                Some(name) if !name.is_empty() => Some(name),
+                _ => file.sender.as_deref(),
             };
 
-            let mut fields = Fields::default();
-            fields.push("Name", text(file.name.as_deref()));
-            fields.push("Type", text(file.media_type.as_deref()));
-            fields.push("Size", size.unwrap_or_default());
-            fields.push("Section", text(file.section.as_deref()));
-            fields.push("Message", sanitize::text(&file.message_id));
-            fields.push("Mailbox", sanitize::text(&file.mailbox));
-            fields.push("Date", date.unwrap_or_default());
-            fields.push("From", sanitize::text(&from));
-
-            records.push(Record {
-                title: sanitize::text(&file.id).into_owned(),
-                state: Vec::new(),
-                fields,
-                body: String::new(),
-            });
+            listing.items.push([
+                sanitize::text(&file.id).into_owned(),
+                size.unwrap_or_default(),
+                text(file.media_type.as_deref()),
+                text(file.section.as_deref()),
+                sanitize::text(&file.message_id).into_owned(),
+                sanitize::text(&file.mailbox).into_owned(),
+                date.unwrap_or_default(),
+                text(from),
+                text(file.name.as_deref()),
+            ]);
         }
 
-        write!(f, "{records}")?;
+        let count = self.attachments.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["file", "files"], next);
 
-        if let Some(token) = &self.next_page {
-            if !records.items.is_empty() {
-                writeln!(f)?;
-            }
-
-            writeln!(f, "Next page: {}", sanitize::text(token))?;
-        }
-
-        Ok(())
+        write!(f, "{listing}")
     }
 }

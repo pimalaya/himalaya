@@ -7,17 +7,15 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
+use humansize::{BINARY, format_size};
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
-use pimalaya_cli::{
-    fields::Fields,
-    printer::Printer,
-    records::{Record, Records},
-    sanitize,
-};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account, backend::Backend, listing::Listing, msgraph::client::MsgraphClient,
+};
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
 #[derive(Debug, Parser)]
@@ -32,12 +30,16 @@ impl MsgraphAttachmentListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
-        _account: &mut Account,
+        account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
         let attachments = client.attachments_list(&self.message_id)?.response.value;
 
-        printer.out(MsgraphAttachmentListOutput { attachments })
+        printer.out(MsgraphAttachmentListOutput {
+            account: account.name().to_string(),
+            message: self.message_id,
+            attachments,
+        })
     }
 }
 
@@ -45,36 +47,38 @@ impl MsgraphAttachmentListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphAttachmentListOutput {
+    #[serde(skip)]
+    account: String,
+    #[serde(skip)]
+    message: String,
     attachments: Vec<MsgraphAttachment>,
 }
 
 impl fmt::Display for MsgraphAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut records = Records::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
+        listing.head("Message", &self.message);
 
         for attachment in &self.attachments {
-            let name = attachment.name.as_deref().unwrap_or_default();
+            let inline = match attachment.is_inline {
+                Some(true) => "inline",
+                _ => "",
+            };
+
+            let size = attachment.size.map(|n| n.max(0) as u64);
+            let size = size.map(|n| format_size(n, BINARY.space_after_value(false)));
             let content_type = attachment.content_type.as_deref().unwrap_or_default();
-            let size = attachment.size.map(|n| n.to_string()).unwrap_or_default();
+            let name = attachment.name.as_deref().unwrap_or_default();
 
-            let mut state = Vec::new();
-            if attachment.is_inline == Some(true) {
-                state.push(String::from("inline"));
-            }
-
-            let mut fields = Fields::default();
-            fields.push("Name", sanitize::text(name));
-            fields.push("Type", sanitize::text(content_type));
-            fields.push("Size", size);
-
-            records.push(Record {
-                title: sanitize::text(&attachment.id).into_owned(),
-                state,
-                fields,
-                body: String::new(),
-            });
+            listing.items.push([
+                sanitize::text(&attachment.id).into_owned(),
+                String::from(inline),
+                size.unwrap_or_default(),
+                sanitize::text(content_type).into_owned(),
+                sanitize::text(name).into_owned(),
+            ]);
         }
 
-        write!(f, "{records}")
+        write!(f, "{listing}")
     }
 }

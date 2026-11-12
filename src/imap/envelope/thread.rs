@@ -22,12 +22,13 @@ use io_imap::{
         sequence::SequenceSet,
     },
 };
-use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::{
     account::context::Account,
+    backend::Backend,
     email::{address::Address, envelope::Envelope, flag::Flag},
     imap::{
         backend::envelope_from,
@@ -36,6 +37,7 @@ use crate::{
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
+    listing::Listing,
     shared::envelope::list::{format_date, format_flags, format_names},
 };
 
@@ -73,6 +75,7 @@ impl ImapEnvelopeThreadCommand {
         account: &Account,
         client: &mut ImapClient,
     ) -> Result<()> {
+        let selected = (!self.mailbox_no_select.inner).then(|| self.mailbox_name.inner.clone());
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -92,6 +95,8 @@ impl ImapEnvelopeThreadCommand {
             let envelopes = fetch_envelopes(client, &ids, !self.seq)?;
 
             Ok(ImapThreadOutput {
+                account: account.name().to_string(),
+                mailbox: selected,
                 datetime_fmt: account.datetime_fmt().to_string(),
                 datetime_local_tz: account.datetime_local_tz(),
                 threads,
@@ -213,6 +218,10 @@ pub struct ThreadEntry {
 
 /// The `imap thread` output, a tree of conversations.
 pub struct ImapThreadOutput {
+    /// The name of the account listed.
+    account: String,
+    /// The mailbox selected, `None` under `--no-select`.
+    mailbox: Option<String>,
     /// The chrono `strftime` format of a date.
     datetime_fmt: String,
     /// Whether a date is converted to the local timezone first.
@@ -276,7 +285,11 @@ impl ImapThreadOutput {
 
 impl fmt::Display for ImapThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut columns = Columns::default();
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+
+        if let Some(mailbox) = &self.mailbox {
+            listing.head("Mailbox", mailbox);
+        }
 
         for entry in self.build_entries() {
             // A message whose envelope could not be fetched shows no flag.
@@ -289,7 +302,7 @@ impl fmt::Display for ImapThreadOutput {
             let indent = "  ".repeat(entry.depth);
             let subject = sanitize::text(&entry.subject);
 
-            columns.push([
+            listing.items.push([
                 entry.id.to_string(),
                 flags,
                 date,
@@ -298,7 +311,7 @@ impl fmt::Display for ImapThreadOutput {
             ]);
         }
 
-        write!(f, "{columns}")
+        write!(f, "{listing}")
     }
 }
 
@@ -393,6 +406,8 @@ mod tests {
         };
 
         let output = ImapThreadOutput {
+            account: String::from("work"),
+            mailbox: Some(String::from("INBOX")),
             datetime_fmt: String::from("%F %R"),
             datetime_local_tz: false,
             threads: vec![lunch, orphans],
@@ -407,6 +422,9 @@ mod tests {
         };
 
         let expected = "\
+Account:    work (imap)
+Mailbox:    INBOX
+
 1        2026-11-11 10:00  Me     Lunch
 2  *     2026-11-11 10:00  Alice    Re: Lunch
 4  *     2026-11-11 10:00  Carol      Re: Lunch
