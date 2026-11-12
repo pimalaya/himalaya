@@ -3,31 +3,44 @@
 //! The `imap thread` command, RFC 5256 `THREAD`.
 
 use io_imap::client::ImapClient as _;
-use std::{borrow::Cow, collections::HashMap, fmt, num::NonZeroU32};
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap},
+    fmt,
+    num::NonZeroU32,
+};
 
 use anyhow::Result;
+use chrono::{DateTime, FixedOffset};
 use clap::{Parser, ValueEnum};
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
     rfc5256::thread::ImapMessageThreadOptions,
     types::{
         extensions::thread::{Thread, ThreadingAlgorithm},
-        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+        fetch::{MacroOrMessageDataItemNames, MessageDataItemName},
         sequence::SequenceSet,
     },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{
+    printer::Printer,
+    sanitize,
+    tree::{Node, Trees},
+};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::{
+    account::context::Account,
+    email::{address::Address, envelope::Envelope, flag::Flag},
     imap::{
+        backend::envelope_from,
         client::ImapClient,
         envelope::search::SearchCriteriaArgs,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
-    shared::message::header,
+    shared::envelope::list::{format_addresses, format_date, format_detail, format_state},
 };
 
 /// Thread messages (THREAD, RFC 5256).
@@ -57,8 +70,13 @@ pub struct ImapEnvelopeThreadCommand {
 
 impl ImapEnvelopeThreadCommand {
     /// Selects the mailbox unless told not to, threads it, then fetches
-    /// the subjects of the messages it returned.
-    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
+    /// the envelopes of the messages it returned.
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -74,16 +92,15 @@ impl ImapEnvelopeThreadCommand {
                 ImapMessageThreadOptions { uid: !self.seq },
             )?;
 
-            let all_ids = collect_thread_ids(&threads);
-            let subjects = if !all_ids.is_empty() {
-                fetch_subjects(client, &all_ids, !self.seq)?
-            } else {
-                HashMap::new()
-            };
+            let ids = collect_thread_ids(&threads);
+            let envelopes = fetch_envelopes(client, &ids, !self.seq)?;
 
-            let table = ImapThreadOutput::new(threads, subjects);
-
-            Ok(table)
+            Ok(ImapThreadOutput {
+                datetime_fmt: account.datetime_fmt().to_string(),
+                datetime_local_tz: account.datetime_local_tz(),
+                threads,
+                envelopes,
+            })
         })();
 
         outcome::print(printer, result)
@@ -138,62 +155,46 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
     }
 }
 
-/// Fetches the subject of every threaded message, so the tree reads as
-/// conversations rather than as bare ids.
-fn fetch_subjects(
+/// Fetches the envelope of every threaded message, keyed by the id the
+/// threads name it by.
+fn fetch_envelopes(
     client: &mut ImapClient,
     ids: &[NonZeroU32],
     uid: bool,
-) -> Result<HashMap<u32, String>> {
+) -> Result<HashMap<u32, Envelope>> {
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
 
-    let seq_set_str = ids
+    let sequence_set: SequenceSet = ids
         .iter()
         .map(|id| id.to_string())
         .collect::<Vec<_>>()
-        .join(",");
-    let sequence_set: SequenceSet = seq_set_str.parse()?;
+        .join(",")
+        .parse()?;
 
-    let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
-        MessageDataItemName::Envelope,
-        MessageDataItemName::Uid,
-    ]);
+    // Without UID, an envelope falls back to its message number as id.
+    let mut names = vec![MessageDataItemName::Flags, MessageDataItemName::Envelope];
+    if uid {
+        names.push(MessageDataItemName::Uid);
+    }
 
     let data = client.fetch(
         sequence_set,
-        item_names,
+        MacroOrMessageDataItemNames::MessageDataItemNames(names),
         ImapMessageFetchOptions {
             uid,
             modifiers: Vec::new(),
         },
     )?;
 
-    let mut subjects: HashMap<u32, String> = HashMap::new();
+    let envelopes = data
+        .into_iter()
+        .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
+        .filter_map(|envelope| Some((envelope.id.parse().ok()?, envelope)))
+        .collect();
 
-    for (seq, items) in data {
-        let mut id = seq.get();
-        let mut subject = String::new();
-
-        for item in items.into_iter() {
-            match item {
-                MessageDataItem::Uid(uid_val) if uid => {
-                    id = uid_val.get();
-                }
-                MessageDataItem::Envelope(env) => {
-                    if let Some(s) = &env.subject.0 {
-                        subject = header::decode_bytes(s.as_ref());
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        subjects.insert(id, subject);
-    }
-
-    Ok(subjects)
+    Ok(envelopes)
 }
 
 /// One flattened thread node.
@@ -202,24 +203,31 @@ fn fetch_subjects(
 pub struct ThreadEntry {
     /// The UID, or the message number under `--seq`.
     pub id: u32,
-    /// The subject fetched for that message.
+    /// The `Subject:` header.
     pub subject: String,
     /// How deep in its conversation the message sits.
     pub depth: usize,
+    /// The senders.
+    pub from: Vec<Address>,
+    /// The `Date:` header, `null` when it is missing or unparseable.
+    pub date: Option<DateTime<FixedOffset>>,
+    /// The flags set on the message.
+    pub flags: BTreeSet<Flag>,
 }
 
 /// The `imap thread` output, a tree of conversations.
 pub struct ImapThreadOutput {
+    /// The chrono `strftime` format of a date.
+    datetime_fmt: String,
+    /// Whether a date is converted to the local timezone first.
+    datetime_local_tz: bool,
+    /// The threads, as the server returned them.
     threads: Vec<Thread>,
-    subjects: HashMap<u32, String>,
+    /// The envelope of each threaded message, by id.
+    envelopes: HashMap<u32, Envelope>,
 }
 
 impl ImapThreadOutput {
-    /// Pairs the threads the server returned with the fetched subjects.
-    pub fn new(threads: Vec<Thread>, subjects: HashMap<u32, String>) -> Self {
-        Self { threads, subjects }
-    }
-
     /// Flattens the tree into one entry per message, depth included.
     fn build_entries(&self) -> Vec<ThreadEntry> {
         let mut entries = Vec::new();
@@ -238,13 +246,7 @@ impl ImapThreadOutput {
         match thread {
             Thread::Members { prefix, answers } => {
                 for (i, id) in prefix.as_ref().iter().enumerate() {
-                    let id_val: u32 = id.get();
-                    let subject = self.subjects.get(&id_val).cloned().unwrap_or_default();
-                    entries.push(ThreadEntry {
-                        id: id_val,
-                        subject,
-                        depth: depth + i,
-                    });
+                    entries.push(self.entry(id.get(), depth + i));
                 }
                 if let Some(nested) = answers {
                     for t in nested.as_ref().iter() {
@@ -259,67 +261,82 @@ impl ImapThreadOutput {
             }
         }
     }
+
+    /// The entry of one message, empty but for its id when its envelope
+    /// could not be fetched.
+    fn entry(&self, id: u32, depth: usize) -> ThreadEntry {
+        let envelope = self.envelopes.get(&id);
+
+        ThreadEntry {
+            id,
+            subject: envelope.map(|e| e.subject.clone()).unwrap_or_default(),
+            depth,
+            from: envelope.map(|e| e.from.clone()).unwrap_or_default(),
+            date: envelope.and_then(|e| e.date),
+            flags: envelope.map(|e| e.flags.clone()).unwrap_or_default(),
+        }
+    }
+
+    /// The nodes a thread hangs at its level: a run of members nests each
+    /// under the one before, the answers under the last, and a parent the
+    /// mailbox lacks leaves its answers side by side.
+    fn nodes(&self, thread: &Thread) -> Vec<Node> {
+        match thread {
+            Thread::Members { prefix, answers } => {
+                let mut nodes: Vec<Node> = answers
+                    .iter()
+                    .flat_map(|answers| answers.as_ref())
+                    .flat_map(|thread| self.nodes(thread))
+                    .collect();
+
+                for id in prefix.as_ref().iter().rev() {
+                    nodes = vec![self.node(id.get(), nodes)];
+                }
+
+                nodes
+            }
+            Thread::Nested { answers } => answers
+                .as_ref()
+                .iter()
+                .flat_map(|thread| self.nodes(thread))
+                .collect(),
+        }
+    }
+
+    /// The node of one message: its subject on the branch, then its date,
+    /// its id with its state words and its senders.
+    fn node(&self, id: u32, children: Vec<Node>) -> Node {
+        let Some(envelope) = self.envelopes.get(&id) else {
+            return Node {
+                title: String::new(),
+                detail: id.to_string(),
+                children,
+            };
+        };
+
+        let date = format_date(envelope.date, &self.datetime_fmt, self.datetime_local_tz);
+        let state = format_state(&envelope.flags, None);
+        let from = format_addresses(&envelope.from);
+
+        Node {
+            title: sanitize::text(&envelope.subject).into_owned(),
+            detail: format_detail(&date, &id.to_string(), &state, &[&from]),
+            children,
+        }
+    }
 }
 
 impl fmt::Display for ImapThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.threads.is_empty() {
-            writeln!(f)?;
-            writeln!(f, "No threads found")?;
-            return Ok(());
-        }
+        let trees = Trees {
+            items: self
+                .threads
+                .iter()
+                .flat_map(|thread| self.nodes(thread))
+                .collect(),
+        };
 
-        let mut thread_num = 0;
-
-        writeln!(f)?;
-
-        for thread in &self.threads {
-            thread_num += 1;
-            writeln!(f, "Thread {thread_num}:")?;
-            self.display_thread(f, thread, 1)?;
-            writeln!(f)?;
-        }
-
-        writeln!(f, "Found {} thread(s)", self.threads.len())?;
-        Ok(())
-    }
-}
-
-impl ImapThreadOutput {
-    fn display_thread(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-        thread: &Thread,
-        depth: usize,
-    ) -> fmt::Result {
-        let indent = "  ".repeat(depth);
-
-        match thread {
-            Thread::Members { prefix, answers } => {
-                for (i, id) in prefix.as_ref().iter().enumerate() {
-                    let id_val: u32 = id.get();
-                    let subject = self.subjects.get(&id_val).cloned().unwrap_or_default();
-                    let connector = if i == 0 && depth > 0 {
-                        "\u{2514}\u{2500}"
-                    } else {
-                        "  "
-                    };
-                    writeln!(f, "{indent}{connector} {id_val}: {subject}")?;
-                }
-                if let Some(nested) = answers {
-                    for t in nested.as_ref().iter() {
-                        self.display_thread(f, t, depth + 1)?;
-                    }
-                }
-            }
-            Thread::Nested { answers } => {
-                for t in answers.as_ref().iter() {
-                    self.display_thread(f, t, depth)?;
-                }
-            }
-        }
-
-        Ok(())
+        write!(f, "{trees}")
     }
 }
 
@@ -347,5 +364,102 @@ impl JsonSchema for ImapThreadOutput {
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <ImapThreadOutputSchema as JsonSchema>::json_schema(generator)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, num::NonZeroU32};
+
+    use chrono::DateTime;
+    use io_imap::types::{
+        core::{Vec1, Vec2},
+        extensions::thread::Thread,
+    };
+
+    use crate::{
+        email::{
+            address::Address,
+            envelope::Envelope,
+            flag::{Flag, IanaFlag},
+        },
+        imap::envelope::thread::ImapThreadOutput,
+    };
+
+    fn members(ids: &[u32], answers: Vec<Thread>) -> Thread {
+        let prefix: Vec<_> = ids.iter().filter_map(|id| NonZeroU32::new(*id)).collect();
+
+        Thread::Members {
+            prefix: Vec1::try_from(prefix).unwrap(),
+            answers: Vec2::try_from(answers).ok(),
+        }
+    }
+
+    fn envelope(id: u32, seen: bool, name: &str, subject: &str) -> (u32, Envelope) {
+        let flags = match seen {
+            true => [Flag::from_iana(IanaFlag::Seen)].into(),
+            false => Default::default(),
+        };
+
+        let envelope = Envelope {
+            id: id.to_string(),
+            message_id: None,
+            in_reply_to: Vec::new(),
+            flags,
+            subject: String::from(subject),
+            from: vec![Address {
+                name: Some(String::from(name)),
+                email: format!("{}@example.org", name.to_lowercase()),
+            }],
+            to: Vec::new(),
+            date: DateTime::parse_from_rfc3339("2026-11-11T10:00:00+01:00").ok(),
+            size: 0,
+            has_attachment: None,
+        };
+
+        (id, envelope)
+    }
+
+    /// A reply hangs under the message it answers, a run of members nests
+    /// each under the one before, and the answers of a message the mailbox
+    /// lacks stand side by side.
+    #[test]
+    fn replies_hang_under_what_they_answer() {
+        let lunch = members(&[1], vec![members(&[2, 4], vec![]), members(&[3], vec![])]);
+        let orphans = Thread::Nested {
+            answers: Vec2::try_from(vec![members(&[5], vec![]), members(&[6], vec![])]).unwrap(),
+        };
+
+        let output = ImapThreadOutput {
+            datetime_fmt: String::from("%F %R%:z"),
+            datetime_local_tz: false,
+            threads: vec![lunch, orphans],
+            envelopes: HashMap::from([
+                envelope(1, true, "Me", "Lunch"),
+                envelope(2, false, "Alice", "Re: Lunch"),
+                envelope(3, true, "Bob", "Re: Lunch"),
+                envelope(4, false, "Carol", "Re: Lunch"),
+                envelope(5, true, "Bob", "Re: Invoice"),
+                envelope(6, true, "Me", "Re: Invoice"),
+            ]),
+        };
+
+        let expected = "\
+Lunch
+│  2026-11-11 10:00+01:00  1  Me <me@example.org>
+├─ Re: Lunch
+│  │  2026-11-11 10:00+01:00  2 (unread)  Alice <alice@example.org>
+│  └─ Re: Lunch
+│     2026-11-11 10:00+01:00  4 (unread)  Carol <carol@example.org>
+└─ Re: Lunch
+   2026-11-11 10:00+01:00  3  Bob <bob@example.org>
+
+Re: Invoice
+   2026-11-11 10:00+01:00  5  Bob <bob@example.org>
+
+Re: Invoice
+   2026-11-11 10:00+01:00  6  Me <me@example.org>
+";
+        assert_eq!(output.to_string(), expected);
     }
 }

@@ -11,6 +11,8 @@
 
 ![screenshot](./screenshot.jpeg)
 
+Himalaya is a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. For daily mail, pair it with one of the [interfaces](#interfaces).
+
 ## Table of contents
 
 - [Features](#features)
@@ -45,7 +47,7 @@
   - [Native TLS](https://crates.io/crates/native-tls) (requires `native-tls` feature)
 - **SOCKS5**, **HTTP** proxy support, per account or via `$ALL_PROXY` and `$HTTPS_PROXY`
 - **TOML configuration** with multi-account support
-- **Plain text** output: wide lists as records the way `git log` prints commits, short ones as aligned columns, records as `Label: value` lines, no border, no colour
+- **Plain text** output: envelopes and threads as trees the way `tree` prints a directory, other wide lists as records the way `git log` prints commits, short ones as aligned columns, records as `Label: value` lines, no border, no colour
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
 - **MCP server** via `himalaya mcp`, the shared API as tools, read-only by default

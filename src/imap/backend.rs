@@ -604,7 +604,7 @@ fn compute_window(exists: u32, page: Option<u32>, page_size: Option<u32>) -> Opt
 }
 
 /// Folds one `FETCH` row into a shared [`Envelope`].
-fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
+pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     let mut id = String::new();
     let mut message_id: Option<String> = None;
     let mut in_reply_to = Vec::new();

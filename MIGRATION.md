@@ -2,7 +2,7 @@
 
 ## From v2 to v3
 
-v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, or marks several accounts default.
+v3 makes Himalaya a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. Daily mail is a frontend's job: see the interfaces listed in README.md. v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, sets `envelope.list.datetime-relative` or marks several accounts default.
 
 What a script or a frontend reads off `--json` and the text output changes, and a few commands that used to report a success they did not achieve now fail. The CHANGELOG lists every change; these are the ones to act on.
 
@@ -14,11 +14,22 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **Every default path is read, as layers.** $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml and $HOME/.himalayarc are each deep-merged on top of the ones before, where v2 read the first one found. An rc file left beside a config.toml now overrides it: delete the one you do not use.
 - **Several `default = true` accounts are refused**, naming them, where v2 picked one at random. Keep it on one account across the merged files: an rc file moving the default sets `default = false` on the account the other file marks.
 - **Colour, table and glyph keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, `table.preset` and `table.arrangement`, and the `envelope.list.table.*-char` glyphs. Under `mailbox` they fail the configuration as unknown keys; elsewhere they are ignored, the whole `envelope.list.table` block included. The envelope lists name a message's state in words, `unread`, `answered`, `flagged` and `attachment`, where v2 drew glyphs.
+- **`envelope.list.datetime-relative` is gone**, refused as an unknown key: remove it. Dates print as `envelope.list.datetime-fmt` and `datetime-local-tz` configure them.
 - **`http` and `https` hosts are ASCII.** A JMAP `server` or an HTTP proxy `url` with an internationalised host is refused: write the host in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers are unchanged.
 
 ### Text output
 
-- **Wide lists are records, the others plain columns**, with no border, no colour and no truncation. A list whose items carry more than one value of unbounded length (an address, a subject, a path, a long id) prints each item the way `git log` prints a commit: its id followed by its state words in parentheses (`42 (unread, flagged, attachment)`), its properties as `Label: value` lines (`From:`, `Date:`, `Size:`), then its subject indented by four spaces, one blank line between items. These are `envelope list|search`, `attachment list|download`, `jmap email query|get`, `msgraph messages list`, `msgraph attachments list`, the Graph mail folders, `pimdir search`, `pimdir thread`, `pimdir tag`, `pimdir queue list` (its queued messages), `pimdir attachment list|search`, `gmail settings filters list` and `gmail history list`. Addresses print whole, `Name <email>`. Every other list is plain columns: an uppercase header, then one item per line, columns two spaces apart, an empty cell as `-`, the free-text column last (`mailbox list` ends with NAME), and a multi-valued cell joining its values with `,`. A script cutting the v2 tables reads `--json` instead, which is unchanged.
+- **Envelopes and threads are trees, other wide lists records, the rest plain columns**, with no border, no colour and no truncation. `envelope list|search` hang the envelopes from the mailbox the way `tree` prints a directory: each subject on a `├─ ` or `└─ ` branch, then on the line under it the date, the id followed by its state words in parentheses (`42 (unread, flagged, attachment)`) and the senders, or `to ` and the recipients with `--recipient`. The size no longer prints. `imap thread` and `pimdir thread` hang each reply under the message it answers. Any other list whose items carry more than one value of unbounded length (an address, a subject, a path, a long id) prints each item the way `git log` prints a commit: its id followed by its state words, its properties as `Label: value` lines, then its free text indented by four spaces, one blank line between items. These are `attachment list|download`, `jmap email query|get`, `msgraph messages list`, `msgraph attachments list`, the Graph mail folders, `pimdir search`, `pimdir tag`, `pimdir queue list` (its queued messages), `pimdir attachment list|search`, `gmail settings filters list` and `gmail history list`. Addresses print whole, `Name <email>`. Every other list is plain columns: an uppercase header, then one item per line, columns two spaces apart, an empty cell as `-`, the free-text column last (`mailbox list` ends with NAME), and a multi-valued cell joining its values with `,`. A script cutting the v2 tables reads `--json` instead, which is unchanged.
+- **A `grep` on the envelope list no longer returns the id with the subject**, the two being on separate lines. Read `--json` with jq instead:
+
+  ```sh
+  # id, sender and subject, one envelope per line
+  himalaya envelope list --json | jq -r '.envelopes[] | [.id, .from[0].email, .subject] | @tsv'
+  # the ids of the unread envelopes
+  himalaya envelope list --json | jq -r '.envelopes[] | select(all(.flags[]; .iana != "seen")) | .id'
+  # the ids of the envelopes whose subject mentions an invoice
+  himalaya envelope list --json | jq -r '.envelopes[] | select(.subject | test("invoice"; "i")) | .id'
+  ```
 - **Records are `Label: value` lines**: `account check`, `imap select`, `imap status`, `imap id`, `imap fetch`, `vacation get|set`, `jmap vacation get`, `sieve capability`, the Gmail and Microsoft Graph `get`s, and the header block of `message read` and `message parse`. `imap search` and `imap sort` no longer end with a count.
 - **`-w/--max-width` is gone** from `envelope list`, `envelope search`, `mailbox list` and the pimdir lists, nothing being truncated any more: a command passing it now fails, so drop it.
 - **`--help` prints without colour**, each paragraph on one line for the terminal to fold.

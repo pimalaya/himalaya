@@ -90,7 +90,7 @@ impl ImapCommand {
 
             Self::Search(cmd) => cmd.execute(printer, account, client),
             Self::Sort(cmd) => cmd.execute(printer, account, client),
-            Self::Thread(cmd) => cmd.execute(printer, client),
+            Self::Thread(cmd) => cmd.execute(printer, account, client),
 
             Self::Store(cmd) => cmd.execute(printer, client),
             Self::Flag(cmd) => cmd.execute(printer, account, client),

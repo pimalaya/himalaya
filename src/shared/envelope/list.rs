@@ -2,19 +2,17 @@
 //!
 //! The `envelope list` command, listing one page of a mailbox.
 
-use std::{collections::BTreeSet, fmt};
+use std::{borrow::Cow, collections::BTreeSet, fmt};
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, FixedOffset, Local, NaiveDate};
+use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
-use humansize::{BINARY, format_size};
 use pimalaya_cli::{
     clap::args::PageTokenArg,
-    fields::Fields,
     output::Paginated,
     printer::Printer,
-    records::{Record, Records},
     sanitize,
+    tree::{Node, Trees},
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -91,7 +89,7 @@ impl EnvelopeListCommand {
         let envelopes = EnvelopeListOutput {
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
-            datetime_relative: account.datetime_relative(),
+            mailbox,
             recipient: self.recipient,
             envelopes,
         };
@@ -113,9 +111,9 @@ pub struct EnvelopeListOutput {
     /// Whether a date is converted to the local timezone first.
     #[serde(skip)]
     pub datetime_local_tz: bool,
-    /// Whether a recent date renders relative to today.
+    /// The mailbox listed, its alias resolved, the root of the text.
     #[serde(skip)]
-    pub datetime_relative: bool,
+    pub mailbox: String,
     /// Whether recipients are printed instead of senders.
     #[serde(skip)]
     pub recipient: bool,
@@ -125,31 +123,54 @@ pub struct EnvelopeListOutput {
 
 impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let today = Local::now().date_naive();
-        let mut records = Records::default();
+        let mut mailbox = Node {
+            title: sanitize::text(&self.mailbox).into_owned(),
+            ..Node::default()
+        };
 
         for env in &self.envelopes {
-            let (label, addresses) = if self.recipient {
-                ("To", &env.to)
-            } else {
-                ("From", &env.from)
+            let addresses = match self.recipient {
+                true if env.to.is_empty() => String::new(),
+                true => format!("to {}", format_addresses(&env.to)),
+                false => format_addresses(&env.from),
             };
 
-            let mut fields = Fields::default();
-            fields.push(label, sanitize::text(&format_addresses(addresses)));
-            fields.push("Date", self.format_date(env.date, today));
-            fields.push("Size", format_size(env.size, BINARY));
+            let date = format_date(env.date, &self.datetime_fmt, self.datetime_local_tz);
+            let state = format_state(&env.flags, env.has_attachment);
 
-            records.push(Record {
-                title: sanitize::text(&env.id).into_owned(),
-                state: format_state(&env.flags, env.has_attachment),
-                fields,
-                body: sanitize::text(&env.subject).into_owned(),
+            mailbox.children.push(Node {
+                title: sanitize::text(&env.subject).into_owned(),
+                detail: format_detail(&date, &env.id, &state, &[&addresses]),
+                children: Vec::new(),
             });
         }
 
-        write!(f, "{records}")
+        let trees = Trees {
+            items: vec![mailbox],
+        };
+
+        write!(f, "{trees}")
     }
+}
+
+/// Renders the line under an envelope's subject: its date, its id with
+/// its state words in parentheses, then the rest (its addresses), two
+/// spaces apart, each only when it holds something.
+pub fn format_detail(date: &str, id: &str, state: &[String], rest: &[&str]) -> String {
+    let mut id = sanitize::text(id).into_owned();
+
+    if !state.is_empty() {
+        id = format!("{id} ({})", state.join(", "));
+    }
+
+    let rest = rest.iter().map(|part| sanitize::text(part));
+
+    [Cow::Borrowed(date), Cow::Owned(id)]
+        .into_iter()
+        .chain(rest)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("  ")
 }
 
 /// Renders the state words of a message: `unread`, `answered`, `flagged`
@@ -188,38 +209,19 @@ pub fn format_addresses(addrs: &[Address]) -> String {
         .join(", ")
 }
 
-impl EnvelopeListOutput {
-    /// Renders a date with the configured format, in the local timezone
-    /// when asked for, or relative to `today` when recent and asked for.
-    fn format_date(&self, date: Option<DateTime<FixedOffset>>, today: NaiveDate) -> String {
-        let Some(date) = date else {
-            return String::new();
-        };
-
-        if self.datetime_relative {
-            let date = date.with_timezone(&Local);
-
-            return match (today - date.date_naive()).num_days() {
-                0 => date.format("%R").to_string(),
-                1 => String::from("yesterday"),
-                2..7 => date.format("%A").to_string(),
-                _ => date.format(&self.datetime_fmt).to_string(),
-            };
-        }
-
-        if self.datetime_local_tz {
-            date.with_timezone(&Local)
-                .format(&self.datetime_fmt)
-                .to_string()
-        } else {
-            date.format(&self.datetime_fmt).to_string()
-        }
+/// Renders a date with a chrono `strftime` format, in the local timezone
+/// when asked for, nothing without one.
+pub fn format_date(date: Option<DateTime<FixedOffset>>, fmt: &str, local_tz: bool) -> String {
+    match date {
+        None => String::new(),
+        Some(date) if local_tz => date.with_timezone(&Local).format(fmt).to_string(),
+        Some(date) => date.format(fmt).to_string(),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone};
+    use chrono::DateTime;
 
     use crate::{
         email::{
@@ -230,11 +232,11 @@ mod tests {
         shared::envelope::list::EnvelopeListOutput,
     };
 
-    fn envelopes(relative: bool) -> EnvelopeListOutput {
+    fn envelopes() -> EnvelopeListOutput {
         EnvelopeListOutput {
-            datetime_fmt: String::from("%F"),
+            datetime_fmt: String::from("%F %R%:z"),
             datetime_local_tz: false,
-            datetime_relative: relative,
+            mailbox: String::from("INBOX"),
             recipient: false,
             envelopes: Vec::new(),
         }
@@ -262,12 +264,11 @@ mod tests {
         }
     }
 
-    /// The list prints as records: the id with its state words, the
-    /// sender, date and size, then the subject as the body.
+    /// The envelopes hang from their mailbox: the subject on the branch,
+    /// then the date, the id with its state words and the sender.
     #[test]
-    fn the_list_prints_as_records() {
-        let mut envelopes = envelopes(false);
-        envelopes.datetime_fmt = String::from("%F %R%:z");
+    fn the_list_hangs_from_its_mailbox() {
+        let mut envelopes = envelopes();
 
         let alice = address(Some("Alice"), "alice@example.org");
         let mut unread = envelope("42", &[IanaFlag::Flagged], alice, "Lunch on Friday?");
@@ -285,52 +286,45 @@ mod tests {
         envelopes.envelopes = vec![unread, answered, seen];
 
         let expected = "\
-42 (unread, flagged, attachment)
-From:  Alice <alice@example.org>
-Date:  2026-11-11 10:00+01:00
-Size:  2 KiB
-
-    Lunch on Friday?
-
-41 (answered)
-From:  bob@example.org
-Date:  2026-11-11 10:00+01:00
-Size:  2 KiB
-
-    Re: the report
-
-40
-From:  Carol <carol@example.org>
-Date:
-Size:  2 KiB
+INBOX
+├─ Lunch on Friday?
+│  2026-11-11 10:00+01:00  42 (unread, flagged, attachment)  Alice <alice@example.org>
+├─ Re: the report
+│  2026-11-11 10:00+01:00  41 (answered)  bob@example.org
+└─
+   40  Carol <carol@example.org>
 ";
         assert_eq!(envelopes.to_string(), expected);
     }
 
-    fn today() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 9, 30).unwrap()
-    }
-
-    fn local(y: i32, m: u32, d: u32, h: u32, min: u32) -> Option<DateTime<FixedOffset>> {
-        let naive = NaiveDate::from_ymd_opt(y, m, d)?.and_hms_opt(h, min, 0)?;
-        Some(Local.from_local_datetime(&naive).single()?.fixed_offset())
-    }
-
+    /// Under `--recipient`, the addresses read as recipients, and an
+    /// envelope without any prints none.
     #[test]
-    fn relative_date_follows_age() {
-        let envelopes = envelopes(true);
-        let render = |date| envelopes.format_date(date, today());
+    fn recipients_print_after_to() {
+        let mut envelopes = envelopes();
+        envelopes.recipient = true;
 
-        assert_eq!(render(local(2026, 9, 30, 11, 35)), "11:35");
-        assert_eq!(render(local(2026, 9, 29, 11, 35)), "yesterday");
-        assert_eq!(render(local(2026, 9, 26, 11, 35)), "Saturday");
-        assert_eq!(render(local(2026, 9, 23, 11, 35)), "2026-09-23");
-        assert_eq!(render(None), "");
+        let me = address(None, "me@example.org");
+        let mut sent = envelope("2", &[IanaFlag::Seen], me.clone(), "Hi");
+        sent.to = vec![address(Some("Bob"), "bob@example.org")];
+        let mut draft = envelope("1", &[IanaFlag::Seen], me, "Notes");
+        draft.date = None;
+
+        envelopes.envelopes = vec![sent, draft];
+
+        let expected = "\
+INBOX
+├─ Hi
+│  2026-11-11 10:00+01:00  2  to Bob <bob@example.org>
+└─ Notes
+   1
+";
+        assert_eq!(envelopes.to_string(), expected);
     }
 
     #[test]
     fn control_characters_from_the_sender_are_not_printed() {
-        let mut envelopes = envelopes(false);
+        let mut envelopes = envelopes();
         envelopes.envelopes.push(Envelope {
             id: String::from("1"),
             message_id: None,
@@ -353,14 +347,5 @@ Size:  2 KiB
         assert!(!output.contains('\x1b'), "{output:?}");
         assert!(!output.contains('\x07'), "{output:?}");
         assert!(output.contains("Hi"), "{output:?}");
-    }
-
-    #[test]
-    fn absolute_date_ignores_age() {
-        let envelopes = envelopes(false);
-        let date = local(2026, 9, 30, 11, 35);
-        let expected = date.unwrap().format("%F").to_string();
-
-        assert_eq!(envelopes.format_date(date, today()), expected);
     }
 }

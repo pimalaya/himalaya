@@ -136,7 +136,7 @@ impl EnvelopeSearchCommand {
         let envelopes = EnvelopeListOutput {
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
-            datetime_relative: account.datetime_relative(),
+            mailbox,
             recipient: self.recipient,
             envelopes,
         };

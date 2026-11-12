@@ -46,8 +46,6 @@ pub struct Account {
     pub datetime_fmt: Option<String>,
     /// Whether an envelope date is converted to the local timezone.
     pub datetime_local_tz: Option<bool>,
-    /// Whether a recent envelope date renders relative to today.
-    pub datetime_relative: Option<bool>,
     /// Page size of `envelope list` when `-s/--page-size` is not passed.
     pub envelopes_list_page_size: Option<u32>,
     /// Mailbox aliases, keys lowercased, an account entry overwriting the
@@ -79,7 +77,6 @@ impl Account {
 
             datetime_fmt: other.datetime_fmt.or(self.datetime_fmt),
             datetime_local_tz: other.datetime_local_tz.or(self.datetime_local_tz),
-            datetime_relative: other.datetime_relative.or(self.datetime_relative),
             envelopes_list_page_size: other
                 .envelopes_list_page_size
                 .or(self.envelopes_list_page_size),
@@ -187,12 +184,6 @@ impl Account {
         self.datetime_local_tz.unwrap_or(false)
     }
 
-    /// Whether a recent date renders relative to today, defaulting to
-    /// `false`.
-    pub fn datetime_relative(&self) -> bool {
-        self.datetime_relative.unwrap_or(false)
-    }
-
     /// Page size of `envelope list` when `-s/--page-size` is not passed,
     /// defaulting to 25.
     pub fn envelopes_list_page_size(&self) -> u32 {
@@ -264,7 +255,6 @@ impl From<Config> for Account {
 
             datetime_fmt: config.envelope.list.datetime_fmt,
             datetime_local_tz: config.envelope.list.datetime_local_tz,
-            datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
@@ -287,7 +277,6 @@ impl From<AccountConfig> for Account {
 
             datetime_fmt: config.envelope.list.datetime_fmt,
             datetime_local_tz: config.envelope.list.datetime_local_tz,
-            datetime_relative: config.envelope.list.datetime_relative,
             envelopes_list_page_size: config.envelope.list.page_size,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),

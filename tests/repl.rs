@@ -150,14 +150,7 @@ fn a_line_json_flag_switches_that_line_alone() {
 
     // The text list follows, nothing added between the two answers.
     let text: Vec<&str> = lines.collect();
-    let expected = [
-        "m1",
-        "From:  a@example.org",
-        "Date:",
-        "Size:  51 B",
-        "",
-        "    Hello there",
-    ];
+    let expected = ["inbox", "└─ Hello there", "   m1  a@example.org"];
     assert_eq!(text, expected, "{stdout}");
 }
 

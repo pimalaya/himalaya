@@ -412,10 +412,6 @@ pub struct EnvelopeListConfig {
     /// Whether the `Date:` offset is converted to the local timezone
     /// before formatting, the default `false` keeping the wire offset.
     pub datetime_local_tz: Option<bool>,
-    /// Whether a recent date renders relative to today in the local
-    /// timezone (time of day, `yesterday`, weekday), an older one falling
-    /// back to `datetime-fmt`, the default `false` never doing so.
-    pub datetime_relative: Option<bool>,
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
@@ -1341,6 +1337,13 @@ mod tests {
         let toml = "[mailbox.list.table]\nname-color = \"blue\"\n[accounts]\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
         assert!(err.contains("unknown field `list`"), "{err}");
+    }
+
+    #[test]
+    fn relative_dates_are_refused() {
+        let toml = "[envelope.list]\ndatetime-relative = true\n[accounts]\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("datetime-relative"), "{err}");
     }
 
     #[test]
