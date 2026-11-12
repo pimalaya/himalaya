@@ -34,7 +34,10 @@ use crate::{
     },
 };
 
-/// Read a message.
+/// Fetch a message from a mailbox and print its headers and parts.
+///
+/// The read leaves the flags of the message alone, unless `--seen` is
+/// given.
 ///
 /// A minimal header block comes first, then one summary line per MIME
 /// part with its `Content-*` headers and, for a plain-text part, its

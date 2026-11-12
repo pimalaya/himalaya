@@ -19,12 +19,17 @@ use crate::{
     },
 };
 
-/// Compose a new message from flags.
+/// Build a new message from flags, then print, save or send it.
 ///
-/// The RFC 5322 bytes go to stdout, unless `--save` appends a copy to a
-/// mailbox, `--send` pushes the message out, or both. With `--json` and
-/// neither, the decoded fields come out instead, without the signature
-/// that sending appends.
+/// With neither `--save` nor `--send`, the RFC 5322 message is printed,
+/// the signature included, for an editor or a composer to take over. Under
+/// `--json`, its decoded fields come out instead, without the signature,
+/// which is added once the message is saved or sent.
+///
+/// `--save` saves it to a mailbox and `--send` sends it, a copy then
+/// going where `message.send.save-copy` puts it, or to the `--save`
+/// mailbox when both are given. Either prints a receipt instead of the
+/// message.
 ///
 /// Multipart MIME, MML directives, signing and editor-driven workflows
 /// belong to a standalone composer such as mml, piped into `message send`
@@ -77,15 +82,21 @@ pub struct MessageComposeCommand {
         conflicts_with = "signature"
     )]
     pub signature_file: Option<PathBuf>,
-    /// Append a copy of the composed message to this mailbox name, alias
-    /// or role, overriding `message.send.save-copy` when sending.
+    /// Save the message to this mailbox, a name, alias or role, flagged
+    /// seen, instead of printing it.
+    ///
+    /// With `--send`, the copy of the sent message goes there instead of
+    /// where `message.send.save-copy` puts it.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-    /// Skip the copy `message.send.save-copy` configures.
+    /// With `--send`, keep no copy of the sent message, whatever
+    /// `message.send.save-copy` says.
     #[arg(long, conflicts_with = "save")]
     pub no_save: bool,
-    /// Send the composed message, which combines with `--save` to keep a
-    /// copy too.
+    /// Send the message instead of printing it.
+    ///
+    /// A copy goes where `message.send.save-copy` puts it, unless `--save`
+    /// names another mailbox or `--no-save` keeps none.
     #[arg(long)]
     pub send: bool,
 }

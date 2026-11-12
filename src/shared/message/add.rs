@@ -24,13 +24,16 @@ use crate::{
     },
 };
 
-/// Add a raw RFC 5322 message to a mailbox.
+/// Add a raw RFC 5322 message to a mailbox as it is.
 ///
-/// The message comes from a file path, an inline string or piped standard
-/// input, and the mailbox is resolved through the account's aliases.
+/// Nothing is built: the message is saved as given, its line endings
+/// made CRLF, with the flags `--flag` sets. It comes from a file path,
+/// the message itself or piped standard input. `message compose`,
+/// `reply` and `forward` build one from flags instead, and save it with
+/// `--save`.
 #[derive(Debug, Parser)]
 pub struct MessageAddCommand {
-    /// Destination mailbox name or alias.
+    /// Destination mailbox name, alias or role.
     #[arg(long = "mailbox", short = 'm', value_name = "NAME")]
     pub mailbox: String,
     /// Flags to set on the new message.

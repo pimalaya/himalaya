@@ -24,11 +24,11 @@ use crate::{
     },
 };
 
-/// Read a raw message without an account.
+/// Parse a raw message from a file or stdin, without an account.
 ///
-/// The message is read from the `EML` file, or from the standard input
-/// when it is `-` or omitted, and printed exactly as `message read`
-/// prints the same bytes: the view under `--json`, the header block and
+/// The RFC 5322 message is read from the `EML` file, or its contents
+/// from the standard input when `EML` is `-` or omitted, and printed
+/// exactly as `message read` prints the same bytes: the view under `--json`, the header block and
 /// part walk otherwise. No account is resolved and no configuration
 /// file is read.
 ///
@@ -41,7 +41,8 @@ use crate::{
 /// code, as on `message read`.
 #[derive(Debug, Parser)]
 pub struct MessageParseCommand {
-    /// Path to the raw RFC 5322 message, `-` or nothing for stdin.
+    /// Path to the RFC 5322 message file, `-` or nothing to read its
+    /// contents from stdin.
     #[arg(value_name = "EML")]
     pub path: Option<PathBuf>,
     /// Write the decoded bytes of this part to stdout, and nothing else.

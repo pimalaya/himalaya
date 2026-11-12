@@ -384,7 +384,7 @@ On a pimdir account, `pimdir search`, `pimdir count`, `pimdir thread` and `pimdi
 
 ### Composing messages
 
-`message compose` / `reply` / `forward` cover simple cases through flags. For rich MIME (MML directives, signing, encryption, an editor-driven flow), chain a composer such as [mml](https://github.com/pimalaya/mml) into `message send` / `message add`, or stage a prepared file as a draft:
+`message compose` / `reply` / `forward` build a message from flags, then print it, save it with `--save` or send it with `--send`; `message send` / `add` take a raw message as it is. For rich MIME (MML directives, signing, encryption, an editor-driven flow), chain a composer such as [mml](https://github.com/pimalaya/mml) into `message send` / `message add`, or stage a prepared file as a draft:
 
 ```sh
 himalaya message compose --to you@example.org --subject Hello --body Hi --send

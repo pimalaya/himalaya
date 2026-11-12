@@ -15,21 +15,26 @@ use crate::{
     },
 };
 
-/// Send a message through the active account.
+/// Send a raw RFC 5322 message as it is.
 ///
-/// The route is SMTP or JMAP, whichever the account configures. The
-/// envelope sender comes from the `From:` header and the recipients from
-/// `To:`, `Cc:` and `Bcc:`.
+/// Nothing is built: the message goes out as given, its line endings
+/// made CRLF, through the JMAP, Gmail or Microsoft Graph backend of the
+/// account, queued on pimdir, and through SMTP otherwise. The envelope
+/// sender comes from the `From:` header and the recipients from `To:`,
+/// `Cc:` and `Bcc:`. A copy goes where `message.send.save-copy` puts it,
+/// unless `--save` names another mailbox or `--no-save` keeps none.
 ///
-/// The message comes from a file path, an inline string or piped standard
-/// input.
+/// The message comes from a file path, the message itself or piped
+/// standard input. `message compose`, `reply` and `forward` build one
+/// from flags instead.
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
-    /// Append a copy of the sent message to this mailbox name, alias or
-    /// role, overriding `message.send.save-copy`.
+    /// Save a copy of the sent message to this mailbox, a name, alias or
+    /// role, instead of where `message.send.save-copy` puts it.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-    /// Skip the copy `message.send.save-copy` configures.
+    /// Keep no copy of the sent message, whatever
+    /// `message.send.save-copy` says.
     #[arg(long, conflicts_with = "save")]
     pub no_save: bool,
     #[command(flatten)]

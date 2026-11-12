@@ -23,16 +23,17 @@ use crate::{
     },
 };
 
-/// Forward a message from flags.
+/// Build a forward of a message from flags, then print, save or send it.
 ///
 /// The source is fetched to pre-fill the `Fwd:` subject and the
-/// `References` header, and to quote the body. The result goes to stdout,
-/// `--save` or `--send`. With `--json` and neither, the decoded fields
-/// come out instead, without the signature that sending appends. Once
-/// sent, the source is flagged as forwarded where the backend takes the
-/// keyword.
+/// `References` header, to quote its body and, unless `--no-attachments`,
+/// to attach its attachments.
 ///
-/// Richer composition is `message read <id>` piped into a standalone
+/// The forward is printed, saved or sent as `message compose` does it.
+/// Once sent, the source is flagged as forwarded where the backend takes
+/// the keyword.
+///
+/// Richer composition is `message read --raw <ID>` piped into a standalone
 /// composer, whose output feeds `message send` or `message add`.
 #[derive(Debug, Parser)]
 pub struct MessageForwardCommand {
@@ -103,15 +104,21 @@ pub struct MessageForwardCommand {
     /// Nothing is substituted in it, so pass the literal string wanted.
     #[arg(long = "quote-headline", short = 'Q', value_name = "TEXT")]
     pub quote_headline: Option<String>,
-    /// Append a copy of the composed message to this mailbox name, alias
-    /// or role, overriding `message.send.save-copy` when sending.
+    /// Save the message to this mailbox, a name, alias or role, flagged
+    /// seen, instead of printing it.
+    ///
+    /// With `--send`, the copy of the sent message goes there instead of
+    /// where `message.send.save-copy` puts it.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
-    /// Skip the copy `message.send.save-copy` configures.
+    /// With `--send`, keep no copy of the sent message, whatever
+    /// `message.send.save-copy` says.
     #[arg(long, conflicts_with = "save")]
     pub no_save: bool,
-    /// Send the composed message, which combines with `--save` to keep a
-    /// copy too.
+    /// Send the message instead of printing it.
+    ///
+    /// A copy goes where `message.send.save-copy` puts it, unless `--save`
+    /// names another mailbox or `--no-save` keeps none.
     #[arg(long)]
     pub send: bool,
 }
