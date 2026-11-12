@@ -18,10 +18,10 @@ message.forward.posting-style = "top"		# write a forward above the forwarded mes
 #message.forward.posting-style = "none"		# quote nothing
 
 envelope.list.page-size = 25			# envelopes per page, absent -s
-envelope.list.datetime-fmt = "%F %R%:z"		# the chrono strftime format of an envelope date
-#envelope.list.datetime-fmt = "%d/%m/%Y %H:%M"	# or any other
-envelope.list.datetime-local-tz = false		# show a date at the offset it was sent with
-#envelope.list.datetime-local-tz = true		# show it in the local timezone
+envelope.list.datetime-fmt = "%F %R"		# the chrono strftime format of an envelope date
+#envelope.list.datetime-fmt = "%F %R%:z"	# with its offset
+envelope.list.datetime-local-tz = true		# show a date in the local timezone
+#envelope.list.datetime-local-tz = false	# show it at the offset it was sent with
 
 #mailbox.alias.inbox = "INBOX"		# the mailbox commands read without -m
 #mailbox.alias.sent = "Sent"		# the sent role, over the backend's own

@@ -6,9 +6,7 @@
 use anyhow::{Context, Result};
 use ariadne::{Config, Label, Report, ReportKind, Source};
 use clap::Parser;
-use pimalaya_cli::{
-    clap::args::PageTokenArg, error::CodedError, output::Paginated, printer::Printer,
-};
+use pimalaya_cli::{clap::args::PageTokenArg, error::CodedError, printer::Printer};
 
 use crate::{
     account::context::Account,
@@ -88,7 +86,7 @@ impl EnvelopeSearchCommand {
     pub fn capabilities(&self) -> Result<Vec<Capability>> {
         let mut capabilities = vec![Capability::EnvelopeSearch];
 
-        if let Some(query) = parse_query(self.query.as_deref())? {
+        if let Some(query) = parse_query(query_text(self.query.as_deref()).as_deref())? {
             capabilities.extend(query.options().into_iter().map(Capability::Search));
         }
 
@@ -114,7 +112,8 @@ impl EnvelopeSearchCommand {
             .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account);
-        let query = parse_query(self.query.as_deref())?;
+        let text = query_text(self.query.as_deref());
+        let query = parse_query(text.as_deref())?;
 
         let envelopes = client.search_envelopes(
             &mailbox,
@@ -133,39 +132,39 @@ impl EnvelopeSearchCommand {
             _ => None,
         };
 
-        let envelopes = EnvelopeListOutput {
+        let resolution = client.resolution();
+
+        printer.out(EnvelopeListOutput {
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
+            account: resolution.account.clone(),
+            backend: resolution.storage,
             mailbox,
+            query: text,
+            page,
+            page_size,
             recipient: self.recipient,
             envelopes,
-        };
-
-        printer.out(Paginated {
-            inner: envelopes,
             next_page,
         })
     }
 }
 
-/// Parses the trailing positional into a query, `None` when it is empty
-/// so the search keeps its default behaviour.
-fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
-    let Some(words) = words else {
+/// Joins the trailing positional into the query text, `None` when it is
+/// empty so the search keeps its default behaviour.
+fn query_text(words: Option<&[String]>) -> Option<String> {
+    let joined = words?.join(" ");
+    let trimmed = joined.trim();
+    Some(trimmed.to_owned()).filter(|text| !text.is_empty())
+}
+
+/// Parses the query text, `None` standing for no query.
+fn parse_query(text: Option<&str>) -> Result<Option<SearchEmailsQuery>> {
+    let Some(text) = text else {
         return Ok(None);
     };
 
-    let joined = words
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join(" ");
-    let trimmed = joined.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-
-    match trimmed.parse::<SearchEmailsQuery>() {
+    match text.parse::<SearchEmailsQuery>() {
         Ok(query) => Ok(Some(query)),
         Err(err) => {
             Err(CodedError::new(ErrorCode::SearchInvalid, render_query_parse_error(&err)).into())

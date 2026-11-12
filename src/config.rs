@@ -407,10 +407,11 @@ pub enum SaveCopyConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListConfig {
     /// chrono `strftime` format of an envelope date, defaulting to
-    /// `"%F %R%:z"`.
+    /// `"%F %R"`.
     pub datetime_fmt: Option<String>,
     /// Whether the `Date:` offset is converted to the local timezone
-    /// before formatting, the default `false` keeping the wire offset.
+    /// before formatting, the default `true`; `false` keeps the offset
+    /// the message was sent with.
     pub datetime_local_tz: Option<bool>,
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.

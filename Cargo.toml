@@ -83,4 +83,4 @@ simd-cpu = { version = "0.1", default-features = false, features = ["std"] }
 url = { version = "2.5", default-features = false }
 
 [patch.crates-io]
-pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "15eea1bf9103583a6dbb51000aa519985a96cc1b" }
+pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "0fbe5dd597ec48419eac87a9372c0c0d1f40f6f3" }

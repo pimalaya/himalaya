@@ -22,11 +22,7 @@ use io_imap::{
         sequence::SequenceSet,
     },
 };
-use pimalaya_cli::{
-    printer::Printer,
-    sanitize,
-    tree::{Node, Trees},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
@@ -40,7 +36,7 @@ use crate::{
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
     },
-    shared::envelope::list::{format_addresses, format_date, format_detail, format_state},
+    shared::envelope::list::{format_date, format_flags, format_names},
 };
 
 /// Thread messages (THREAD, RFC 5256).
@@ -276,67 +272,33 @@ impl ImapThreadOutput {
             flags: envelope.map(|e| e.flags.clone()).unwrap_or_default(),
         }
     }
-
-    /// The nodes a thread hangs at its level: a run of members nests each
-    /// under the one before, the answers under the last, and a parent the
-    /// mailbox lacks leaves its answers side by side.
-    fn nodes(&self, thread: &Thread) -> Vec<Node> {
-        match thread {
-            Thread::Members { prefix, answers } => {
-                let mut nodes: Vec<Node> = answers
-                    .iter()
-                    .flat_map(|answers| answers.as_ref())
-                    .flat_map(|thread| self.nodes(thread))
-                    .collect();
-
-                for id in prefix.as_ref().iter().rev() {
-                    nodes = vec![self.node(id.get(), nodes)];
-                }
-
-                nodes
-            }
-            Thread::Nested { answers } => answers
-                .as_ref()
-                .iter()
-                .flat_map(|thread| self.nodes(thread))
-                .collect(),
-        }
-    }
-
-    /// The node of one message: its subject on the branch, then its date,
-    /// its id with its state words and its senders.
-    fn node(&self, id: u32, children: Vec<Node>) -> Node {
-        let Some(envelope) = self.envelopes.get(&id) else {
-            return Node {
-                title: String::new(),
-                detail: id.to_string(),
-                children,
-            };
-        };
-
-        let date = format_date(envelope.date, &self.datetime_fmt, self.datetime_local_tz);
-        let state = format_state(&envelope.flags, None);
-        let from = format_addresses(&envelope.from);
-
-        Node {
-            title: sanitize::text(&envelope.subject).into_owned(),
-            detail: format_detail(&date, &id.to_string(), &state, &[&from]),
-            children,
-        }
-    }
 }
 
 impl fmt::Display for ImapThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let trees = Trees {
-            items: self
-                .threads
-                .iter()
-                .flat_map(|thread| self.nodes(thread))
-                .collect(),
-        };
+        let mut columns = Columns::default();
 
-        write!(f, "{trees}")
+        for entry in self.build_entries() {
+            // A message whose envelope could not be fetched shows no flag.
+            let flags = match self.envelopes.contains_key(&entry.id) {
+                true => format_flags(&entry.flags, None),
+                false => String::from("    "),
+            };
+
+            let date = format_date(entry.date, &self.datetime_fmt, self.datetime_local_tz);
+            let indent = "  ".repeat(entry.depth);
+            let subject = sanitize::text(&entry.subject);
+
+            columns.push([
+                entry.id.to_string(),
+                flags,
+                date,
+                sanitize::text(&format_names(&entry.from)).into_owned(),
+                format!("{indent}{subject}"),
+            ]);
+        }
+
+        write!(f, "{columns}")
     }
 }
 
@@ -420,18 +382,18 @@ mod tests {
         (id, envelope)
     }
 
-    /// A reply hangs under the message it answers, a run of members nests
-    /// each under the one before, and the answers of a message the mailbox
-    /// lacks stand side by side.
+    /// A reply follows the message it answers, its subject one step further
+    /// in: a run of members nests each under the one before, and the
+    /// answers of a message the mailbox lacks start back at the margin.
     #[test]
-    fn replies_hang_under_what_they_answer() {
+    fn replies_follow_what_they_answer() {
         let lunch = members(&[1], vec![members(&[2, 4], vec![]), members(&[3], vec![])]);
         let orphans = Thread::Nested {
             answers: Vec2::try_from(vec![members(&[5], vec![]), members(&[6], vec![])]).unwrap(),
         };
 
         let output = ImapThreadOutput {
-            datetime_fmt: String::from("%F %R%:z"),
+            datetime_fmt: String::from("%F %R"),
             datetime_local_tz: false,
             threads: vec![lunch, orphans],
             envelopes: HashMap::from([
@@ -445,20 +407,12 @@ mod tests {
         };
 
         let expected = "\
-Lunch
-│  2026-11-11 10:00+01:00  1  Me <me@example.org>
-├─ Re: Lunch
-│  │  2026-11-11 10:00+01:00  2 (unread)  Alice <alice@example.org>
-│  └─ Re: Lunch
-│     2026-11-11 10:00+01:00  4 (unread)  Carol <carol@example.org>
-└─ Re: Lunch
-   2026-11-11 10:00+01:00  3  Bob <bob@example.org>
-
-Re: Invoice
-   2026-11-11 10:00+01:00  5  Bob <bob@example.org>
-
-Re: Invoice
-   2026-11-11 10:00+01:00  6  Me <me@example.org>
+1        2026-11-11 10:00  Me     Lunch
+2  *     2026-11-11 10:00  Alice    Re: Lunch
+4  *     2026-11-11 10:00  Carol      Re: Lunch
+3        2026-11-11 10:00  Bob      Re: Lunch
+5        2026-11-11 10:00  Bob    Re: Invoice
+6        2026-11-11 10:00  Me     Re: Invoice
 ";
         assert_eq!(output.to_string(), expected);
     }

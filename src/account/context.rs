@@ -21,7 +21,7 @@ use crate::email::mailbox::{Mailbox, MailboxRole};
 
 /// chrono `strftime` format of an envelope date.
 #[cfg(any(backend, feature = "smtp"))]
-const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
+const DEFAULT_DATETIME_FMT: &str = "%F %R";
 /// Page size of `envelope list` when nothing names one.
 #[cfg(any(backend, feature = "smtp"))]
 const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
@@ -173,15 +173,15 @@ impl Account {
     }
 
     /// chrono `strftime` format of an envelope date, defaulting to
-    /// `%F %R%:z`.
+    /// `%F %R`.
     pub fn datetime_fmt(&self) -> &str {
         self.datetime_fmt.as_deref().unwrap_or(DEFAULT_DATETIME_FMT)
     }
 
     /// Whether a `Date:` header is converted to the local timezone,
-    /// defaulting to `false`.
+    /// defaulting to `true`.
     pub fn datetime_local_tz(&self) -> bool {
-        self.datetime_local_tz.unwrap_or(false)
+        self.datetime_local_tz.unwrap_or(true)
     }
 
     /// Page size of `envelope list` when `-s/--page-size` is not passed,

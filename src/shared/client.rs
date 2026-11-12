@@ -616,6 +616,11 @@ impl EmailClient {
         self.resolution.require(capabilities)
     }
 
+    /// The account the client runs for and the backends it resolved to.
+    pub fn resolution(&self) -> &Resolution {
+        &self.resolution
+    }
+
     /// Whether the storage backend queues its writes for a sync engine to
     /// apply later rather than performing them, so a confirmation says the
     /// write is queued rather than done.

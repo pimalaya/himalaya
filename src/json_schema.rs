@@ -11,7 +11,9 @@
 //! [`JsonSchemaCommand`]: pimalaya_cli::clap::commands::json_schema::JsonSchemaCommand
 
 #[cfg(any(backend, feature = "smtp"))]
-use pimalaya_cli::output::{Bytes, Paginated};
+use pimalaya_cli::output::Bytes;
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+use pimalaya_cli::output::Paginated;
 use pimalaya_cli::{clap::commands::json_schema::JsonSchemaRegistry, error::ErrorReport};
 use schemars::JsonSchema;
 
@@ -39,9 +41,9 @@ use crate::shared::receipt::IdsReceipt;
 ///
 /// Each value describes the type the command hands to the printer, and
 /// `himalaya-error` the failure object every command prints instead.
-/// Paginated listings use the `Paginated<T>` wrapper, so the extra
-/// `nextPage` field is described too, and a command printing one of two
-/// types is described by both, through `OneOf`.
+/// The Gmail and Graph listings use the `Paginated<T>` wrapper, so the
+/// extra `nextPage` field is described too, and a command printing one of
+/// two types is described by both, through `OneOf`.
 pub fn registry() -> JsonSchemaRegistry {
     let mut registry = JsonSchemaRegistry::new("himalaya", env!("CARGO_PKG_VERSION"));
 
@@ -78,12 +80,12 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-envelope-list",
-            Paginated<crate::shared::envelope::list::EnvelopeListOutput>
+            crate::shared::envelope::list::EnvelopeListOutput
         );
         // NOTE: `envelope search` renders the page `list` renders.
         insert!(
             "himalaya-envelope-search",
-            Paginated<crate::shared::envelope::list::EnvelopeListOutput>
+            crate::shared::envelope::list::EnvelopeListOutput
         );
         insert!("himalaya-flag-add", crate::shared::flag::add::FlagAddOutput);
         insert!("himalaya-flag-set", crate::shared::flag::set::FlagSetOutput);

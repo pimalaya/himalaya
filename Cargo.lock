@@ -1591,7 +1591,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.4.0"
-source = "git+https://github.com/pimalaya/cli?rev=15eea1bf9103583a6dbb51000aa519985a96cc1b#15eea1bf9103583a6dbb51000aa519985a96cc1b"
+source = "git+https://github.com/pimalaya/cli?rev=0fbe5dd597ec48419eac87a9372c0c0d1f40f6f3#0fbe5dd597ec48419eac87a9372c0c0d1f40f6f3"
 dependencies = [
  "anyhow",
  "base64-codec",

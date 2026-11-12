@@ -7,11 +7,7 @@ use std::{collections::HashMap, fmt};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{
-    printer::Printer,
-    sanitize,
-    tree::{Node, Trees},
-};
+use pimalaya_cli::{columns::Columns, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -21,15 +17,16 @@ use crate::{
         client::PimdirClient,
         index::{PimdirListStyle, PimdirMailThread},
     },
-    shared::envelope::list::{format_addresses, format_detail, format_state},
+    shared::envelope::list::{format_flags, format_names},
 };
 
 /// List the thread of a message, oldest first.
 ///
 /// The thread is read from the store's search index, which joins a reply
 /// to its parent by `In-Reply-To`, else `References`, never by subject. A
-/// message no thread holds is listed alone. The text hangs each message
-/// under the earlier one its `In-Reply-To` names; JSON lists them flat.
+/// message no thread holds is listed alone. The text lists each reply after
+/// the earlier message its `In-Reply-To` names, its subject indented one
+/// step further; JSON lists them flat.
 #[derive(Debug, Parser)]
 pub struct PimdirThreadCommand {
     /// The message id, as a listing prints it.
@@ -67,19 +64,33 @@ pub struct PimdirThreadOutput {
 
 impl fmt::Display for PimdirThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let trees = Trees {
-            items: self.nodes(),
-        };
+        let mut columns = Columns::default();
 
-        write!(f, "{trees}")
+        for (i, depth) in self.reply_order() {
+            let hit = &self.thread.hits[i];
+            let envelope = &hit.envelope;
+            let indent = "  ".repeat(depth);
+            let subject = sanitize::text(&envelope.subject);
+
+            columns.push([
+                sanitize::text(&envelope.id).into_owned(),
+                format_flags(&envelope.flags, envelope.has_attachment),
+                self.style.date(envelope.date),
+                sanitize::text(&hit.mailboxes.join(",")).into_owned(),
+                sanitize::text(&format_names(&envelope.from)).into_owned(),
+                format!("{indent}{subject}"),
+            ]);
+        }
+
+        write!(f, "{columns}")
     }
 }
 
 impl PimdirThreadOutput {
-    /// The thread as trees: each message under the earlier one its
-    /// `In-Reply-To` names, a message whose parent the account lacks at
-    /// the top.
-    fn nodes(&self) -> Vec<Node> {
+    /// The hits in reply order, each with its depth: a message follows the
+    /// earlier one its `In-Reply-To` names, one whose parent the account
+    /// lacks standing at depth 0.
+    fn reply_order(&self) -> Vec<(usize, usize)> {
         let hits = &self.thread.hits;
         let mut children = vec![Vec::new(); hits.len()];
         let mut roots = Vec::new();
@@ -103,31 +114,16 @@ impl PimdirThreadOutput {
             }
         }
 
-        roots.into_iter().map(|i| self.node(i, &children)).collect()
-    }
+        let mut order = Vec::with_capacity(hits.len());
+        let mut stack: Vec<_> = roots.into_iter().rev().map(|i| (i, 0)).collect();
 
-    /// The node of one message: its subject on the branch, then its date,
-    /// its id with its state words, its mailboxes and its senders.
-    fn node(&self, i: usize, children: &[Vec<usize>]) -> Node {
-        let hit = &self.thread.hits[i];
-        let envelope = &hit.envelope;
-
-        let date = self.style.date(envelope.date);
-        let state = format_state(&envelope.flags, envelope.has_attachment);
-        let from = format_addresses(&envelope.from);
-        let mailboxes = match hit.mailboxes.is_empty() {
-            true => String::new(),
-            false => format!("in {}", hit.mailboxes.join(", ")),
-        };
-
-        Node {
-            title: sanitize::text(&envelope.subject).into_owned(),
-            detail: format_detail(&date, &envelope.id, &state, &[&mailboxes, &from]),
-            children: children[i]
-                .iter()
-                .map(|&child| self.node(child, children))
-                .collect(),
+        while let Some((i, depth)) = stack.pop() {
+            order.push((i, depth));
+            let replies = children[i].iter().rev().map(|&child| (child, depth + 1));
+            stack.extend(replies);
         }
+
+        order
     }
 }
 
@@ -189,13 +185,14 @@ mod tests {
         }
     }
 
-    /// Each message hangs under the earlier one it replies to, and one
-    /// whose parent the account lacks stands as a root of its own.
+    /// Each reply follows the earlier message it answers, its subject one
+    /// step further in, and one whose parent the account lacks starts back
+    /// at the margin.
     #[test]
-    fn replies_hang_under_their_parent() {
+    fn replies_follow_their_parent() {
         let output = PimdirThreadOutput {
             style: PimdirListStyle {
-                datetime_fmt: String::from("%F %R%:z"),
+                datetime_fmt: String::from("%F %R"),
                 datetime_local_tz: false,
             },
             thread: PimdirMailThread {
@@ -213,15 +210,10 @@ mod tests {
         };
 
         let expected = "\
-Lunch
-│  2026-11-11 10:00+01:00  1  in INBOX  Me <me@example.org>
-└─ Re: Lunch
-   │  2026-11-11 10:00+01:00  2 (unread)  in INBOX, Archive  Alice <alice@example.org>
-   └─ Re: Lunch
-      2026-11-11 10:00+01:00  3  in Sent  Me <me@example.org>
-
-Re: Lunch
-   2026-11-11 10:00+01:00  4  in INBOX  Bob <bob@example.org>
+1        2026-11-11 10:00  INBOX          Me     Lunch
+2  *     2026-11-11 10:00  INBOX,Archive  Alice    Re: Lunch
+3        2026-11-11 10:00  Sent           Me         Re: Lunch
+4        2026-11-11 10:00  INBOX          Bob    Re: Lunch
 ";
         assert_eq!(output.to_string(), expected);
     }
