@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-/// Manage envelopes using the shared API.
+/// Manage envelopes using the unified API.
 ///
 /// An envelope is a small subset of a message's headers, enough to say
 /// what the message is about without fetching it.

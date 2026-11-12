@@ -1,6 +1,6 @@
 //! # SMTP backend
 //!
-//! The SMTP adapter of the shared cross-protocol client, a send-only
+//! The SMTP adapter of the unified client, a send-only
 //! transport for the storage backends that cannot send themselves.
 //!
 //! The RFC 5321 envelope comes from [`SubmissionEnvelope`], derived from

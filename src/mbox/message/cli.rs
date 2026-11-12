@@ -17,7 +17,7 @@ use crate::mbox::{
 ///
 /// A message is a `From_` line and the bytes up to the next one, and
 /// these store and relocate one. Rendering its content belongs to the
-/// shared `message` and `envelope` commands.
+/// unified `message` and `envelope` commands.
 #[derive(Debug, Subcommand)]
 pub enum MboxMessageCommand {
     Save(MboxMessageSaveCommand),

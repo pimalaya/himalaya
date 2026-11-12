@@ -1,7 +1,7 @@
 //! # Maildir
 //!
 //! The `maildir` command family, covering what maps onto the on-disk
-//! layout, plus the adapter serving the shared commands over Maildir.
+//! layout, plus the adapter serving the unified commands over Maildir.
 
 pub mod arg;
 pub mod backend;

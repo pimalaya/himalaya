@@ -1,7 +1,7 @@
 //! # mbox
 //!
 //! The `mbox` command family, covering what maps onto mbox files, plus
-//! the adapter serving the shared commands over mbox.
+//! the adapter serving the unified commands over mbox.
 
 pub mod arg;
 pub mod backend;

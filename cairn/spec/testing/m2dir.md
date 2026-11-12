@@ -1,6 +1,6 @@
-# m2dir (local): shared-command test report
+# m2dir (local): unified-command test report
 
-Shared cross-protocol commands on the m2dir backend. Companion:
+Unified commands on the m2dir backend. Companion:
 [m2dir-specific.md](m2dir-specific.md) (the `m2dir …` raw API). Method:
 [provider-test-plan.md](provider-test-plan.md), against a throwaway
 m2store in `/tmp`.
@@ -42,7 +42,7 @@ m2store in `/tmp`.
 
 ### Bugs
 
-- **E1: shared `-m <folder-name>` did not resolve. FIXED.**
+- **E1: unified `-m <folder-name>` did not resolve. FIXED.**
   `envelope list -m Inbox` failed `path Inbox is not a directory`; only
   the absolute path from `mailbox list` (`-m /tmp/himalaya-m2dir/Inbox`)
   worked. io-m2dir's `open_m2dir` takes a filesystem path as-is, and the
@@ -57,7 +57,7 @@ m2store in `/tmp`.
 
 ### Behaviour (not bugs)
 
-- m2dir **supports the shared `envelope search`** (lists then
+- m2dir **supports the unified `envelope search`** (lists then
   filters/sorts client-side), like Maildir and unlike Gmail/Graph.
 - Messages are **content-addressed**: `message add` returns a
   `<checksum>.<nonce>` id, and `copy`/`move` are emulated as get + store
@@ -75,7 +75,7 @@ m2store in `/tmp`.
 
 ## Verdict
 
-Shared commands on m2dir are **solid**: list/search/add/read/flag/copy/
+Unified commands on m2dir are **solid**: list/search/add/read/flag/copy/
 move/attachment all work, addressing folders by name (E1 fixed), by the
 absolute id, or the default via the `inbox` alias. `message send`
 correctly needs an `[smtp]` block. No functional blocker.

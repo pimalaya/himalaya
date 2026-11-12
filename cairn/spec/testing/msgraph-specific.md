@@ -1,6 +1,6 @@
 # Microsoft Graph *specific* API on Outlook: test report
 
-Companion to [msgraph.md](msgraph.md) (shared commands). Exercises
+Companion to [msgraph.md](msgraph.md) (unified commands). Exercises
 `himalaya msgraph …`: the raw Microsoft Graph mail surface (profile,
 mail folders, messages, attachments).
 
@@ -53,7 +53,7 @@ shapes as the verified verbs.
 - **M3: moving a *just-copied* message can 405.** `msgraph messages move
   <id> <dest>` on the id returned directly by `msgraph messages copy`
   fails `HTTP 405 (ErrorInvalidRequest): The OData request is not
-  supported`. The command is byte-identical to the shared `message move`
+  supported`. The command is byte-identical to the unified `message move`
   (both call `message_move`) and works on any settled message id: the
   405 comes from Graph itself, whose `copy` is **asynchronous**: the id
   it returns points at a copy still materialising and is not yet
@@ -65,7 +65,7 @@ shapes as the verified verbs.
   a display name: the specific commands mirror the REST path and do not
   run the shared name→id resolver (that is `msgraph.md`'s M1, a
   shared-layer convenience). This is the established raw-vs-shared split;
-  the friendly path is the shared `envelope list -m <name>`.
+  the friendly path is the unified `envelope list -m <name>`.
 
 - Graph regenerates the `Date` header on stored/sent messages (a wrong
   weekday in the submitted MIME comes back corrected), and stamps its own

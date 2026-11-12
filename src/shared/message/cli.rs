@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-/// Manage messages using the shared API.
+/// Manage messages using the unified API.
 ///
 /// A message is headers plus a body of MIME parts. The `compose`, `reply`,
 /// `forward` and `read` subcommands cover the simple cases through flags.

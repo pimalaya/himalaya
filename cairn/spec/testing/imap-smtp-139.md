@@ -1,6 +1,6 @@
 # IMAP + SMTP on 139 Mail: test report
 
-Shared cross-protocol commands on the IMAP/SMTP backend against **139 Mail**
+Unified commands on the IMAP/SMTP backend against **139 Mail**
 (China Mobile). Method: [provider-test-plan.md](provider-test-plan.md).
 
 - himalaya: `v2.2.1 +imap +smtp +native-tls` (rev `4df380b`)
@@ -128,7 +128,7 @@ smtp.sasl.login.password.raw = "***"
 
 ## Verdict
 
-139 Mail (IMAP + SMTP) is **mostly working** across shared commands, with the
+139 Mail (IMAP + SMTP) is **mostly working** across unified commands, with the
 important caveat that `native-tls` is required (the default `rustls-ring` does
 not work). Core functionality (list, read, flag, copy, move, send, reply,
 forward) all work, though transient server errors were observed on reply and

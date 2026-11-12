@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-/// Manage mailboxes using the shared API.
+/// Manage mailboxes using the unified API.
 ///
 /// A mailbox is a message container.
 #[derive(Debug, Subcommand)]

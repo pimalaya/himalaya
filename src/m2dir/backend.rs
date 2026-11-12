@@ -1,6 +1,6 @@
 //! # m2dir backend
 //!
-//! The m2dir adapter of the shared cross-protocol client, glue over the
+//! The m2dir adapter of the unified client, glue over the
 //! io-m2dir client [`M2dirClient`] wraps.
 //!
 //! m2dir is content-addressed and has no native copy or move, so a copy
@@ -28,7 +28,7 @@ impl M2dirClient {
     /// under the store root first, percent-encoded as the spec wants,
     /// io-m2dir taking a filesystem path alone.
     ///
-    /// That is what lets a shared command address a folder by name or by
+    /// That is what lets a unified command address a folder by name or by
     /// id, as the raw `m2dir` commands and the Maildir backend do.
     fn resolve_m2dir(&self, mailbox: &str) -> Result<M2dir> {
         if Path::new(mailbox).is_absolute() {

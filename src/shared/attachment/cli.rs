@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-/// Manage attachments using the shared API.
+/// Manage attachments using the unified API.
 ///
 /// An attachment is a binary part of a message.
 #[derive(Debug, Subcommand)]

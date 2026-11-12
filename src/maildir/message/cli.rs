@@ -18,7 +18,7 @@ use crate::maildir::{
 ///
 /// A message is a file under the Maildir's `new` or `cur` subdirectory,
 /// and these store and relocate one. Rendering its content belongs to the
-/// shared `message` and `envelope` commands.
+/// unified `message` and `envelope` commands.
 #[derive(Debug, Subcommand)]
 pub enum MaildirMessageCommand {
     Save(MaildirMessageSaveCommand),

@@ -7,7 +7,7 @@ use std::fmt;
 
 use clap::{Parser, ValueEnum};
 
-/// A flag a shared command accepts.
+/// A flag a unified command accepts.
 ///
 /// The flags with one meaning across the backends declaring them, each a
 /// capability of its own: `\Deleted`, the Maildir letters and the custom

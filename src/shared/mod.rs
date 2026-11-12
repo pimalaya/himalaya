@@ -1,4 +1,4 @@
-//! # Shared API
+//! # Unified API
 //!
 //! The cross-protocol commands, behaving the same whatever backend serves
 //! the active account, and the client dispatching them onto it.

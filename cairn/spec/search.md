@@ -6,7 +6,7 @@ status: current
 
 # Search
 
-Shared envelope search is expressed in one backend-agnostic query language, himalaya's own, parsed once and translated per backend. The query type carries a filter tree and a sort list; the parser is built on chumsky and renders its errors through the CLI's ariadne setup. Each backend matches text its own way, and refuses a clause it cannot search rather than dropping it.
+Unified envelope search is expressed in one backend-agnostic query language, himalaya's own, parsed once and translated per backend. The query type carries a filter tree and a sort list; the parser is built on chumsky and renders its errors through the CLI's ariadne setup. Each backend matches text its own way, and refuses a clause it cannot search rather than dropping it.
 
 A pimdir account also answers the pimdir SEARCH query language natively, from the store's search index, under `himalaya pimdir`; the shared language stays himalaya's.
 

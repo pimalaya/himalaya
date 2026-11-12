@@ -1,6 +1,6 @@
-# JMAP on Fastmail: shared-command test report
+# JMAP on Fastmail: unified-command test report
 
-Shared cross-protocol commands on the JMAP backend. Companion:
+Unified commands on the JMAP backend. Companion:
 [jmap-specific-fastmail.md](jmap-specific-fastmail.md) (the `jmap …` raw
 API). Method: [provider-test-plan.md](provider-test-plan.md), every
 command × flag by hand inside two throwaway JMAP mailboxes
@@ -76,7 +76,7 @@ by their display **name** and resolve to the opaque id transparently.
 
 ## Verdict
 
-Shared commands on JMAP are **solid and release-ready**: every command
+Unified commands on JMAP are **solid and release-ready**: every command
 and flag works, addressing mailboxes by name via the id resolver, table
 + JSON output correct, errors clean. No functional blocker. J1 is a
 minor CLI-ergonomics nit (left in docs); J3 is **fixed**: JMAP send now

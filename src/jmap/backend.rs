@@ -1,6 +1,6 @@
 //! # JMAP backend
 //!
-//! The JMAP adapter of the shared cross-protocol client, glue over the
+//! The JMAP adapter of the unified client, glue over the
 //! io-jmap client [`JmapClient`] wraps.
 //!
 //! The shared mailbox argument is always an opaque JMAP id, the client

@@ -1,6 +1,6 @@
 //! # Email
 //!
-//! The cross-protocol email domain types, the shapes the shared
+//! The cross-protocol email domain types, the shapes the unified
 //! subcommands render.
 //!
 //! They were inlined from the retired io-email crate, the CLI owning its

@@ -36,7 +36,7 @@ use crate::{shared::message::arg::MessageArg, smtp::client::SmtpClient};
 /// `--notify`, `--ret` and `--envid` request delivery status notifications
 /// (RFC 3461), refused when the server does not announce `DSN`.
 ///
-/// The shared `message send` derives the envelope from the headers
+/// The unified `message send` derives the envelope from the headers
 /// instead.
 #[derive(Debug, Parser)]
 pub struct SmtpSendCommand {

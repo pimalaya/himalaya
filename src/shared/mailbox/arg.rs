@@ -1,6 +1,6 @@
 //! # Mailbox argument
 //!
-//! The `-m/--mailbox` flag every shared command targeting one mailbox
+//! The `-m/--mailbox` flag every unified command targeting one mailbox
 //! takes, and the alias resolution behind it.
 
 use clap::Parser;

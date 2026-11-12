@@ -1,6 +1,6 @@
 //! # IMAP backend
 //!
-//! The IMAP adapter of the shared cross-protocol client, glue over the
+//! The IMAP adapter of the unified client, glue over the
 //! io-imap session [`ImapClient`] already wraps.
 //!
 //! Each method takes and returns the CLI's own [`crate::email`] types, so
@@ -533,7 +533,7 @@ type ListRow = (
 );
 
 /// Drops `\Noselect` containers (RFC 3501 section 6.3.8): they cannot hold
-/// messages and would error out on any later shared-API op.
+/// messages and would error out on any later unified-API op.
 fn is_selectable(row: &ListRow) -> bool {
     !row.2.contains(&FlagNameAttribute::Noselect)
 }

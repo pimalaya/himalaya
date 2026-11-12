@@ -1,6 +1,6 @@
 # IMAP on iCloud: test report
 
-Shared cross-protocol commands (and IMAP-specific spot-checks) on the
+Unified commands (and IMAP-specific spot-checks) on the
 IMAP backend against **iCloud** (`imaps://imap.mail.me.com`, app-specific
 password). The account is **IMAP-only**: no SMTP block is configured:
 so `compose`/`send`/`reply`/`forward` were out of scope for this run.
@@ -69,7 +69,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
   (iCloud rejects the command): expected, not a himalaya fault.
 - **Custom keywords are accepted.** Raw `imap store <id> --action add -f
   keywordtest` succeeded and the keyword showed up in `fetch --flags`. (The
-  *shared* `flag` command still rejects non-standard flags at the CLI enum,
+  *unified* `flag` command still rejects non-standard flags at the CLI enum,
   by design.)
 - **Default mailbox** requires an explicit `-m` or a configured
   `mailbox.alias.inbox`; omitting it gives a clear actionable error rather
@@ -99,7 +99,7 @@ All work happened inside two throwaway mailboxes (`Himalaya-Test-A`,
 
 ## Verdict
 
-The IMAP backend is **functionally solid on iCloud** for the whole shared
+The IMAP backend is **functionally solid on iCloud** for the whole unified
 surface: list, search (conditions/combinators/grouping), add, read,
 flags, copy, the MOVE-less move fallback, and attachments all behave
 correctly. **Sorting** needed one config knob plus one code fix:
@@ -111,5 +111,5 @@ correctly. **Sorting** needed one config knob plus one code fix:
    `Date:`-header parse); date ordering now works under the fallback.
 
 With `imap.sort.fallback = true`, iCloud is release-ready on the IMAP
-shared surface. SMTP was not exercised (not configured);
+unified surface. SMTP was not exercised (not configured);
 compose/send/reply/forward remain untested on iCloud.

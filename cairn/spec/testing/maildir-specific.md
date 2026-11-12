@@ -1,6 +1,6 @@
 # Maildir *specific* API: test report
 
-Companion to [maildir.md](maildir.md) (shared commands). Exercises
+Companion to [maildir.md](maildir.md) (unified commands). Exercises
 `himalaya maildir …`: the raw Maildir API (folder lifecycle, message
 store/copy/move, filename flags).
 
@@ -55,11 +55,11 @@ store/copy/move, filename flags).
   FIXED.** `--flag` was declared `num_args = 1..` (greedy variadic), so
   `flags add -m Drafts -f seen -f flagged <id>` consumed `<id>` as a flag
   value (`invalid value '<id>' for '--flag'`). It now takes exactly one
-  value per `-f` (repeat `-f` per flag), mirroring the shared `flag`
+  value per `-f` (repeat `-f` per flag), mirroring the unified `flag`
   command, so ids can come before or after the flags. Flag values are
   lowercase (`passed`, `replied`, `seen`, `trashed`, `draft`,
   `flagged`); `flags list` prints the code/name legend.
-- `messages save` defaults its target subdir to `new` (the shared
+- `messages save` defaults its target subdir to `new` (the unified
   `message add` uses `cur`); copied/moved messages get a fresh Maildir id
   on delivery.
 

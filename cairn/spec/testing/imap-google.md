@@ -1,6 +1,6 @@
 # Gmail over IMAP on Google: test report
 
-Shared cross-protocol commands (and IMAP-specific spot-checks) on the
+Unified commands (and IMAP-specific spot-checks) on the
 IMAP backend against **Gmail** (Google). Distinct from the Gmail *REST*
 backend in [gmail.md](gmail.md) / [gmail-specific.md](gmail-specific.md):
 this is `imaps://imap.gmail.com` with an app password. Companion to the
@@ -55,16 +55,16 @@ semantics worth knowing (and were the basis of the cleanup).
   label but not the message, which remains in `[Gmail]/All Mail`.
   Deleting test data means trashing it (move to `[Gmail]/Trash`, then
   `\Deleted` + expunge): not just deleting the label.
-- **H2: the shared `flag` command has no `deleted` value** (only
+- **H2: the unified `flag` command has no `deleted` value** (only
   `seen`, `answered`, `flagged`, `draft`). IMAP deletion goes through the
   protocol-specific `imap store <uid-set> --action add --flag '\Deleted'`
-  then `imap expunge`, or a move to Trash. Deliberate: the shared API
+  then `imap expunge`, or a move to Trash. Deliberate: the unified API
   keeps the destructive `\Deleted`/expunge dance out of the friendly
   surface. Worth stating in the docs.
 - **H3: Gmail's server-side `imap search --subject` is tokenized and
   loose.** `--subject "Gmail-IMAP"` matched an extra Trash message that
   did *not* contain that string literally (Gmail split it into `gmail`
-  + `imap` word tokens). The shared `envelope search` (client-side
+  + `imap` word tokens). The unified `envelope search` (client-side
   substring) is stricter. For scripted cleanup, prefer the shared search
   or verify each hit before deleting.
 - **H4: `imap store <SEQUENCE>` takes one IMAP sequence-set string**
@@ -77,7 +77,7 @@ semantics worth knowing (and were the basis of the cleanup).
 
 ## Verdict
 
-Gmail over IMAP is **fully working** across shared and IMAP-specific
+Gmail over IMAP is **fully working** across unified and IMAP-specific
 commands, with no himalaya bugs: only Gmail's own label/search
 semantics to account for (H1–H4). The account is IMAP-only, so sending
 needs a separate `[smtp]` block (or the Gmail REST backend). Safe to

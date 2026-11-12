@@ -1,11 +1,11 @@
-# IMAP + SMTP on Fastmail: shared-command test report
+# IMAP + SMTP on Fastmail: unified-command test report
 
 - himalaya: `v2.0.0-alpha.1 +imap +smtp +rustls-ring` (rev `1dddbe8`,
   working tree with the shared-JMAP / CRLF / date fixes applied)
 - account: `fastmail` (`imap.server = imaps://imap.fastmail.com`,
   `smtp.server = smtps://smtp.fastmail.com`, SASL PLAIN)
 - date: 2026-07-17
-- method: every shared command × every flag variant, run by hand inside
+- method: every unified command × every flag variant, run by hand inside
   two throwaway mailboxes (`Himalaya-Test-A` / `-B`), per
   [provider-test-plan.md](provider-test-plan.md). Fixtures: 6 messages
   (Alpha…Epsilon + Eta) with distinct sender/subject/date/flags and one
@@ -60,14 +60,14 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
     also scans untagged codes (+ a regression test). himalaya
     path-patches io-imap until a release >0.2.0 ships this.
 
-- **F3: inconsistent default-mailbox resolution across shared
+- **F3: inconsistent default-mailbox resolution across unified
   commands. FIXED.** `copy`/`move` used to hardcode
   `#[arg(default_value = "Inbox")]` on `--from`, silently selecting the
   literal INBOX, while `envelope list`/`search` required
   `mailbox.alias.inbox`. `--from` is now `Option<String>` resolved via
   the shared `resolve_mailbox_or_default`, so an omitted source falls
   back to the `inbox` alias and errors identically when none is
-  configured. Every shared command now shares one policy: names come
+  configured. Every unified command now shares one policy: names come
   from the user or the alias map; the shared layer never guesses an
   inbox id.
 
@@ -111,7 +111,7 @@ both landed in the inbox; delivered copies moved to Trash on cleanup).
 
 ## Verdict
 
-IMAP + SMTP on Fastmail is **solid and release-ready** for the shared
+IMAP + SMTP on Fastmail is **solid and release-ready** for the unified
 command surface: every command and flag works, output (table + JSON) is
 correct, error handling is clean. No functional blocker. F1 (empty-input
 validation), F2 (accurate copy/move counts, incl. the io-imap untagged

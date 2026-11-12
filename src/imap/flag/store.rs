@@ -36,12 +36,12 @@ pub struct ImapStoreCommand {
     pub action: StoreActionArg,
     /// Flags as raw RFC 3501 tokens.
     ///
-    /// This is the raw IMAP API, not the shared
+    /// This is the raw IMAP API, not the unified
     /// `seen|answered|flagged|draft` enum: a system flag keeps its
     /// backslash, as in `-f '\Seen'`, and a bare word is a custom
     /// keyword, so `-f seen` stores the keyword `seen`.
     ///
-    /// The shared `flag add -f seen` is the enum-mapped behaviour.
+    /// The unified `flag add -f seen` is the enum-mapped behaviour.
     #[arg(short, long, required = true, num_args = 1..)]
     pub flag: Vec<String>,
     /// Read the sequence set as message numbers rather than UIDs.

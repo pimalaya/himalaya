@@ -27,7 +27,7 @@ use crate::{
     shared::vacation::{get::VacationGetCommand, set::VacationSetCommand},
 };
 
-/// Manage the auto-reply using the shared API.
+/// Manage the auto-reply using the unified API.
 ///
 /// The auto-reply answers incoming mail while it is on, within its window
 /// when it has one. It is a feature of the account rather than of a

@@ -1,7 +1,7 @@
 # IMAP + SMTP *specific* API on Fastmail: test report
 
 Companion to [imap-smtp-fastmail.md](imap-smtp-fastmail.md) (which covers
-the shared commands). This one exercises the raw protocol commands under
+the unified commands). This one exercises the raw protocol commands under
 `himalaya imap …` and `himalaya smtp …`.
 
 - himalaya: `v2.0.0-alpha.1 +imap +smtp +rustls-ring` (rev `1dddbe8` +
@@ -43,7 +43,7 @@ the shared commands). This one exercises the raw protocol commands under
 ### Bugs / issues
 
 - **G1: `imap append`/`imap store` `-f` takes *raw* flag tokens, not
-  the shared `seen|answered|flagged|draft` enum.** `imap append -f seen`
+  the unified `seen|answered|flagged|draft` enum.** `imap append -f seen`
   stores a **keyword** `seen`, not the system flag `\Seen`; likewise
   `-f flagged` → keyword `flagged`. Consequences verified:
   `imap search --seen` (`SEARCH SEEN`) does **not** match those messages
@@ -51,21 +51,21 @@ the shared commands). This one exercises the raw protocol commands under
   keyword. The system flag requires the backslash form:
   `imap append -f '\Seen'` correctly sets `\Seen` and is then found by
   `--seen`. This is defensible for a "raw IMAP" surface, but it is a
-  **footgun**: the flag *names* collide with the shared `-f` enum
+  **footgun**: the flag *names* collide with the unified `-f` enum
   (`message add -f seen` → `\Seen`) while the *meaning* differs, and the
   `--help` listed no possible values and gave no warning. **Resolved by
   documentation** (per owner decision: it is deliberately the raw API,
   not the shared one): the `-f` help on `imap append` and `imap store`
   now states that flags are raw IMAP tokens, that a bare word becomes a
   keyword, that system flags need the backslash (`-f '\Seen'`), and
-  points to the shared `message add`/`flag add` for the enum behaviour.
+  points to the unified `message add`/`flag add` for the enum behaviour.
 
 - **F2 (inherited): raw `imap copy`/`move` of a non-existent UID
   reported success. FIXED at the shared layer** (see the shared report's
   F2), including the io-imap untagged-MOVE-`COPYUID` sub-fix. The raw
   `imap copy`/`move` still print the generic `Message(s) successfully …`,
   since that surface mirrors the protocol verbatim; the count-aware
-  messaging lives on the shared `copy`/`move`.
+  messaging lives on the unified `copy`/`move`.
 
 ### Provider / protocol behaviour (not bugs)
 
@@ -79,7 +79,7 @@ the shared commands). This one exercises the raw protocol commands under
   selected, so these mid-session commands have no state to act on.
   Expected.
 - **B3: `imap search --before/--since/--on` use `INTERNALDATE`
-  (arrival)**, whereas the *shared* `envelope search` `date`/`after`
+  (arrival)**, whereas the *unified* `envelope search` `date`/`after`
   target the `Date:` header (sent date). The raw command mirrors RFC
   3501 `SINCE/ON/BEFORE`; the shared DSL deliberately maps to
   `SENTSINCE/SENTON/SENTBEFORE`. Same-day appends match `--since today`

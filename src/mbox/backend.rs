@@ -1,6 +1,6 @@
 //! # mbox backend
 //!
-//! The mbox adapter of the shared cross-protocol client, glue over the
+//! The mbox adapter of the unified client, glue over the
 //! io-mbox client [`MboxClient`] wraps.
 //!
 //! A mailbox is one mbox file and a message is addressed by its io-mbox

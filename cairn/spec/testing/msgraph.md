@@ -1,6 +1,6 @@
-# Microsoft Graph on Outlook: shared-command test report
+# Microsoft Graph on Outlook: unified-command test report
 
-Shared cross-protocol commands on the Microsoft Graph backend.
+Unified commands on the Microsoft Graph backend.
 Companion: [msgraph-specific.md](msgraph-specific.md) (the `msgraph …`
 raw API). Method: [provider-test-plan.md](provider-test-plan.md),
 inside a throwaway Graph mail folder.
@@ -38,7 +38,7 @@ inside a throwaway Graph mail folder.
 
 ### Bugs
 
-- **M1: shared `-m <folder-name>` now resolves to a folder id. FIXED.**
+- **M1: unified `-m <folder-name>` now resolves to a folder id. FIXED.**
   `envelope list -m "Boîte de réception"` (a localised display name) used
   to fail `HTTP 400 (ErrorInvalidIdMalformed): Id is malformed`; only the
   opaque id or an English well-known name (`inbox`) worked. Graph mail
@@ -56,7 +56,7 @@ inside a throwaway Graph mail folder.
   fetches by the globally-unique message id and ignores the folder (like
   JMAP `get_message` and the Gmail backend).
 - `message add` and `envelope search` bail with clear messages
-  (`Microsoft Graph does not support adding messages` / `… the shared
+  (`Microsoft Graph does not support adding messages` / `… the unified
   envelope search`): Graph has no MIME append and no server-side
   shared-query search (its own `$search`/`$filter` live on the specific
   `msgraph messages list`).
@@ -69,8 +69,8 @@ inside a throwaway Graph mail folder.
 
 ## Verdict
 
-Shared commands on Microsoft Graph are **solid** for the supported
-subset (Graph legitimately lacks shared `add`/`search`):
+Unified commands on Microsoft Graph are **solid** for the supported
+subset (Graph legitimately lacks unified `add`/`search`):
 list/read/flag/copy/move/attachment/send all work, now addressing
 folders by **name, id, or well-known name** (M1 fixed). No functional
 blocker.

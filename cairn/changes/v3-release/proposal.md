@@ -9,7 +9,7 @@ created: 2026-11-02
 
 ## Why
 
-Master breaks the v2 contract already: every `--json` key is camelCase, `message read --json` is a designed view, and Gmail and Graph refuse what they used to pretend to do (`capability-missing`). The 2027 plan's first task, a REPL and an MCP server over the shared API, landed on 2026-11-02 together with the capability union the MCP server's tool list rests on. A 2.2.2 was considered and dropped: the breaking changes are on master, so the next release is a major.
+Master breaks the v2 contract already: every `--json` key is camelCase, `message read --json` is a designed view, and Gmail and Graph refuse what they used to pretend to do (`capability-missing`). The 2027 plan's first task, a REPL and an MCP server over the unified API, landed on 2026-11-02 together with the capability union the MCP server's tool list rests on. A 2.2.2 was considered and dropped: the breaking changes are on master, so the next release is a major.
 
 ## What
 

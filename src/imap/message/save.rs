@@ -30,13 +30,13 @@ pub struct ImapMessageSaveCommand {
     pub mailbox: MailboxNameArg,
     /// Flags to set on the appended message, as raw RFC 3501 tokens.
     ///
-    /// This is the raw IMAP API, not the shared
+    /// This is the raw IMAP API, not the unified
     /// `seen|answered|flagged|draft` enum: a system flag keeps its
     /// backslash, as in `-f '\Seen'`, and a bare word is a custom
     /// keyword, so `-f seen` stores the keyword `seen` and `imap search
     /// --seen` will not match it.
     ///
-    /// The shared `message add -f seen` is the enum-mapped behaviour.
+    /// The unified `message add -f seen` is the enum-mapped behaviour.
     #[arg(short, long, num_args = 0..)]
     pub flag: Vec<String>,
     #[command(flatten)]

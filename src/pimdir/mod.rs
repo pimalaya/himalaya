@@ -1,6 +1,6 @@
 //! # pimdir
 //!
-//! The `pimdir` command family and the adapter serving the shared
+//! The `pimdir` command family and the adapter serving the unified
 //! commands over a local pimdir store: an offline cache a sync engine
 //! populates, not a live server.
 //!

@@ -1,6 +1,6 @@
 //! # pimdir backend
 //!
-//! The pimdir adapter of the shared cross-protocol client, reading the
+//! The pimdir adapter of the unified client, reading the
 //! store's index and blobs.
 //!
 //! Envelopes are built from the stored mail summary with no body read,
@@ -168,7 +168,7 @@ impl PimdirClient {
             .collect())
     }
 
-    /// How the store serves a shared write, read from what its sources
+    /// How the store serves a unified write, read from what its sources
     /// declare (pimdir STORAGE §15.6), nothing staged: `None` for a read or
     /// an account feature, and for a store whose sources declare nothing,
     /// where the backend's static row stands.
@@ -1096,7 +1096,7 @@ impl PimdirClient {
     }
 
     /// Pulls every live item of a collection with its summary by keyset
-    /// paging, newest first (the read API is paginated; the shared
+    /// paging, newest first (the read API is paginated; the unified
     /// list/search commands paginate in memory, as the file backends do).
     fn scan_items(&self, collection: &str) -> Result<Vec<PimdirItem>> {
         let mut all: Vec<PimdirItem> = Vec::new();
@@ -3848,7 +3848,7 @@ mod tests {
         );
     }
 
-    /// The shared `flag set -f seen` on three mails, which drops `act` from
+    /// The unified `flag set -f seen` on three mails, which drops `act` from
     /// `k1` only: the one refusal stages nothing for the other two either.
     #[test]
     fn a_refusal_part_way_stages_nothing() {
@@ -3883,7 +3883,7 @@ mod tests {
     }
 
     /// An id the mailbox does not hold is skipped and counted out, as the
-    /// shared commands report how many of the given ids they found.
+    /// unified commands report how many of the given ids they found.
     #[test]
     fn an_unknown_id_is_skipped_and_counted_out() {
         let (_dir, mut client) = flag_store(None);

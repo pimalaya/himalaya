@@ -1,6 +1,6 @@
 //! # Mailbox
 //!
-//! The shared `mailbox create`, `rename` and `delete` run as the built
+//! The unified `mailbox create`, `rename` and `delete` run as the built
 //! binary against a Maildir, asserting each changes the store and prints
 //! the id it leaves.
 

@@ -1,7 +1,7 @@
 //! # mbox client
 //!
 //! The wrapper around io-mbox's client every mbox-specific subcommand
-//! receives, plus the index sync both the subcommands and the shared
+//! receives, plus the index sync both the subcommands and the unified
 //! adapter go through.
 //!
 //! The dispatch layer builds it up front and hands it down, the merged

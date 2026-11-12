@@ -1,6 +1,6 @@
-# Gmail REST on Google: shared-command test report
+# Gmail REST on Google: unified-command test report
 
-Shared cross-protocol commands on the Gmail REST backend. Companion:
+Unified commands on the Gmail REST backend. Companion:
 [gmail-specific.md](gmail-specific.md) (the `gmail …` raw API). Method:
 [provider-test-plan.md](provider-test-plan.md), inside a throwaway Gmail
 label.
@@ -31,7 +31,7 @@ label.
 
 ### Bugs
 
-- **G1: shared `-m <label-name>` now resolves to a label id. FIXED.**
+- **G1: unified `-m <label-name>` now resolves to a label id. FIXED.**
   `envelope list -m Himalaya-Test` used to fail `HTTP 400: Invalid
   label`; only `-m Label_7` (the opaque id) worked. Gmail labels are
   opaque-id + display-name like JMAP mailboxes, so `GmailClient` now
@@ -46,7 +46,7 @@ label.
   fetches by the globally-unique message id and ignores the `-m` label
   (like JMAP `get_message`).
 - `message add` and `envelope search` bail with clear messages (`Gmail
-  does not support adding messages` / `… the shared envelope search`):
+  does not support adding messages` / `… the unified envelope search`):
   Gmail has no append and no server-side shared-query search.
 - `flag`/`copy`/`move` map onto Gmail labels (seen = absence of
   `UNREAD`, flagged = `STARRED`; copy = add label, move = add + remove).
@@ -58,7 +58,7 @@ label.
 
 ## Verdict
 
-Shared commands on Gmail are **solid** for the supported subset (Gmail
-legitimately lacks shared `add`/`search`): list/read/flag/copy/move/
+Unified commands on Gmail are **solid** for the supported subset (Gmail
+legitimately lacks unified `add`/`search`): list/read/flag/copy/move/
 attachment/send all work, now addressing labels by **name or id** (G1
 fixed). No functional blocker.

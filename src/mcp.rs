@@ -1,7 +1,7 @@
 //! # MCP command
 //!
 //! The `mcp` subcommand, a Model Context Protocol server over stdin and
-//! stdout exposing the shared API as tools, one per leaf command.
+//! stdout exposing the unified API as tools, one per leaf command.
 //!
 //! pimalaya-cli's [`mcp`] module answers the protocol and checks each call
 //! against its tool's input schema; this one lists the tools and runs the
@@ -62,7 +62,7 @@ only when the server runs with --allow-write, those that send mail only \
 with --allow-send. A failed call answers isError with a himalaya-error \
 object, its `code` naming the failure when it has one.";
 
-/// The shared API leaves exposed as tools, with what each may do.
+/// The unified API leaves exposed as tools, with what each may do.
 ///
 /// A leaf missing here is not exposed, so a new command is listed only
 /// once it is classified; `message parse` (reads a local file the caller
@@ -146,7 +146,7 @@ const URI_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
 
 /// Start an MCP server over stdio for one account.
 ///
-/// Each tool is a shared API command (`envelope_list`, `message_read`)
+/// Each tool is a unified API command (`envelope_list`, `message_read`)
 /// run over clients connected once for the server's lifetime; the
 /// account and `--backend` are the server's. Without flags only the
 /// tools that read are listed.
@@ -223,7 +223,7 @@ pub fn max_attachment_size() -> Option<u64> {
     Some(ATTACHMENT_CAP.load(Ordering::Relaxed)).filter(|max| *max != u64::MAX)
 }
 
-/// A shared API leaf as a tool, and what it may do.
+/// A unified API leaf as a tool, and what it may do.
 struct McpTool {
     group: &'static str,
     leaf: &'static str,
@@ -920,11 +920,11 @@ mod tests {
 
     use crate::{cli::Cli, mcp::*};
 
-    /// The shared API leaves no tool exposes: `message parse` reads a local
+    /// The unified API leaves no tool exposes: `message parse` reads a local
     /// file the caller names.
     const EXCLUDED: &[(&str, &str)] = &[("message", "parse")];
 
-    /// The command groups of the shared API.
+    /// The command groups of the unified API.
     const GROUPS: &[&str] = &[
         "mailbox",
         "envelope",

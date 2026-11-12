@@ -1,6 +1,6 @@
 # Gmail *specific* API on Google: test report
 
-Companion to [gmail.md](gmail.md) (shared commands). Exercises
+Companion to [gmail.md](gmail.md) (unified commands). Exercises
 `himalaya gmail …`: the raw Gmail REST v1 surface.
 
 - himalaya: `v2.0.0-alpha.1 +gmail +rustls-ring` (working tree)
@@ -64,13 +64,13 @@ Companion to [gmail.md](gmail.md) (shared commands). Exercises
 ### Behaviour / usability
 
 - **G2: `gmail attachments get` needs the raw Gmail `attachmentId`, and
-  small attachments have none.** Passing the shared `attachment list`
+  small attachments have none.** Passing the unified `attachment list`
   index (`1`) → `HTTP 400: Invalid attachment token`. The real
   `attachmentId` only comes from `messages get --format full`. Worse,
   Gmail **inlines** small attachments in `body.data` with no
   `attachmentId` at all (the test `note.txt` had none → empty id → `404
   …/attachments/`). So `gmail attachments get` only applies to larger,
-  separately-stored attachments; the shared `attachment download` reads
+  separately-stored attachments; the unified `attachment download` reads
   both inline and stored data and is the reliable path.
 - **G3: `gmail profile get --json` is now structured. FIXED.** It used
   to emit `{"message":"Email: …\n…"}` because the command formatted a

@@ -1,6 +1,6 @@
 //! # Maildir backend
 //!
-//! The Maildir adapter of the shared cross-protocol client, glue over the
+//! The Maildir adapter of the unified client, glue over the
 //! io-maildir client [`MaildirClient`] wraps.
 //!
 //! Each method takes and returns the CLI's own [`crate::email`] types, so

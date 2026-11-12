@@ -16,14 +16,14 @@ Method: [provider-test-plan.md](provider-test-plan.md).
 
 The automated counterpart is the live suites, tests/google.rs, tests/microsoft.rs and tests/fastmail.rs (cairn/spec/packaging.md, "Live provider suites"): read-only checks on the test accounts, run with `cargo test --test <provider> -- --ignored`.
 
-Every report pairs a **shared** run (the cross-protocol `mailbox` /
+Every report pairs a **unified** run (the cross-protocol `mailbox` /
 `envelope` / `flag` / `message` / `attachment` commands) with a
 **specific** run (the raw `himalaya <proto> …` surface), except where a
 single combined report sufficed.
 
 ## Network backends
 
-| Backend | Provider | Shared | Specific |
+| Backend | Provider | Unified | Specific |
 | --- | --- | --- | --- |
 | IMAP + SMTP | Fastmail | [imap-smtp-fastmail.md](imap-smtp-fastmail.md) | [imap-smtp-specific-fastmail.md](imap-smtp-specific-fastmail.md) |
 | IMAP + SMTP | QQ Mail (Tencent) | [imap-smtp-qq.md](imap-smtp-qq.md) | *(combined)* |
@@ -37,7 +37,7 @@ single combined report sufficed.
 
 ## Local backends
 
-| Backend | Shared | Specific |
+| Backend | Unified | Specific |
 | --- | --- | --- |
 | Maildir | [maildir.md](maildir.md) | [maildir-specific.md](maildir-specific.md) |
 | m2dir | [m2dir.md](m2dir.md) | [m2dir-specific.md](m2dir-specific.md) |

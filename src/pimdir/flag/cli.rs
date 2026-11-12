@@ -19,7 +19,7 @@ use crate::{
 
 /// Read and stage any flag on a message, keywords included.
 ///
-/// The shared `flag` commands take the four flags every backend carries.
+/// The unified `flag` commands take the four flags every backend carries.
 /// A pimdir store carries whatever its sources read, and these name a
 /// flag by its raw spelling, as `imap store` does on IMAP. Whether a
 /// source can push a keyword is its own declaration: one that cannot

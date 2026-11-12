@@ -1,6 +1,6 @@
 //! # Gmail backend
 //!
-//! The Gmail adapter of the shared cross-protocol client, glue over the
+//! The Gmail adapter of the unified client, glue over the
 //! io-gmail client [`GmailClient`] wraps.
 //!
 //! Gmail is label-based, so a label is a mailbox, nested by its name, and
@@ -194,7 +194,7 @@ impl GmailClient {
         // NOTE: an IANA flag without a label (`$Forwarded`) leaves nothing
         // to patch, and an empty `messages.modify` is a wasted request that
         // could still fail. The ids are then not checked and all count as
-        // found. `\Answered` and `\Draft` never get here: the shared API
+        // found. `\Answered` and `\Draft` never get here: the unified API
         // refuses them up front (`flags.answered`, `flags.draft`).
         if add.is_empty() && remove.is_empty() {
             return Ok(ids.len());

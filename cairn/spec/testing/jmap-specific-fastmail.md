@@ -1,6 +1,6 @@
 # JMAP *specific* API on Fastmail: test report
 
-Companion to [jmap-fastmail.md](jmap-fastmail.md) (shared commands). This
+Companion to [jmap-fastmail.md](jmap-fastmail.md) (unified commands). This
 exercises `himalaya jmap …`: the raw JMAP method surface.
 
 - himalaya: `v2.0.0-alpha.1 +jmap +rustls-ring` (working tree)
@@ -38,7 +38,7 @@ exercises `himalaya jmap …`: the raw JMAP method surface.
 JMAP send genuinely works via `jmap submission create` using the account
 identity (id `178831439`, `pimalaya@fastmail.org`): status `final`, the
 message was delivered to the inbox. This is the JMAP equivalent of the
-shared `message send` that J3 (shared report) blocks on missing config.
+unified `message send` that J3 (shared report) blocks on missing config.
 
 ## Findings
 

@@ -1,7 +1,7 @@
 //! # Capabilities
 //!
-//! What each backend serves of the shared API, and which configured
-//! transport answers each shared verb for an account.
+//! What each backend serves of the unified API, and which configured
+//! transport answers each unified verb for an account.
 //!
 //! The names and levels follow pimdir STORAGE Annex B without its domain
 //! word: himalaya's `message.move` is pimdir's `mail.message.move`. A
@@ -32,7 +32,7 @@ use Capability as C;
 use SearchOption as O;
 use Support::{Full, None as Not, Partial, Server};
 
-/// A shared capability, named by [`Capability::name`].
+/// A unified capability, named by [`Capability::name`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Capability {
     /// Listing the mailboxes.
@@ -277,7 +277,7 @@ impl From<Support> for StoreSupport {
 /// One declared capability of a backend.
 type Row = (Capability, Support);
 
-/// What a backend declares, nothing for the ones serving no shared verb.
+/// What a backend declares, nothing for the ones serving no unified verb.
 pub fn declared(backend: Backend) -> &'static [Row] {
     match backend {
         Backend::Imap => IMAP,
@@ -325,7 +325,7 @@ const SENDING_STORAGE: &[Backend] = &[
     Backend::Pimdir,
 ];
 
-/// The transports an account's shared verbs resolve to.
+/// The transports an account's unified verbs resolve to.
 ///
 /// The verbs exchanging ids (mailbox, envelope, message, flag,
 /// attachment) all resolve to the one storage backend, so an id one
@@ -464,7 +464,7 @@ pub fn missing(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::CapabilityMissing, message.into()).into()
 }
 
-/// Whether `--backend` lets `backend` serve a shared verb.
+/// Whether `--backend` lets `backend` serve a unified verb.
 fn allows(filter: Backend, backend: Backend) -> bool {
     filter == Backend::Auto || filter == backend
 }
@@ -529,7 +529,7 @@ const LOCAL_KEYWORD: &str = "a keyword, kept in the dovecot-keywords file or the
 /// Why a mail store holds no auto-reply.
 const NO_VACATION: &str = "the auto-reply lives on the provider; configure its JMAP or Gmail block";
 
-/// The shared verbs every storage backend serves the same way.
+/// The unified verbs every storage backend serves the same way.
 macro_rules! storage_rows {
     ($($row:expr),* $(,)?) => {
         &[
@@ -747,7 +747,7 @@ const MSGRAPH: &[Row] = storage_rows![
     (C::SubmitCopy, Full),
 ];
 
-/// The shared verbs the local backends serve alike, evaluating the query
+/// The unified verbs the local backends serve alike, evaluating the query
 /// themselves.
 macro_rules! local_rows {
     ($($row:expr),* $(,)?) => {
@@ -856,7 +856,7 @@ const SMTP: &[Row] = &[
     ),
 ];
 
-/// A shared leaf command and the capabilities it reaches, for the help
+/// A unified leaf command and the capabilities it reaches, for the help
 /// and the MCP tool list.
 pub struct Leaf {
     /// The command group, `message`.
@@ -910,7 +910,7 @@ const SEARCH: &[Capability] = &[
     C::Search(O::SortSubject),
 ];
 
-/// Every shared leaf reaching a transport.
+/// Every unified leaf reaching a transport.
 pub const LEAVES: &[Leaf] = &[
     Leaf::new("mailbox", "list", &[C::MailboxList]),
     Leaf::new("mailbox", "create", &[C::MailboxCreate]),
@@ -954,7 +954,7 @@ impl Leaf {
     }
 }
 
-/// Every capability a shared leaf reaches, once each, in the order the
+/// Every capability a unified leaf reaches, once each, in the order the
 /// leaves list them.
 pub fn all() -> Vec<Capability> {
     let mut all = Vec::new();

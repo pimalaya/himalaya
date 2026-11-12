@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-/// Manage flags using the shared API.
+/// Manage flags using the unified API.
 ///
 /// A flag acts like a tag, saying what state or kind a message is in.
 #[derive(Debug, Subcommand)]

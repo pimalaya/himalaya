@@ -1,7 +1,7 @@
 //! # pimdir flag
 //!
 //! The `pimdir flag` command family, naming any flag on a pimdir message,
-//! keywords included, where the shared `flag` commands take the four
+//! keywords included, where the unified `flag` commands take the four
 //! flags every backend carries.
 
 pub mod add;

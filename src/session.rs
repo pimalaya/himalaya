@@ -52,7 +52,7 @@ use crate::{
 pub struct Session<'a> {
     /// The account every client of the session is built for.
     pub account: SessionAccount<'a>,
-    /// The client of the shared commands.
+    /// The client of the unified commands.
     #[cfg(any(backend, feature = "smtp"))]
     pub email: Option<(Account, EmailClient)>,
     /// The client of the `imap` commands.
@@ -94,7 +94,7 @@ pub struct SessionAccount<'a> {
     pub config_paths: &'a [PathBuf],
     /// The account `-a` names, the default one when `None`.
     pub name: Option<&'a str>,
-    /// The backend `--backend` allows for the shared commands.
+    /// The backend `--backend` allows for the unified commands.
     pub backend: Backend,
 }
 

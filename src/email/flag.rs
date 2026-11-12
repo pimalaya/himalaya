@@ -65,7 +65,7 @@ pub enum IanaFlag {
 }
 
 impl Flag {
-    /// The shared capability adding and removing the flag, `None` for one
+    /// The unified capability adding and removing the flag, `None` for one
     /// the shared flag arguments cannot name.
     pub fn capability(&self) -> Option<Capability> {
         match self.iana? {

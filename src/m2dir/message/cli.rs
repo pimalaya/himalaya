@@ -11,7 +11,7 @@ use crate::m2dir::{client::M2dirClient, message::save::M2dirMessageSaveCommand};
 /// Manage m2dir messages.
 ///
 /// A message is a file inside an m2dir folder, and this stores one.
-/// Rendering its content belongs to the shared `message` and `envelope`
+/// Rendering its content belongs to the unified `message` and `envelope`
 /// commands.
 #[derive(Debug, Subcommand)]
 pub enum M2dirMessageCommand {

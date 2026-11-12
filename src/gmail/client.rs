@@ -4,7 +4,7 @@
 //! subcommand receives, plus the credential helper the shared client and
 //! the account checker take.
 //!
-//! The shared API covers the least-common-denominator operations, where
+//! The unified API covers the operations every mail backend names, where
 //! the `gmail` command reaches for the full REST surface through this
 //! wrapper.
 

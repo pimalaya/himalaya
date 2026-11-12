@@ -1,7 +1,7 @@
 //! # Capabilities
 //!
 //! The built binary refusing, under `capability-missing` or
-//! `search-unsupported`, a shared verb the account's backend does not
+//! `search-unsupported`, a unified verb the account's backend does not
 //! serve, before it connects: every account below points at a credential
 //! command that fails or a port nothing listens on, so reaching the
 //! network would fail with another error.

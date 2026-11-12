@@ -1,6 +1,6 @@
 # Manually testing a provider
 
-A followable checklist to deeply exercise every **shared** command
+A followable checklist to deeply exercise every **unified** command
 against a real provider/account. Unit tests run each `io-*` crate in
 isolation; this pass catches behaviour that only shows up end-to-end
 against a live server (search semantics, date handling, error surfaces,
@@ -163,7 +163,7 @@ the delivered inbox copy to Trash during cleanup.
 
 ## Protocol-specific API (per backend)
 
-After the shared commands, exercise the backend's raw API: for IMAP/SMTP
+After the unified commands, exercise the backend's raw API: for IMAP/SMTP
 that is `himalaya imap …` / `himalaya smtp …`. These expose the protocol
 verbatim, so the flags differ from the shared enum-driven ones.
 
@@ -197,7 +197,7 @@ verbatim, so the flags differ from the shared enum-driven ones.
   `vacation-response get/set` (may be `403`/unsupported per provider).
   Mailboxes are opaque ids: get them from `mailbox list --json` or
   `jmap mailbox query`.
-  - **Shared `message send`/`compose --send` need `identity_id` +
+  - **Unified `message send`/`compose --send` need `identity_id` +
     `drafts_mailbox_id`** in the account config; without them the raw
     `jmap submission create --identity-id …` is the send path.
 - **Gmail** (`gmail …`, inside a fake label; the OAuth token must be
@@ -207,14 +207,14 @@ verbatim, so the flags differ from the shared enum-driven ones.
   (`get --format metadata|raw|full`; `modify --add/remove-label`);
   `attachments get <msg> <attachmentId> -o` (needs the raw id from
   `messages get --format full`; small attachments are inlined and have
-  none: use the shared `attachment download`); `drafts
+  none: use the unified `attachment download`); `drafts
   create/list/get/update/send/delete`; `threads
   list/get/modify/trash/untrash/delete`; `history list
   --start-history-id`; `settings <imap|pop|language|vacation|
   auto-forwarding> get`, `settings <send-as|filters|
   forwarding-addresses|delegates> list` (writes mutate the account:
   test with care). Labels are opaque ids: `mailbox list` /
-  `gmail labels list`. Shared `-m` currently needs the label **id**, not
+  `gmail labels list`. Unified `-m` currently needs the label **id**, not
   its name; `message add` / `envelope search` are unsupported.
 
 ## Backend / provider-specific notes to capture
@@ -245,7 +245,7 @@ $H imap delete "$A"; $H imap delete "$B"
 Copy this into `cairn/spec/testing/<backend>-<provider>.md`:
 
 ```markdown
-# <BACKEND> on <PROVIDER>: shared-command test report
+# <BACKEND> on <PROVIDER>: unified-command test report
 
 - himalaya: <version + build rev>
 - account: <name> (<backend blocks>)

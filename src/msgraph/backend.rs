@@ -1,6 +1,6 @@
 //! # Microsoft Graph backend
 //!
-//! The Graph adapter of the shared cross-protocol client, glue over the
+//! The Graph adapter of the unified client, glue over the
 //! io-msgraph client [`MsgraphClient`] wraps.
 //!
 //! Graph is folder-based, and a shared flag maps onto a scalar field of
@@ -196,7 +196,7 @@ impl MsgraphClient {
         // NOTE: `$Forwarded` has no Graph field, so adding or removing it
         // alone leaves an empty PATCH, a wasted request that could still
         // fail. The ids are then not checked and all count as found.
-        // `\Answered` and `\Draft` never get here: the shared API refuses
+        // `\Answered` and `\Draft` never get here: the unified API refuses
         // them up front (`flags.answered`, `flags.draft`).
         if patch == MsgraphMessage::default() {
             return Ok(ids.len());

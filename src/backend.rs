@@ -1,6 +1,6 @@
 //! # Backend
 //!
-//! The `--backend` global flag: which backend the shared, cross-protocol
+//! The `--backend` global flag: which backend the unified, cross-protocol
 //! commands target.
 
 use std::fmt;
@@ -80,47 +80,47 @@ impl Backend {
         Self::Sieve,
     ];
 
-    /// Whether the IMAP arm of a shared command may run.
+    /// Whether the IMAP arm of a unified command may run.
     pub fn allows_imap(self) -> bool {
         matches!(self, Self::Auto | Self::Imap)
     }
 
-    /// Whether the JMAP arm of a shared command may run.
+    /// Whether the JMAP arm of a unified command may run.
     pub fn allows_jmap(self) -> bool {
         matches!(self, Self::Auto | Self::Jmap)
     }
 
-    /// Whether the Gmail arm of a shared command may run.
+    /// Whether the Gmail arm of a unified command may run.
     pub fn allows_gmail(self) -> bool {
         matches!(self, Self::Auto | Self::Gmail)
     }
 
-    /// Whether the Microsoft Graph arm of a shared command may run.
+    /// Whether the Microsoft Graph arm of a unified command may run.
     pub fn allows_msgraph(self) -> bool {
         matches!(self, Self::Auto | Self::Msgraph)
     }
 
-    /// Whether the Maildir arm of a shared command may run.
+    /// Whether the Maildir arm of a unified command may run.
     pub fn allows_maildir(self) -> bool {
         matches!(self, Self::Auto | Self::Maildir)
     }
 
-    /// Whether the m2dir arm of a shared command may run.
+    /// Whether the m2dir arm of a unified command may run.
     pub fn allows_m2dir(self) -> bool {
         matches!(self, Self::Auto | Self::M2dir)
     }
 
-    /// Whether the mbox arm of a shared command may run.
+    /// Whether the mbox arm of a unified command may run.
     pub fn allows_mbox(self) -> bool {
         matches!(self, Self::Auto | Self::Mbox)
     }
 
-    /// Whether the pimdir arm of a shared command may run.
+    /// Whether the pimdir arm of a unified command may run.
     pub fn allows_pimdir(self) -> bool {
         matches!(self, Self::Auto | Self::Pimdir)
     }
 
-    /// Whether the SMTP arm of a shared command may run.
+    /// Whether the SMTP arm of a unified command may run.
     pub fn allows_smtp(self) -> bool {
         matches!(self, Self::Auto | Self::Smtp)
     }

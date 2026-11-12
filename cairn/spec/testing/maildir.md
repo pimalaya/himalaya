@@ -1,6 +1,6 @@
-# Maildir (local): shared-command test report
+# Maildir (local): unified-command test report
 
-Shared cross-protocol commands on the Maildir backend. Companion:
+Unified commands on the Maildir backend. Companion:
 [maildir-specific.md](maildir-specific.md) (the `maildir …` raw API).
 Method: [provider-test-plan.md](provider-test-plan.md), against a
 throwaway Maildir tree in `/tmp`.
@@ -58,7 +58,7 @@ throwaway Maildir tree in `/tmp`.
 
 ### Behaviour (not bugs)
 
-- Maildir **supports the shared `envelope search`** (it lists then
+- Maildir **supports the unified `envelope search`** (it lists then
   filters/sorts client-side against the already-read bytes), unlike the
   Gmail and Graph backends which bail.
 - The root maildir is INBOX; `mailbox list` shows its `name` as the root
@@ -75,7 +75,7 @@ throwaway Maildir tree in `/tmp`.
 
 ## Verdict
 
-Shared commands on Maildir are **solid**: list/search/add/read/flag/
+Unified commands on Maildir are **solid**: list/search/add/read/flag/
 copy/move/attachment all work, addressing folders by relative name, by
 the absolute id from `mailbox list`, or the root by alias/`.`/path (D1
 fixed). `message send` correctly needs an `[smtp]` block. No functional

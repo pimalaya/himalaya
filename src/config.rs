@@ -317,7 +317,7 @@ pub struct MailboxConfig {
     /// case-insensitively.
     ///
     /// An alias named after a mailbox role overrides the role the backend
-    /// reports, the `inbox` one being the default mailbox of a shared
+    /// reports, the `inbox` one being the default mailbox of a unified
     /// command omitting `-m/--mailbox`.
     #[serde(default, rename = "alias", alias = "aliases")]
     pub aliases: HashMap<String, String>,

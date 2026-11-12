@@ -1,7 +1,7 @@
 //! # Account capability
 //!
 //! The `account capability` command, listing what the account serves of
-//! the shared API, which backend serves each capability and how well.
+//! the unified API, which backend serves each capability and how well.
 
 use std::{fmt, path::PathBuf};
 
@@ -19,7 +19,7 @@ use crate::{
     cli::resolve_account,
 };
 
-/// List what the account serves of the shared API.
+/// List what the account serves of the unified API.
 ///
 /// One row per capability: the backend it resolves to, the level it is
 /// served at (`full`, `partial`, `server` when the server decides once
@@ -86,12 +86,12 @@ impl AccountCapabilityCommand {
 pub struct AccountCapabilityOutput {
     /// The account the capabilities are resolved for.
     pub account: String,
-    /// One row per shared capability, in the order the commands reach
+    /// One row per unified capability, in the order the commands reach
     /// them.
     pub capabilities: Vec<AccountCapability>,
 }
 
-/// How the account serves one shared capability.
+/// How the account serves one unified capability.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountCapability {

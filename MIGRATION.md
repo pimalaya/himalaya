@@ -41,7 +41,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message. `message parse` prints the same view.
 - **Piped `--json` prints one value per line**, and every schema `json-schema` writes carries an `$id` naming the contract version.
 - **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, the pimdir store codes), described by the `himalaya-error` schema, and `null` otherwise. Match on the code, never on the message, which may be reworded.
-- **No output is a sentence any more.** The `{"message": "..."}` confirmations are gone: every write prints what it acted on. `message copy|move` print `{count, queued}`; `message send` and a composer's `--save`/`--send` print `{id, saved, sent, queued}`; a protocol write prints `{id}` or `{ids}` (a Gmail label's id, the UIDs of an IMAP append or copy, a Sieve script's name). A shared write's `queued` is `true` when a sync engine applies it later (pimdir).
+- **No output is a sentence any more.** The `{"message": "..."}` confirmations are gone: every write prints what it acted on. `message copy|move` print `{count, queued}`; `message send` and a composer's `--save`/`--send` print `{id, saved, sent, queued}`; a protocol write prints `{id}` or `{ids}` (a Gmail label's id, the UIDs of an IMAP append or copy, a Sieve script's name). A unified write's `queued` is `true` when a sync engine applies it later (pimdir).
 - **Bytes never reach a JSON stdout raw.** `message read --raw`, `jmap email export`, the raw Gmail and Graph `get`s and their attachment downloads print `{data, size, mime}`, `data` in base64.
 - **Absent values are `null`**, every key printed.
 - **Shapes made one:** flags written print `{raw, iana}` like envelopes, `inReplyTo` is a list in the read view, `imap fetch` addresses are `{name, email}`, `imap search` ids are numbers, an attachment row carries `role` instead of `inline`, maildir and mbox `flag list` rows are `{raw, iana}`.
@@ -53,7 +53,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 
 ### Commands that now fail instead of pretending
 
-- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the shared API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
+- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the unified API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
 - **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
 - **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
@@ -65,8 +65,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 
 ### New
 
-- `himalaya repl` runs commands over connections kept for the session, and `himalaya mcp` serves the shared API to MCP clients, read-only unless `--allow-write` or `--allow-send` is given.
-- Shared verbs that used to be protocol-only: `mailbox create|rename|delete`, the `important` and `junk` flags, and `vacation get|set`, which reads the auto-reply from JMAP or Gmail whatever backend stores the mail. `himalaya jmap`, `gmail` and the other namespaces keep their own commands.
+- `himalaya repl` runs commands over connections kept for the session, and `himalaya mcp` serves the unified API to MCP clients, read-only unless `--allow-write` or `--allow-send` is given.
+- Unified verbs that used to be protocol-only: `mailbox create|rename|delete`, the `important` and `junk` flags, and `vacation get|set`, which reads the auto-reply from JMAP or Gmail whatever backend stores the mail. `himalaya jmap`, `gmail` and the other namespaces keep their own commands.
 
 ## From v1 to v2
 

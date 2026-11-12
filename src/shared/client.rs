@@ -1,6 +1,6 @@
 //! # Email client
 //!
-//! The cross-protocol client every shared subcommand runs over: one
+//! The cross-protocol client every unified subcommand runs over: one
 //! storage backend, plus an SMTP transport for the backends that cannot
 //! send.
 //!
@@ -49,7 +49,7 @@ use crate::{
 #[cfg(feature = "smtp")]
 use crate::{config::SmtpConfig, smtp::client::SmtpClient};
 
-/// The client every shared subcommand runs over.
+/// The client every unified subcommand runs over.
 pub struct EmailClient {
     /// The transports the account's verbs resolve to.
     resolution: Resolution,
@@ -110,7 +110,8 @@ impl EmailClient {
         #[cfg(not(feature = "smtp"))]
         let has_transport = storage.is_some();
         if !has_transport {
-            // NOTE: ManageSieve holds no mailbox, so no shared command runs on it.
+            // NOTE: ManageSieve holds no mailbox, so no unified command runs
+            // on it.
             let supported: Vec<Backend> = Backend::COMPILED
                 .iter()
                 .copied()

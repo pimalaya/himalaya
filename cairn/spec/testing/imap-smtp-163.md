@@ -1,6 +1,6 @@
 # IMAP + SMTP on 163 Mail: test report
 
-Shared cross-protocol commands on the IMAP/SMTP backend against **163 Mail**
+Unified commands on the IMAP/SMTP backend against **163 Mail**
 (NetEase, Coremail). Method:
 [provider-test-plan.md](provider-test-plan.md).
 
@@ -116,7 +116,7 @@ smtp.sasl.login.password.raw = "***"
 
 ## Verdict
 
-163 Mail (IMAP + SMTP) is **mostly working** across shared commands. The core
+163 Mail (IMAP + SMTP) is **mostly working** across unified commands. The core
 functionality (list, read, flag, copy, move, send, reply, forward) all work
 correctly, and Chinese mailbox names and content are handled properly.
 

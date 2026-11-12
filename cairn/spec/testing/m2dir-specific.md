@@ -1,6 +1,6 @@
 # m2dir *specific* API: test report
 
-Companion to [m2dir.md](m2dir.md) (shared commands). Exercises `himalaya
+Companion to [m2dir.md](m2dir.md) (unified commands). Exercises `himalaya
 m2dir …`: the raw m2dir API (store/folder lifecycle, message save,
 sidecar flags).
 
@@ -38,7 +38,7 @@ sidecar flags).
   `M2dir flag(s) successfully added` while writing **nothing** (a false
   success, worse than Maildir's D5 which at least errored on its flag
   enum). `--flag` now takes exactly one value per `-f` (repeat `-f` per
-  flag), mirroring the shared `flag` command, so ids can come before or
+  flag), mirroring the unified `flag` command, so ids can come before or
   after the flags. Verified on `add`/`set`/`remove` and `messages save`.
 
 ### Behaviour (not bugs)
@@ -55,7 +55,7 @@ sidecar flags).
   missing.
 - `messages save` writes to `<folder>` by **name** (`-m`, relative to the
   store root): the same resolution the shared layer gained in E1.
-  Message read/list are shared-only (no `m2dir message read/list`).
+  Message read/list are unified-only (no `m2dir message read/list`).
 - Flag values are arbitrary UTF-8 strings (`seen`, `$custom`), stored one
   per line in `.meta/<id>.flags`; `flags list` prints them and an empty
   set deletes the sidecar.

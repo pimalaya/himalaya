@@ -90,7 +90,7 @@ pub struct Cli {
     pub account: AccountFlag,
     /// Force a specific backend for cross-protocol commands.
     ///
-    /// Only the shared commands read it, the protocol-specific ones always
+    /// Only the unified commands read it, the protocol-specific ones always
     /// using their own backend. `auto`, the default, picks the first
     /// configured backend the command supports; an explicit value bails when
     /// the account has no such block, or the command no such implementation.
@@ -219,7 +219,7 @@ pub fn welcome<'a>(
     }
 }
 
-/// Runs a shared command over the session's email client, refusing it
+/// Runs a unified command over the session's email client, refusing it
 /// first when the account does not serve what it reaches.
 ///
 /// Checked against the kept client's resolution, or against the

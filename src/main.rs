@@ -27,7 +27,7 @@
 //!
 //! ## Command families
 //!
-//! The command tree ([`cli`], `Command`) splits in three. The shared API
+//! The command tree ([`cli`], `Command`) splits in three. The unified API
 //! (mailbox, envelope, flag, message, attachment, vacation) is the
 //! cross-protocol surface: the union of what the backends serve, each verb
 //! meaning one thing wherever it runs, a backend that cannot give that
@@ -35,19 +35,19 @@
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
 //! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one
-//! backend, including operations the shared API cannot model. The meta
+//! backend, including operations the unified API cannot model. The meta
 //! commands cover the accounts, the sessions (repl, mcp), completions, man
 //! pages and JSON Schemas.
 //!
-//! ## Shared commands and backend selection
+//! ## Unified commands and backend selection
 //!
-//! The shared commands run over a [`shared::client`] `EmailClient` owning
+//! The unified commands run over a [`shared::client`] `EmailClient` owning
 //! one `BackendClient` variant per compiled-in backend: the first
 //! configured storage backend the global `--backend` flag allows, local
 //! before network, plus an SMTP transport for those that cannot send.
 //! The [`capability`] resolver picks them from the account's blocks and
 //! refuses, before connecting, a verb the resolved backend does not
-//! serve, under `capability-missing`; its tables also write each shared
+//! serve, under `capability-missing`; its tables also write each unified
 //! command's `--help` footer and filter the MCP tool list.
 //!
 //! Each shared method matches the active backend and calls its
@@ -65,7 +65,7 @@
 //! The imap command mirrors IMAP's flat command list, gmail and msgraph
 //! track their REST resource domains one-to-one, and the filesystem
 //! backends expose only what maps to their on-disk layout, leaving MIME
-//! rendering to the shared commands.
+//! rendering to the unified commands.
 //!
 //! ## Sessions
 //!
@@ -74,7 +74,7 @@
 //! fails on it. A one-shot run uses a fresh session for its single command;
 //! the [`repl`] keeps one across the lines of its stdin, so each client
 //! connects once for the whole session. The [`mcp`] server keeps one the
-//! same way, each tool call parsed back into a shared API command. Both
+//! same way, each tool call parsed back into a unified API command. Both
 //! run on pimalaya-cli's shared core (its `repl` loop, its `mcp` protocol
 //! answers and tool grammar), which claims stdin, so a command reading
 //! its input there is refused under `stdin-taken`.

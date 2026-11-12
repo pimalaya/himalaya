@@ -35,7 +35,7 @@ Himalaya is a low-level CLI: plain text for a human to glance at, JSON for scrip
 
 ## Features
 
-- **Shared API** for `mailboxes`, `envelopes`, `flags`, `messages` and `attachments`
+- **Unified API** for `mailboxes`, `envelopes`, `flags`, `messages` and `attachments`
 - **Protocol-specific APIs** exposing each backend's full surface
 - **IMAP**, **SMTP**, **ManageSieve**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
 - **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>, **mbox** <sup>[specs](https://manpages.debian.org/bookworm/mutt/mbox.5.en.html)</sup>, **pimdir** <sup>[specs](https://github.com/pimalaya/pimdir)</sup> support
@@ -50,7 +50,7 @@ Himalaya is a low-level CLI: plain text for a human to glance at, JSON for scrip
 - **Plain text** output: envelopes and threads one line each the way `mscan` prints a mailbox, other wide lists as records the way `git log` prints commits, short ones as aligned columns, records as `Label: value` lines, no border, no colour
 - **JSON** output via `--json`
 - **REPL** via `himalaya repl`, running commands over connections kept for the session
-- **MCP server** via `himalaya mcp`, the shared API as tools, read-only by default
+- **MCP server** via `himalaya mcp`, the unified API as tools, read-only by default
 
 > [!TIP]
 > Himalaya is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate backend support. The default feature set is declared in [Cargo.toml](./Cargo.toml).
@@ -341,7 +341,7 @@ mailbox.alias.sent = "Sent Messages"
 
 Every command carries its own `--help`, the source of truth for its flags and syntax. The snippets below are a taste of the surface.
 
-### Shared API
+### Unified API
 
 Backend-agnostic commands run on the account's first configured backend, or the one picked with `-b/--backend`. `-m/--mailbox` takes a mailbox id, name, alias or role (`inbox`, `sent`, `drafts`, `trash`...), and defaults to the inbox.
 
@@ -403,7 +403,7 @@ Each invocation opens a fresh TCP+TLS+SASL session. To amortize the handshake, t
 
 ### MCP server
 
-`himalaya mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio for one account, exposing the shared API as tools (`mailbox_list`, `envelope_list`, `envelope_search`, `message_read`, `attachment_list`, `attachment_download`, the composers, and so on). Each tool takes the arguments of its command, spelled as on the command line (`mailbox`, `page-size`, `message-ids`), and answers the same JSON as `--json`; an argument a tool does not take is refused, never ignored. Clients connect once for the server's lifetime, as in `himalaya repl`.
+`himalaya mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio for one account, exposing the unified API as tools (`mailbox_list`, `envelope_list`, `envelope_search`, `message_read`, `attachment_list`, `attachment_download`, the composers, and so on). Each tool takes the arguments of its command, spelled as on the command line (`mailbox`, `page-size`, `message-ids`), and answers the same JSON as `--json`; an argument a tool does not take is refused, never ignored. Clients connect once for the server's lifetime, as in `himalaya repl`.
 
 Only the tools that read are listed by default. `--allow-write` adds the ones that change the store (flags, add, copy, move, delete, saving a composed message, marking a read one seen), and `--allow-send` the ones that send mail. An agent reading mail can be told by a message to send mail, so think twice before giving it both. Tools never read nor write local files: `attachment_download` always runs as `attachment download --stdout`, `message parse` and the file arguments of the composers are left out, and a message given to `message_add` or `message_send` is taken as the message itself, even when it spells a path. `attachment_download` returns the part's bytes as an embedded resource, and the composers take their attachments inline instead, as `attach-data`: a list of `{filename, mimeType, data, text}`, `data` in base64 or `text` as is. Either way, an attachment over `--max-attachment-size <BYTES>` (10 MiB by default) is refused with `attachment-too-large`. Under `--allow-send` this lets an agent send any data it holds, not only text.
 

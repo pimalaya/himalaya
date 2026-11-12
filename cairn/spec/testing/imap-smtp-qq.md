@@ -1,6 +1,6 @@
 # IMAP + SMTP on QQ Mail: test report
 
-Shared cross-protocol commands on the IMAP/SMTP backend against **QQ Mail**
+Unified commands on the IMAP/SMTP backend against **QQ Mail**
 (Tencent / Foxmail). Method:
 [provider-test-plan.md](provider-test-plan.md).
 
@@ -92,7 +92,7 @@ smtp.sasl.login.password.raw = "***"
 
 ## Verdict
 
-QQ Mail (IMAP + SMTP) is **mostly working** across shared commands. The core
+QQ Mail (IMAP + SMTP) is **mostly working** across unified commands. The core
 functionality (list, read, flag, copy, move, send, reply, forward) all work
 correctly. Both TLS providers (`rustls-ring` and `native-tls`) are supported.
 

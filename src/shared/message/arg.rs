@@ -3,7 +3,7 @@
 //! The clap argument every command taking a raw RFC 5322 message reads
 //! its input from.
 //!
-//! Ported from mml so the shared commands and the protocol-specific save
+//! Ported from mml so the unified commands and the protocol-specific save
 //! and send ones all accept the same three forms: a file path, an inline
 //! message, or piped standard input.
 

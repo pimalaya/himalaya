@@ -16,7 +16,7 @@ use crate::{
 
 /// List and search the files the account's messages attach.
 ///
-/// The shared `attachment list` reads the parts of one message. These
+/// The unified `attachment list` reads the parts of one message. These
 /// read every file of the account at once, from the store's index, each
 /// with the message it came with, so a mailbox need not be walked.
 #[derive(Debug, Subcommand)]
