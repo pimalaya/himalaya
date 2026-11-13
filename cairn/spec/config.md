@@ -85,6 +85,11 @@ Two commands SHALL count as one only where the configuration wrote them identica
 
 The resolved value SHALL live no longer than the run that resolved it, and SHALL never be written to a config file, a log line or a cache.
 
+#### Scenario: A send saving its copy
+- GIVEN an account whose IMAP and SMTP blocks name one password command
+- WHEN `message send` sends over SMTP and saves the copy over IMAP
+- THEN the command runs once, the SMTP transport connecting on the send with the value the IMAP session resolved
+
 ### Requirement: A proxy is set per account and per backend
 An account's `proxy` SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph) whose own block names no `proxy`, and a backend's own `proxy` SHALL win over it. With neither, the connection SHALL read the `all_proxy` and `https_proxy` environment variables, honouring `no_proxy`.
 

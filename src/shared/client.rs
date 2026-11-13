@@ -19,6 +19,7 @@
 #[cfg(feature = "gmail")]
 use anyhow::Context;
 use anyhow::{Result, anyhow, bail};
+use pimalaya_config::secret::SecretResolver;
 
 #[cfg(feature = "gmail")]
 use crate::gmail::client::GmailClient;
@@ -71,6 +72,9 @@ pub struct EmailClient {
     /// server dropped while idle.
     #[cfg(feature = "smtp")]
     smtp: Option<Box<SmtpConfig>>,
+    /// The credentials of the run, so a send reuses those the storage ran.
+    #[cfg(feature = "smtp")]
+    resolver: SecretResolver,
 }
 
 /// The active storage backend, one of the compiled-in per-protocol
@@ -102,7 +106,8 @@ impl EmailClient {
         backend: Backend,
     ) -> Result<(Account, Self)> {
         let resolution = Resolution::of(name, &account_config, backend);
-        let storage = open_storage(&mut account_config, resolution.storage)?;
+        let mut resolver = SecretResolver::new();
+        let storage = open_storage(&mut account_config, resolution.storage, &mut resolver)?;
 
         // NOTE: left unconnected, so a read-only command opens no SMTP
         // connection and a single-session proxy serves storage alone.
@@ -140,6 +145,8 @@ impl EmailClient {
                 storage,
                 #[cfg(feature = "smtp")]
                 smtp,
+                #[cfg(feature = "smtp")]
+                resolver,
             },
         ))
     }
@@ -733,7 +740,7 @@ impl EmailClient {
 
         #[cfg(feature = "smtp")]
         if let Some(config) = &self.smtp {
-            let mut smtp = SmtpClient::new(config.as_ref().clone())?;
+            let mut smtp = SmtpClient::new(config.as_ref().clone(), &mut self.resolver)?;
             return smtp.send_message(raw).map(|()| SentCopy::Owed);
         }
 
@@ -818,6 +825,7 @@ fn named(id: String) -> (Option<String>, String) {
 fn open_storage(
     account_config: &mut AccountConfig,
     storage: Option<Backend>,
+    #[cfg_attr(not(feature = "imap"), allow(unused_variables))] resolver: &mut SecretResolver,
 ) -> Result<Option<BackendClient>> {
     let client = match storage {
         #[cfg(feature = "maildir")]
@@ -854,11 +862,89 @@ fn open_storage(
         },
         #[cfg(feature = "imap")]
         Some(Backend::Imap) => match account_config.imap.take() {
-            Some(config) => Some(BackendClient::Imap(Box::new(ImapClient::new(config)?))),
+            Some(config) => Some(BackendClient::Imap(Box::new(ImapClient::new(
+                config, resolver,
+            )?))),
             None => None,
         },
         _ => None,
     };
 
     Ok(client)
+}
+
+#[cfg(all(test, feature = "imap", feature = "smtp"))]
+mod tests {
+    use std::{
+        fs,
+        io::{BufRead, BufReader, Write},
+        net::TcpListener,
+        thread,
+    };
+
+    use super::*;
+
+    /// Serves one IMAP session that accepts any credential.
+    fn serve_imap() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut out = stream;
+            write!(out, "* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN SASL-IR] hi\r\n").unwrap();
+
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                let tag = line.split(' ').next().unwrap_or_default().to_owned();
+                let reply = match line.split(' ').nth(1).map(str::trim) {
+                    Some("CAPABILITY") => {
+                        format!("* CAPABILITY IMAP4rev1\r\n{tag} OK done\r\n")
+                    }
+                    Some("LOGOUT") => format!("* BYE bye\r\n{tag} OK done\r\n"),
+                    _ => format!("{tag} OK done\r\n"),
+                };
+
+                line.clear();
+                if out.write_all(reply.as_bytes()).is_err() {
+                    break;
+                }
+            }
+        });
+
+        format!("imap://{addr}")
+    }
+
+    #[test]
+    fn a_send_reuses_the_credential_the_storage_resolved() {
+        let dir = tempfile::tempdir().unwrap();
+        let runs = dir.path().join("runs");
+        let command = format!("echo run >> '{}'; echo secret", runs.display());
+
+        // NOTE: nothing listens there, so the send fails once its
+        // credential is resolved.
+        let closed = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap();
+
+        let account_config: AccountConfig = toml::from_str(&format!(
+            "imap.server = \"{imap}\"\n\
+             imap.sasl.plain.username = \"alice\"\n\
+             imap.sasl.plain.password.command = \"{command}\"\n\
+             smtp.server = \"smtp://{closed}\"\n\
+             smtp.sasl.plain.username = \"alice\"\n\
+             smtp.sasl.plain.password.command = \"{command}\"\n",
+            imap = serve_imap(),
+        ))
+        .unwrap();
+
+        let (_, mut client) =
+            EmailClient::new(Config::default(), "alice", account_config, Backend::Auto).unwrap();
+
+        let raw = b"From: a@x.org\r\nTo: b@x.org\r\n\r\nhi\r\n".to_vec();
+        assert!(client.send_message(None, &[], raw, false).is_err());
+        assert_eq!(fs::read_to_string(&runs).unwrap(), "run\n");
+    }
 }

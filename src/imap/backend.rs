@@ -1808,7 +1808,7 @@ mod tests {
 
         fn client(server: &str) -> ImapClient {
             let config: ImapConfig = toml::from_str(&format!("server = \"{server}\"")).unwrap();
-            ImapClient::new(config).unwrap()
+            ImapClient::new(config, &mut pimalaya_config::secret::SecretResolver::new()).unwrap()
         }
 
         /// Runs `op` against a scripted server, returning its count and

@@ -203,6 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a send over SMTP running again the credential command the IMAP block already ran, which `message send` with `save-copy` asked for twice ([#813]).
 - Fixed a message sent over SMTP, or queued on a pimdir account, taking from its headers an envelope address holding a control character, and `message send` over SMTP an address the transaction cannot carry (a space, a line break): the send fails naming the address before anything is written (io-smtp).
 - Fixed `scram-sha-256` on IMAP and SMTP failing as an unsupported mechanism: the `imap` and `smtp` cargo features enable the SCRAM-SHA-256 of io-imap and io-smtp.
 - Fixed an IMAP answer holding lines that do not decode being printed as whole: a warning says how many were skipped, a `message read` whose message was among them fails rather than report it missing, and a server `ALERT` is logged as a warning (io-imap).
@@ -1717,6 +1718,7 @@ Few major concepts changed:
 [#802]: https://github.com/pimalaya/himalaya/issues/802
 [#805]: https://github.com/pimalaya/himalaya/issues/805
 [#806]: https://github.com/pimalaya/himalaya/issues/806
+[#813]: https://github.com/pimalaya/himalaya/issues/813
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
