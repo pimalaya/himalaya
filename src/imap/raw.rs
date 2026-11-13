@@ -29,7 +29,7 @@ use crate::{
 /// The text form prints every response as received. Under `--json`,
 /// untagged and continuation responses print as events, then the tagged
 /// completions as the result, each split into its parts. A tagged NO or
-/// BAD is part of the result and exits 2, the server having answered.
+/// BAD is part of the result and exits 3, the server having answered.
 #[derive(Debug, Parser)]
 pub struct ImapRawCommand {
     #[command(flatten)]

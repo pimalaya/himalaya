@@ -3,7 +3,7 @@
 //! What an `imap` command prints: the tagged completion of its exchange.
 //! A completion the server accepts prints `status: "OK"` beside the data
 //! the command understood; one it refuses prints `status: "NO"` or
-//! `"BAD"` with the server's text, and the command exits 2, the server
+//! `"BAD"` with the server's text, and the command exits 3, the server
 //! having answered. A command that gets no completion at all (network,
 //! TLS, a stream that does not parse) fails with the failure object.
 

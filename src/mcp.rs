@@ -24,6 +24,7 @@ use anyhow::{Result, anyhow};
 use clap::{CommandFactory, Parser};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use pimalaya_cli::{
+    error::usage_error,
     mcp::{ServerInfo, ToolCall, ToolResult, grammar::Grammar, serve, text, tool_output_schema},
     printer::CapturePrinter,
 };
@@ -542,7 +543,7 @@ impl McpServer<'_, '_> {
         let result = tool
             .grammar
             .argv(&grammar)
-            .and_then(|argv| Ok(McpLine::try_parse_from(argv)?))
+            .and_then(|argv| McpLine::try_parse_from(argv).map_err(|err| usage_error(&err)))
             .and_then(|mut line| {
                 for (arg, value) in server {
                     (arg.hand)(value, limits, &mut line.cmd)?;

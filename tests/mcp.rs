@@ -4,12 +4,13 @@
 //! requests on stdin, asserting the instructions `initialize` gives, that
 //! a line that is no JSON-RPC 2.0 request is refused while the server
 //! reads on, the tools each gate lists, that a call answers the command's
-//! payload, that an unknown argument or a failing command is a tool error
-//! the caller reads, that a path given as a message is never read from
-//! disk, that the composers' inline attachments, a server-only argument,
-//! are stored byte for byte, refused with their codes, and capped before
-//! they are decoded, and that an attachment is read as an embedded
-//! resource, bounded by the server, without writing a file.
+//! payload, that an argument the grammar refuses (coded `usage-invalid`)
+//! or a failing command is a tool error the caller reads, that a path
+//! given as a message is never read from disk, that the composers' inline
+//! attachments, a server-only argument, are stored byte for byte, refused
+//! with their codes, and capped before they are decoded, and that an
+//! attachment is read as an embedded resource, bounded by the server,
+//! without writing a file.
 
 #![cfg(all(backend, feature = "maildir"))]
 
@@ -325,6 +326,31 @@ fn a_failing_command_carries_its_code_and_the_server_goes_on() {
         responses[1]["result"]["structuredContent"]["envelopes"][0]["id"],
         "m1"
     );
+}
+
+/// An argument the tool's schema refuses, and a value it admits but the
+/// command's grammar refuses, fail the call coded `usage-invalid`.
+#[test]
+fn a_refused_argument_is_a_usage_failure() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let responses = serve(
+        &config,
+        &[],
+        &[
+            call(1, "envelope_list", json!({ "query": "hello" })),
+            call(2, "envelope_list", json!({ "page-size": -1 })),
+        ],
+    );
+
+    let unknown = refusal(&responses[0]);
+    assert_eq!(unknown["code"], "usage-invalid", "{unknown}");
+
+    let invalid = refusal(&responses[1]);
+    let error = invalid["error"].as_str().unwrap();
+    assert_eq!(invalid["code"], "usage-invalid", "{invalid}");
+    assert!(error.contains("--page-size"), "{error}");
+    assert!(!error.starts_with("error:"), "{error}");
 }
 
 #[test]

@@ -57,7 +57,7 @@ impl SmtpRawCommand {
 }
 
 /// The result of `smtp raw`: the reply, split into its code and text. A
-/// 4xx or 5xx reply exits 2, the server having answered.
+/// 4xx or 5xx reply exits 3, the server having answered.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SmtpRawOutput {

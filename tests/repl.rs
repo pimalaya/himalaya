@@ -107,6 +107,7 @@ fn a_session_answers_each_line_and_survives_its_failures() {
     assert_eq!(answers.len(), 6, "{answers:#?}");
     assert_eq!(answers[0]["envelopes"][0]["subject"], "Hello there");
     assert!(answers[1]["error"].is_string());
+    assert_eq!(answers[1]["code"], "usage-invalid", "{}", answers[1]);
     assert!(answers[2].get("error").is_none(), "{}", answers[2]);
     assert!(answers[3]["error"].is_string());
     assert!(answers[4]["error"].is_string());

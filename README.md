@@ -486,6 +486,12 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 </details>
 
 <details>
+  <summary>What does the exit code mean?</summary>
+
+  `0` is a success and `1` a failure, printed on stdout as the failure object under `--json`, its `code` naming it when a caller can act on it. `2` is a command line Himalaya refuses (an unknown flag, a missing argument, a bad value): clap's message goes to stderr, or, with `--json`, the failure object coded `usage-invalid` to stdout. `3` means the command printed its result without fully succeeding: an `account check` with a failed backend, or a protocol command whose server refused (an IMAP `NO` or `BAD`, an SMTP 4xx or 5xx, a ManageSieve `NO` or `BYE`).
+</details>
+
+<details>
   <summary>How to read the text output from a script?</summary>
 
   Every list prints one item per line, its cells two spaces apart with no header row, an empty cell as `-` and the free text (a subject, a name) last, under a header naming the account, what it lists and, for a paged list, the `Page:` it holds, a blank line away. An envelope list prints the id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment), the date, the senders and the subject; so does every other list of messages. A record prints one `Label: value` line per field. Nothing is coloured, bordered, truncated or sized to the terminal. For anything sturdier than `grep` or `awk`, use `--json`.

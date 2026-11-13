@@ -142,9 +142,8 @@ mod smtp;
 use std::process;
 
 use anyhow::Result;
-use clap::Parser;
 use pimalaya_cli::{
-    clap::args::LogFlags,
+    clap::{args::LogFlags, parse},
     error::{EXIT_FAILURE, ErrorReport},
     log::Logger,
     printer::StdoutPrinter,
@@ -164,7 +163,7 @@ fn main() {
     // token, the portable baseline until one is installed.
     let _ = SimdCpu::install_detected();
 
-    let cli = Cli::parse();
+    let cli = parse::<Cli>();
     let mut printer = StdoutPrinter::new(&cli.json);
 
     let account = SessionAccount {

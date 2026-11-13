@@ -94,7 +94,7 @@ impl fmt::Display for SieveRawEvent {
 }
 
 /// The result of `sieve raw`: the completion line, split into its parts.
-/// A `NO` or `BYE` exits 2, the server having answered.
+/// A `NO` or `BYE` exits 3, the server having answered.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SieveRawOutput {

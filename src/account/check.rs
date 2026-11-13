@@ -29,7 +29,7 @@ use crate::{backend::Backend, cli::resolve_account, error::ErrorCode};
 ///
 /// The report is printed whole, each backend with its outcome and, when it
 /// failed, its code and why. A failed backend exits the command with
-/// status 2, the report being the output rather than a failure object.
+/// status 3, the report being the output rather than a failure object.
 #[derive(Debug, Parser)]
 pub struct AccountCheckCommand;
 
@@ -559,7 +559,7 @@ mod tests {
 
         let (result, out) = check();
         let err = result.unwrap_err();
-        assert_eq!(partial_outcome_of(&err).map(|o| o.status()), Some(2));
+        assert_eq!(partial_outcome_of(&err).map(|o| o.status()), Some(3));
         assert!(out.contains("\npimdir:   FAIL (No pimdir store"), "{out}");
 
         io_pimdir::client::PimdirStore::open(&store)
