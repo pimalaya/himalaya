@@ -17,8 +17,11 @@ The IMAP and SMTP SASL OAuth mechanisms SHALL carry the login, not just the toke
 ### Requirement: JMAP download host may differ
 A JMAP provider MAY serve blob downloads from a different host than its API endpoint (Fastmail serves downloads off a user-content host). The JMAP client SHALL open a fresh authenticated connection to the download host rather than reuse the API socket, which the API server would answer with a redirect.
 
-### Requirement: IMAP special-use is inbox-only for now
-IMAP SHALL mark only the reserved `INBOX` with a mailbox role. Reading the Sent/Drafts/Trash/Junk/Archive roles needs LIST `RETURN (SPECIAL-USE)` (RFC 6154), which io-imap cannot yet issue because upstream imap-codec has no LIST-EXTENDED support. The other IMAP roles are set through `mailbox.alias.<role>` until then.
+### Requirement: IMAP special-use roles come from a plain LIST
+IMAP SHALL mark the reserved `INBOX` with the inbox role, and every other mailbox with the role its plain `LIST` row carries as a special-use attribute (`\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive`, `\All`, `\Flagged` of RFC 6154, `\Important` of RFC 8457), which Fastmail and iCloud send unasked. A role word (`-m sent`, the trash `message delete` moves to) SHALL resolve through those roles, a `mailbox.alias.<role>` still winning. LIST `RETURN (SPECIAL-USE)` SHALL stay unissued, io-imap being unable to send it while upstream imap-codec has no LIST-EXTENDED support, so a server marking its roles only when asked shows none: its roles are set through `mailbox.alias.<role>`.
+
+### Requirement: iCloud SORT ignores its keys
+iCloud SHALL be treated as advertising `SORT` without honouring it: it answers every `SORT` in UID order, whatever the keys and `REVERSE`. A server advertising `X-APPLE-REMOTE-LINKS`, which only iCloud does, SHALL sort client-side when `imap.sort.fallback` is unset; `imap.sort.fallback = false` still forces the server `SORT`.
 
 ### Requirement: RFC 2971 ID after auth
 IMAP SHALL support sending an RFC 2971 `ID` command right after authentication, configured by `imap.id.{auto, fields}`, because some providers require it before serving other commands. Unset `fields` sends himalaya's canned `name`, `version`, `vendor` and `support-url`; an empty map sends `ID NIL`.

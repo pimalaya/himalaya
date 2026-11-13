@@ -8,10 +8,13 @@ created: 2026-07-25
 # Read IMAP special-use mailbox roles
 
 ## Why
-The shared `Mailbox` carries a role (see mailbox-role), but IMAP marks only the reserved `INBOX`. The Sent/Drafts/Trash/Junk/Archive roles carry RFC 6154 special-use attributes (`\Sent`, `\Drafts`, ...), and Himalaya already parses them (the `imap mailbox list` command renders them). The gap is that a plain LIST only advertises the attributes on some servers; the reliable path is LIST `RETURN (SPECIAL-USE)`, which io-imap cannot issue because upstream imap-codec has no support for the RETURN option (duesee/imap-codec#350).
+The shared `Mailbox` carries a role (see mailbox-role). The Sent/Drafts/Trash/Junk/Archive roles carry RFC 6154 special-use attributes (`\Sent`, `\Drafts`, ...). A plain LIST advertises them on some servers only; the reliable path is LIST `RETURN (SPECIAL-USE)`, which io-imap cannot issue because upstream imap-codec has no support for the RETURN option (duesee/imap-codec#350).
 
-## What
-Once io-imap can issue LIST `RETURN (SPECIAL-USE)`, the IMAP backend lists with it and maps the returned attributes onto `Mailbox.role` through `MailboxRole::parse`, on top of the existing `INBOX`. `role_mailbox_id` then answers from that listing, so `-m sent` and the trash resolve on IMAP too.
+## What landed (2026-11-12, the-live-campaign-fixes)
+The IMAP backend reads the special-use attributes a plain LIST carries, as Fastmail and iCloud send them unasked, onto `Mailbox.role`, beside `INBOX`. `role_mailbox_id` and `resolve_mailbox_id` answer from that listing, so `-m sent` and the trash of `message delete` resolve on IMAP, a `mailbox.alias.<role>` still winning. IMAP's `message.trash` is declared `server`.
+
+## What remains
+A server marking its roles only under LIST `RETURN (SPECIAL-USE)` (RFC 6154 lets it) shows none, its roles set through `mailbox.alias.<role>`. Once io-imap can issue the RETURN option, the IMAP backend lists with it and maps the returned attributes the same way.
 
 ## Blocked on
 imap-codec gaining the extended-LIST RETURN option, then io-imap exposing it on its LIST coroutine.

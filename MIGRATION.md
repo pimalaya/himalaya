@@ -47,21 +47,32 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **Shapes made one:** flags written print `{raw, iana}` like envelopes, `inReplyTo` is a list in the read view, `imap fetch` addresses are `{name, email}`, `imap search` ids are numbers, an attachment row carries `role` instead of `inline`, maildir and mbox `flag list` rows are `{raw, iana}`.
 - **Listings say whether more follow.** `envelope list` and `search` print `nextPage`, `null` on the last page, which `--page-token` takes back; `msgraph messages list` does the same with Graph's `$skip`.
 - **`account check` prints every backend and exits 2** when one fails, each row carrying the failure's `code`, where v2 exited 0 whatever failed.
-- **A protocol command prints its completion.** Every `imap` command prints `status` (`OK`, or `NO`/`BAD` with `text`, exiting 2). `imap raw` and `sieve raw` print the server's untagged or data responses as events, one JSON line each, then the completion; `smtp raw` prints `{code, text}`. Exit 2 means the server refused; exit 1 still means no answer.
+- **A protocol command prints its completion.** Every `imap` command prints `status` (`OK`, or `NO`/`BAD` with `text`, exiting 2). `imap select` prints the mailbox state beside it, the number of the first unseen message as `firstUnseen`. `imap raw` and `sieve raw` print the server's untagged or data responses as events, one JSON line each, then the completion; `smtp raw` prints `{code, text}`. Exit 2 means the server refused; exit 1 still means no answer.
 - **pimdir names a queue row `row`** (`queueId`, `copyQueueId` and the queue view's `id` before); `pimdir flag add|set|remove` print `{messages: [{id, row}]}`; tag statuses are kebab-case (`unknown-flags`, `ambiguous-source`).
 - **Gmail lists use the provider's key**: `messages list` prints `messages` (not `ids`), the settings lists `delegates`, `filter` and `forwardingAddresses` (not `response`); settings writes print the settings.
 
 ### Commands that now fail instead of pretending
 
-- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the unified API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there, fail before connecting rather than after the send.
+- **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the unified API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there without `--send`, fail before connecting; a send on Graph ignores `--save` and `--no-save`, Graph filing every sent message in Sent Items itself.
 - **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
 - **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
+- **`-f/--flag` takes one value per occurrence** on `message add`, `imap append`, `imap store`, `maildir message save` and `mbox message save`: `-f seen flagged msg.eml` read the path as a flag. Repeat the flag, `-f seen -f flagged msg.eml`.
+- **A message argument naming no file must be a message.** `message add`, `message send` and the protocol saves refuse a positional that is neither a file nor a message opening on a header field, where they stored a mistyped path as a message.
+- **`maildir message save -f` needs `--subdir cur`**: a message saved to `new`, the default, carries no flags, and the flags are now refused there rather than written.
+- **`--page 0` is refused** by `envelope list` and `envelope search`, where it listed every envelope: pass `--page-size 0` for the whole mailbox.
+- **`--no-save` needs `--send`** on `message compose`, `reply` and `forward`.
 
 ### Search results that change
 
 - **Gmail dates are UTC days.** `after 2026-09-08` used to keep that day's mail and `date 2026-09-08` two days, Gmail reading a bare date as midnight in PST.
 - **JMAP date clauses under `not` or `or`** read the server's received date; `not after 2026-01-01` used to list nothing.
+- **The query grammar is stricter.** `order by` is two words outside any pattern, so a quoted or escaped pattern holding them stays a pattern, and an empty `order by` is refused; a bare `"` cannot open an unquoted pattern, a quote left unterminated is refused rather than read as a character, and `\"` escapes one inside a pattern. A query that parsed by accident now fails with `search-invalid`.
+
+### Commands that act differently
+
+- **`attachment download` without an id skips the inline parts**, as `attachment list` does: pass `--inline` (`-i`) to write them too.
+- **m2dir flags are written in the m2dir spelling**, `$seen`, `$answered`, `$flagged`, `$draft` and `$Deleted`, where v2 wrote `\Seen` and the other IMAP spellings. Both spellings are read, and a removal drops both.
 
 ### New
 
