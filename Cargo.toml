@@ -61,7 +61,7 @@ io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.7", default-features = false, optional = true }
-io-pimdir = { version = "0.10", default-features = false, features = ["client"], optional = true }
+io-pimdir = { version = "0.11", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
 jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
