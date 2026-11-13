@@ -14,7 +14,6 @@
 
 #[cfg(feature = "pimdir")]
 use io_pimdir::client::PimdirError;
-#[cfg(feature = "pimdir")]
 use pimalaya_cli::error::CodedError;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -55,6 +54,10 @@ pub enum ErrorCode {
     /// it asked for: nothing was done. The message names the capability
     /// and what serves it instead.
     CapabilityMissing,
+    /// The mailbox named does not exist: nothing was done.
+    MailboxNotFound,
+    /// None of the message ids given is in the mailbox: nothing was done.
+    MessageNotFound,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
     StoreVersion,
@@ -75,7 +78,9 @@ pub enum ErrorCode {
     /// The pimdir store's sync state was written by another version of
     /// its sync engine.
     SyncVersion,
-    /// Another writer holds the pimdir store's write lock: retry.
+    /// Another writer holds the store's lock: the pimdir store's write
+    /// lock, or the dotlock or fcntl lock of an mbox file past
+    /// `mbox.lock.timeout`. Retry.
     StoreBusy,
     /// A sync owns the pimdir store: retry once it ends.
     StoreOwned,
@@ -128,6 +133,23 @@ pub enum ErrorCode {
     /// The pimdir tag names no flag, or adds and removes one flag:
     /// nothing was staged.
     TagRefused,
+}
+
+/// A refusal under `mailbox-not-found`: the mailbox named does not
+/// exist.
+#[cfg_attr(
+    not(any(feature = "imap", feature = "maildir", feature = "mbox")),
+    allow(dead_code)
+)]
+pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
+    CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
+}
+
+/// A refusal under `message-not-found`: no id given matched a message
+/// of the mailbox.
+#[cfg_attr(not(backend), allow(dead_code))]
+pub fn message_not_found(message: impl Into<String>) -> anyhow::Error {
+    CodedError::new(ErrorCode::MessageNotFound, message.into()).into()
 }
 
 /// The pimdir codes Himalaya relays, by io-pimdir's spelling, which

@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -13,6 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    error::message_not_found,
     shared::{
         client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::resolve_mailbox_or_default,
     },
@@ -48,7 +49,9 @@ impl MessageCopyCommand {
         let ids = self.ids.ids();
         let count = client.copy_messages(&from, &to, &ids)?;
         if count == 0 {
-            bail!("No message copied: no id matched in the source mailbox");
+            return Err(message_not_found(
+                "No message copied: no id matched in the source mailbox",
+            ));
         }
 
         printer.out(MessageCopyOutput {

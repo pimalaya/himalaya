@@ -216,21 +216,39 @@ impl Account {
     /// Overlays the `mailbox.alias.<role>` entries onto the roles the
     /// backend reported.
     ///
-    /// An alias naming a listed mailbox id gives it the role and takes it
+    /// An alias naming a listed mailbox gives it the role and takes it
     /// from any other mailbox, so the configuration corrects a server
-    /// that mislabels.
-    pub fn apply_role_aliases(&self, mailboxes: &mut [Mailbox]) {
-        for (key, id) in &self.mailbox_alias {
+    /// that mislabels. The alias names the mailbox by id, else by the
+    /// name of exactly one listed mailbox. `resolve` maps an alias onto
+    /// the id of a backend taking several spellings of one mailbox (a
+    /// Maildir named with a trailing slash or `./`), else `None`.
+    pub fn apply_role_aliases(
+        &self,
+        mailboxes: &mut [Mailbox],
+        mut resolve: impl FnMut(&str) -> Option<String>,
+    ) {
+        for (key, alias) in &self.mailbox_alias {
             let Some(role) = MailboxRole::known(key) else {
                 continue;
             };
 
-            if !mailboxes.iter().any(|mailbox| mailbox.id == *id) {
-                continue;
-            }
+            let resolved = resolve(alias);
+            let by_id =
+                |mailbox: &&Mailbox| mailbox.id == *alias || resolved.as_ref() == Some(&mailbox.id);
+
+            let id = match mailboxes.iter().find(by_id) {
+                Some(mailbox) => mailbox.id.clone(),
+                None => {
+                    let mut named = mailboxes.iter().filter(|mailbox| mailbox.name == *alias);
+                    match (named.next(), named.next()) {
+                        (Some(mailbox), None) => mailbox.id.clone(),
+                        _ => continue,
+                    }
+                }
+            };
 
             for mailbox in mailboxes.iter_mut() {
-                if mailbox.id == *id {
+                if mailbox.id == id {
                     mailbox.role = Some(role.clone());
                 } else if mailbox.role.as_ref() == Some(&role) {
                     mailbox.role = None;
@@ -337,11 +355,64 @@ mod tests {
             ("archive", "Missing"),
             ("work", "Old"),
         ]);
-        account.apply_role_aliases(&mut mailboxes);
+        account.apply_role_aliases(&mut mailboxes, |_| None);
 
         assert_eq!(mailboxes[0].role, None);
         assert_eq!(mailboxes[1].role, Some(MailboxRole::Sent));
         assert_eq!(mailboxes[2].role, Some(MailboxRole::Archive));
+    }
+
+    #[test]
+    fn a_role_alias_names_a_mailbox_by_its_unique_name_too() {
+        let mailbox = |id: &str, name: &str| Mailbox {
+            id: id.to_string(),
+            name: name.to_string(),
+            role: None,
+            total: None,
+            unread: None,
+        };
+        let mut mailboxes = [
+            mailbox("/mail/Trash", "Trash"),
+            mailbox("/mail/a/Junk", "Junk"),
+            mailbox("/mail/b/Junk", "Junk"),
+        ];
+
+        let account = account_with_aliases(&[("trash", "Trash"), ("junk", "Junk")]);
+        account.apply_role_aliases(&mut mailboxes, |_| None);
+
+        assert_eq!(mailboxes[0].role, Some(MailboxRole::Trash));
+        assert_eq!(mailboxes[1].role, None);
+        assert_eq!(mailboxes[2].role, None);
+    }
+
+    #[cfg(feature = "maildir")]
+    #[test]
+    fn a_maildir_role_alias_spelled_with_a_slash_marks_the_role() {
+        use crate::{config::MaildirConfig, maildir::client::MaildirClient};
+
+        let dir = tempfile::tempdir().unwrap();
+        for subdir in ["cur", "new", "tmp"] {
+            std::fs::create_dir_all(dir.path().join("Trash").join(subdir)).unwrap();
+            std::fs::create_dir_all(dir.path().join("Sent").join(subdir)).unwrap();
+        }
+        let client = MaildirClient::new(MaildirConfig {
+            root: dir.path().to_path_buf(),
+            keywords: Default::default(),
+            layout: Default::default(),
+        });
+
+        let mut mailboxes = client.list_mailboxes(false).unwrap();
+        let account = account_with_aliases(&[("trash", "Trash/"), ("sent", "./Sent/")]);
+        account.apply_role_aliases(&mut mailboxes, |alias| {
+            client.resolve_mailbox_id(alias).ok()
+        });
+
+        let role = |name: &str| {
+            let mailbox = mailboxes.iter().find(|mailbox| mailbox.name == name);
+            mailbox.unwrap().role.clone()
+        };
+        assert_eq!(role("Trash"), Some(MailboxRole::Trash));
+        assert_eq!(role("Sent"), Some(MailboxRole::Sent));
     }
 
     #[test]

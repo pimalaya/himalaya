@@ -19,7 +19,8 @@ use crate::{
 /// Remove mbox flag(s) from message(s).
 ///
 /// Removes the given flags from the status headers of each message
-/// identified by the given id(s), in one rewrite of the file.
+/// identified by the given id(s), in one rewrite of the file. Every id is
+/// looked up first: an unknown one refuses the whole set, nothing changed.
 #[derive(Debug, Parser)]
 pub struct MboxFlagRemoveCommand {
     #[command(flatten)]
@@ -36,9 +37,14 @@ pub struct MboxFlagRemoveCommand {
 impl MboxFlagRemoveCommand {
     /// Removes the flags from the existing set of each message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
-        let path = client.resolve_mbox(&self.mbox.inner);
+        let path = client.open_mbox(&self.mbox.inner)?;
         let flags = MboxFlags::from_iter(self.flags.into_iter().map(Into::into));
-        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let mut ids: Vec<&str> = Vec::with_capacity(self.ids.inner.len());
+        for id in &self.ids.inner {
+            if !ids.contains(&id.as_str()) {
+                ids.push(id);
+            }
+        }
 
         client.edit_flags(&path, &ids, |current| {
             current
@@ -49,7 +55,7 @@ impl MboxFlagRemoveCommand {
         })?;
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner.clone(),
+            ids: ids.iter().map(ToString::to_string).collect(),
             done: "Flag(s) successfully removed",
         })
     }

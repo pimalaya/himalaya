@@ -85,6 +85,7 @@ pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "8cd41db5db8608b
 io-gmail = { git = "https://github.com/pimalaya/io-gmail", rev = "458f882874fb02f18d4ad54666a4f75587f43fdd" }
 io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "dfe456f49e830ffd3742fd48328f1d5d4117ed3d" }
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "359069519fcc750ad7ead0ea5bd727592a978dae" }
-io-maildir = { git = "https://github.com/pimalaya/io-maildir", rev = "ab6c2829ea7c05b5dbca0eec5f327faaba7ddc31" }
+io-maildir = { git = "https://github.com/pimalaya/io-maildir", rev = "01552733c853784514578338f0059e28d4277656" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "7480799b808958d6ba289e02ec3d6da25b98f635" }
 mime-rs = { git = "https://github.com/pimalaya/mime", rev = "2591e7fec9e3dd8b995d47323c6fa8868c558857" }
+io-mbox = { git = "https://github.com/pimalaya/io-mbox", rev = "161d84fb691d6954d15d7e3739793251f499d05f" }

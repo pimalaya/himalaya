@@ -164,6 +164,8 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##maildir.keywords.dovecot = true		# read them through each mailbox's dovecot-keywords
 ##maildir.keywords.header = "x-keywords"	# read keywords from X-Keywords, as mbsync writes
 ##maildir.keywords.header = "x-label"		# from X-Label, as mutt and notmuch write
+#maildir.layout = "fs"			# a directory per Maildir, nested as the hierarchy is
+##maildir.layout = "maildir++"		# the root is INBOX, the others dot-named beside it (Dovecot, Courier)
 
 # mbox
 #

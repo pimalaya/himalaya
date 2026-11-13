@@ -57,6 +57,7 @@ use crate::{
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
         },
     },
+    error::{mailbox_not_found, message_not_found},
     imap::client::ImapClient,
     shared::message::{header, part},
 };
@@ -283,7 +284,9 @@ impl ImapClient {
         )?;
 
         if data.is_empty() {
-            bail!("Message `{id}` not found in mailbox `{mailbox}`");
+            return Err(message_not_found(format!(
+                "Message `{id}` not found in mailbox `{mailbox}`"
+            )));
         }
 
         data.into_values()
@@ -460,7 +463,9 @@ impl ImapClient {
                     .into_iter()
                     .find(|(known, _)| same_name(known, parent))
                 else {
-                    bail!("IMAP mailbox `{parent}` not found");
+                    return Err(mailbox_not_found(format!(
+                        "IMAP mailbox `{parent}` not found"
+                    )));
                 };
                 if !holds_others {
                     bail!("IMAP mailbox `{parent}` can hold no other (\\Noinferiors)");
@@ -520,7 +525,7 @@ impl ImapClient {
         };
 
         if !names.iter().any(|known| same_name(known, mailbox)) {
-            return anyhow!("IMAP mailbox `{mailbox}` not found");
+            return mailbox_not_found(format!("IMAP mailbox `{mailbox}` not found"));
         }
 
         let Some(delimiter) = delimiter else {
@@ -1917,6 +1922,8 @@ mod tests {
 
             let expected = "Message `999` not found in mailbox `INBOX`";
             assert_eq!(err.to_string(), expected);
+            let code = pimalaya_cli::error::code_of::<crate::error::ErrorCode>(&err);
+            assert_eq!(code, Some(crate::error::ErrorCode::MessageNotFound));
         }
 
         #[test]

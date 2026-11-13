@@ -43,7 +43,7 @@ impl PimdirMailboxListCommand {
             .into_iter()
             .map(|covered| (covered.mailbox, (covered.coverage, covered.round)))
             .unzip();
-        account.apply_role_aliases(&mut mailboxes);
+        account.apply_role_aliases(&mut mailboxes, |_| None);
 
         printer.out(PimdirMailboxListOutput {
             account: account.name().to_string(),

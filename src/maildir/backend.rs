@@ -6,7 +6,7 @@
 //! Each method takes and returns the CLI's own [`crate::email`] types, so
 //! the work here is converting between those and io-maildir's.
 
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::{Result, bail};
 use io_maildir::{
@@ -21,23 +21,31 @@ use crate::{
     email::{
         envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, child_path, renamed_path},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    maildir::client::{MaildirClient, validate_maildir_level, validate_maildir_name},
+    error::message_not_found,
+    maildir::client::{MaildirClient, validate_maildir_name},
 };
 
 impl MaildirClient {
-    /// Lists every Maildir under the configured root, sorted by name.
-    /// `with_counts` is ignored (Maildir does not surface counts
-    /// cheaply).
+    /// Lists every Maildir under the configured root, sorted by name,
+    /// the store's inbox marked with its role. `with_counts` is ignored
+    /// (Maildir does not surface counts cheaply).
     pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Vec<Mailbox>> {
         self.ensure_root()?;
 
+        let inbox = self.inbox().map(|inbox| inbox.path().to_string());
         let mut mailboxes: Vec<Mailbox> = self
             .list_maildirs()?
             .into_iter()
             .map(|maildir| mailbox_from(self, maildir))
+            .map(|mut mailbox| {
+                if inbox.as_ref() == Some(&mailbox.id) {
+                    mailbox.role = Some(MailboxRole::Inbox);
+                }
+                mailbox
+            })
             .collect();
         mailboxes.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(mailboxes)
@@ -55,7 +63,7 @@ impl MaildirClient {
     ) -> Result<Vec<Envelope>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let fulls = self.read_entries(&maildir, &entries)?;
+        let fulls = self.read_readable_entries(&maildir, &entries);
 
         let mut envelopes: Vec<Envelope> = fulls.iter().map(envelope_from_entry).collect();
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
@@ -76,7 +84,7 @@ impl MaildirClient {
     ) -> Result<Vec<Envelope>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let fulls = self.read_entries(&maildir, &entries)?;
+        let fulls = self.read_readable_entries(&maildir, &entries);
 
         let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = Vec::new();
@@ -160,10 +168,17 @@ impl MaildirClient {
 
     /// Moves the messages of `ids` `from` holds to `to`, returning how
     /// many it found.
+    ///
+    /// A move within one Maildir changes nothing, the ids kept, rather
+    /// than re-delivering each message under a new id.
     pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
         let found = self.found(&source, ids)?;
+
+        if source.path() == target.path() {
+            return Ok(found.len());
+        }
 
         for id in &found {
             self.r#move(*id, source.clone(), target.clone(), None)?;
@@ -175,20 +190,24 @@ impl MaildirClient {
     /// Creates the Maildir `name` at the top of the store, or under
     /// `parent`, returning its id, its path on disk, and its name.
     ///
-    /// An existing Maildir is refused, as IMAP's `CREATE` refuses one.
+    /// An existing folder is refused, as IMAP's `CREATE` refuses one.
     pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<(String, String)> {
-        validate_maildir_level(name)?;
+        self.validate_level(name)?;
 
         let path = match parent {
             Some(parent) => {
-                let parent = self.resolve_maildir(Path::new(parent))?;
-                child_path(&self.mailbox_name(&parent), '/', name)
+                let parent = self.relative_name(&self.resolve_maildir(Path::new(parent))?);
+                match parent.is_empty() {
+                    true => name.to_string(),
+                    false => child_path(&parent, '/', name),
+                }
             }
             None => name.to_string(),
         };
 
         validate_maildir_name(Path::new(&path))?;
-        if self.load_maildir(path.clone()).is_ok() {
+        let target = self.store.resolve(&path.as_str().into());
+        if Path::new(target.as_str()).exists() {
             bail!("Cannot create Maildir `{path}`: it already exists");
         }
         self.create_maildir(path.clone())?;
@@ -199,11 +218,17 @@ impl MaildirClient {
 
     /// Renames the last level of the Maildir `mailbox` to `name`, its
     /// parent kept, returning its new id and name. The target must not
-    /// exist.
+    /// exist, and the root cannot be renamed.
     pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<(String, String)> {
-        validate_maildir_level(name)?;
+        self.validate_level(name)?;
 
-        let from = self.mailbox_name(&self.resolve_maildir(Path::new(mailbox))?);
+        let maildir = self.resolve_maildir(Path::new(mailbox))?;
+        if self.is_root(&maildir) {
+            let name = self.mailbox_name(&maildir);
+            bail!("Cannot rename Maildir `{name}`: it is the store root");
+        }
+
+        let from = self.relative_name(&maildir);
         let to = renamed_path(&from, '/', name);
 
         validate_maildir_name(Path::new(&to))?;
@@ -220,27 +245,58 @@ impl MaildirClient {
     /// Deletes the Maildir `mailbox` and every message in it, returning
     /// its id.
     ///
-    /// A Maildir holding others is refused, naming them, rather than
-    /// removed with them, as IMAP servers keeping inferiors refuse it.
+    /// The root is refused, being the whole store. A Maildir holding
+    /// others is refused, naming them, rather than removed with them, as
+    /// IMAP servers keeping inferiors refuse it; so is one holding any
+    /// directory besides `cur`, `new` and `tmp`, listed or not, which the
+    /// removal would take along.
     pub fn delete_mailbox(&self, mailbox: &str) -> Result<String> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
-        let name = self.mailbox_name(&maildir);
+        if self.is_root(&maildir) {
+            let name = self.mailbox_name(&maildir);
+            bail!("Cannot delete Maildir `{name}`: it is the store root");
+        }
+
+        let name = self.relative_name(&maildir);
         let prefix = format!("{name}/");
 
-        let children: Vec<String> = self
+        let mut children: Vec<String> = self
             .list_maildirs()?
             .iter()
-            .map(|maildir| self.mailbox_name(maildir))
+            .map(|maildir| self.relative_name(maildir))
             .filter(|child| child.starts_with(&prefix))
             .collect();
 
+        for entry in fs::read_dir(maildir.path().as_str())? {
+            let entry = entry?;
+            let level = entry.file_name().to_string_lossy().into_owned();
+            let child = child_path(&name, '/', &level);
+            let is_dir = fs::metadata(entry.path()).is_ok_and(|m| m.is_dir());
+            if is_dir
+                && !matches!(level.as_str(), "cur" | "new" | "tmp")
+                && !children.contains(&child)
+            {
+                children.push(child);
+            }
+        }
+
         if !children.is_empty() {
+            children.sort();
             let children = children.join("`, `");
             bail!("Cannot delete Maildir `{name}`: it holds `{children}`; delete them first");
         }
 
         self.delete_maildir(name)?;
         Ok(maildir.path().to_string())
+    }
+
+    /// The path of `maildir` relative to the root, empty for the root,
+    /// which io-maildir resolves names by.
+    pub fn relative_name(&self, maildir: &Maildir) -> String {
+        self.store
+            .relative(maildir.path())
+            .map(|name| name.to_string())
+            .unwrap_or_default()
     }
 
     /// Permanently deletes the messages of `ids` `mailbox` holds by
@@ -259,8 +315,42 @@ impl MaildirClient {
     /// The ids of `ids` `maildir` holds, each entry once, every id checked
     /// before the first write. An unknown one is skipped with a warning.
     fn found<'a>(&self, maildir: &Maildir, ids: &[&'a str]) -> Result<Vec<&'a str>> {
+        let (found, missing) = self.locate_all(maildir, ids)?;
+
+        for id in missing {
+            warn!("skip message `{id}`: not found in {}", maildir.path());
+        }
+
+        Ok(found)
+    }
+
+    /// The ids of `ids` `maildir` holds, each entry once, every id checked
+    /// before the first write, as the raw commands want them: one unknown
+    /// id refuses the whole set, naming the unknown ones.
+    pub fn found_all<'a>(&self, maildir: &Maildir, ids: &[&'a str]) -> Result<Vec<&'a str>> {
+        let (found, missing) = self.locate_all(maildir, ids)?;
+
+        if !missing.is_empty() {
+            let missing = missing.join("`, `");
+            let maildir = self.mailbox_name(maildir);
+            return Err(message_not_found(format!(
+                "No message changed: `{missing}` not found in Maildir `{maildir}`"
+            )));
+        }
+
+        Ok(found)
+    }
+
+    /// Splits `ids` into the ones `maildir` holds, each entry once, and
+    /// the unknown ones.
+    fn locate_all<'a>(
+        &self,
+        maildir: &Maildir,
+        ids: &[&'a str],
+    ) -> Result<(Vec<&'a str>, Vec<&'a str>)> {
         let mut paths = HashSet::new();
         let mut found = Vec::with_capacity(ids.len());
+        let mut missing = Vec::new();
 
         for id in ids {
             match self.locate(maildir.clone(), *id) {
@@ -270,13 +360,15 @@ impl MaildirClient {
                     }
                 }
                 Err(MaildirClientError::EntryLocate(MaildirEntryLocateError::NotFound(_))) => {
-                    warn!("skip message `{id}`: not found in {}", maildir.path());
+                    if !missing.contains(id) {
+                        missing.push(*id);
+                    }
                 }
                 Err(err) => return Err(err.into()),
             }
         }
 
-        Ok(found)
+        Ok((found, missing))
     }
 }
 
@@ -373,6 +465,7 @@ mod tests {
         let client = MaildirClient::new(MaildirConfig {
             root: dir.path().to_path_buf(),
             keywords: Default::default(),
+            layout: Default::default(),
         });
         client.create_mailbox("A", None).unwrap();
         let id = client
@@ -420,6 +513,7 @@ mod tests {
         let missing = MaildirClient::new(MaildirConfig {
             root: dir.path().join("missing"),
             keywords: Default::default(),
+            layout: Default::default(),
         });
         let err = missing.list_mailboxes(false).unwrap_err().to_string();
         assert!(err.contains("does not exist"), "{err}");
@@ -448,6 +542,91 @@ mod tests {
         let err = client.delete_mailbox("A").unwrap_err().to_string();
         assert!(err.contains("A/Kid2"), "{err}");
         assert!(dir.path().join("A/Kid2/cur").is_dir());
+    }
+
+    #[test]
+    fn deleting_or_renaming_the_root_leaves_the_store_whole() {
+        let (dir, client, id) = fixture();
+        for subdir in ["cur", "new", "tmp"] {
+            fs::create_dir(dir.path().join(subdir)).unwrap();
+        }
+        fs::create_dir_all(dir.path().join(".Sent/cur")).unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+
+        for mailbox in [".", "./", "", "INBOX", "A/..", &root] {
+            assert!(client.delete_mailbox(mailbox).is_err(), "{mailbox}");
+            assert!(client.rename_mailbox(mailbox, "X").is_err(), "{mailbox}");
+        }
+
+        assert!(dir.path().join(".Sent/cur").is_dir());
+        assert_eq!(
+            client.store_flags("A", &[&id], &[], FlagOp::Add).unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_maildir_holding_an_unlisted_folder_is_not_deleted() {
+        let (dir, client, _) = fixture();
+        fs::create_dir_all(dir.path().join("A/.hidden/cur")).unwrap();
+        fs::create_dir_all(dir.path().join("A/Half/cur")).unwrap();
+
+        let err = client.delete_mailbox("A").unwrap_err().to_string();
+        assert!(err.contains("A/.hidden") && err.contains("A/Half"), "{err}");
+        assert!(dir.path().join("A/.hidden/cur").is_dir());
+    }
+
+    #[test]
+    fn a_move_within_one_maildir_keeps_the_id() {
+        let (dir, client, id) = fixture();
+        let path = dir.path().join("A").to_string_lossy().into_owned();
+
+        assert_eq!(client.move_messages("A", &path, &[&id]).unwrap(), 1);
+        assert_eq!(client.move_messages("A/", "A", &[&id, "nope"]).unwrap(), 1);
+
+        let envelopes = client.list_envelopes("A", None, None, false).unwrap();
+        assert_eq!(envelopes.len(), 1);
+        assert_eq!(envelopes[0].id, id);
+    }
+
+    #[test]
+    fn the_raw_lookup_refuses_a_set_holding_an_unknown_id() {
+        let (_dir, client, id) = fixture();
+        let maildir = client.resolve_maildir(Path::new("A")).unwrap();
+
+        let err = client.found_all(&maildir, &[&id, "nope", &id]).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<crate::error::ErrorCode>(&err);
+        assert_eq!(code, Some(crate::error::ErrorCode::MessageNotFound));
+        assert!(err.to_string().contains("`nope`"), "{err}");
+
+        assert_eq!(client.found_all(&maildir, &[&id, &id]).unwrap(), [&id]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_message_is_skipped_by_the_listing() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, client, _) = fixture();
+        let locked = client
+            .add_message("A", &[], b"Subject: Locked\r\n\r\nbody".to_vec())
+            .unwrap();
+        let path = fs::read_dir(dir.path().join("A/cur"))
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|path| path.to_string_lossy().contains(&locked))
+            .unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+
+        // NOTE: root reads through any mode.
+        if fs::read(&path).is_ok() {
+            return;
+        }
+
+        let envelopes = client.list_envelopes("A", None, None, false);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(envelopes.unwrap().len(), 1);
     }
 
     #[test]

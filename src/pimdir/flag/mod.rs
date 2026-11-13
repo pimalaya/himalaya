@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use crate::{
     email::flag::{Flag, IanaFlag, classify_iana},
-    error::ErrorCode,
+    error::{ErrorCode, message_not_found},
     pimdir::backend::PimdirFlagged,
     shared::flag::arg::MessageIdsArg,
 };
@@ -150,7 +150,9 @@ impl PimdirFlagStageOutput {
     /// the shared flag commands do.
     pub fn found(staged: Vec<PimdirFlagged>) -> Result<Self> {
         if staged.is_empty() {
-            bail!("No flag staged: no id matched in the mailbox");
+            return Err(message_not_found(
+                "No flag staged: no id matched in the mailbox",
+            ));
         }
         Ok(Self::from(staged))
     }

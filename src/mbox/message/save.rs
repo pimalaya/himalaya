@@ -35,7 +35,7 @@ pub struct MboxMessageSaveCommand {
 impl MboxMessageSaveCommand {
     /// Appends the raw message to the mbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
-        let path = client.resolve_mbox(&self.mbox.inner);
+        let path = client.open_mbox(&self.mbox.inner)?;
         let msg = self.message.parse()?;
         let flags = MboxFlags::from_iter(self.flags.into_iter().map(Into::into));
 

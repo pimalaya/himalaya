@@ -22,9 +22,9 @@ pub struct MaildirNameArg {
 #[derive(Debug, Parser)]
 pub struct MaildirPathFlag {
     /// Maildir folder, resolved relative to the account root. Must name
-    /// an existing folder; use `.` for the root maildir itself (the
-    /// INBOX in the default fs layout, where there is no `Inbox`
-    /// subfolder). Defaults to `Inbox`.
+    /// an existing folder; `.` names the root Maildir itself. Defaults
+    /// to `Inbox`: a top-level folder of that name in any case, else the
+    /// root.
     #[arg(name = "maildir_source_path", long = "maildir", short = 'm')]
     #[arg(value_name = "PATH", default_value = INBOX)]
     pub inner: PathBuf,
@@ -67,15 +67,16 @@ pub struct MessageIdsArg {
     pub inner: Vec<String>,
 }
 
-/// A subdirectory of a Maildir.
+/// A subdirectory of a Maildir a message can land in.
+///
+/// `tmp` is left out: no reader lists a message there, and Maildir
+/// readers delete what stays in it for 36 hours.
 #[derive(Clone, Debug, ValueEnum)]
 pub enum MaildirSubdirArg {
     /// Where a message a client has seen lives.
     Cur,
     /// Where a freshly delivered message lives.
     New,
-    /// Where a delivery is staged before its rename.
-    Tmp,
 }
 
 impl From<MaildirSubdirArg> for MaildirSubdir {
@@ -83,7 +84,6 @@ impl From<MaildirSubdirArg> for MaildirSubdir {
         match value {
             MaildirSubdirArg::Cur => MaildirSubdir::Cur,
             MaildirSubdirArg::New => MaildirSubdir::New,
-            MaildirSubdirArg::Tmp => MaildirSubdir::Tmp,
         }
     }
 }

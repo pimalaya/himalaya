@@ -29,7 +29,7 @@ use io_mbox::{
     flag::{MboxFlag, MboxFlags},
     index::MboxIndex,
     mbox::{create::MboxCreate, delete::MboxDelete, rename::MboxRename},
-    path::MboxFsPath,
+    path::{MboxFsPath, MboxPath},
     store::{INBOX, SBD},
 };
 use log::warn;
@@ -41,14 +41,24 @@ use crate::{
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
+    error::message_not_found,
     mbox::{
         cache::MboxCache,
         client::{MboxClient, validate_mbox_name},
     },
 };
 
-/// The flag fields, which an append writes from the flags it is given.
-const STORE_FIELDS: [&str; 3] = ["Status", "X-Status", "X-Keywords"];
+/// The fields the store owns: the flag fields, which an append writes from
+/// the flags it is given, and Thunderbird's, which a flag write keeps in
+/// step.
+const STORE_FIELDS: [&str; 6] = [
+    "Status",
+    "X-Status",
+    "X-Keywords",
+    "X-Mozilla-Status",
+    "X-Mozilla-Status2",
+    "X-Mozilla-Keys",
+];
 
 impl MboxClient {
     /// Lists the mbox files of the store, the spool as `INBOX`.
@@ -96,7 +106,7 @@ impl MboxClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let mut envelopes: Vec<Envelope> = self
             .envelopes(&path, false)?
             .into_iter()
@@ -117,7 +127,7 @@ impl MboxClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
 
         let mut hits: Vec<Envelope> = Vec::new();
@@ -152,7 +162,7 @@ impl MboxClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<usize> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let flags = flags_to_mbox(flags);
         let (index, mut cache) = self.index(&path, false)?;
 
@@ -199,24 +209,23 @@ impl MboxClient {
         edit: impl Fn(&MboxFlags) -> MboxFlags,
     ) -> Result<()> {
         let (index, mut cache) = self.index(path, false)?;
-        for id in ids {
-            find(&index, id, path)?;
-        }
+        require_all(&index, ids, path)?;
         self.rewrite_flags(path, ids, edit, index, &mut cache)
     }
 
     /// Reads one message's raw RFC 5322 bytes, unquoted, from `mailbox`,
     /// without the fields the store owns: the flag fields, which the
-    /// flags render, and the `Content-Length` of the mboxcl variants.
+    /// flags render, Thunderbird's status fields, and the `Content-Length`
+    /// of the mboxcl variants.
     ///
     /// An index another client made stale is rebuilt and the read tried
     /// once more.
     pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let (index, _) = self.index(&path, false)?;
 
         let contents = match self.read(&path, find(&index, id, &path)?) {
-            Err(MboxClientError::EntryGet(MboxEntryGetError::Stale(_))) => {
+            Err(err) if is_stale(&err) => {
                 let (index, _) = self.index(&path, true)?;
                 self.read(&path, find(&index, id, &path)?)?
             }
@@ -234,7 +243,7 @@ impl MboxClient {
 
     /// Appends `raw` to `mailbox` with `flags`, returning its id.
     pub fn add_message(&self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let mut flags = flags_to_mbox(flags);
         read_is_old(&mut flags);
         self.append(&path, flags, raw)
@@ -253,30 +262,47 @@ impl MboxClient {
             lock: self.lock.clone(),
             scanner: self.scanner.clone(),
         };
-        let appended = self.run(MboxEntryAppend::new(path.clone(), vec![item], opts))?;
-        let offset = appended.first().map(|entry| entry.offset);
+        let appended = self.exec(MboxEntryAppend::new(path.clone(), vec![item], opts))?;
+        let id = self.appended_ids(path, &appended)?.into_iter().next();
+        id.ok_or_else(|| anyhow!("Cannot find the message appended to {path}"))
+    }
 
-        // NOTE: the append knows the content id, not how many copies of
-        // the message the file already holds, which the numbered id needs.
+    /// The ids the synced index of `path` gives the messages `appended` to
+    /// it.
+    ///
+    /// An append knows the content id, not how many copies of the message
+    /// the file already holds, which the numbered id needs.
+    fn appended_ids(&self, path: &MboxFsPath, appended: &[MboxEntry]) -> Result<Vec<String>> {
         let (index, _) = self.index(path, false)?;
-        index
-            .entries
+        appended
             .iter()
-            .find(|entry| Some(entry.offset) == offset)
-            .map(|entry| entry.id.clone())
-            .ok_or_else(|| anyhow!("Cannot find the message appended to {path}"))
+            .map(|appended| {
+                index
+                    .entries
+                    .iter()
+                    .find(|entry| entry.offset == appended.offset)
+                    .map(|entry| entry.id.clone())
+                    .ok_or_else(|| anyhow!("Cannot find the message appended to {path}"))
+            })
+            .collect()
     }
 
     /// Copies the messages of `from` among `ids` to the end of `to`,
     /// returning how many it found. An unknown id is skipped, and none
     /// found writes nothing.
     pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let source = self.resolve_mbox(from);
-        let target = self.resolve_mbox(to);
+        Ok(self.copy_message_ids(from, to, ids)?.len())
+    }
+
+    /// Copies like [`Self::copy_messages`], returning the ids of the
+    /// copies in `to`, each message found once.
+    pub fn copy_message_ids(&self, from: &str, to: &str, ids: &[&str]) -> Result<Vec<String>> {
+        let source = self.open_mbox(from)?;
+        let target = self.open_mbox(to)?;
         let (index, _) = self.index(&source, false)?;
         let entries: Vec<MboxEntry> = found(&index, ids, &source).into_iter().cloned().collect();
         if entries.is_empty() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let opts = MboxEntryCopyOptions {
@@ -285,20 +311,26 @@ impl MboxClient {
             scanner: self.scanner.clone(),
             chunk_size: self.chunk_size,
         };
-        let copied = self.run(MboxEntryCopy::new(source, target, entries, opts))?;
-        Ok(copied.len())
+        let copied = self.exec(MboxEntryCopy::new(source, target.clone(), entries, opts))?;
+        self.appended_ids(&target, &copied)
     }
 
     /// Moves the messages of `from` among `ids` to the end of `to`: a
     /// copy, then a removal from the source. Returns how many it found,
     /// an unknown id being skipped and none found writing nothing.
     pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let source = self.resolve_mbox(from);
-        let target = self.resolve_mbox(to);
+        Ok(self.move_message_ids(from, to, ids)?.len())
+    }
+
+    /// Moves like [`Self::move_messages`], returning the ids of the
+    /// messages in `to`, each message found once.
+    pub fn move_message_ids(&self, from: &str, to: &str, ids: &[&str]) -> Result<Vec<String>> {
+        let source = self.open_mbox(from)?;
+        let target = self.open_mbox(to)?;
         let (index, mut cache) = self.index(&source, false)?;
         let entries: Vec<MboxEntry> = found(&index, ids, &source).into_iter().cloned().collect();
         if entries.is_empty() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let opts = MboxEntryMoveOptions {
@@ -308,29 +340,30 @@ impl MboxClient {
             scanner: self.scanner.clone(),
             chunk_size: self.chunk_size,
         };
-        let output = self.run(MboxEntryMove::new(source.clone(), target, entries, opts))?;
-        let moved = output.entries.len();
+        let output = self.exec(MboxEntryMove::new(
+            source.clone(),
+            target.clone(),
+            entries,
+            opts,
+        ))?;
 
         cache.index = Some(output.index);
         cache.save(self.cache_dir.as_deref(), &source);
-        Ok(moved)
+        self.appended_ids(&target, &output.entries)
     }
 
     /// Fails unless the mbox at `path` holds every id of `ids`, for the raw
     /// commands, which act on all of them or none.
     pub fn require_ids(&self, path: &MboxFsPath, ids: &[&str]) -> Result<()> {
         let (index, _) = self.index(path, false)?;
-        for id in ids {
-            find(&index, id, path)?;
-        }
-        Ok(())
+        require_all(&index, ids, path)
     }
 
     /// Permanently removes the messages of `mailbox` among `ids`,
     /// returning how many it found. An unknown id is skipped, and none
     /// found writes nothing.
     pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<usize> {
-        let path = self.resolve_mbox(mailbox);
+        let path = self.open_mbox(mailbox)?;
         let (index, mut cache) = self.index(&path, false)?;
 
         let edits: BTreeMap<String, MboxEntryUpdateEdit> = found(&index, ids, &path)
@@ -350,28 +383,34 @@ impl MboxClient {
     /// `parent`, with its parent directories, returning its id, its name.
     ///
     /// In the plain layout a mailbox nests only under a directory: one
-    /// under an mbox file is refused, naming `mbox.thunderbird`.
+    /// under an mbox file is refused, naming `mbox.thunderbird`. In the
+    /// Thunderbird layout a missing parent mbox is created empty, so the
+    /// children listed under it can be renamed with it.
     pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
         let name = match parent {
             Some(parent) => child_path(parent, '/', name),
             None => name.to_string(),
         };
 
-        validate_mbox_name(&name)?;
+        validate_mbox_name(&name, self.store.thunderbird)?;
 
-        if !self.store.thunderbird {
-            let components: Vec<&str> = name.split('/').collect();
-            for depth in 1..components.len() {
-                let parent = components[..depth].join("/");
-                if Path::new(self.store.root.join(&parent).as_str()).is_file() {
-                    bail!(
-                        "Cannot create mbox `{name}`: `{parent}` is an mbox file, which holds no mailbox unless `mbox.thunderbird` is set"
-                    );
-                }
+        let components: Vec<&str> = name.split('/').collect();
+        for depth in 1..components.len() {
+            let parent = components[..depth].join("/");
+            let path = self.store.resolve(&MboxPath::from(parent.as_str()));
+            let path = Path::new(path.as_str());
+
+            if self.store.thunderbird && !path.exists() {
+                self.exec(MboxCreate::new(MboxFsPath::from(path)))?;
+            } else if !self.store.thunderbird && path.is_file() {
+                bail!(
+                    "Cannot create mbox `{name}`: `{parent}` is an mbox file, which holds no mailbox unless `mbox.thunderbird` is set"
+                );
             }
         }
 
-        self.run(MboxCreate::new(self.resolve_mbox(&name)))?;
+        let path = self.store.resolve(&MboxPath::from(name.as_str()));
+        self.exec(MboxCreate::new(path))?;
         Ok(name)
     }
 
@@ -386,12 +425,18 @@ impl MboxClient {
     /// Renames the mbox `from` to `to`, which must not exist. In the
     /// Thunderbird layout the `.sbd` directory holding its children
     /// follows, so they keep their parent.
+    ///
+    /// The spool is refused either way, and so is a directory, which is
+    /// no mbox.
     pub fn rename_mbox(&self, from: &str, to: &str) -> Result<()> {
-        validate_mbox_name(from)?;
-        validate_mbox_name(to)?;
+        validate_mbox_name(from, self.store.thunderbird)?;
+        validate_mbox_name(to, self.store.thunderbird)?;
 
-        let from_path = self.resolve_mbox(from);
-        let to_path = self.resolve_mbox(to);
+        let from_path = self.resolve_mbox(from)?;
+        let to_path = self.store.resolve(&MboxPath::from(to));
+        self.refuse_spool(&from_path, "rename", from)?;
+        self.refuse_spool(&to_path, "rename a mailbox to", to)?;
+        refuse_dir(&from_path, "rename", from)?;
         let from_sbd = from_path.with_suffix(SBD);
         let to_sbd = to_path.with_suffix(SBD);
         let subtree = self.store.thunderbird && Path::new(from_sbd.as_str()).is_dir();
@@ -400,11 +445,11 @@ impl MboxClient {
             bail!("Cannot rename mbox `{from}` to `{to}`: {to_sbd} already exists");
         }
 
-        self.run(MboxRename::new(from_path.clone(), to_path.clone()))?;
+        self.exec(MboxRename::new(from_path.clone(), to_path.clone()))?;
 
         if subtree && let Err(err) = fs::rename(from_sbd.as_str(), to_sbd.as_str()) {
             // Put the file back, so the mbox and its children stay together.
-            self.run(MboxRename::new(to_path, from_path))
+            self.exec(MboxRename::new(to_path, from_path))
                 .context("Cannot move the renamed mbox back")?;
             return Err(err).with_context(|| format!("Cannot rename {from_sbd} to {to_sbd}"));
         }
@@ -416,9 +461,14 @@ impl MboxClient {
     /// delivery lands in it meanwhile. In the Thunderbird layout an mbox
     /// holding others is refused, naming them, and its emptied `.sbd`
     /// directory goes with it.
+    ///
+    /// The spool is refused, the mail system delivering to it, and so is
+    /// a directory, which is no mbox.
     pub fn delete_mailbox(&self, name: &str) -> Result<()> {
-        validate_mbox_name(name)?;
-        let path = self.resolve_mbox(name);
+        validate_mbox_name(name, self.store.thunderbird)?;
+        let path = self.resolve_mbox(name)?;
+        self.refuse_spool(&path, "delete", name)?;
+        refuse_dir(&path, "delete", name)?;
 
         if self.store.thunderbird {
             let prefix = format!("{name}/");
@@ -435,7 +485,7 @@ impl MboxClient {
             }
         }
 
-        self.run(MboxDelete::new(path.clone(), self.lock.clone()))?;
+        self.exec(MboxDelete::new(path.clone(), self.lock.clone()))?;
 
         let sbd = path.with_suffix(SBD);
         if self.store.thunderbird
@@ -443,6 +493,28 @@ impl MboxClient {
             && err.kind() != io::ErrorKind::NotFound
         {
             warn!("cannot remove {sbd}, left in place: {err}");
+        }
+
+        Ok(())
+    }
+
+    /// Fails when `path` is the spool `mbox.inbox` names: the mail system
+    /// delivers to it, and IMAP refuses to delete or rename `INBOX`
+    /// alike.
+    fn refuse_spool(&self, path: &MboxFsPath, verb: &str, name: &str) -> Result<()> {
+        let Some(spool) = &self.store.inbox else {
+            return Ok(());
+        };
+
+        let same = spool == path
+            || matches!(
+                (fs::canonicalize(spool.as_str()), fs::canonicalize(path.as_str())),
+                (Ok(spool), Ok(path)) if spool == path
+            );
+        if same {
+            bail!(
+                "Cannot {verb} `{name}`: it is the spool `mbox.inbox` names, which the mail system delivers to"
+            );
         }
 
         Ok(())
@@ -511,7 +583,7 @@ impl MboxClient {
             scanner: self.scanner.clone(),
             chunk_size: self.chunk_size,
         };
-        let output = self.run(MboxEntryUpdate::new(path.clone(), edits, opts))?;
+        let output = self.exec(MboxEntryUpdate::new(path.clone(), edits, opts))?;
 
         cache.index = Some(output.index);
         cache.save(self.cache_dir.as_deref(), path);
@@ -524,12 +596,31 @@ impl MboxClient {
     /// Envelopes come from the cache when it has them, the flags always
     /// from the fresh index. A message the cache lacks is read and parsed
     /// once, then cached.
+    ///
+    /// A read finding the index stale, another client having rewritten the
+    /// file meanwhile, rebuilds it and starts over once.
     fn envelopes(
         &self,
         path: &MboxFsPath,
         contents: bool,
     ) -> Result<Vec<(Envelope, Option<Vec<u8>>)>> {
-        let (index, mut cache) = self.index(path, false)?;
+        match self.envelopes_once(path, contents, false) {
+            Err(err) if err.downcast_ref().is_some_and(is_stale) => {
+                self.envelopes_once(path, contents, true)
+            }
+            result => result,
+        }
+    }
+
+    /// One pass of [`Self::envelopes`], over the index rebuilt from
+    /// scratch when `rebuild`.
+    fn envelopes_once(
+        &self,
+        path: &MboxFsPath,
+        contents: bool,
+        rebuild: bool,
+    ) -> Result<Vec<(Envelope, Option<Vec<u8>>)>> {
+        let (index, mut cache) = self.index(path, rebuild)?;
         let mut envelopes = Vec::new();
         let mut parsed = false;
 
@@ -564,11 +655,45 @@ impl MboxClient {
     }
 }
 
+/// Fails when `path` is a directory, which holds mailboxes but is none.
+fn refuse_dir(path: &MboxFsPath, verb: &str, name: &str) -> Result<()> {
+    if Path::new(path.as_str()).is_dir() {
+        bail!("Cannot {verb} `{name}`: it is a directory holding mailboxes, not an mbox");
+    }
+    Ok(())
+}
+
+/// Whether a read failed on an entry another client moved.
+fn is_stale(err: &MboxClientError) -> bool {
+    matches!(err, MboxClientError::EntryGet(MboxEntryGetError::Stale(_)))
+}
+
 /// Finds the entry `id` names in `index`.
 fn find<'a>(index: &'a MboxIndex, id: &str, path: &MboxFsPath) -> Result<&'a MboxEntry> {
     index
         .get(id)
-        .ok_or_else(|| anyhow!("Message `{id}` not found in mbox {path}"))
+        .filter(|entry| !entry.pseudo)
+        .ok_or_else(|| message_not_found(format!("Message `{id}` not found in mbox {path}")))
+}
+
+/// Fails with `message-not-found` unless `index` holds every id of
+/// `ids`, naming each unknown one, before any write.
+fn require_all(index: &MboxIndex, ids: &[&str], path: &MboxFsPath) -> Result<()> {
+    let mut missing: Vec<&str> = Vec::new();
+    for id in ids {
+        if find(index, id, path).is_err() && !missing.contains(id) {
+            missing.push(id);
+        }
+    }
+
+    if !missing.is_empty() {
+        let missing = missing.join("`, `");
+        return Err(message_not_found(format!(
+            "No message changed: `{missing}` not found in mbox {path}"
+        )));
+    }
+
+    Ok(())
 }
 
 /// The entries of `index` among `ids`, each once, in the order given. An
@@ -902,5 +1027,111 @@ mod tests {
         assert_eq!(envelope.message_id.as_deref(), Some("1@x"));
         assert_eq!(envelope.in_reply_to, ["0@x"]);
         assert_eq!(envelope.has_attachment, Some(false));
+    }
+
+    #[test]
+    fn the_spool_is_neither_deleted_nor_renamed() {
+        let (root, mut client) = client(MboxFormatConfig::Mboxrd, false);
+        let spool = root.path().join("spool.mbox");
+        fs::write(&spool, b"").unwrap();
+        client.store.inbox = Some(MboxFsPath::from(spool.as_path()));
+        client.add_message("INBOX", &[], MESSAGE.to_vec()).unwrap();
+        client.create_mailbox("A", None).unwrap();
+
+        for name in ["INBOX", "inbox"] {
+            let err = client.delete_mailbox(name).unwrap_err().to_string();
+            assert!(err.contains("`mbox.inbox`"), "{err}");
+            let err = client.rename_mbox(name, "Moved").unwrap_err().to_string();
+            assert!(err.contains("`mbox.inbox`"), "{err}");
+        }
+        assert!(client.rename_mailbox("A", "INBOX").is_err());
+        assert!(client.delete_mailbox(spool.to_str().unwrap()).is_err());
+
+        let inbox = client.list_envelopes("INBOX", None, None, false).unwrap();
+        assert_eq!(inbox.len(), 1);
+        assert_eq!(names(&client), ["A", "INBOX"]);
+    }
+
+    #[test]
+    fn a_listing_rebuilds_a_stale_index_once() {
+        let (_root, mut client) = client(MboxFormatConfig::Mboxrd, false);
+        let cache_dir = tempfile::tempdir().unwrap();
+        client.cache_dir = Some(cache_dir.path().to_path_buf());
+        client.create_mailbox("A", None).unwrap();
+        client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
+        let other = b"From: b@x.org\nSubject: two\n\nbody two\n";
+        client.add_message("A", &[], other.to_vec()).unwrap();
+
+        // NOTE: a cached index whose file did not change on disk is reused
+        // as is, so a wrong entry stands for one another client moved.
+        let path = client.resolve_mbox("A").unwrap();
+        let mut cache = MboxCache::load(client.cache_dir.as_deref(), &path);
+        let index = cache.index.as_mut().unwrap();
+        index.entries[0].len -= 1;
+        cache.save(client.cache_dir.as_deref(), &path);
+
+        let query = "body body".parse::<SearchEmailsQuery>().unwrap();
+        let hits = client.search_envelopes("A", Some(&query), None, None, false);
+        assert_eq!(hits.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn copies_report_the_ids_they_get_in_the_target() {
+        let (_root, client) = client(MboxFormatConfig::Mboxrd, false);
+        client.create_mailbox("A", None).unwrap();
+        client.create_mailbox("B", None).unwrap();
+        let id = client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
+        client.add_message("B", &[], MESSAGE.to_vec()).unwrap();
+
+        let ids = client.copy_message_ids("A", "B", &[&id, &id]).unwrap();
+        assert_eq!(ids, [format!("{id}-2")]);
+        let ids = client.move_message_ids("A", "B", &[&id, &id]).unwrap();
+        assert_eq!(ids, [format!("{id}-3")]);
+    }
+
+    #[test]
+    fn names_a_listing_hides_and_directories_are_refused() {
+        let (root, client) = client(MboxFormatConfig::Mboxrd, false);
+        for name in [".hidden", "Y.msf", "Z.lock"] {
+            assert!(client.create_mailbox(name, None).is_err(), "{name}");
+        }
+
+        client.create_mailbox("Leaf", Some("dir")).unwrap();
+        let err = client.delete_mailbox("dir").unwrap_err().to_string();
+        assert!(err.contains("directory"), "{err}");
+        let err = client.rename_mbox("dir", "newdir").unwrap_err().to_string();
+        assert!(err.contains("directory"), "{err}");
+        assert!(root.path().join("dir/Leaf").is_file());
+    }
+
+    #[test]
+    fn a_thunderbird_child_gets_its_parent() {
+        let (root, client) = client(MboxFormatConfig::Mboxrd, true);
+        assert!(client.create_mailbox("X.sbd", None).is_err());
+
+        client.create_mailbox("Ghost/Kid", None).unwrap();
+        assert!(root.path().join("Ghost").is_file());
+        assert_eq!(names(&client), ["Ghost", "Ghost/Kid"]);
+        client.rename_mailbox("Ghost", "G2").unwrap();
+        assert_eq!(names(&client), ["G2", "G2/Kid"]);
+    }
+
+    #[test]
+    fn a_read_leaves_out_the_thunderbird_fields() {
+        let (root, client) = client(MboxFormatConfig::Mboxrd, false);
+        let stored = b"From - Mon Jan  1 00:00:00 2024\nX-Mozilla-Status: 0001\nX-Mozilla-Status2: 00000000\nX-Mozilla-Keys: $label1\nFrom: a@x.org\nSubject: hi\nMessage-ID: <1@x>\n\nbody\n";
+        fs::write(root.path().join("T"), stored).unwrap();
+        let id = client.list_envelopes("T", None, None, false).unwrap()[0]
+            .id
+            .clone();
+
+        assert_eq!(client.get_message("T", &id, false).unwrap(), MESSAGE);
+
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+        client
+            .store_flags("T", &[&id], &seen, FlagOp::Remove)
+            .unwrap();
+        let stored = fs::read_to_string(root.path().join("T")).unwrap();
+        assert!(stored.contains("X-Mozilla-Status: 0000\n"), "{stored}");
     }
 }

@@ -535,7 +535,8 @@ const COPY_SHARED: &str = "the message is added to the target mailbox rather tha
      both share flags, and deleting one deletes both";
 
 /// What the backends finding the trash by alias alone need.
-const TRASH_ALIAS: &str = "needs `mailbox.alias.trash`, the backend marking no trash";
+const TRASH_ALIAS: &str =
+    "finds the trash through `mailbox.alias.trash` alone, the backend marking none";
 
 /// What deleting a mailbox holding others does on IMAP.
 const KEEPS_INFERIORS: &str = "a mailbox holding others is refused by the servers keeping inferior names (RFC 3501 section 6.3.4)";

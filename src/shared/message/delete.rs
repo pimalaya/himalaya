@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -15,6 +15,7 @@ use crate::{
     account::context::Account,
     capability::{self, Capability},
     email::mailbox::MailboxRole,
+    error::message_not_found,
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
@@ -62,7 +63,9 @@ impl MessageDeleteCommand {
         let report = if current_id == trash_id {
             let (count, removed) = client.delete_messages(&current_id, &ids)?;
             if count == 0 {
-                bail!("No message deleted: no id matched in the mailbox");
+                return Err(message_not_found(
+                    "No message deleted: no id matched in the mailbox",
+                ));
             }
             let action = if removed {
                 DeleteAction::Deleted
@@ -73,7 +76,9 @@ impl MessageDeleteCommand {
         } else {
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
             if moved == 0 {
-                bail!("No message deleted: no id matched in the mailbox");
+                return Err(message_not_found(
+                    "No message deleted: no id matched in the mailbox",
+                ));
             }
             MessageDeleteOutput::new(DeleteAction::MovedToTrash, moved, queued)
         };

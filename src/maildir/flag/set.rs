@@ -19,7 +19,8 @@ use crate::{
 /// Set Maildir flags on messages.
 ///
 /// Replaces the info flags in the filename of each message identified
-/// by the given id(s) with the given flags.
+/// by the given id(s) with the given flags. Every id is looked up first:
+/// an unknown one refuses the whole set, nothing changed.
 #[derive(Debug, Parser)]
 pub struct MaildirFlagSetCommand {
     #[command(flatten)]
@@ -29,7 +30,7 @@ pub struct MaildirFlagSetCommand {
     /// Flag(s) to set on the message. Repeat `-f` per flag (e.g. `-f
     /// seen -f flagged`); a single `-f` takes one value so trailing
     /// message ids are not swallowed as flags.
-    #[arg(long = "flag", short, value_name = "FLAG")]
+    #[arg(long = "flag", short, value_name = "FLAG", required = true)]
     pub flags: Vec<FlagArg>,
 }
 
@@ -40,12 +41,15 @@ impl MaildirFlagSetCommand {
 
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        for id in self.ids.inner.clone() {
-            client.set_flags(maildir.clone(), id, flags.clone())?;
+        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let found = client.found_all(&maildir, &ids)?;
+
+        for id in &found {
+            client.set_flags(maildir.clone(), *id, flags.clone())?;
         }
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner,
+            ids: found.into_iter().map(String::from).collect(),
             done: "Flag(s) successfully changed",
         })
     }

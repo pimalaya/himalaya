@@ -308,7 +308,7 @@ fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> 
 }
 
 /// Checks that the mbox root is a directory and the spool, when set, a
-/// readable file.
+/// readable file, not a directory.
 #[cfg(feature = "mbox")]
 fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
     if !mbox_config.root.is_dir() {
@@ -318,9 +318,18 @@ fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
         );
     }
 
-    if let Some(inbox) = &mbox_config.inbox
-        && let Err(err) = File::open(inbox)
-    {
+    let Some(inbox) = &mbox_config.inbox else {
+        return Ok(());
+    };
+
+    if inbox.is_dir() {
+        bail!(
+            "Mbox spool `{}` is a directory: set `mbox.inbox` to the spool file",
+            inbox.display()
+        );
+    }
+
+    if let Err(err) = File::open(inbox) {
         bail!("Cannot open mbox spool `{}`: {err}", inbox.display());
     }
 
@@ -596,5 +605,28 @@ mod tests {
             Err(_) => Vec::new(),
         };
         assert!(left.is_empty(), "{left:?}");
+    }
+}
+
+#[cfg(all(test, feature = "mbox"))]
+mod mbox_tests {
+    use crate::{
+        account::check::connect_mbox,
+        config::{MboxConfig, MboxFormatConfig},
+    };
+
+    #[test]
+    fn a_spool_directory_fails_the_check_naming_the_key() {
+        let root = tempfile::tempdir().unwrap();
+        let config = MboxConfig {
+            root: root.path().to_path_buf(),
+            inbox: Some(root.path().to_path_buf()),
+            format: MboxFormatConfig::Mboxrd,
+            thunderbird: false,
+            lock: Default::default(),
+        };
+
+        let err = connect_mbox(&config).unwrap_err().to_string();
+        assert!(err.contains("`mbox.inbox`"), "{err}");
     }
 }

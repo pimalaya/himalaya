@@ -18,7 +18,10 @@ use crate::{
 /// Move Maildir message(s) to another folder.
 ///
 /// Relocates each message file identified by the given id(s) from the
-/// source folder into the target folder.
+/// source folder into the target folder, printing the ids the messages
+/// got there. Every id is looked up first: an unknown one refuses the
+/// whole set, nothing moved. A move within one folder without
+/// `--subdir` changes nothing, the ids kept.
 #[derive(Debug, Parser)]
 pub struct MaildirMessageMoveCommand {
     #[command(flatten)]
@@ -38,18 +41,29 @@ impl MaildirMessageMoveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let source = client.resolve_maildir(&self.source.inner)?;
         let target = client.resolve_maildir(&self.target.inner)?;
+        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let found = client.found_all(&source, &ids)?;
 
-        for id in self.ids.inner.clone() {
-            client.r#move(
+        if source.path() == target.path() && self.subdir.is_none() {
+            let ids = found.into_iter().map(String::from).collect();
+            return printer.out(IdsReceipt {
+                ids,
+                done: "Message(s) successfully moved",
+            });
+        }
+
+        let mut ids = Vec::with_capacity(found.len());
+        for id in found {
+            ids.push(client.r#move(
                 id,
                 source.clone(),
                 target.clone(),
                 self.subdir.clone().map(Into::into),
-            )?;
+            )?);
         }
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner,
+            ids,
             done: "Message(s) successfully moved",
         })
     }

@@ -137,28 +137,17 @@ fn has_attachment(envelope: &Envelope, raw: &[u8]) -> bool {
     !raw.is_empty() && part::has_attachment(&MimeCst::parse(raw))
 }
 
+/// Whether a text or HTML part of the message holds `pattern`, folding
+/// case as the subject does.
 fn body_contains(raw: &[u8], pattern: &str) -> bool {
     let message = MimeCst::parse(raw);
     let lists = message.root.body_lists();
-    let needle = pattern.as_bytes();
+    let needle = pattern.to_lowercase();
 
     lists.text.iter().chain(&lists.html).any(|part| {
         part.text()
-            .is_some_and(|text| contains_ignore_ascii_case(text.as_bytes(), needle))
+            .is_some_and(|text| text.to_lowercase().contains(&needle))
     })
-}
-
-/// Case-insensitive substring search on raw bytes, ASCII semantics.
-fn contains_ignore_ascii_case(haystack: &[u8], needle: &[u8]) -> bool {
-    if needle.is_empty() {
-        return true;
-    }
-    if needle.len() > haystack.len() {
-        return false;
-    }
-    haystack
-        .windows(needle.len())
-        .any(|w| w.eq_ignore_ascii_case(needle))
 }
 
 fn same_day(date: Option<DateTime<FixedOffset>>, target: NaiveDate) -> bool {
@@ -268,6 +257,12 @@ mod tests {
             None,
             &raw,
             &SearchEmailsFilterQuery::Body("absent".into())
+        ));
+        assert!(matches_filter(
+            &env,
+            None,
+            &raw_with_body("Ça va?"),
+            &SearchEmailsFilterQuery::Body("çA".into())
         ));
     }
 

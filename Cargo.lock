@@ -1020,7 +1020,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.3.1"
-source = "git+https://github.com/pimalaya/io-maildir?rev=ab6c2829ea7c05b5dbca0eec5f327faaba7ddc31#ab6c2829ea7c05b5dbca0eec5f327faaba7ddc31"
+source = "git+https://github.com/pimalaya/io-maildir?rev=01552733c853784514578338f0059e28d4277656#01552733c853784514578338f0059e28d4277656"
 dependencies = [
  "gethostname",
  "log",
@@ -1047,8 +1047,7 @@ dependencies = [
 [[package]]
 name = "io-mbox"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a16f63a47571e7f95d804fdce2ea161bbb8cb0017d74192aea99d477d535b915"
+source = "git+https://github.com/pimalaya/io-mbox?rev=161d84fb691d6954d15d7e3739793251f499d05f#161d84fb691d6954d15d7e3739793251f499d05f"
 dependencies = [
  "libc",
  "log",

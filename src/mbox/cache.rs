@@ -24,9 +24,10 @@ use sha2::{Digest, Sha256};
 
 use crate::email::envelope::Envelope;
 
-/// The version of what a cached envelope holds, raised when a message
-/// would now read differently, so an older cache is rebuilt.
-const VERSION: u32 = 1;
+/// The version of what a cached envelope or index holds, raised when a
+/// message would now read or scan differently, so an older cache is
+/// rebuilt.
+const VERSION: u32 = 3;
 
 /// The cached state of one mbox file.
 #[derive(Debug, Default, Deserialize, Serialize)]

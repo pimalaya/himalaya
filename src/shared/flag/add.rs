@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -14,6 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::flag::{Flag, FlagOp},
+    error::message_not_found,
     shared::{
         client::EmailClient,
         flag::arg::{FlagsArg, MessageIdsArg},
@@ -46,7 +47,9 @@ impl FlagAddCommand {
 
         let count = client.store_flags(&mailbox, &ids, &flags, FlagOp::Add)?;
         if count == 0 {
-            bail!("No flag added: no id matched in the mailbox");
+            return Err(message_not_found(
+                "No flag added: no id matched in the mailbox",
+            ));
         }
 
         let queued = client.queues_writes();

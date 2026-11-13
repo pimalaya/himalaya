@@ -41,7 +41,7 @@ impl MailboxListCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mut mailboxes = client.list_mailboxes(self.counts)?;
-        account.apply_role_aliases(&mut mailboxes);
+        account.apply_role_aliases(&mut mailboxes, |alias| client.alias_mailbox_id(alias));
 
         let resolution = client.resolution();
 

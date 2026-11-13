@@ -2,22 +2,21 @@
 //!
 //! The `maildir delete` command, removing a Maildir and its messages.
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    maildir::{
-        arg::RequiredMaildirPathFlag,
-        client::{MaildirClient, validate_maildir_name},
-    },
+    maildir::{arg::RequiredMaildirPathFlag, client::MaildirClient},
     shared::receipt::IdReceipt,
 };
 
 /// Delete a Maildir folder.
 ///
-/// The directory and every message in it go. The target is named
-/// explicitly, with no default, deletion being destructive.
+/// The directory goes, with every message in it and every folder below
+/// it, nested Maildirs included, where `mailbox delete` refuses a
+/// Maildir holding others. The root cannot be deleted. The target is
+/// named explicitly, with no default, deletion being destructive.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxDeleteCommand {
     #[command(flatten)]
@@ -27,16 +26,20 @@ pub struct MaildirMailboxDeleteCommand {
 impl MaildirMailboxDeleteCommand {
     /// Deletes the Maildir and every message in it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
-        validate_maildir_name(&self.maildir_path.inner)?;
+        let maildir = client.resolve_maildir(&self.maildir_path.inner)?;
+        if client.is_root(&maildir) {
+            let path = self.maildir_path.inner.display();
+            bail!("Cannot delete Maildir `{path}`: it is the store root");
+        }
 
         // NOTE: io-maildir resolves a name relative to the store root, so
-        // the bare name goes through: pre-joining the root would look for
-        // the Maildir under a second copy of it.
-        let path = self.maildir_path.inner.to_string_lossy().into_owned();
-        client.delete_maildir(path.clone())?;
+        // the root-relative name goes through: the absolute path would
+        // land under a second copy of the root.
+        let name = client.relative_name(&maildir);
+        client.delete_maildir(name.clone())?;
 
         printer.out(IdReceipt {
-            id: path,
+            id: name,
             done: "Maildir successfully deleted",
         })
     }

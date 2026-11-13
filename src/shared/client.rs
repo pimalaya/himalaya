@@ -763,8 +763,27 @@ impl EmailClient {
             BackendClient::Msgraph(client) => client.resolve_mailbox_id(mailbox),
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.resolve_mailbox_id(mailbox),
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.resolve_mailbox_id(mailbox),
             #[allow(unreachable_patterns)]
             _ => Ok(mailbox.to_string()),
+        }
+    }
+
+    /// The id a role alias names on a backend taking several spellings
+    /// of one mailbox, `None` elsewhere or when it names none.
+    ///
+    /// Only Maildir resolves, locally: the other backends compare the
+    /// alias with the listed ids and names as it is.
+    pub fn alias_mailbox_id(&mut self, alias: &str) -> Option<String> {
+        match self.storage.as_mut()? {
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.resolve_mailbox_id(alias).ok(),
+            #[allow(unreachable_patterns)]
+            _ => {
+                let _ = alias;
+                None
+            }
         }
     }
 

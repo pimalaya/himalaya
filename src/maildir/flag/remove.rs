@@ -20,7 +20,8 @@ use crate::{
 /// Remove Maildir flags from messages.
 ///
 /// Removes the given info flags from the filename of each message
-/// identified by the given id(s).
+/// identified by the given id(s). Every id is looked up first: an unknown
+/// one refuses the whole set, nothing changed.
 #[derive(Debug, Parser)]
 pub struct MaildirFlagRemoveCommand {
     #[command(flatten)]
@@ -41,12 +42,15 @@ impl MaildirFlagRemoveCommand {
 
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        for id in self.ids.inner.clone() {
-            client.remove_flags(maildir.clone(), id, flags.clone())?;
+        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let found = client.found_all(&maildir, &ids)?;
+
+        for id in &found {
+            client.remove_flags(maildir.clone(), *id, flags.clone())?;
         }
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner,
+            ids: found.into_iter().map(String::from).collect(),
             done: "Flag(s) successfully removed",
         })
     }

@@ -19,7 +19,8 @@ use crate::{
 /// Add Maildir flags to messages.
 ///
 /// Appends the given info flags to the filename of each message
-/// identified by the given id(s).
+/// identified by the given id(s). Every id is looked up first: an unknown
+/// one refuses the whole set, nothing changed.
 #[derive(Debug, Parser)]
 pub struct MaildirFlagAddCommand {
     #[command(flatten)]
@@ -40,12 +41,15 @@ impl MaildirFlagAddCommand {
 
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
-        for id in self.ids.inner.clone() {
-            client.add_flags(maildir.clone(), id, flags.clone())?;
+        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let found = client.found_all(&maildir, &ids)?;
+
+        for id in &found {
+            client.add_flags(maildir.clone(), *id, flags.clone())?;
         }
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner,
+            ids: found.into_iter().map(String::from).collect(),
             done: "Flag(s) successfully added",
         })
     }

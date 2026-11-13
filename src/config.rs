@@ -590,6 +590,26 @@ pub struct MaildirConfig {
     /// How custom, non-IANA keywords are read, if at all.
     #[serde(default)]
     pub keywords: MaildirKeywordsConfig,
+    /// How the Maildirs of the store are laid out below the root.
+    #[serde(default)]
+    pub layout: MaildirLayoutConfig,
+}
+
+/// The layout of a Maildir store.
+///
+/// Mirrors io-maildir's `MaildirStore::maildirpp` switch, kept local so
+/// the config schema does not depend on any backend crate.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+pub enum MaildirLayoutConfig {
+    /// One directory per Maildir, nested as the hierarchy is (`a/b`).
+    #[default]
+    #[serde(rename = "fs")]
+    Fs,
+    /// Maildir++, as Dovecot and Courier lay it out: the root is the
+    /// inbox, and every other Maildir a dot-named sibling of its `cur`,
+    /// `new` and `tmp` (`.a.b`).
+    #[serde(rename = "maildir++")]
+    MaildirPlusPlus,
 }
 
 /// mbox configuration: a directory of mbox files, plus the spool.
@@ -1392,6 +1412,24 @@ mod tests {
             config.keywords.header,
             Some(MaildirKeywordHeaderConfig::XLabel)
         );
+    }
+
+    #[test]
+    fn maildir_layout_defaults_to_fs_and_takes_maildir_plus_plus() {
+        let config: MaildirConfig = toml::from_str(r#"root = "/tmp/mail""#).unwrap();
+        assert_eq!(config.layout, MaildirLayoutConfig::Fs);
+
+        let config: MaildirConfig = toml::from_str(
+            r#"
+                root = "/tmp/mail"
+                layout = "maildir++"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.layout, MaildirLayoutConfig::MaildirPlusPlus);
+
+        let bad = toml::from_str::<MaildirConfig>("root = \"/m\"\nlayout = \"flat\"");
+        assert!(bad.is_err());
     }
 
     #[test]
