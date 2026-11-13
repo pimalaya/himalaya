@@ -274,10 +274,15 @@ fn a_call_answers_the_payload_and_refuses_what_it_does_not_take() {
                 "envelope_search",
                 json!({ "query": ["subject", "Hello"] }),
             ),
+            call(
+                5,
+                "envelope_search",
+                json!({ "query": "subject Hello order by date desc" }),
+            ),
         ],
     );
 
-    assert_eq!(responses.len(), 4, "{responses:#?}");
+    assert_eq!(responses.len(), 5, "{responses:#?}");
 
     let envelopes = &responses[0]["result"]["structuredContent"]["envelopes"];
     assert_eq!(envelopes[0]["id"], "m1");
@@ -292,6 +297,9 @@ fn a_call_answers_the_payload_and_refuses_what_it_does_not_take() {
 
     let found = &responses[3]["result"]["structuredContent"]["envelopes"];
     assert_eq!(found[0]["id"], "m1");
+
+    let found = &responses[4]["result"]["structuredContent"]["envelopes"];
+    assert_eq!(found[0]["id"], "m1", "{:#?}", responses[4]);
 }
 
 #[test]
@@ -334,18 +342,17 @@ fn a_path_given_as_a_message_is_not_read_from_disk() {
         )],
     );
 
-    let id = responses[0]["result"]["structuredContent"]["id"]
-        .as_str()
-        .unwrap();
+    // NOTE: the path opens on no header field, so it is refused as a
+    // message rather than read as a file.
+    let refused = &responses[0]["result"];
+    assert_eq!(refused["isError"], true, "{refused}");
+
     let cur = dir.path().join("root/inbox/cur");
     let stored = fs::read_dir(&cur)
         .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .find(|entry| entry.file_name().unwrap().to_string_lossy().starts_with(id))
-        .unwrap();
-    let stored = fs::read_to_string(stored).unwrap();
-
-    assert_eq!(stored, path, "the configuration file was stored instead");
+        .map(|entry| fs::read_to_string(entry.unwrap().path()).unwrap())
+        .any(|stored| stored == path || stored.contains("[accounts"));
+    assert!(!stored, "the path or the file it names was stored");
 }
 
 /// A configuration whose one account holds `blocks` alone.
@@ -380,6 +387,26 @@ fn a_tool_the_account_cannot_serve_is_not_listed() {
         assert!(tool(tools, "message_add").is_none());
         assert!(tool(tools, "message_copy").is_some());
         assert!(tool(tools, "flag_add").is_some());
+    }
+}
+
+/// A composer stays listed on an account that cannot send, without the
+/// `send` argument it could not serve.
+#[test]
+#[cfg(all(feature = "smtp", feature = "maildir"))]
+fn an_argument_the_account_cannot_serve_is_left_out() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("root");
+    fs::create_dir_all(&root).unwrap();
+    let maildir = format!("maildir.root = \"{}\"\n", root.display());
+    let config = account_with(dir.path(), &maildir);
+    let tools = &serve(&config, &["--allow-write", "--allow-send"], &[list(1)])[0];
+
+    for name in ["message_compose", "message_reply", "message_forward"] {
+        let properties = &tool(tools, name).expect(name)["inputSchema"]["properties"];
+        assert!(properties.get("send").is_none(), "{name}: {properties}");
+        assert!(properties.get("no-save").is_none(), "{name}: {properties}");
+        assert!(properties.get("save").is_some(), "{name}: {properties}");
     }
 }
 
@@ -454,9 +481,7 @@ fn the_download_tool_is_listed_read_only_without_its_disk_arguments() {
     assert!(properties.get("dir").is_none(), "{properties:?}");
 
     let id = &properties["attachment-id"];
-    assert_eq!(id["type"], "array");
-    assert_eq!(id["minItems"], 1);
-    assert_eq!(id["maxItems"], 1);
+    assert_eq!(id["type"], "string");
 
     let required = download["inputSchema"]["required"].as_array().unwrap();
     assert!(required.contains(&json!("message-id")), "{required:?}");
@@ -493,7 +518,7 @@ fn an_attachment_is_read_as_an_embedded_resource_and_nothing_is_written() {
         &[call(
             1,
             "attachment_download",
-            json!({ "message-id": "m2", "attachment-id": ["3"] }),
+            json!({ "message-id": "m2", "attachment-id": "3" }),
         )],
     );
 
@@ -548,7 +573,7 @@ fn the_part_uri_names_the_mailbox_as_the_call_does() {
         &[call(
             1,
             "attachment_download",
-            json!({ "mailbox": "inbox", "message-id": "m2", "attachment-id": ["2"] }),
+            json!({ "mailbox": "inbox", "message-id": "m2", "attachment-id": "2" }),
         )],
     );
 

@@ -54,14 +54,19 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
     })
 }
 
-/// Renders a pattern as a KQL value: several words group in parentheses,
-/// a double quote having no way through Graph's own quoting.
+/// Renders a pattern as a KQL value: each word a quoted phrase, escaped
+/// for the `$search` quotes around the whole query, so a word that is KQL
+/// syntax (`OR`, `x:y`, `alpha*`) is matched as a word; several words
+/// group in parentheses. A double quote has no way through.
 fn value_kql(pattern: &str) -> String {
-    let pattern = pattern.replace('"', "");
-    if pattern.contains(char::is_whitespace) {
-        format!("({pattern})")
-    } else {
-        pattern
+    let words: Vec<String> = pattern
+        .split_whitespace()
+        .map(|word| format!("\\\"{}\\\"", word.replace('"', "")))
+        .collect();
+
+    match words.as_slice() {
+        [word] => word.clone(),
+        words => format!("({})", words.join(" ")),
     }
 }
 
@@ -86,7 +91,7 @@ mod tests {
 
         assert_eq!(
             filter_to_search(&filter).unwrap(),
-            "\"(from:alice) AND (NOT (subject:(weekly report)))\""
+            r#""(from:\"alice\") AND (NOT (subject:(\"weekly\" \"report\")))""#
         );
     }
 
@@ -114,16 +119,26 @@ mod tests {
         );
         assert_eq!(
             filter_to_kql(&SearchEmailsFilterQuery::Cc("carol".into())).unwrap(),
-            "cc:carol"
+            r#"cc:\"carol\""#
         );
         assert_eq!(
             filter_to_kql(&SearchEmailsFilterQuery::Address("eve".into())).unwrap(),
-            "participants:eve"
+            r#"participants:\"eve\""#
         );
         assert_eq!(
             filter_to_kql(&SearchEmailsFilterQuery::Attachment).unwrap(),
             "hasAttachments:true"
         );
+    }
+
+    #[test]
+    fn a_word_that_is_kql_syntax_is_matched_as_a_word() {
+        let kql =
+            |pattern: &str| filter_to_kql(&SearchEmailsFilterQuery::From(pattern.into())).unwrap();
+
+        assert_eq!(kql("OR"), r#"from:\"OR\""#);
+        assert_eq!(kql("x:y"), r#"from:\"x:y\""#);
+        assert_eq!(kql("say \"hi\""), r#"from:(\"say\" \"hi\")"#);
     }
 
     #[test]

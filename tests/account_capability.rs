@@ -16,12 +16,13 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// Runs `--json [args] account capability` for an account syncing a
-/// Maildir from JMAP, returning the rows by name.
-fn capabilities(args: &[&str]) -> Vec<Value> {
+/// Maildir from JMAP, its block extended with `extra`, returning the rows
+/// by name.
+fn capabilities(args: &[&str], extra: &str) -> Vec<Value> {
     let dir = TempDir::new().unwrap();
     let config = dir.path().join("config.toml");
     let account = format!(
-        "[accounts.a]\ndefault = true\nemail = \"a@example.org\"\nmaildir.root = \"{}\"\njmap.server = \"https://127.0.0.1:1\"\njmap.auth.bearer.token.command = \"false\"\n",
+        "[accounts.a]\ndefault = true\nemail = \"a@example.org\"\nmaildir.root = \"{}\"\njmap.server = \"https://127.0.0.1:1\"\njmap.auth.bearer.token.command = \"false\"\n{extra}",
         dir.path().join("root").display()
     );
     fs::write(&config, account).unwrap();
@@ -53,10 +54,10 @@ fn row<'a>(rows: &'a [Value], name: &str) -> &'a Value {
 
 #[test]
 fn each_capability_names_the_backend_serving_it() {
-    let rows = capabilities(&[]);
+    let rows = capabilities(&[], "");
 
     assert_eq!(row(&rows, "mailbox.list")["backend"], "maildir");
-    assert_eq!(row(&rows, "flags.important")["level"], "partial");
+    assert_eq!(row(&rows, "flags.important")["level"], "none");
     assert_eq!(row(&rows, "vacation")["backend"], "jmap");
     assert_eq!(row(&rows, "vacation")["level"], "server");
     assert_eq!(row(&rows, "submit")["backend"], Value::Null);
@@ -64,9 +65,19 @@ fn each_capability_names_the_backend_serving_it() {
 
 #[test]
 fn a_backend_filter_shows_the_account_under_it() {
-    let rows = capabilities(&["--backend", "jmap"]);
+    let rows = capabilities(&["--backend", "jmap"], "");
 
     assert_eq!(row(&rows, "mailbox.list")["backend"], "jmap");
     assert_eq!(row(&rows, "mailbox.delete")["level"], "partial");
     assert_eq!(row(&rows, "submit")["backend"], "jmap");
+}
+
+#[test]
+fn a_maildir_keeps_keywords_only_with_dovecot_keywords_on() {
+    let rows = capabilities(&[], "maildir.keywords.header = \"x-keywords\"\n");
+    assert_eq!(row(&rows, "flags.junk")["level"], "none");
+
+    let rows = capabilities(&[], "maildir.keywords.dovecot = true\n");
+    assert_eq!(row(&rows, "flags.important")["level"], "partial");
+    assert_eq!(row(&rows, "flags.junk")["level"], "partial");
 }

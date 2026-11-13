@@ -26,11 +26,10 @@ use crate::{
 /// trailing one is appended when missing. The response is read until
 /// every tagged completion has arrived, possibly out of order.
 ///
-/// Untagged and continuation responses print as events, then the tagged
+/// The text form prints every response as received. Under `--json`,
+/// untagged and continuation responses print as events, then the tagged
 /// completions as the result, each split into its parts. A tagged NO or
 /// BAD is part of the result and exits 2, the server having answered.
-/// Events print to a terminal only in text mode, so redirect `--json`
-/// output to keep them.
 #[derive(Debug, Parser)]
 pub struct ImapRawCommand {
     #[command(flatten)]
@@ -48,21 +47,24 @@ impl ImapRawCommand {
             command.push_str("\r\n");
         }
 
-        let response = client.raw(command.as_bytes())?;
-        let mut completions = Vec::new();
+        let reply = client.raw(command.as_bytes())?;
+        let (events, output) = split_reply(&reply);
 
-        for response in split_responses(&response) {
-            match parse_response(response) {
-                ImapResponse::Completion(completion) => completions.push(completion),
-                ImapResponse::Event(event) => printer.event(event)?,
+        // NOTE: a text event reaches a terminal only, and the untagged
+        // responses are what a raw command asks for, so the text form
+        // prints them within the result instead.
+        if printer.is_json() {
+            for event in events {
+                printer.event(event)?;
             }
         }
 
-        let refused = completions
+        let refused = output
+            .completions
             .iter()
             .any(|completion| completion.status != ImapStatus::Ok);
 
-        printer.out(ImapRawOutput { completions })?;
+        printer.out(output)?;
 
         if refused {
             return Err(PartialOutcome::default().into());
@@ -79,16 +81,38 @@ impl ImapRawCommand {
 pub(crate) struct ImapRawOutput {
     /// One per command sent.
     completions: Vec<ImapCompletion>,
+    /// Every response as received, for the text form.
+    #[serde(skip)]
+    lines: Vec<String>,
 }
 
 impl fmt::Display for ImapRawOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for completion in &self.completions {
-            writeln!(f, "{}", completion.line)?;
+        for line in &self.lines {
+            writeln!(f, "{line}")?;
         }
 
         Ok(())
     }
+}
+
+/// Splits a raw reply into the events printed before the result and the
+/// result.
+fn split_reply(reply: &str) -> (Vec<ImapRawEvent>, ImapRawOutput) {
+    let mut events = Vec::new();
+    let mut completions = Vec::new();
+    let mut lines = Vec::new();
+
+    for response in split_responses(reply) {
+        lines.push(response.to_owned());
+
+        match parse_response(response) {
+            ImapResponse::Completion(completion) => completions.push(completion),
+            ImapResponse::Event(event) => events.push(event),
+        }
+    }
+
+    (events, ImapRawOutput { completions, lines })
 }
 
 /// A tagged completion, split into its parts.
@@ -103,9 +127,6 @@ pub(crate) struct ImapCompletion {
     code: Option<String>,
     /// The human-readable text.
     text: String,
-    /// The line as received, for the text form.
-    #[serde(skip)]
-    line: String,
 }
 
 /// What `imap raw` prints before its result: each response the server
@@ -254,7 +275,6 @@ fn parse_response(response: &str) -> ImapResponse {
         status,
         code,
         text: text.to_owned(),
-        line: response.to_owned(),
     })
 }
 
@@ -262,7 +282,23 @@ fn parse_response(response: &str) -> ImapResponse {
 mod tests {
     use serde_json::json;
 
-    use crate::imap::raw::{ImapResponse, parse_response, split_responses};
+    use crate::imap::raw::{ImapResponse, parse_response, split_reply, split_responses};
+
+    #[test]
+    fn the_text_form_prints_the_untagged_responses() {
+        let reply = "* CAPABILITY IMAP4rev1 SORT\r\n+ go on\r\nA1 OK done\r\n";
+        let (events, output) = split_reply(reply);
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            output.to_string(),
+            "* CAPABILITY IMAP4rev1 SORT\n+ go on\nA1 OK done\n"
+        );
+        assert_eq!(
+            serde_json::to_value(&output).unwrap(),
+            json!({ "completions": [{ "tag": "A1", "status": "OK", "code": null, "text": "done" }] })
+        );
+    }
 
     #[test]
     fn a_literal_stays_in_its_response() {

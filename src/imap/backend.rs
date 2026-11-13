@@ -49,7 +49,7 @@ use crate::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
+        mailbox::{Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level},
         search::{
             error::unsupported,
             filter::query::SearchEmailsFilterQuery,
@@ -92,6 +92,26 @@ impl ImapClient {
         }
 
         Ok(mailboxes)
+    }
+
+    /// Maps a role (`sent`, `trash`...) onto the mailbox whose special-use
+    /// attribute names it, a mailbox literally named so winning; any other
+    /// name passes through without a round trip.
+    pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        match MailboxRole::known(mailbox) {
+            None | Some(MailboxRole::Inbox) => Ok(mailbox.to_string()),
+            Some(_) => MailboxIndex(self.list_mailboxes(false)?).resolve(mailbox),
+        }
+    }
+
+    /// The mailbox carrying `role`, `None` when none does: `INBOX`, else
+    /// the one whose special-use attribute names it.
+    pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
+        if *role == MailboxRole::Inbox {
+            return Ok(Some(String::from("INBOX")));
+        }
+
+        MailboxIndex(self.list_mailboxes(false)?).with_role(role)
     }
 
     /// Lists envelopes most recent first, the whole mailbox when neither
@@ -262,6 +282,10 @@ impl ImapClient {
             },
         )?;
 
+        if data.is_empty() {
+            bail!("Message `{id}` not found in mailbox `{mailbox}`");
+        }
+
         data.into_values()
             .flat_map(|items| items.into_inner().into_iter())
             .find_map(|item| match item {
@@ -414,16 +438,34 @@ impl ImapClient {
     }
 
     /// Creates `name` at the top, or under `parent` joined by the
-    /// delimiter its `LIST` row reports, returning the new mailbox's id,
-    /// its full name.
+    /// server's hierarchy delimiter, returning the new mailbox's id, its
+    /// full name. A NAME holding the delimiter is refused, NAME being one
+    /// level.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        let delimiter = self.delimiter()?;
+        if let Some(delimiter) = delimiter {
+            validate_level(name, delimiter)?;
+        }
+
         let path = match parent {
             None => name.to_string(),
             Some(parent) => {
-                let Some(delimiter) = self.delimiter(parent)? else {
+                let Some(delimiter) = delimiter else {
                     bail!("IMAP mailbox `{parent}` holds no other: the server keeps no hierarchy");
                 };
-                child_path(parent, delimiter, name)
+                // NOTE: the parent is joined as the server spells it, so
+                // `Inbox` nests under the reserved `INBOX`.
+                let Some((parent, holds_others)) = self
+                    .mailbox_rows()?
+                    .into_iter()
+                    .find(|(known, _)| same_name(known, parent))
+                else {
+                    bail!("IMAP mailbox `{parent}` not found");
+                };
+                if !holds_others {
+                    bail!("IMAP mailbox `{parent}` can hold no other (\\Noinferiors)");
+                }
+                child_path(&parent, delimiter, name)
             }
         };
 
@@ -432,64 +474,160 @@ impl ImapClient {
     }
 
     /// Renames the last level of `mailbox` to `name`, its parent kept,
-    /// returning the mailbox's new id, its full name.
+    /// returning the mailbox's new id, its full name. A NAME holding the
+    /// delimiter is refused, NAME being one level.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
-        let path = match self.delimiter(mailbox)? {
-            Some(delimiter) => renamed_path(mailbox, delimiter, name),
+        let path = match self.delimiter()? {
+            Some(delimiter) => {
+                validate_level(name, delimiter)?;
+                renamed_path(mailbox, delimiter, name)
+            }
             None => name.to_string(),
         };
 
-        self.rename(parse_mailbox(mailbox)?, parse_mailbox(&path)?)?;
+        if let Err(err) = self.rename(parse_mailbox(mailbox)?, parse_mailbox(&path)?) {
+            return Err(self.explain(mailbox, err.into(), None));
+        }
+
         Ok(path)
     }
 
     /// Deletes `mailbox` and the messages it holds (RFC 3501 section
     /// 6.3.4).
+    ///
+    /// A server keeping inferior names refuses a mailbox holding others,
+    /// which the error then names rather than the server's own text.
     pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
-        self.delete(parse_mailbox(mailbox)?)?;
-        Ok(())
+        let Err(err) = self.delete(parse_mailbox(mailbox)?) else {
+            return Ok(());
+        };
+
+        let delimiter = self.delimiter().ok().flatten();
+        Err(self.explain(mailbox, err.into(), delimiter))
     }
 
-    /// The hierarchy delimiter of `mailbox` as its `LIST` row reports it,
-    /// `None` for a server keeping a flat namespace.
-    fn delimiter(&mut self, mailbox: &str) -> Result<Option<char>> {
+    /// Replaces the server's refusal of a write on `mailbox` by what the
+    /// mailboxes it lists explain: `mailbox` missing, or holding others
+    /// when `delimiter` is given. The server's error stays otherwise.
+    fn explain(
+        &mut self,
+        mailbox: &str,
+        err: anyhow::Error,
+        delimiter: Option<char>,
+    ) -> anyhow::Error {
+        let Ok(names) = self.mailbox_names() else {
+            return err;
+        };
+
+        if !names.iter().any(|known| same_name(known, mailbox)) {
+            return anyhow!("IMAP mailbox `{mailbox}` not found");
+        }
+
+        let Some(delimiter) = delimiter else {
+            return err;
+        };
+
+        let prefix = format!("{mailbox}{delimiter}");
+        let children: Vec<String> = names
+            .into_iter()
+            .filter(|name| name.starts_with(&prefix))
+            .collect();
+
+        if children.is_empty() {
+            return err;
+        }
+
+        let children = children.join("`, `");
+        anyhow!("Cannot delete IMAP mailbox `{mailbox}`: it holds `{children}`; delete them first")
+    }
+
+    /// The server's hierarchy delimiter, `None` for a flat namespace.
+    ///
+    /// Read from `LIST "" ""` (RFC 3501 section 6.3.8), so no mailbox name
+    /// goes out as a pattern: one is not encoded in modified UTF-7 there,
+    /// and a `*` or `%` in it would match others.
+    fn delimiter(&mut self) -> Result<Option<char>> {
         let reference: ImapMailbox<'static> = ""
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP list reference"))?;
-        let pattern: ListMailbox<'static> = String::from(mailbox)
+        let pattern: ListMailbox<'static> = ""
             .try_into()
-            .map_err(|_| anyhow!("Invalid IMAP mailbox `{mailbox}`"))?;
+            .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
 
-        let Some((_, delimiter, _)) = self.list(reference, pattern)?.into_iter().next() else {
-            bail!("IMAP mailbox `{mailbox}` not found");
-        };
-
+        let rows = self.list(reference, pattern)?;
+        let delimiter = rows
+            .into_iter()
+            .next()
+            .and_then(|(_, delimiter, _)| delimiter);
         Ok(delimiter.map(|delimiter| delimiter.inner()))
     }
 
-    /// Permanently deletes a UID set from the trash, returning whether
-    /// the messages were really removed.
+    /// The full name of every mailbox of the server, the ones that cannot
+    /// be selected included.
+    fn mailbox_names(&mut self) -> Result<Vec<String>> {
+        let rows = self.mailbox_rows()?;
+        Ok(rows.into_iter().map(|(name, _)| name).collect())
+    }
+
+    /// Every mailbox name the server lists, with whether it can hold
+    /// others (no `\Noinferiors`, RFC 3501 section 7.2.2).
+    fn mailbox_rows(&mut self) -> Result<Vec<(String, bool)>> {
+        let reference: ImapMailbox<'static> = ""
+            .try_into()
+            .map_err(|_| anyhow!("Invalid IMAP list reference"))?;
+        let pattern: ListMailbox<'static> = "*"
+            .try_into()
+            .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
+
+        let rows = self
+            .list(reference, pattern)?
+            .into_iter()
+            .map(|(mailbox, _, attrs)| {
+                let name = match mailbox {
+                    ImapMailbox::Inbox => String::from("INBOX"),
+                    ImapMailbox::Other(other) => {
+                        String::from_utf8_lossy(other.inner().as_ref()).into_owned()
+                    }
+                };
+                (name, !attrs.contains(&FlagNameAttribute::Noinferiors))
+            })
+            .collect();
+
+        Ok(rows)
+    }
+
+    /// Permanently deletes a UID set from the trash, returning how many
+    /// of the UIDs the mailbox held and whether they were really removed.
     ///
     /// They are flagged `\Deleted`, then `UID EXPUNGE`d one by one when
     /// the server advertises RFC 4315 UIDPLUS, which leaves every other
-    /// `\Deleted` message alone. Without it they are only flagged.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
+    /// `\Deleted` message alone. Without it they are only flagged. The
+    /// count comes from the STORE echoes, else from a `UID SEARCH UID`
+    /// run before the expunge.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<(usize, bool)> {
         let mbox = parse_mailbox(mailbox)?;
+        let sequence_set = parse_uids(ids)?;
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
-        self.store(
-            parse_uids(ids)?,
+        let echoes = self.store(
+            sequence_set.clone(),
             StoreType::Add,
             vec![ImapFlag::Deleted],
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        if self.supports_uidplus() {
-            self.uid_expunge(parse_uids(ids)?)?;
-            return Ok(true);
+        let count = if echoes.len() >= ids.len() {
+            ids.len()
+        } else {
+            self.present_uids(sequence_set.clone())?.len()
+        };
+
+        if count > 0 && self.supports_uidplus() {
+            self.uid_expunge(sequence_set)?;
+            return Ok((count, true));
         }
 
-        Ok(false)
+        Ok((count, false))
     }
 
     /// The source UIDs a `UID COPY` of `requested` really copied, the
@@ -539,8 +677,21 @@ fn is_selectable(row: &ListRow) -> bool {
 }
 
 /// Converts one `LIST` row into the shared [`Mailbox`] shape.
+///
+/// The role is the reserved `INBOX`, else the first special-use attribute
+/// the row carries (RFC 6154 §2 lets a plain `LIST` return them).
 fn mailbox_from(row: ListRow) -> Mailbox {
-    let role = matches!(row.0, ImapMailbox::Inbox).then_some(MailboxRole::Inbox);
+    let role = match row.0 {
+        ImapMailbox::Inbox => Some(MailboxRole::Inbox),
+        ImapMailbox::Other(_) => {
+            row.2
+                .iter()
+                .find_map(|attr| match MailboxRole::known(&attr.to_string())? {
+                    MailboxRole::Subscribed => None,
+                    role => Some(role),
+                })
+        }
+    };
     let name = match row.0 {
         ImapMailbox::Inbox => "Inbox".to_string(),
         ImapMailbox::Other(other) => String::from_utf8_lossy(other.inner().as_ref()).into_owned(),
@@ -835,6 +986,12 @@ fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
         .map_err(|_| anyhow!("Invalid IMAP mailbox `{name}`"))
 }
 
+/// Whether two full mailbox names name the same mailbox, `INBOX` being
+/// case-insensitive (RFC 3501 section 5.1).
+fn same_name(left: &str, right: &str) -> bool {
+    left == right || (left.eq_ignore_ascii_case("INBOX") && right.eq_ignore_ascii_case("INBOX"))
+}
+
 /// Parses stringified UIDs into an IMAP [`SequenceSet`].
 fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
     let uids = ids
@@ -894,13 +1051,16 @@ fn bytes_to_string(bytes: &[u8]) -> String {
     })
 }
 
-/// The `SEARCH` keys of a shared filter, `ALL` when there is none.
+/// The `SEARCH` keys of a shared filter, `ALL` when there is none, a
+/// root `and` sent as the list of its keys.
 fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKey<'static>>> {
-    let key = match filter {
-        None => SearchKey::All,
-        Some(filter) => convert_filter(filter)?,
-    };
-    Ok(Vec1::from(key))
+    match filter {
+        None => Ok(Vec1::from(SearchKey::All)),
+        Some(filter) => match convert_filter(filter)? {
+            SearchKey::And(keys) => Ok(keys),
+            key => Ok(Vec1::from(key)),
+        },
+    }
 }
 
 /// The `SORT` criteria of a shared sort, `REVERSE DATE` when there is
@@ -917,20 +1077,51 @@ fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
     Vec1::try_from(criteria).expect("non-empty by construction")
 }
 
-/// Translates one shared filter node into an IMAP search key.
+/// Translates a shared filter into an IMAP search key, its negations
+/// pushed down to the single keys.
+///
+/// `NOT` then only ever applies to one non-composite key: iCloud reads
+/// `NOT OR a b` as matching everything and `NOT NOT a` as `NOT a`, and
+/// refuses `NOT (a b)`. The rewrite (De Morgan, double negations
+/// cancelled) means the same on every server.
 fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>> {
+    convert_filter_with(filter, false)
+}
+
+/// Translates `filter`, or its negation when `negated` holds.
+fn convert_filter_with(
+    filter: &SearchEmailsFilterQuery,
+    negated: bool,
+) -> Result<SearchKey<'static>> {
     use SearchEmailsFilterQuery as Q;
 
-    Ok(match filter {
-        Q::And(left, right) => {
-            let keys = vec![convert_filter(left)?, convert_filter(right)?];
-            SearchKey::And(Vec1::try_from(keys).expect("non-empty by construction"))
+    let key = match filter {
+        Q::Not(inner) => return convert_filter_with(inner, !negated),
+        Q::And(left, right) if !negated => {
+            return Ok(and_key(
+                convert_filter_with(left, false)?,
+                convert_filter_with(right, false)?,
+            ));
         }
-        Q::Or(left, right) => SearchKey::Or(
-            Box::new(convert_filter(left)?),
-            Box::new(convert_filter(right)?),
-        ),
-        Q::Not(inner) => SearchKey::Not(Box::new(convert_filter(inner)?)),
+        Q::And(left, right) => {
+            return Ok(SearchKey::Or(
+                Box::new(convert_filter_with(left, true)?),
+                Box::new(convert_filter_with(right, true)?),
+            ));
+        }
+        Q::Or(left, right) if !negated => {
+            return Ok(SearchKey::Or(
+                Box::new(convert_filter_with(left, false)?),
+                Box::new(convert_filter_with(right, false)?),
+            ));
+        }
+        Q::Or(left, right) => {
+            return Ok(and_key(
+                convert_filter_with(left, true)?,
+                convert_filter_with(right, true)?,
+            ));
+        }
+        Q::Address(pattern) => return address_key(pattern, negated),
 
         Q::Date(date) => SearchKey::SentOn(imap_date(*date)?),
 
@@ -949,16 +1140,6 @@ fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>
         Q::To(pattern) => SearchKey::To(astring(pattern)?),
         Q::Cc(pattern) => SearchKey::Cc(astring(pattern)?),
         Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
-        Q::Address(pattern) => SearchKey::Or(
-            Box::new(SearchKey::From(astring(pattern)?)),
-            Box::new(SearchKey::Or(
-                Box::new(SearchKey::To(astring(pattern)?)),
-                Box::new(SearchKey::Or(
-                    Box::new(SearchKey::Cc(astring(pattern)?)),
-                    Box::new(SearchKey::Bcc(astring(pattern)?)),
-                )),
-            )),
-        ),
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
         Q::Attachment => {
@@ -967,19 +1148,69 @@ fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>
                 "IMAP SEARCH has no key for attachments",
             ));
         }
+        Q::Flag(flag) => flag_key(flag)?,
+    };
 
-        Q::Flag(flag) => match flag.iana() {
-            Some(IanaFlag::Seen) => SearchKey::Seen,
-            Some(IanaFlag::Answered) => SearchKey::Answered,
-            Some(IanaFlag::Flagged) => SearchKey::Flagged,
-            Some(IanaFlag::Draft) => SearchKey::Draft,
-            Some(IanaFlag::Deleted) => SearchKey::Deleted,
-            _ => SearchKey::Keyword(
-                Atom::try_from(String::from(flag.raw()))
-                    .map_err(|_| anyhow!("Invalid IMAP keyword `{}`", flag.raw()))?,
-            ),
-        },
-    })
+    if negated {
+        Ok(SearchKey::Not(Box::new(key)))
+    } else {
+        Ok(key)
+    }
+}
+
+/// Joins two keys under `AND`, a side that is an `AND` already giving
+/// its keys rather than a nested list.
+fn and_key(left: SearchKey<'static>, right: SearchKey<'static>) -> SearchKey<'static> {
+    let mut keys = Vec::new();
+
+    for key in [left, right] {
+        match key {
+            SearchKey::And(inner) => keys.extend(inner.into_inner()),
+            key => keys.push(key),
+        }
+    }
+
+    SearchKey::And(Vec1::try_from(keys).expect("non-empty by construction"))
+}
+
+/// The `address` clause: an `OR` of `FROM`, `TO`, `CC` and `BCC`, or
+/// negated, the four negated keys joined by `AND`.
+fn address_key(pattern: &str, negated: bool) -> Result<SearchKey<'static>> {
+    let keys = [
+        SearchKey::From(astring(pattern)?),
+        SearchKey::To(astring(pattern)?),
+        SearchKey::Cc(astring(pattern)?),
+        SearchKey::Bcc(astring(pattern)?),
+    ];
+
+    if negated {
+        let keys = keys.map(|key| SearchKey::Not(Box::new(key)));
+        let keys = Vec1::try_from(Vec::from(keys)).expect("non-empty by construction");
+        return Ok(SearchKey::And(keys));
+    }
+
+    let [from, to, cc, bcc] = keys;
+    let cc_or_bcc = SearchKey::Or(Box::new(cc), Box::new(bcc));
+    let to_or_rest = SearchKey::Or(Box::new(to), Box::new(cc_or_bcc));
+    Ok(SearchKey::Or(Box::new(from), Box::new(to_or_rest)))
+}
+
+/// The key of a `flag` clause, a keyword of the IANA registry going by
+/// its canonical spelling: `flag junk` searches `$Junk`.
+fn flag_key(flag: &Flag) -> Result<SearchKey<'static>> {
+    let raw = match flag.iana() {
+        Some(IanaFlag::Seen) => return Ok(SearchKey::Seen),
+        Some(IanaFlag::Answered) => return Ok(SearchKey::Answered),
+        Some(IanaFlag::Flagged) => return Ok(SearchKey::Flagged),
+        Some(IanaFlag::Draft) => return Ok(SearchKey::Draft),
+        Some(IanaFlag::Deleted) => return Ok(SearchKey::Deleted),
+        Some(iana) => Flag::from_iana(iana).raw().to_owned(),
+        None => flag.raw().to_owned(),
+    };
+
+    let keyword =
+        Atom::try_from(raw.clone()).map_err(|_| anyhow!("Invalid IMAP keyword `{raw}`"))?;
+    Ok(SearchKey::Keyword(keyword))
 }
 
 /// Translates one shared sorter into an IMAP sort criterion.
@@ -1011,7 +1242,16 @@ fn imap_date(date: chrono::NaiveDate) -> Result<ImapNaiveDate> {
 }
 
 /// Slices one page out of the sorted UIDs, keeping their order.
+///
+/// A UID listed twice is kept at its first place: Fastmail can answer a
+/// `SORT` under `OR` and `NOT` with one UID twice.
 fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>) -> Vec<u32> {
+    let mut seen = BTreeSet::new();
+    let uids: Vec<u32> = uids
+        .iter()
+        .map(|uid| uid.get())
+        .filter(|uid| seen.insert(*uid))
+        .collect();
     let total = uids.len();
     let size = page_size.map(|n| n as usize);
     let start = ((page.unwrap_or(1).max(1) - 1) as usize).saturating_mul(size.unwrap_or(0));
@@ -1025,7 +1265,7 @@ fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>)
         None => total,
     };
 
-    uids[start..end].iter().map(|u| u.get()).collect()
+    uids[start..end].to_vec()
 }
 
 /// Reorders a `FETCH` response into the requested UID order, dropping the
@@ -1055,12 +1295,15 @@ fn reorder_envelopes(
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU32;
+
     use chrono::NaiveDate;
     use pimalaya_cli::error::code_of;
 
     use io_imap::{
-        codec::{ResponseCodec, decode::Decoder},
+        codec::{CommandCodec, ResponseCodec, decode::Decoder, encode::Encoder},
         types::{
+            command::{Command, CommandBody},
             core::Atom,
             fetch::MessageDataItem,
             flag::{Flag as ImapFlag, FlagPerm},
@@ -1069,13 +1312,13 @@ mod tests {
     };
 
     use super::{
-        SearchKey, body_structure_has_attachment, convert_filter, envelope_from,
-        parse_rfc2822_date, refuse_impermanent,
+        SearchKey, body_structure_has_attachment, convert_filter, envelope_from, paginate_uids,
+        parse_rfc2822_date, refuse_impermanent, search_keys,
     };
     use crate::{
         email::{
             flag::{Flag, IanaFlag},
-            search::filter::query::SearchEmailsFilterQuery,
+            search::{filter::query::SearchEmailsFilterQuery, query::SearchEmailsQuery},
         },
         error::ErrorCode,
     };
@@ -1109,6 +1352,67 @@ mod tests {
             SearchKey::Cc(_)
         ));
         assert!(matches!(address, SearchKey::Or(..)));
+    }
+
+    /// The `UID SEARCH` line a query's filter is sent as.
+    fn search_line(query: &str) -> String {
+        let query: SearchEmailsQuery = query.parse().unwrap();
+        let criteria = search_keys(query.filter.as_ref()).unwrap();
+        let body = CommandBody::Search {
+            charset: None,
+            criteria,
+            uid: true,
+        };
+        let command = Command::new("A", body).unwrap();
+        let bytes = CommandCodec::default().encode(&command).dump();
+        String::from_utf8(bytes).unwrap().trim_end().to_owned()
+    }
+
+    #[test]
+    fn negations_reach_single_keys_only() {
+        assert_eq!(
+            search_line("not (from alice or from bob)"),
+            "A UID SEARCH NOT FROM alice NOT FROM bob",
+        );
+        assert_eq!(search_line("not not from alice"), "A UID SEARCH FROM alice");
+        assert_eq!(
+            search_line("not (from alice and flag flagged)"),
+            "A UID SEARCH OR NOT FROM alice NOT FLAGGED",
+        );
+        assert_eq!(
+            search_line("not address eve"),
+            "A UID SEARCH NOT FROM eve NOT TO eve NOT CC eve NOT BCC eve",
+        );
+        assert_eq!(
+            search_line("address eve"),
+            "A UID SEARCH OR FROM eve OR TO eve OR CC eve BCC eve",
+        );
+        assert_eq!(
+            search_line("from a and not (subject b or not (to c and cc d))"),
+            "A UID SEARCH FROM a NOT SUBJECT b TO c CC d",
+        );
+    }
+
+    #[test]
+    fn a_uid_the_server_sorts_twice_is_listed_once() {
+        let uids = [1, 1, 7, 3, 1].map(|uid| NonZeroU32::new(uid).unwrap());
+
+        assert_eq!(paginate_uids(&uids, Some(1), Some(2)), [1, 7]);
+        assert_eq!(paginate_uids(&uids, Some(2), Some(2)), [3]);
+    }
+
+    #[test]
+    fn a_registry_keyword_is_searched_by_its_canonical_spelling() {
+        assert_eq!(
+            search_line("flag important"),
+            "A UID SEARCH KEYWORD $Important"
+        );
+        assert_eq!(search_line("flag junk"), "A UID SEARCH KEYWORD $Junk");
+        assert_eq!(
+            search_line("flag Forwarded"),
+            "A UID SEARCH KEYWORD $Forwarded"
+        );
+        assert_eq!(search_line("flag custom"), "A UID SEARCH KEYWORD custom");
     }
 
     #[test]
@@ -1581,5 +1885,84 @@ mod tests {
             assert_eq!(run(UIDPLUS, &[1], valid, copy(&["999"])).0, 0);
             assert_eq!(run(PLAIN, &[1], none, copy(&["1", "999"])).0, 1);
         }
+
+        #[test]
+        fn a_trash_delete_counts_the_messages_present() {
+            let delete = |ids: &'static [&'static str]| {
+                move |client: &mut ImapClient| {
+                    let (count, _) = client.delete_messages("INBOX", ids)?;
+                    Ok(count)
+                }
+            };
+
+            let (count, commands) = run(UIDPLUS, &[1], none, delete(&["1", "999"]));
+            assert_eq!(count, 1);
+            assert!(has(&commands, "UID SEARCH UID 1,999"), "{commands:?}");
+            assert!(has(&commands, "UID EXPUNGE 1,999"), "{commands:?}");
+
+            let (count, commands) = run(UIDPLUS, &[1], none, delete(&["999"]));
+            assert_eq!(count, 0);
+            assert!(!has(&commands, "UID EXPUNGE"), "{commands:?}");
+
+            assert_eq!(run(PLAIN, &[1], none, delete(&["999"])).0, 0);
+        }
+
+        #[test]
+        fn reading_an_unknown_id_names_it_and_the_mailbox() {
+            let (server, handle) = serve(PLAIN, vec![1], none);
+            let mut client = client(&server);
+            let err = client.get_message("INBOX", "999", false).unwrap_err();
+            drop(client);
+            handle.join().unwrap();
+
+            let expected = "Message `999` not found in mailbox `INBOX`";
+            assert_eq!(err.to_string(), expected);
+        }
+
+        #[test]
+        fn thread_support_follows_the_advertised_algorithms() {
+            use io_imap::types::extensions::thread::ThreadingAlgorithm;
+
+            let (server, handle) = serve("IMAP4rev1 THREAD=REFERENCES", Vec::new(), none);
+            let client = client(&server);
+            let references = client.supports_thread(&ThreadingAlgorithm::References);
+            let subject = client.supports_thread(&ThreadingAlgorithm::OrderedSubject);
+            drop(client);
+            handle.join().unwrap();
+
+            assert!(references);
+            assert!(!subject);
+        }
+    }
+
+    /// A plain `LIST` row carrying a special-use attribute gives its role,
+    /// `INBOX` its own, and the other attributes none.
+    #[test]
+    fn a_special_use_attribute_gives_the_role() {
+        use io_imap::types::{flag::FlagNameAttribute, mailbox::Mailbox as ImapMailbox};
+
+        use crate::email::mailbox::MailboxRole;
+
+        let row = |name: &str, attrs: &[&str]| {
+            let attrs = attrs
+                .iter()
+                .map(|attr| FlagNameAttribute::from(Atom::try_from(attr.to_string()).unwrap()))
+                .collect();
+            (
+                ImapMailbox::try_from(name.to_string()).unwrap(),
+                None,
+                attrs,
+            )
+        };
+
+        let role = |name, attrs| super::mailbox_from(row(name, attrs)).role;
+
+        assert_eq!(role("INBOX", &[]), Some(MailboxRole::Inbox));
+        assert_eq!(
+            role("Deleted Messages", &["HasNoChildren", "Trash"]),
+            Some(MailboxRole::Trash)
+        );
+        assert_eq!(role("Sent Messages", &["Sent"]), Some(MailboxRole::Sent));
+        assert_eq!(role("Lists", &["HasChildren", "Subscribed"]), None);
     }
 }

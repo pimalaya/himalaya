@@ -27,15 +27,17 @@ use crate::{
         base64,
         client::EmailClient,
         mailbox::arg::MailboxArg,
-        message::part,
+        message::part::{self, PartRole},
     },
 };
 
 /// Download the attachments of one message to disk.
 ///
 /// An attachment id is the MIME part position `attachment list` and
-/// `message read` report, inline parts included. A name colliding with an
-/// existing file is suffixed rather than overwriting it.
+/// `message read` report, inline parts included. Without an id, the parts
+/// `attachment list` lists are written: the inline ones only with
+/// `--inline`. A name colliding with an existing file is suffixed rather
+/// than overwriting it.
 ///
 /// `--stdout` writes the decoded bytes of one part to the standard output
 /// instead, and touches no file.
@@ -50,6 +52,10 @@ pub struct AttachmentDownloadCommand {
     /// is given.
     #[arg(value_name = "ATTACHMENT-ID", num_args = 0..)]
     pub attachment_ids: Vec<String>,
+    /// Also write the parts carrying `Content-Disposition: inline` when no
+    /// id is given, as `attachment list --inline` lists them.
+    #[arg(long, short)]
+    pub inline: bool,
     /// Destination directory, overriding the configured `downloads-dir`.
     #[arg(long, short, value_name = "PATH", conflicts_with = "stdout")]
     pub dir: Option<PathBuf>,
@@ -109,6 +115,10 @@ impl AttachmentDownloadCommand {
 
         for mut attachment in list::attachments(&message) {
             if !wanted_all && !remaining.remove(&attachment.id) {
+                continue;
+            }
+
+            if wanted_all && !self.inline && attachment.role == PartRole::Inline {
                 continue;
             }
 

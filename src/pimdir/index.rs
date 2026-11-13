@@ -377,7 +377,9 @@ fn refusal_report(query: &str, err: &PimdirQueryError) -> String {
 
     let mut buf = Vec::new();
     let _ = report.finish().write((name, Source::from(query)), &mut buf);
-    String::from_utf8_lossy(&buf).into_owned()
+
+    // NOTE: the report heads itself `Error:`, which the printer adds too.
+    String::from_utf8_lossy(&buf).replacen("Error: ", "", 1)
 }
 
 /// One page of hits.

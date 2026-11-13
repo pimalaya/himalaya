@@ -37,6 +37,6 @@ pub struct MessageIdArg {
 pub struct MessageIdsArg {
     /// Identifier(s) of message(s).
     #[arg(name = "message_ids", value_name = "ID")]
-    #[arg(num_args = 1..)]
+    #[arg(num_args = 1.., required = true)]
     pub inner: Vec<String>,
 }

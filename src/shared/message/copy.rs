@@ -26,13 +26,11 @@ use crate::{
 pub struct MessageCopyCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
-    /// Source mailbox name or alias, the `inbox` alias when omitted.
-    ///
-    /// The command errors when neither is given, the shared layer having
-    /// no way to guess a backend's inbox id.
+    /// Source mailbox name, alias, role or backend-native id, the inbox
+    /// when omitted: the `inbox` alias, else the backend's inbox role.
     #[arg(long = "from", short = 'f', value_name = "NAME")]
     pub from: Option<String>,
-    /// Destination mailbox name or alias.
+    /// Destination mailbox name, alias, role or backend-native id.
     #[arg(long = "to", short = 't', value_name = "NAME")]
     pub to: String,
 }
@@ -47,7 +45,7 @@ impl MessageCopyCommand {
     ) -> Result<()> {
         let from = resolve_mailbox_or_default(account, self.from.as_deref());
         let to = account.resolve_mailbox(&self.to).to_owned();
-        let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        let ids = self.ids.ids();
         let count = client.copy_messages(&from, &to, &ids)?;
         if count == 0 {
             bail!("No message copied: no id matched in the source mailbox");

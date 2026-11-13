@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -13,6 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    capability::{self, Capability},
     email::mailbox::MailboxRole,
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
@@ -42,15 +43,14 @@ impl MessageDeleteCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
+        let ids = self.message_ids.ids();
 
         let trash = match account.mailbox_alias.get("trash") {
             Some(trash) => trash.clone(),
-            None => client.role_mailbox_id(&MailboxRole::Trash)?.ok_or_else(|| {
-                anyhow!(
-                    "Cannot determine the trash mailbox; set `mailbox.alias.trash` in your config"
-                )
-            })?,
+            None => match client.role_mailbox_id(&MailboxRole::Trash)? {
+                Some(trash) => trash,
+                None => return Err(no_trash(client)),
+            },
         };
 
         // NOTE: `resolve_mailbox_id` is idempotent, so the comparison holds
@@ -60,12 +60,16 @@ impl MessageDeleteCommand {
 
         let queued = client.queues_writes();
         let report = if current_id == trash_id {
-            let count = ids.len();
-            if client.delete_messages(&current_id, &ids)? {
-                MessageDeleteOutput::new(DeleteAction::Deleted, count, queued)
-            } else {
-                MessageDeleteOutput::new(DeleteAction::Flagged, count, queued)
+            let (count, removed) = client.delete_messages(&current_id, &ids)?;
+            if count == 0 {
+                bail!("No message deleted: no id matched in the mailbox");
             }
+            let action = if removed {
+                DeleteAction::Deleted
+            } else {
+                DeleteAction::Flagged
+            };
+            MessageDeleteOutput::new(action, count, queued)
         } else {
             let moved = client.move_messages(&current_id, &trash_id, &ids)?;
             if moved == 0 {
@@ -76,6 +80,21 @@ impl MessageDeleteCommand {
 
         printer.out(report)
     }
+}
+
+/// The refusal of a delete on an account with no trash: neither
+/// `mailbox.alias.trash` nor a mailbox the backend marks as the trash.
+fn no_trash(client: &EmailClient) -> anyhow::Error {
+    let resolution = client.resolution();
+    let account = &resolution.account;
+    let backend = match resolution.transport(Capability::MessageTrash) {
+        Some(backend) => format!(" over {backend}"),
+        None => String::new(),
+    };
+    let capability = Capability::MessageTrash;
+    capability::missing(format!(
+        "Account `{account}` cannot `{capability}`{backend}: no mailbox is marked as the trash; set `mailbox.alias.trash`"
+    ))
 }
 
 /// The `message delete` output: what was done, and to how many messages.

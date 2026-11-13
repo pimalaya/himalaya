@@ -14,7 +14,7 @@ use io_imap::{
     client::{ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
     has_imap_capability,
     session::ImapSessionOpenOptions,
-    types::response::Capability,
+    types::{extensions::thread::ThreadingAlgorithm, response::Capability},
 };
 use io_sasl::mechanism::Sasl;
 use pimalaya_config::secret::SecretResolver;
@@ -78,11 +78,11 @@ impl ImapClient {
     /// Whether to sort client-side with SEARCH and FETCH rather than
     /// issue a server `SORT`.
     ///
-    /// `imap.sort.fallback` decides when it is set, and the absence of
-    /// the SORT capability otherwise.
+    /// `imap.sort.fallback` decides when it is set, and otherwise
+    /// [`default_sort_fallback`] over the advertised capabilities.
     pub fn sort_fallback(&self) -> bool {
         self.sort_fallback
-            .unwrap_or_else(|| !has_imap_capability!(self.capabilities, Sort(_)))
+            .unwrap_or_else(|| default_sort_fallback(&self.capabilities))
     }
 
     /// Whether the server advertised RFC 4315 UIDPLUS.
@@ -98,6 +98,30 @@ impl ImapClient {
     pub fn supports_move(&self) -> bool {
         has_imap_capability!(self.capabilities, Move)
     }
+
+    /// Whether the server advertised RFC 5256 THREAD with `algorithm`.
+    pub fn supports_thread(&self, algorithm: &ThreadingAlgorithm<'_>) -> bool {
+        self.capabilities.iter().any(|capability| {
+            matches!(capability, Capability::Thread(advertised) if advertised == algorithm)
+        })
+    }
+}
+
+/// Whether to sort client-side when `imap.sort.fallback` is unset: the
+/// server lacks SORT, or it is iCloud, whose SORT ignores its keys and
+/// `REVERSE`.
+///
+/// iCloud is told by its `X-APPLE-REMOTE-LINKS` capability, which holds
+/// behind a proxy and on every `*.mail.me.com` host.
+fn default_sort_fallback(capabilities: &[Capability<'_>]) -> bool {
+    let icloud = capabilities.iter().any(|capability| {
+        matches!(capability, Capability::Other(_))
+            && capability
+                .to_string()
+                .eq_ignore_ascii_case("X-APPLE-REMOTE-LINKS")
+    });
+
+    icloud || !has_imap_capability!(capabilities, Sort(_))
 }
 
 /// Parses an IMAP server string into a URL.
@@ -142,4 +166,38 @@ pub fn build_imap_client(
     };
     let client = ImapClient::new(imap_config)?;
     Ok((account, client))
+}
+
+#[cfg(test)]
+mod tests {
+    use io_imap::types::response::Capability;
+
+    use crate::imap::client::default_sort_fallback;
+
+    fn capabilities(line: &str) -> Vec<Capability<'static>> {
+        line.split(' ')
+            .map(|atom| Capability::try_from(atom.to_owned()).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn icloud_sorts_on_the_client_though_it_advertises_sort() {
+        // NOTE: iCloud's CAPABILITY line as of 2026-11-12.
+        let icloud = capabilities(
+            "XAPPLEPUSHSERVICE IMAP4 IMAP4rev1 CONDSTORE ENABLE QRESYNC QUOTA \
+             XAPPLELITERAL NAMESPACE UIDPLUS UNSELECT SORT ESEARCH ESORT \
+             CONTEXT=SORT WITHIN SASL-IR ID IDLE X-APPLE-REMOTE-LINKS LIST-STATUS",
+        );
+
+        assert!(default_sort_fallback(&icloud));
+    }
+
+    #[test]
+    fn a_server_sorts_when_it_advertises_sort() {
+        let fastmail = capabilities("IMAP4rev1 SORT SORT=DISPLAY XAPPLEPUSHSERVICE");
+        let bare = capabilities("IMAP4rev1 IDLE");
+
+        assert!(!default_sort_fallback(&fastmail));
+        assert!(default_sort_fallback(&bare));
+    }
 }

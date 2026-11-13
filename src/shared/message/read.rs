@@ -10,13 +10,9 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::{
-    header::marker::{CC, DATE, FROM, IN_REPLY_TO, MESSAGE_ID, REFERENCES, TO},
+    header::marker::{DATE, IN_REPLY_TO, MESSAGE_ID, REFERENCES},
     tree::{cst::MimeCst, entity::MimeEntity},
-    value::{
-        address::{MimeAddressList, MimeMailbox},
-        content_type::MimeParam,
-        datetime::MimeDateTime,
-    },
+    value::{content_type::MimeParam, datetime::MimeDateTime},
 };
 use pimalaya_cli::{fields::Fields, output::Bytes, printer::Printer, sanitize};
 use schemars::JsonSchema;
@@ -528,14 +524,10 @@ impl fmt::Display for MessageView {
         if let Some(date) = root.header::<DATE>() {
             headers.push("Date", date);
         }
-        if let Some(from) = root.header::<FROM>() {
-            headers.push("From", sanitize::text(&format_address(&from)));
-        }
-        if let Some(to) = root.header::<TO>() {
-            headers.push("To", sanitize::text(&format_address(&to)));
-        }
-        if let Some(cc) = root.header::<CC>() {
-            headers.push("Cc", sanitize::text(&format_address(&cc)));
+        for name in ["From", "To", "Cc"] {
+            if let Some(line) = address_line(root, name) {
+                headers.push(name, sanitize::text(&line));
+            }
         }
         if let Some(subject) = header::unstructured(root, "Subject") {
             headers.push("Subject", sanitize::text(&subject));
@@ -649,32 +641,46 @@ fn render_part_headers(f: &mut fmt::Formatter<'_>, part: &MimeEntity) -> fmt::Re
     Ok(())
 }
 
+/// A parameter value as RFC 2045 writes it: a token as it is, anything
+/// else quoted, so a `;` or `=` it holds reads as part of it.
+fn param_value(value: &str) -> String {
+    let tspecial = |c: char| "()<>@,;:\\\"/[]?= ".contains(c);
+
+    if !value.is_empty() && value.chars().all(|c| c.is_ascii_graphic() && !tspecial(c)) {
+        return value.to_owned();
+    }
+
+    let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{escaped}\"")
+}
+
 /// Formats a `Content-Type` or `Content-Disposition` value, parameters
 /// included.
 fn format_params(value: &str, params: &[MimeParam]) -> String {
     let mut rendered = value.to_owned();
 
     for param in params {
-        rendered.push_str(&format!("; {}={}", param.name, param.value));
+        rendered.push_str(&format!("; {}={}", param.name, param_value(&param.value)));
     }
 
     rendered
 }
 
-/// Renders an address header as a comma-separated list, flattening any
-/// address group.
-fn format_address(address: &MimeAddressList) -> String {
-    let addrs: Vec<String> = address.mailboxes().map(format_addr).collect();
-    addrs.join(", ")
-}
+/// An address header read as the JSON view reads it, its addresses as
+/// `Name <email>` then the entries unreadable as one; `None` when it holds
+/// neither.
+fn address_line(entity: &MimeEntity, name: &str) -> Option<String> {
+    let (valid, invalid) = addresses(entity, name);
+    let valid = valid.into_iter().map(|address| match address.name {
+        Some(name) => format!("{name} <{}>", address.email),
+        None => address.email,
+    });
+    let invalid = invalid
+        .into_iter()
+        .map(|entry| format!("(unreadable: {entry})"));
+    let entries: Vec<String> = valid.chain(invalid).collect();
 
-/// Formats one address as `Name <addr>`, or bare when it has no name.
-fn format_addr(mailbox: &MimeMailbox) -> String {
-    let email = mailbox.address.as_deref().unwrap_or_default();
-    match mailbox.name.as_deref() {
-        Some(name) if !name.is_empty() => format!("{name} <{email}>"),
-        _ => email.to_owned(),
-    }
+    (!entries.is_empty()).then(|| entries.join(", "))
 }
 
 #[cfg(test)]
@@ -685,6 +691,16 @@ mod tests {
 
     fn render(raw: &[u8]) -> String {
         MessageReadOutput::new(part::parse(raw).expect("parse")).to_string()
+    }
+
+    /// A parameter value holding a blank, `;` or `=` prints quoted, so it
+    /// cannot read as further parameters.
+    #[test]
+    fn a_parameter_value_that_is_no_token_is_quoted() {
+        assert_eq!(param_value("report.pdf"), "report.pdf");
+        assert_eq!(param_value("résumé été.pdf"), "\"résumé été.pdf\"");
+        assert_eq!(param_value("a;b=\"c\""), "\"a;b=\\\"c\\\"\"");
+        assert_eq!(param_value(""), "\"\"");
     }
 
     #[test]
@@ -924,6 +940,27 @@ mod tests {
         assert_eq!(
             json["headers"]["to"],
             serde_json::json!([{ "name": "\u{c9}lodie", "email": "elodie@example.com" }])
+        );
+    }
+
+    #[test]
+    fn text_view_shows_unreadable_address_entries_as_the_json_view_lists_them() {
+        let raw = b"From: not an address\r\nTo: ,,, <>\r\nCc: Bob <bob@example.com>, nobody\r\n\r\nbody\r\n";
+        let out = render(raw);
+        let line = |name: &str| {
+            out.lines()
+                .find(|line| line.starts_with(name))
+                .map(|line| line[name.len()..].trim().to_owned())
+        };
+
+        assert_eq!(
+            line("From:").as_deref(),
+            Some("(unreadable: not an address)")
+        );
+        assert_eq!(line("To:").as_deref(), Some("(unreadable: <>)"));
+        assert_eq!(
+            line("Cc:").as_deref(),
+            Some("Bob <bob@example.com>, (unreadable: nobody)")
         );
     }
 

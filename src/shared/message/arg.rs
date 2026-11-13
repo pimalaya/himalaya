@@ -27,7 +27,11 @@ use crate::{error::ErrorCode, mcp, shared::crlf};
 pub struct MessageArg {
     /// A path to a file, the message itself, or the standard input when
     /// piped.
-    #[arg(name = "message-raw", value_name = "MESSAGE", raw = true)]
+    ///
+    /// It comes last, every word after it taken as part of it: put it
+    /// after `--` when it opens on a hyphen.
+    #[arg(name = "message-raw", value_name = "MESSAGE")]
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub raw: Vec<String>,
 }
 
@@ -69,6 +73,16 @@ impl MessageArg {
                 return Ok(crlf::normalize(&contents));
             }
 
+            // NOTE: a mistyped path would otherwise be stored as a message
+            // made of that path alone.
+            if !opens_on_a_field(&mime) {
+                if mcp::paths_closed() {
+                    bail!("The message opens on no header field");
+                }
+
+                bail!("No file at `{mime}`, nor a header field opening a message");
+            }
+
             return Ok(crlf::normalize(mime.as_bytes()));
         }
 
@@ -83,5 +97,37 @@ impl MessageArg {
         }
 
         bail!("No message provided: pass it as an argument, a file path, or via stdin");
+    }
+}
+
+/// Whether an inline message opens on a header field, a name of printable
+/// ASCII then a colon (RFC 5322 §2.2).
+fn opens_on_a_field(message: &str) -> bool {
+    let Some((name, _)) = message.split_once(':') else {
+        return false;
+    };
+
+    !name.is_empty() && name.bytes().all(|b| b.is_ascii_graphic())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::shared::message::arg::MessageArg;
+
+    fn arg(raw: &str) -> MessageArg {
+        MessageArg {
+            raw: vec![String::from(raw)],
+        }
+    }
+
+    /// A value naming no file is a message only when it opens on a header
+    /// field, so a mistyped path is refused instead of stored.
+    #[test]
+    fn a_missing_path_is_not_a_message() {
+        let err = arg("/nonexistent/file.eml").parse().unwrap_err();
+        assert!(err.to_string().contains("No file at"), "{err}");
+
+        let message = arg("Subject: hi\\n\\nbody").parse().unwrap();
+        assert_eq!(message, b"Subject: hi\r\n\r\nbody");
     }
 }

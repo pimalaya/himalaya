@@ -41,11 +41,11 @@ impl MailboxCreateCommand {
             .as_deref()
             .map(|parent| account.resolve_mailbox(parent).to_string());
 
-        let id = client.create_mailbox(&self.name, parent.as_deref())?;
+        let (id, name) = client.create_mailbox(&self.name, parent.as_deref())?;
 
         printer.out(MailboxCreateOutput {
             id,
-            name: self.name,
+            name,
             queued: client.queues_writes(),
         })
     }
@@ -58,7 +58,8 @@ pub struct MailboxCreateOutput {
     /// The new mailbox's id, `null` when the backend queued the creation
     /// for its sync engine, the id arriving with the sync.
     pub id: Option<String>,
-    /// The name it was created with.
+    /// Its full name, the parent's path joined where the backend names
+    /// the hierarchy by path.
     pub name: String,
     /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,

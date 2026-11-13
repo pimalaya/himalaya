@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-/// Manage MAILDIR flags.
+/// Manage Maildir flags.
 ///
 /// A flag is an info code stored in the message filename (the part
 /// after `:2,`, e.g. FRST). This subcommand manages them.

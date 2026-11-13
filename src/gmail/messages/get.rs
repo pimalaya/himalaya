@@ -14,11 +14,17 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    gmail::{client::GmailClient, format::FormatArg},
+    gmail::{
+        client::GmailClient,
+        format::{FormatArg, snippet_text},
+    },
     shared::output::write_bytes_or_save,
 };
 
 /// Get a single Gmail message (users.messages.get).
+///
+/// Under `--format full`, JSON carries the MIME payload, bodies and
+/// attachment ids included, and the text lists the parts.
 #[derive(Debug, Parser)]
 pub struct GmailMessageGetCommand {
     /// The id of the message to get.
@@ -59,16 +65,15 @@ impl GmailMessageGetCommand {
             snippet: msg.snippet,
             size_estimate: msg.size_estimate,
             internal_date: msg.internal_date,
-            headers: message_headers(msg.payload, &hs),
+            headers: message_headers(msg.payload.clone(), &hs),
+            payload: msg.payload.filter(|_| format == GmailMessageFormat::Full),
         })
     }
 }
 
-/// The `gmail messages get` output, the metadata of one message.
-///
-/// The whole resource is never exposed: a full-format payload is a
-/// recursive MIME tree of base64 bodies, which belongs on the raw path.
-/// `--format raw` and `attachments get` are how a body is reached.
+/// The `gmail messages get` output, the metadata of one message, and its
+/// MIME payload under `--format full`: the parts, their bodies and the
+/// attachment ids `gmail attachments get` takes, keys in Gmail's spelling.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailMessageGetOutput {
@@ -79,6 +84,7 @@ pub(crate) struct GmailMessageGetOutput {
     size_estimate: Option<u64>,
     internal_date: Option<String>,
     headers: Vec<GmailMessageHeaderOutput>,
+    payload: Option<GmailMessagePayload>,
 }
 
 impl fmt::Display for GmailMessageGetOutput {
@@ -92,7 +98,7 @@ impl fmt::Display for GmailMessageGetOutput {
             fields.push("Labels", sanitize::text(&self.label_ids.join(", ")));
         }
         if let Some(snippet) = &self.snippet {
-            fields.push("Snippet", sanitize::text(snippet));
+            fields.push("Snippet", sanitize::text(&snippet_text(snippet)));
         }
         if let Some(size) = self.size_estimate {
             fields.push("Size", size);
@@ -105,8 +111,44 @@ impl fmt::Display for GmailMessageGetOutput {
             fields.push(&header.name, sanitize::text(&header.value));
         }
 
+        let parts = self.payload.as_ref().map(leaf_parts).unwrap_or_default();
+        for (label, value) in &parts {
+            fields.push(label, value);
+        }
+
         write!(f, "{fields}")
     }
+}
+
+/// The `(label, value)` rows of the leaf parts of a payload, in order:
+/// the part id, then its MIME type, file name, size and the attachment id
+/// `gmail attachments get` takes.
+fn leaf_parts(payload: &GmailMessagePayload) -> Vec<(String, String)> {
+    if !payload.parts.is_empty() {
+        return payload.parts.iter().flat_map(leaf_parts).collect();
+    }
+
+    let label = match payload.part_id.as_deref() {
+        Some(id) if !id.is_empty() => format!("Part {}", sanitize::text(id)),
+        _ => String::from("Part"),
+    };
+
+    let mime_type = payload
+        .mime_type
+        .as_deref()
+        .unwrap_or("application/octet-stream");
+    let mut value = vec![sanitize::text(mime_type).to_string()];
+    if !payload.filename.is_empty() {
+        value.push(format!("\"{}\"", sanitize::text(&payload.filename)));
+    }
+    if let Some(body) = &payload.body {
+        value.push(format!("{} bytes", body.size));
+        if let Some(id) = &body.attachment_id {
+            value.push(format!("attachment {}", sanitize::text(id)));
+        }
+    }
+
+    vec![(label, value.join(", "))]
 }
 
 /// One RFC 5322 header of a Gmail message.
@@ -161,9 +203,11 @@ pub(crate) fn message_headers(
 
 #[cfg(test)]
 mod tests {
-    use io_gmail::v1::rest::messages::{GmailMessageHeader, GmailMessagePayload};
+    use io_gmail::v1::rest::messages::{
+        GmailMessageHeader, GmailMessagePartBody, GmailMessagePayload,
+    };
 
-    use super::message_headers;
+    use super::{GmailMessageGetOutput, message_headers};
 
     fn payload(headers: &[(&str, &str)]) -> Option<GmailMessagePayload> {
         Some(GmailMessagePayload {
@@ -211,5 +255,49 @@ mod tests {
     #[test]
     fn a_payload_less_message_has_no_header() {
         assert!(message_headers(None, &["Subject"]).is_empty());
+    }
+
+    #[test]
+    fn a_full_message_shows_its_parts_and_attachment_ids() {
+        let part =
+            |id: &str, mime: &str, filename: &str, attachment: Option<&str>| GmailMessagePayload {
+                part_id: Some(id.into()),
+                mime_type: Some(mime.into()),
+                filename: filename.into(),
+                body: Some(GmailMessagePartBody {
+                    attachment_id: attachment.map(Into::into),
+                    size: 12,
+                    data: None,
+                }),
+                ..Default::default()
+            };
+        let payload = GmailMessagePayload {
+            mime_type: Some("multipart/mixed".into()),
+            parts: vec![
+                part("0", "text/plain", "", None),
+                part("1", "image/png", "logo.png", Some("ANGj")),
+            ],
+            ..Default::default()
+        };
+        let output = GmailMessageGetOutput {
+            id: "m1".into(),
+            thread_id: None,
+            label_ids: Vec::new(),
+            snippet: None,
+            size_estimate: None,
+            internal_date: None,
+            headers: Vec::new(),
+            payload: Some(payload),
+        };
+
+        let text = output.to_string();
+        assert!(text.contains("text/plain, 12 bytes"), "{text}");
+        assert!(
+            text.contains("image/png, \"logo.png\", 12 bytes, attachment ANGj"),
+            "{text}"
+        );
+
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["payload"]["parts"][1]["body"]["attachmentId"], "ANGj");
     }
 }

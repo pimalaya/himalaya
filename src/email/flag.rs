@@ -108,6 +108,7 @@ impl Flag {
         feature = "jmap",
         feature = "gmail",
         feature = "maildir",
+        feature = "m2dir",
         feature = "mbox",
         feature = "msgraph",
         feature = "pimdir"
@@ -129,12 +130,6 @@ impl Flag {
     /// Whether this is `\Flagged`.
     pub fn is_flagged(&self) -> bool {
         matches!(self.iana, Some(IanaFlag::Flagged))
-    }
-
-    /// Whether this is `\Draft`.
-    #[cfg(feature = "gmail")]
-    pub fn is_draft(&self) -> bool {
-        matches!(self.iana, Some(IanaFlag::Draft))
     }
 
     /// Whether this is `$Junk`.
@@ -317,11 +312,8 @@ mod tests {
     fn predicates_match_iana_only() {
         assert!(Flag::from_iana(IanaFlag::Seen).is_seen());
         assert!(!Flag::from_raw("seen-ish").is_seen());
-        // NOTE: the draft and junk predicates serve the Gmail backend only.
+        // NOTE: the junk predicate serves the Gmail backend only.
         #[cfg(feature = "gmail")]
-        {
-            assert!(Flag::from_iana(IanaFlag::Draft).is_draft());
-            assert!(Flag::from_iana(IanaFlag::Junk).is_junk());
-        }
+        assert!(Flag::from_iana(IanaFlag::Junk).is_junk());
     }
 }

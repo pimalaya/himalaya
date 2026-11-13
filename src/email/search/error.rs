@@ -22,7 +22,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self::ParseError(_, query) = self;
-        write!(f, "cannot parse search emails query `{query}`")
+        write!(f, "Cannot parse search query `{query}`")
     }
 }
 

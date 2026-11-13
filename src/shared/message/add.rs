@@ -37,7 +37,7 @@ pub struct MessageAddCommand {
     #[arg(long = "mailbox", short = 'm', value_name = "NAME")]
     pub mailbox: String,
     /// Flags to set on the new message.
-    #[arg(long = "flag", short = 'f', value_name = "FLAG", num_args = 0..)]
+    #[arg(long = "flag", short = 'f', value_name = "FLAG")]
     pub flag: Vec<FlagArg>,
     /// Send the message too, before appending it, as `message send
     /// --save` does.
@@ -62,7 +62,12 @@ impl MessageAddCommand {
         let Outcome::Saved { id, sent } = outcome else {
             unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
         };
-        printer.out(MessageAddOutput { id, sent, queued })
+        printer.out(MessageAddOutput {
+            id,
+            saved: true,
+            sent,
+            queued,
+        })
     }
 }
 
@@ -71,6 +76,8 @@ impl MessageAddCommand {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MessageAddOutput {
     id: Option<String>,
+    /// Always true, the receipt sharing the shape of `message send`.
+    saved: bool,
     sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
@@ -102,6 +109,7 @@ mod tests {
     fn a_queued_add_says_it_is_queued() {
         let output = |queued| MessageAddOutput {
             id: Some("d1@x.org".into()),
+            saved: true,
             sent: true,
             queued,
         };
@@ -116,7 +124,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output(true)).unwrap(),
-            r#"{"id":"d1@x.org","sent":true,"queued":true}"#
+            r#"{"id":"d1@x.org","saved":true,"sent":true,"queued":true}"#
         );
     }
 }

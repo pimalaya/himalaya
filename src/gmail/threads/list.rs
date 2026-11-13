@@ -17,7 +17,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    gmail::client::GmailClient,
+    gmail::{client::GmailClient, format::snippet_text},
     listing::{Listing, ListingPage},
 };
 
@@ -112,7 +112,9 @@ impl fmt::Display for GmailThreadListOutput {
             listing.items.push([
                 sanitize::text(&thread.id),
                 sanitize::text(thread.history_id.as_deref().unwrap_or_default()),
-                sanitize::text(thread.snippet.as_deref().unwrap_or_default()),
+                sanitize::text(&snippet_text(thread.snippet.as_deref().unwrap_or_default()))
+                    .into_owned()
+                    .into(),
             ]);
         }
 

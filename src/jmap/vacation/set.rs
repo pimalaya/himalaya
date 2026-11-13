@@ -63,11 +63,11 @@ impl JmapVacationSetCommand {
 
         let patch = JmapVacationResponseUpdate {
             is_enabled,
-            from_date: self.from_date,
-            to_date: self.to_date,
-            subject: self.subject,
-            text_body: self.text_body,
-            html_body: self.html_body,
+            from_date: self.from_date.map(Some),
+            to_date: self.to_date.map(Some),
+            subject: self.subject.map(Some),
+            text_body: self.text_body.map(Some),
+            html_body: self.html_body.map(Some),
         };
 
         client.vacation_response_set(patch)?;

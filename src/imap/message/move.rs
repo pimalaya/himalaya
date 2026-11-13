@@ -16,6 +16,7 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
     message::copy::ImapMessageCopyOutput,
     outcome,
+    utils::parse_sequence_set,
 };
 
 /// Move messages to the given mailbox (MOVE, RFC 6851).
@@ -42,7 +43,7 @@ impl ImapMessageMoveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let sequence_set = self.sequence_set.as_str().try_into()?;
+        let sequence_set = parse_sequence_set(&self.sequence_set)?;
         let destination: Mailbox<'static> = self.mailbox_dest_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -56,10 +57,7 @@ impl ImapMessageMoveCommand {
                 ImapMessageMoveOptions { uid: !self.seq },
             )?;
 
-            Ok(ImapMessageCopyOutput::new(
-                copy_uid,
-                "Messages successfully moved",
-            ))
+            Ok(ImapMessageCopyOutput::new(copy_uid, "Move completed"))
         })();
 
         outcome::print(printer, result)

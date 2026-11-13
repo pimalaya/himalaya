@@ -149,8 +149,9 @@ impl fmt::Display for GmailHistoryListOutput {
                 ]
             };
 
-            for message in &record.messages_added {
-                listing.items.push(line("added", message, &[]));
+            for message in &record.messages_added_details {
+                let labels = &message.label_ids;
+                listing.items.push(line("added", &message.id, labels));
             }
 
             for message in &record.messages_deleted {
@@ -251,4 +252,45 @@ fn label_changes(labels: Vec<GmailHistoryLabel>) -> Vec<GmailHistoryLabelOutput>
             label_ids: label.label_ids,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use io_gmail::v1::rest::{
+        history::{GmailHistory, GmailHistoryMessage},
+        messages::GmailMessage,
+    };
+
+    use crate::gmail::history::list::{GmailHistoryListOutput, GmailHistoryRecordOutput};
+
+    #[test]
+    fn an_added_message_shows_its_labels() {
+        let added = GmailHistoryMessage {
+            message: GmailMessage {
+                id: "m1".into(),
+                label_ids: vec!["Label_1".into(), "INBOX".into()],
+                ..Default::default()
+            },
+        };
+        let record = GmailHistory {
+            id: "42".into(),
+            messages: Vec::new(),
+            messages_added: vec![added],
+            messages_deleted: Vec::new(),
+            labels_added: Vec::new(),
+            labels_removed: Vec::new(),
+        };
+        let output = GmailHistoryListOutput {
+            account: "a".into(),
+            since: "1".into(),
+            label: None,
+            history_id: Some("42".into()),
+            history: vec![GmailHistoryRecordOutput::from(record)],
+            next_page: None,
+        };
+
+        let text = output.to_string();
+        let line = text.lines().find(|line| line.contains("m1")).unwrap();
+        assert!(line.contains("Label_1,INBOX"), "{text}");
+    }
 }

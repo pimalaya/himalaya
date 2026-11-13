@@ -4,12 +4,6 @@
 
 use std::fmt;
 
-#[cfg(any(
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "pimdir"
-))]
 use anyhow::{Result, bail};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -47,6 +41,7 @@ pub struct Mailbox {
 /// The mailboxes of a backend minting opaque ids, which names and roles
 /// resolve through.
 #[cfg(any(
+    feature = "imap",
     feature = "jmap",
     feature = "gmail",
     feature = "msgraph",
@@ -56,6 +51,7 @@ pub struct Mailbox {
 pub struct MailboxIndex(pub Vec<Mailbox>);
 
 #[cfg(any(
+    feature = "imap",
     feature = "jmap",
     feature = "gmail",
     feature = "msgraph",
@@ -65,17 +61,34 @@ impl MailboxIndex {
     /// Maps a mailbox id, name or role onto its id.
     ///
     /// A known id passes through, then a name match, then a role match,
-    /// which errors when several mailboxes carry the role. An unknown
+    /// either erroring when several mailboxes match. An unknown
     /// value goes back as it is, so the backend surfaces the error or
     /// takes it as a native name.
-    #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph"
+    ))]
     pub fn resolve(&self, mailbox: &str) -> Result<String> {
         if self.0.iter().any(|m| m.id == mailbox) {
             return Ok(mailbox.to_string());
         }
 
-        if let Some(m) = self.0.iter().find(|m| m.name == mailbox) {
-            return Ok(m.id.clone());
+        let mut named = self.0.iter().filter(|m| m.name == mailbox);
+
+        if let Some(first) = named.next() {
+            let others: Vec<&str> = named.map(|m| m.id.as_str()).collect();
+
+            if !others.is_empty() {
+                bail!(
+                    "Several mailboxes are named `{mailbox}` ({}, {}): pass the mailbox id",
+                    first.id,
+                    others.join(", ")
+                );
+            }
+
+            return Ok(first.id.clone());
         }
 
         if let Some(role) = MailboxRole::known(mailbox)
@@ -117,6 +130,7 @@ impl MailboxIndex {
     feature = "imap",
     feature = "gmail",
     feature = "maildir",
+    feature = "m2dir",
     feature = "mbox"
 ))]
 pub fn child_path(parent: &str, delimiter: char, name: &str) -> String {
@@ -136,6 +150,42 @@ pub fn renamed_path(mailbox: &str, delimiter: char, name: &str) -> String {
         Some((parent, _)) => child_path(parent, delimiter, name),
         None => name.to_string(),
     }
+}
+
+/// Refuses a mailbox NAME no backend can take: an empty or blank one, or
+/// one holding a control character.
+pub fn validate_name(name: &str) -> Result<()> {
+    if name.trim().is_empty() {
+        bail!("Mailbox name must not be empty");
+    }
+
+    if name.chars().any(char::is_control) {
+        bail!(
+            "Mailbox name `{}` must not hold a control character",
+            name.escape_debug()
+        );
+    }
+
+    Ok(())
+}
+
+/// Refuses a NAME holding `delimiter`, the backend's hierarchy separator,
+/// NAME being one level of the hierarchy.
+#[cfg(any(
+    feature = "imap",
+    feature = "gmail",
+    feature = "maildir",
+    feature = "m2dir",
+    feature = "mbox"
+))]
+pub fn validate_level(name: &str, delimiter: char) -> Result<()> {
+    if name.contains(delimiter) {
+        bail!(
+            "Mailbox name `{name}` must not hold `{delimiter}`, the hierarchy delimiter: it names one level of the hierarchy"
+        );
+    }
+
+    Ok(())
 }
 
 /// Special-use role of a mailbox.
@@ -235,6 +285,21 @@ impl<'de> Deserialize<'de> for MailboxRole {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_name_is_not_blank_and_holds_no_control_character() {
+        assert!(validate_name("Été 2026").is_ok());
+        for name in ["", " ", "a\nb", "a\u{7f}"] {
+            assert!(validate_name(name).is_err(), "{name:?}");
+        }
+    }
+
+    #[cfg(feature = "imap")]
+    #[test]
+    fn a_level_holds_no_delimiter() {
+        assert!(validate_level("a.b", '/').is_ok());
+        assert!(validate_level("a.b", '.').is_err());
+    }
 
     #[cfg(any(
         feature = "imap",

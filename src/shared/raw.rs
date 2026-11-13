@@ -25,10 +25,10 @@ use crate::{error::ErrorCode, shared::crlf};
 /// result goes through [`crlf::normalize`], so a bare `\n` becomes CRLF.
 #[derive(Debug, Parser)]
 pub struct RawCommandArg {
-    /// The raw command lines, or the standard input when piped.
+    /// The raw command, or the standard input when piped.
     ///
-    /// A literal `\r` or `\n` in the argument becomes a real CRLF, so a
-    /// batch of CRLF-separated commands can be passed inline.
+    /// A literal `\r` or `\n` in the argument becomes a real CRLF, for the
+    /// protocols taking several lines at once.
     #[arg(name = "command-raw", value_name = "COMMAND", raw = true)]
     pub raw: Vec<String>,
 }

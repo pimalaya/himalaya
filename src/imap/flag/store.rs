@@ -19,6 +19,7 @@ use crate::imap::{
     fetch::{FetchedMessage, ImapFetchOutput},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
     outcome,
+    utils::parse_sequence_set,
 };
 
 /// Store flags on messages (STORE, RFC 3501).
@@ -41,8 +42,9 @@ pub struct ImapStoreCommand {
     /// backslash, as in `-f '\Seen'`, and a bare word is a custom
     /// keyword, so `-f seen` stores the keyword `seen`.
     ///
-    /// The unified `flag add -f seen` is the enum-mapped behaviour.
-    #[arg(short, long, required = true, num_args = 1..)]
+    /// The unified `flag add -f seen` is the enum-mapped behaviour. Repeat
+    /// `-f` for several flags.
+    #[arg(short, long, required = true)]
     pub flag: Vec<String>,
     /// Read the sequence set as message numbers rather than UIDs.
     #[arg(long)]
@@ -77,7 +79,7 @@ impl ImapStoreCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let sequence_set = self.sequence_set.as_str().try_into()?;
+        let sequence_set = parse_sequence_set(&self.sequence_set)?;
         let flags: Vec<Flag<'static>> = self
             .flag
             .iter()
@@ -105,5 +107,21 @@ impl ImapStoreCommand {
         })();
 
         outcome::print(printer, result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use crate::imap::flag::store::ImapStoreCommand;
+
+    #[test]
+    fn a_flag_before_the_sequence_leaves_it_positional() {
+        let args = ["store", "-f", "\\Flagged", "10", "-f", "kw"];
+        let cmd = ImapStoreCommand::try_parse_from(args).unwrap();
+
+        assert_eq!(cmd.sequence_set, "10");
+        assert_eq!(cmd.flag, ["\\Flagged", "kw"]);
     }
 }

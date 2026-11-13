@@ -31,15 +31,16 @@ pub struct Vacation {
     pub html: Option<String>,
 }
 
-/// What `vacation set` changes, the rest left as it is.
+/// What `vacation set` changes, the rest left as it is: a field `None`
+/// stays, `Some(None)` is cleared.
 #[derive(Clone, Debug, Default)]
 pub struct VacationPatch {
     pub enabled: Option<bool>,
-    pub from: Option<DateTime<Utc>>,
-    pub to: Option<DateTime<Utc>>,
-    pub subject: Option<String>,
-    pub text: Option<String>,
-    pub html: Option<String>,
+    pub from: Option<Option<DateTime<Utc>>>,
+    pub to: Option<Option<DateTime<Utc>>>,
+    pub subject: Option<Option<String>>,
+    pub text: Option<Option<String>>,
+    pub html: Option<Option<String>>,
 }
 
 /// Parses a `--from` or `--to` value: an RFC 3339 date-time, or a bare

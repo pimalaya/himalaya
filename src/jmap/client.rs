@@ -9,7 +9,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
@@ -56,8 +56,17 @@ impl JmapClient {
     /// Maps a mailbox id, name or role onto its opaque JMAP id.
     ///
     /// It lives here so every backend method stays a pure id consumer.
+    /// JMAP naming no mailbox natively, a value matching none is refused
+    /// here, the server only answering `invalidArguments` for it.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
-        self.mailbox_index()?.resolve(mailbox)
+        let index = self.mailbox_index()?;
+        let id = index.resolve(mailbox)?;
+
+        if !index.0.iter().any(|m| m.id == id) {
+            bail!("Mailbox `{mailbox}` not found");
+        }
+
+        Ok(id)
     }
 
     /// The id of the mailbox carrying `role`, `None` when none does.

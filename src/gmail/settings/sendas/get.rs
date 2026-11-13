@@ -13,7 +13,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    gmail::{
+        client::GmailClient,
+        settings::convert::{verification_status_wire, yes_no},
+    },
     shared::message::read::sanitize_body,
 };
 
@@ -61,13 +64,13 @@ impl fmt::Display for GmailSettingsSendAsGetOutput {
             fields.push("Signature", sanitize_body(signature));
         }
         if let Some(is_primary) = self.0.is_primary {
-            fields.push("Primary", is_primary);
+            fields.push("Primary", yes_no(is_primary));
         }
         if let Some(is_default) = self.0.is_default {
-            fields.push("Default", is_default);
+            fields.push("Default", yes_no(is_default));
         }
         if let Some(treat_as_alias) = self.0.treat_as_alias {
-            fields.push("Treat as alias", treat_as_alias);
+            fields.push("Treat as alias", yes_no(treat_as_alias));
         }
         if let Some(status) = self.0.verification_status {
             fields.push("Verification", verification_status_wire(status));

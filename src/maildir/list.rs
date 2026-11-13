@@ -30,6 +30,7 @@ impl MaildirMailboxListCommand {
         account: &mut Account,
         client: &mut MaildirClient,
     ) -> Result<()> {
+        client.ensure_root()?;
         let maildirs = client.list_maildirs()?;
 
         let table = MaildirListOutput {

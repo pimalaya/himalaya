@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use io_jmap::rfc8621::email::set::JmapEmailSetArgs;
 use pimalaya_cli::printer::Printer;
 
@@ -17,6 +17,12 @@ use crate::{
 
 /// Update JMAP emails via patch operations (Email/set).
 #[derive(Debug, Parser)]
+#[command(group(
+    ArgGroup::new("change")
+        .required(true)
+        .multiple(true)
+        .args(["add_keyword", "remove_keyword", "keywords", "add_mailbox", "remove_mailbox", "mailboxes"])
+))]
 pub struct JmapEmailUpdateCommand {
     /// Email ID(s) to update.
     #[arg(value_name = "ID", required = true)]
@@ -28,7 +34,7 @@ pub struct JmapEmailUpdateCommand {
     #[arg(long, value_name = "KEYWORD", required = false)]
     pub remove_keyword: Vec<String>,
     /// Replace all keywords atomically.
-    #[arg(long, value_name = "KEYWORD")]
+    #[arg(long, value_name = "KEYWORD", conflicts_with_all = ["add_keyword", "remove_keyword"])]
     pub keywords: Option<Vec<String>>,
     /// Add email(s) to a mailbox.
     #[arg(long, value_name = "MAILBOX-ID", required = false)]
@@ -37,7 +43,7 @@ pub struct JmapEmailUpdateCommand {
     #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub remove_mailbox: Vec<String>,
     /// Replace all mailbox memberships atomically.
-    #[arg(long, value_name = "MAILBOX-ID")]
+    #[arg(long, value_name = "MAILBOX-ID", conflicts_with_all = ["add_mailbox", "remove_mailbox"])]
     pub mailboxes: Option<Vec<String>>,
 }
 
@@ -92,5 +98,31 @@ impl JmapEmailUpdateCommand {
             ids: output.updated.into_keys().collect(),
             done: "JMAP emails successfully updated",
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use crate::jmap::email::update::JmapEmailUpdateCommand;
+
+    fn parse(args: &[&str]) -> Result<JmapEmailUpdateCommand, clap::Error> {
+        JmapEmailUpdateCommand::try_parse_from([&["update", "E1"], args].concat())
+    }
+
+    #[test]
+    fn a_replacement_refuses_the_patches_it_would_drop() {
+        assert!(parse(&["--keywords", "a", "--add-keyword", "b"]).is_err());
+        assert!(parse(&["--keywords", "a", "--remove-keyword", "b"]).is_err());
+        assert!(parse(&["--mailboxes", "M1", "--add-mailbox", "M2"]).is_err());
+        assert!(parse(&["--mailboxes", "M1", "--remove-mailbox", "M2"]).is_err());
+        assert!(parse(&["--keywords", "a", "--add-mailbox", "M2"]).is_ok());
+    }
+
+    #[test]
+    fn an_update_naming_no_change_is_refused() {
+        assert!(parse(&[]).is_err());
+        assert!(parse(&["--add-keyword", "a", "--remove-keyword", "b"]).is_ok());
     }
 }

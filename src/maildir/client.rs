@@ -17,6 +17,7 @@ use io_maildir::{client::MaildirClient as Inner, flag::KeywordHeader, maildir::M
 use crate::{
     account::context::Account,
     config::{AccountConfig, Config, MaildirConfig, MaildirKeywordHeaderConfig},
+    email::mailbox::validate_level,
 };
 
 impl From<MaildirKeywordHeaderConfig> for KeywordHeader {
@@ -44,6 +45,19 @@ impl MaildirClient {
         inner.dovecot_keywords = config.keywords.dovecot;
         inner.keywords_header = config.keywords.header.map(Into::into);
         Self { inner, root }
+    }
+
+    /// Refuses a root that is not a directory, which io-maildir would list
+    /// as an empty store, hiding a typo in `maildir.root`.
+    pub fn ensure_root(&self) -> Result<()> {
+        if !self.root.is_dir() {
+            bail!(
+                "Maildir root `{}` does not exist or is not a directory",
+                self.root.display()
+            );
+        }
+
+        Ok(())
     }
 
     /// Resolves a command's Maildir argument into a loaded [`Maildir`].
@@ -121,13 +135,30 @@ pub fn validate_maildir_name(name: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Rejects a NAME that cannot be one level of a Maildir store: one holding
+/// the `/` delimiter, a `cur`, `new` or `tmp` subdirectory name, or one
+/// starting with a dot, which the listing reads as hidden.
+pub fn validate_maildir_level(name: &str) -> Result<()> {
+    validate_level(name, '/')?;
+
+    if matches!(name, "cur" | "new" | "tmp") {
+        bail!("Maildir folder name `{name}` is reserved: it names a Maildir subdirectory");
+    }
+
+    if name.starts_with('.') {
+        bail!("Maildir folder name `{name}` must not start with a dot: it would be hidden");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
 
     use io_maildir::maildir::Maildir;
 
-    use super::{MaildirClient, validate_maildir_name};
+    use super::{MaildirClient, validate_maildir_level, validate_maildir_name};
     use crate::config::MaildirConfig;
 
     #[test]
@@ -142,6 +173,16 @@ mod tests {
         assert!(validate_maildir_name(Path::new("/etc")).is_err());
         assert!(validate_maildir_name(Path::new("../foo")).is_err());
         assert!(validate_maildir_name(Path::new("a/../../b")).is_err());
+    }
+
+    #[test]
+    fn a_level_is_one_listable_folder_name() {
+        assert!(validate_maildir_level("Archive").is_ok());
+        assert!(validate_maildir_level("Été 2026").is_ok());
+
+        for name in ["x/y", "cur", "new", "tmp", ".hidden", "..", "."] {
+            assert!(validate_maildir_level(name).is_err(), "{name}");
+        }
     }
 
     #[test]

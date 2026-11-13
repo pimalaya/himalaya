@@ -6,11 +6,15 @@
 use anyhow::Result;
 use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::list::MsgraphMailFoldersListParams;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer};
 
 use crate::{
     account::context::Account,
-    msgraph::{client::MsgraphClient, mail_folders::list::MsgraphMailFolderListOutput},
+    msgraph::{
+        client::MsgraphClient,
+        mail_folders::list::MsgraphMailFolderListOutput,
+        messages::list::{next_page_token, page_skip},
+    },
 };
 
 /// List a mail folder's child folders (`GET
@@ -26,6 +30,8 @@ pub struct MsgraphChildFoldersListCommand {
     /// Number of folders to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
     #[arg(long, value_name = "FIELDS")]
@@ -45,15 +51,17 @@ impl MsgraphChildFoldersListCommand {
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
             top: self.top,
-            skip: self.skip,
+            skip: page_skip(self.page_token.token.as_deref(), self.skip)?,
             select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
-        let folders = client
-            .mail_child_folders_list(&self.id, &params)?
-            .response
-            .value;
+        let response = client.mail_child_folders_list(&self.id, &params)?.response;
+        let next = next_page_token(response.next_link, params.skip);
 
-        printer.out(MsgraphMailFolderListOutput::new(account, folders))
+        printer.out(MsgraphMailFolderListOutput::page(
+            account,
+            response.value,
+            next,
+        ))
     }
 }

@@ -22,6 +22,7 @@ use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
     outcome,
+    utils::parse_sequence_set,
 };
 
 /// Copy messages to the given mailbox (COPY, RFC 3501).
@@ -46,7 +47,7 @@ impl ImapMessageCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let sequence_set = self.sequence_set.as_str().try_into()?;
+        let sequence_set = parse_sequence_set(&self.sequence_set)?;
         let destination: Mailbox = self.mailbox_dest_name.inner.try_into()?;
 
         let result = (|| -> Result<_> {
@@ -60,10 +61,7 @@ impl ImapMessageCopyCommand {
                 ImapMessageCopyOptions { uid: !self.seq },
             )?;
 
-            Ok(ImapMessageCopyOutput::new(
-                copy_uid,
-                "Messages successfully copied",
-            ))
+            Ok(ImapMessageCopyOutput::new(copy_uid, "Copy completed"))
         })();
 
         outcome::print(printer, result)
@@ -105,6 +103,35 @@ impl ImapMessageCopyOutput {
 
 impl fmt::Display for ImapMessageCopyOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.done)
+        let join = |uids: &[u32]| {
+            let uids: Vec<String> = uids.iter().map(u32::to_string).collect();
+            uids.join(",")
+        };
+
+        // NOTE: a server sends no COPYUID without UIDPLUS, and a UIDPLUS
+        // one sends none when nothing matched, so the plain form says
+        // which UIDs moved only when it knows.
+        if self.uid_validity.is_none() {
+            return writeln!(f, "{}, no COPYUID returned", self.done);
+        }
+
+        let source = join(&self.source_uids);
+        let destination = join(&self.destination_uids);
+        writeln!(f, "{}: UIDs {source} to {destination}", self.done)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::imap::message::copy::ImapMessageCopyOutput;
+
+    #[test]
+    fn the_text_form_says_whether_a_copyuid_came_back() {
+        let copied =
+            ImapMessageCopyOutput::new(Some((7, vec![1, 2], vec![10, 11])), "Copy completed");
+        let unknown = ImapMessageCopyOutput::new(None, "Copy completed");
+
+        assert_eq!(copied.to_string(), "Copy completed: UIDs 1,2 to 10,11\n");
+        assert_eq!(unknown.to_string(), "Copy completed, no COPYUID returned\n");
     }
 }

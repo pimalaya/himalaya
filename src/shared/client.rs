@@ -16,6 +16,8 @@
 // use its parameters, the resolver refusing the verb before any runs.
 #![cfg_attr(not(backend), allow(unused_variables))]
 
+#[cfg(feature = "gmail")]
+use anyhow::Context;
 use anyhow::{Result, anyhow, bail};
 
 #[cfg(feature = "gmail")]
@@ -42,12 +44,21 @@ use crate::{
     email::{
         envelope::Envelope,
         flag::{Flag, FlagOp},
-        mailbox::{Mailbox, MailboxRole},
+        mailbox::{self, Mailbox, MailboxRole},
         search::query::SearchEmailsQuery,
     },
 };
 #[cfg(feature = "smtp")]
 use crate::{config::SmtpConfig, smtp::client::SmtpClient};
+
+/// What a send did with the copy it was asked to file.
+#[cfg_attr(not(any(feature = "gmail", feature = "pimdir")), allow(dead_code))]
+pub enum SentCopy {
+    /// Not filed: the caller saves it.
+    Owed,
+    /// Filed by the backend as part of the send, under the id it reported.
+    Filed(Option<String>),
+}
 
 /// The client every unified subcommand runs over.
 pub struct EmailClient {
@@ -162,9 +173,15 @@ impl EmailClient {
     }
 
     /// Creates the mailbox `name` at the top, or under `parent`,
-    /// returning its id, `None` when the backend queues the creation.
-    pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<Option<String>> {
+    /// returning its id, `None` when the backend queues the creation, and
+    /// its full name where the backend names the hierarchy by path.
+    pub fn create_mailbox(
+        &mut self,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<(Option<String>, String)> {
         self.require(&[Capability::MailboxCreate])?;
+        mailbox::validate_name(name)?;
 
         let parent = match parent {
             Some(parent) => Some(self.resolve_mailbox_id(parent)?),
@@ -174,21 +191,36 @@ impl EmailClient {
 
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Imap(client) => client.create_mailbox(name, parent).map(named),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Jmap(client) => client
+                .create_mailbox(name, parent)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Gmail(client) => client
+                .create_mailbox(name, parent)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Msgraph(client) => client
+                .create_mailbox(name, parent)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Maildir(client) => client
+                .create_mailbox(name, parent)
+                .map(|(id, name)| (Some(id), name)),
             #[cfg(feature = "m2dir")]
-            BackendClient::M2dir(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::M2dir(client) => client
+                .create_mailbox(name, parent)
+                .map(|(id, name)| (Some(id), name)),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client.create_mailbox(name, parent).map(Some),
+            BackendClient::Mbox(client) => {
+                mailbox::validate_level(name, '/')?;
+                client.create_mailbox(name, parent).map(named)
+            }
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.create_mailbox(name, parent).map(|_| None),
+            BackendClient::Pimdir(client) => client
+                .create_mailbox(name, parent)
+                .map(|_| (None, name.into())),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -196,7 +228,8 @@ impl EmailClient {
 
     /// Renames the last level of `mailbox` to `name`, its parent kept,
     /// returning the id it has afterwards, `None` when the backend queues
-    /// the rename.
+    /// the rename, and its full name where the backend names the hierarchy
+    /// by path.
     #[cfg_attr(
         not(any(
             feature = "imap",
@@ -209,34 +242,53 @@ impl EmailClient {
         )),
         allow(unused_variables)
     )]
-    pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<Option<String>> {
+    pub fn rename_mailbox(
+        &mut self,
+        mailbox: &str,
+        name: &str,
+    ) -> Result<(Option<String>, String)> {
         self.require(&[Capability::MailboxRename])?;
+        mailbox::validate_name(name)?;
 
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Imap(client) => client.rename_mailbox(mailbox, name).map(named),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Jmap(client) => client
+                .rename_mailbox(mailbox, name)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Gmail(client) => client
+                .rename_mailbox(mailbox, name)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Msgraph(client) => client
+                .rename_mailbox(mailbox, name)
+                .map(|id| (Some(id), name.into())),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Maildir(client) => client
+                .rename_mailbox(mailbox, name)
+                .map(|(id, name)| (Some(id), name)),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(_) => bail!("m2dir has no rename yet"),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client.rename_mailbox(mailbox, name).map(Some),
+            BackendClient::Mbox(client) => {
+                mailbox::validate_level(name, '/')?;
+                client.rename_mailbox(mailbox, name).map(named)
+            }
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.rename_mailbox(mailbox, name).map(|_| None),
+            BackendClient::Pimdir(client) => client
+                .rename_mailbox(mailbox, name)
+                .map(|_| (None, name.into())),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
     }
 
-    /// Deletes `mailbox` and the messages it holds, returning its id.
+    /// Deletes `mailbox` and the messages it holds, returning its id, the
+    /// one `mailbox list` prints.
     #[cfg_attr(not(backend), allow(unreachable_code))]
     pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<String> {
         self.require(&[Capability::MailboxDelete])?;
@@ -244,28 +296,24 @@ impl EmailClient {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Imap(client) => client.delete_mailbox(&mailbox).map(|()| mailbox),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Jmap(client) => client.delete_mailbox(&mailbox).map(|()| mailbox),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Gmail(client) => client.delete_mailbox(&mailbox).map(|()| mailbox),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Msgraph(client) => client.delete_mailbox(&mailbox).map(|()| mailbox),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Maildir(client) => client.delete_mailbox(&mailbox),
             #[cfg(feature = "m2dir")]
-            BackendClient::M2dir(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::M2dir(client) => client.delete_mailbox(&mailbox),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client.delete_mailbox(&mailbox)?,
+            BackendClient::Mbox(client) => client.delete_mailbox(&mailbox).map(|()| mailbox),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => {
-                client.delete_mailbox(&mailbox)?;
-            }
+            BackendClient::Pimdir(client) => client.delete_mailbox(&mailbox).map(|_| mailbox),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
-
-        Ok(mailbox)
     }
 
     /// Lists envelopes from `mailbox`.
@@ -429,9 +477,9 @@ impl EmailClient {
         }
     }
 
-    /// Adds a raw message to a mailbox with the given flags, which Gmail
-    /// and Microsoft Graph do not implement. Returns the new message id,
-    /// absent when an IMAP or JMAP server does not report it.
+    /// Adds a raw message to a mailbox with the given flags, refusing a
+    /// flag the backend cannot keep. Returns the new message id, absent
+    /// when an IMAP or JMAP server does not report it.
     #[cfg_attr(
         not(any(
             feature = "imap",
@@ -450,7 +498,9 @@ impl EmailClient {
         flags: &[Flag],
         raw: Vec<u8>,
     ) -> Result<Option<String>> {
-        self.require(&[Capability::MessageAdd])?;
+        let mut capabilities = vec![Capability::MessageAdd];
+        capabilities.extend(flags.iter().filter_map(Flag::capability));
+        self.require(&capabilities)?;
 
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
@@ -555,9 +605,7 @@ impl EmailClient {
     pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(_) => {
-                Ok((*role == MailboxRole::Inbox).then(|| String::from("INBOX")))
-            }
+            BackendClient::Imap(client) => client.role_mailbox_id(role),
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.role_mailbox_id(role),
             #[cfg(feature = "gmail")]
@@ -579,11 +627,15 @@ impl EmailClient {
 
     /// Permanently deletes messages from the trash.
     ///
-    /// Returns whether they were really removed, an IMAP server without
-    /// UIDPLUS only flagging them `\Deleted`.
+    /// Returns how many of the ids the mailbox held, every id for a
+    /// backend that cannot tell, and whether they were really removed, an
+    /// IMAP server without UIDPLUS only flagging them `\Deleted`.
     #[cfg_attr(
         not(any(
             feature = "imap",
+            feature = "jmap",
+            feature = "gmail",
+            feature = "msgraph",
             feature = "maildir",
             feature = "m2dir",
             feature = "mbox",
@@ -591,24 +643,32 @@ impl EmailClient {
         )),
         allow(unused_variables)
     )]
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<(usize, bool)> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.delete_messages(mailbox, ids),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.delete_messages(ids).map(|()| true),
+            BackendClient::Jmap(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.delete_messages(ids).map(|()| true),
+            BackendClient::Gmail(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.delete_messages(ids).map(|()| true),
+            BackendClient::Msgraph(client) => {
+                client.delete_messages(mailbox, ids).map(|n| (n, true))
+            }
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            BackendClient::Maildir(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|found| (found, true)),
             #[cfg(feature = "m2dir")]
-            BackendClient::M2dir(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            BackendClient::M2dir(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|found| (found, true)),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            BackendClient::Mbox(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.delete_messages(mailbox, ids).map(|_| true),
+            BackendClient::Pimdir(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|count| (count, true)),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -625,6 +685,20 @@ impl EmailClient {
         &self.resolution
     }
 
+    /// The flags as the storage backend writes them, which a receipt
+    /// names: JMAP spells an IANA flag as its keyword (`$flagged`), the
+    /// other backends as given.
+    pub fn written_flags(&self, flags: Vec<Flag>) -> Vec<Flag> {
+        match &self.storage {
+            #[cfg(feature = "jmap")]
+            Some(BackendClient::Jmap(_)) => flags
+                .iter()
+                .map(crate::jmap::backend::written_flag)
+                .collect(),
+            _ => flags,
+        }
+    }
+
     /// Whether the storage backend queues its writes for a sync engine to
     /// apply later rather than performing them, so a confirmation says the
     /// write is queued rather than done.
@@ -636,34 +710,63 @@ impl EmailClient {
         false
     }
 
+    /// Whether the storage backend files every message it sends in its sent
+    /// mailbox itself, whatever is asked: Microsoft Graph does, its
+    /// `sendMail` saving to Sent Items.
+    pub fn files_sent_copy(&self) -> bool {
+        #[cfg(feature = "msgraph")]
+        if let Some(BackendClient::Msgraph(_)) = &self.storage {
+            return true;
+        }
+        false
+    }
+
     /// Sends a raw message through the storage backend when it can send,
     /// and through the SMTP transport otherwise.
     ///
     /// `mailbox` is the sent mailbox, and `copy` asks for the message to
-    /// be filed there. A backend may file that copy itself as part of the
-    /// send and return `true`; most ignore both and return `false`, the
-    /// copy being the caller's.
-    #[cfg_attr(not(feature = "pimdir"), allow(unused_variables))]
+    /// be filed there with `flags`. A backend may file that copy itself as
+    /// part of the send, [`SentCopy::Filed`]: pimdir, and Gmail, which
+    /// files every sent message under `SENT` and labels that one rather
+    /// than insert a second message differing from the one delivered. The
+    /// others owe the copy to the caller.
+    #[cfg_attr(not(feature = "gmail"), allow(unused_variables))]
     pub fn send_message(
         &mut self,
         mailbox: Option<&str>,
+        flags: &[Flag],
         raw: Vec<u8>,
         copy: bool,
-    ) -> Result<bool> {
+    ) -> Result<SentCopy> {
         match &mut self.storage {
             #[cfg(feature = "jmap")]
-            Some(BackendClient::Jmap(client)) => return client.send_message(raw).map(|()| false),
+            Some(BackendClient::Jmap(client)) => {
+                return client.send_message(raw).map(|()| SentCopy::Owed);
+            }
             #[cfg(feature = "gmail")]
-            Some(BackendClient::Gmail(client)) => return client.send_message(raw).map(|()| false),
+            Some(BackendClient::Gmail(client)) => {
+                let id = client.send_message(raw)?;
+                let Some(mailbox) = mailbox.filter(|_| copy) else {
+                    return Ok(SentCopy::Owed);
+                };
+
+                let context = || format!("Message sent, but saving a copy to {mailbox} failed");
+                let label = client.resolve_mailbox_id(mailbox).with_context(context)?;
+                client.file_sent(&id, &label, flags).with_context(context)?;
+                return Ok(SentCopy::Filed(Some(id)));
+            }
             #[cfg(feature = "msgraph")]
+            // NOTE: Graph files every message it sends in Sent Items itself.
             Some(BackendClient::Msgraph(client)) => {
-                return client.send_message(raw).map(|()| false);
+                return client.send_message(raw).map(|()| SentCopy::Filed(None));
             }
             #[cfg(feature = "pimdir")]
             Some(BackendClient::Pimdir(client)) => {
-                return client
-                    .send_message(mailbox, raw, copy)
-                    .map(|sent| sent.carried);
+                let sent = client.send_message(mailbox, raw, copy)?;
+                return Ok(match sent.carried {
+                    true => SentCopy::Filed(None),
+                    false => SentCopy::Owed,
+                });
             }
             _ => {}
         }
@@ -671,7 +774,7 @@ impl EmailClient {
         #[cfg(feature = "smtp")]
         if let Some(config) = &self.smtp {
             let mut smtp = SmtpClient::new(config.as_ref().clone())?;
-            return smtp.send_message(raw).map(|()| false);
+            return smtp.send_message(raw).map(|()| SentCopy::Owed);
         }
 
         bail!(
@@ -690,6 +793,8 @@ impl EmailClient {
     /// which is what lets a caller compare a mailbox against the trash.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(client) => client.resolve_mailbox_id(mailbox),
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.resolve_mailbox_id(mailbox),
             #[cfg(feature = "gmail")]
@@ -708,6 +813,13 @@ impl EmailClient {
             .as_mut()
             .ok_or_else(|| anyhow!("No storage backend is configured for this account"))
     }
+}
+
+/// The id and full name of a mailbox on a backend whose id is its full
+/// name (IMAP, mbox).
+#[cfg(any(feature = "imap", feature = "mbox"))]
+fn named(id: String) -> (Option<String>, String) {
+    (Some(id.clone()), id)
 }
 
 /// Opens the storage backend the resolver picked, taking its block out

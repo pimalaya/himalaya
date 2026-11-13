@@ -19,6 +19,8 @@ use crate::{
 
 /// Rename a Maildir folder.
 ///
+/// NAME is the full new path relative to the store root, so the folder
+/// can move across the hierarchy, where `mailbox rename` keeps the parent.
 /// The source is named explicitly, with no default, renaming being
 /// destructive.
 #[derive(Debug, Parser)]

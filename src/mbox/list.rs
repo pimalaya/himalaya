@@ -30,6 +30,7 @@ impl MboxMailboxListCommand {
         account: &mut Account,
         client: &mut MboxClient,
     ) -> Result<()> {
+        client.check_root()?;
         let mboxes = client.list_mboxes()?;
 
         printer.out(MboxListOutput {

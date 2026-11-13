@@ -8,7 +8,10 @@ use chumsky::prelude::*;
 
 use crate::email::{
     flag::Flag,
-    search::{filter::query::SearchEmailsFilterQuery, parser::ParserError},
+    search::{
+        filter::query::SearchEmailsFilterQuery,
+        parser::{ParserError, blanks, blanks1, hidden, keyword, mismatch},
+    },
 };
 
 /// Parses a filter of space-separated conditions.
@@ -33,10 +36,10 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserEr
             flag(),
             attachment(),
             filter
-                .delimited_by(lparen(), rparen())
+                .delimited_by(lparen().then_ignore(blanks()), rparen())
                 .labelled("(nested filter)"),
         ))
-        .then_ignore(space().labelled("space between filters").repeated());
+        .then_ignore(blanks());
 
         let not = not().repeated().foldr(filter, |_, filter| {
             SearchEmailsFilterQuery::Not(Box::new(filter))
@@ -56,89 +59,90 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserEr
 }
 
 fn not<'a>() -> impl Parser<'a, &'a str, (), ParserError<'a>> + Clone {
-    just('n')
-        .labelled("`not`")
-        .ignore_then(just('o').labelled("`not`"))
-        .ignore_then(just('t').labelled("`not`"))
-        .ignore_then(space().labelled("space after `not`").repeated().at_least(1))
+    keyword("not", "`not`").ignore_then(blanks1("space after `not`"))
 }
 
 fn and<'a>() -> impl Parser<'a, &'a str, (), ParserError<'a>> + Clone {
-    just('a')
-        .labelled("`and`")
-        .ignore_then(just('n').labelled("`and`"))
-        .ignore_then(just('d').labelled("`and`"))
-        .ignore_then(space().labelled("space after `and`").repeated().at_least(1))
+    keyword("and", "`and`").ignore_then(blanks1("space after `and`"))
 }
 
 fn or<'a>() -> impl Parser<'a, &'a str, (), ParserError<'a>> + Clone {
-    just('o')
-        .labelled("`or`")
-        .ignore_then(just('r').labelled("`or`"))
-        .ignore_then(space().labelled("space after `or`").repeated().at_least(1))
+    keyword("or", "`or`").ignore_then(blanks1("space after `or`"))
 }
 
 fn date<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('d')
-        .labelled("`date`")
-        .ignore_then(just('a').labelled("`date`"))
-        .ignore_then(just('t').labelled("`date`"))
-        .ignore_then(just('e').labelled("`date`"))
-        .ignore_then(
-            space()
-                .labelled("space after `date`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(naive_date().labelled("date format after `date`"))
+    clause("date", "`date`", "space after `date`")
+        .ignore_then(naive_date().labelled("date after `date`"))
         .map(SearchEmailsFilterQuery::Date)
 }
 
 fn after_date<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('a')
-        .labelled("`after`")
-        .ignore_then(just('f').labelled("`after`"))
-        .ignore_then(just('t').labelled("`after`"))
-        .ignore_then(just('e').labelled("`after`"))
-        .ignore_then(just('r').labelled("`after`"))
-        .ignore_then(
-            space()
-                .labelled("space after `after`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(naive_date().labelled("pattern after `after`"))
+    clause("after", "`after`", "space after `after`")
+        .ignore_then(naive_date().labelled("date after `after`"))
         .map(SearchEmailsFilterQuery::AfterDate)
 }
 
 fn before_date<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    keyword("before", "`before`", "space after `before`")
-        .ignore_then(naive_date().labelled("date format after `before`"))
+    clause("before", "`before`", "space after `before`")
+        .ignore_then(naive_date().labelled("date after `before`"))
         .map(SearchEmailsFilterQuery::BeforeDate)
 }
 
+fn from<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    clause("from", "`from`", "space after `from`")
+        .ignore_then(pattern().labelled("pattern after `from`"))
+        .map(SearchEmailsFilterQuery::From)
+}
+
+fn to<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    clause("to", "`to`", "space after `to`")
+        .ignore_then(pattern().labelled("pattern after `to`"))
+        .map(SearchEmailsFilterQuery::To)
+}
+
 fn cc<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    keyword("cc", "`cc`", "space after `cc`")
+    clause("cc", "`cc`", "space after `cc`")
         .ignore_then(pattern().labelled("pattern after `cc`"))
         .map(SearchEmailsFilterQuery::Cc)
 }
 
 fn bcc<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    keyword("bcc", "`bcc`", "space after `bcc`")
+    clause("bcc", "`bcc`", "space after `bcc`")
         .ignore_then(pattern().labelled("pattern after `bcc`"))
         .map(SearchEmailsFilterQuery::Bcc)
 }
 
 fn address<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    keyword("address", "`address`", "space after `address`")
+    clause("address", "`address`", "space after `address`")
         .ignore_then(pattern().labelled("pattern after `address`"))
         .map(SearchEmailsFilterQuery::Address)
 }
 
+fn subject<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    clause("subject", "`subject`", "space after `subject`")
+        .ignore_then(pattern().labelled("pattern after `subject`"))
+        .map(SearchEmailsFilterQuery::Subject)
+}
+
+fn body<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    clause("body", "`body`", "space after `body`")
+        .ignore_then(pattern().labelled("pattern after `body`"))
+        .map(SearchEmailsFilterQuery::Body)
+}
+
+fn flag<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    clause("flag", "`flag`", "space after `flag`")
+        .ignore_then(
+            unquoted_pattern()
+                .map(Flag::from_raw)
+                .labelled("flag name after `flag`"),
+        )
+        .map(SearchEmailsFilterQuery::Flag)
+}
+
 /// The valueless attachment clause, which ends where its word does.
 fn attachment<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just("attachment")
-        .labelled("`attachment`")
+    keyword("attachment", "`attachment`")
         .then_ignore(
             choice((space(), rparen()))
                 .rewind()
@@ -150,108 +154,23 @@ fn attachment<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserE
 }
 
 /// A clause keyword followed by the spaces separating it from its value.
-fn keyword<'a>(
+fn clause<'a>(
     word: &'static str,
     label: &'static str,
     space_label: &'static str,
 ) -> impl Parser<'a, &'a str, (), ParserError<'a>> + Clone {
-    just(word)
-        .labelled(label)
-        .ignore_then(space().labelled(space_label).repeated().at_least(1))
+    keyword(word, label).ignore_then(blanks1(space_label))
 }
 
-fn from<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('f')
-        .labelled("`from`")
-        .ignore_then(just('r').labelled("`from`"))
-        .ignore_then(just('o').labelled("`from`"))
-        .ignore_then(just('m').labelled("`from`"))
-        .ignore_then(
-            space()
-                .labelled("space after `from`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(pattern().labelled("pattern after `from`"))
-        .map(SearchEmailsFilterQuery::From)
-}
-
-fn to<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('t')
-        .labelled("`to`")
-        .ignore_then(just('o').labelled("`to`"))
-        .ignore_then(space().labelled("space after `to`").repeated().at_least(1))
-        .ignore_then(pattern().labelled("pattern after `to`"))
-        .map(SearchEmailsFilterQuery::To)
-}
-
-fn subject<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('s')
-        .labelled("`subject`")
-        .ignore_then(just('u').labelled("`subject`"))
-        .ignore_then(just('b').labelled("`subject`"))
-        .ignore_then(just('j').labelled("`subject`"))
-        .ignore_then(just('e').labelled("`subject`"))
-        .ignore_then(just('c').labelled("`subject`"))
-        .ignore_then(just('t').labelled("`subject`"))
-        .ignore_then(
-            space()
-                .labelled("space after `subject`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(pattern().labelled("pattern after `subject`"))
-        .map(SearchEmailsFilterQuery::Subject)
-}
-
-fn body<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('b')
-        .labelled("`body`")
-        .ignore_then(just('o').labelled("`body`"))
-        .ignore_then(just('d').labelled("`body`"))
-        .ignore_then(just('y').labelled("`body`"))
-        .ignore_then(
-            space()
-                .labelled("space after `body`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(pattern().labelled("pattern after `body`"))
-        .map(SearchEmailsFilterQuery::Body)
-}
-
-fn flag<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    just('f')
-        .labelled("`flag`")
-        .ignore_then(just('l').labelled("`flag`"))
-        .ignore_then(just('a').labelled("`flag`"))
-        .ignore_then(just('g').labelled("`flag`"))
-        .ignore_then(
-            space()
-                .labelled("space after `flag`")
-                .repeated()
-                .at_least(1),
-        )
-        .ignore_then(
-            unquoted_pattern()
-                .map(Flag::from_raw)
-                .labelled("flag name after `flag`"),
-        )
-        .map(SearchEmailsFilterQuery::Flag)
-}
-
+/// A date in one of the four accepted formats, refused as a whole word.
 fn naive_date<'a>() -> impl Parser<'a, &'a str, NaiveDate, ParserError<'a>> + Clone {
-    choice((
-        naive_date_with_fmt("%Y-%m-%d"),
-        naive_date_with_fmt("%Y/%m/%d"),
-        naive_date_with_fmt("%d-%m-%Y"),
-        naive_date_with_fmt("%d/%m/%Y"),
-    ))
-}
+    const FORMATS: [&str; 4] = ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"];
 
-fn naive_date_with_fmt(fmt: &str) -> impl Parser<'_, &str, NaiveDate, ParserError<'_>> + Clone {
-    pattern().try_map(move |ref s, span| {
-        NaiveDate::parse_from_str(s, fmt).map_err(|err| Rich::custom(span, err.to_string()))
+    pattern().try_map(|s, span| {
+        FORMATS
+            .iter()
+            .find_map(|fmt| NaiveDate::parse_from_str(&s, fmt).ok())
+            .ok_or_else(|| mismatch(span))
     })
 }
 
@@ -268,22 +187,29 @@ fn quoted_pattern<'a>() -> impl Parser<'a, &'a str, String, ParserError<'a>> + C
                 bslash().ignore_then(one_of(escapable_chars)),
                 none_of(escapable_chars),
             ))
+            .labelled(hidden())
             .repeated()
             .collect(),
         )
-        .then_ignore(dquote())
+        .then_ignore(just('"').labelled("closing double quote"))
 }
 
+/// A pattern up to the next unescaped space or parenthesis.
+///
+/// It cannot open with a bare double quote, which opens a quoted pattern,
+/// so an unterminated one is refused rather than read as a literal.
 fn unquoted_pattern<'a>() -> impl Parser<'a, &'a str, String, ParserError<'a>> + Clone {
-    let escapable_chars = ['\\', ' ', '(', ')'];
+    let escapable_chars = ['\\', ' ', '(', ')', '"'];
+    let escaped = bslash().ignore_then(one_of(escapable_chars));
 
-    choice((
-        bslash().ignore_then(one_of(escapable_chars)),
-        none_of(escapable_chars),
-    ))
-    .repeated()
-    .at_least(1)
-    .collect()
+    choice((escaped.clone(), none_of(escapable_chars)))
+        .then(
+            choice((escaped, none_of(['\\', ' ', '(', ')'])))
+                .labelled(hidden())
+                .repeated()
+                .collect::<Vec<char>>(),
+        )
+        .map(|(first, rest)| std::iter::once(first).chain(rest).collect())
 }
 
 fn space<'a>() -> impl Parser<'a, &'a str, char, ParserError<'a>> + Clone {

@@ -17,7 +17,7 @@ use pimalaya_cli::sanitize;
 pub trait JmapSetError {
     fn description(&self) -> Option<&str>;
     fn properties(&self) -> &[String];
-    fn type_name(&self) -> &'static str;
+    fn type_name(&self) -> &str;
 }
 
 /// Renders the suffix a failed JMAP set is reported with: its error type,
@@ -28,7 +28,7 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
     if !err.properties().is_empty() {
         msg.push_str(" (`");
         msg.push_str(&err.properties().join("`, `"));
-        msg.push(')');
+        msg.push_str("`)");
     }
 
     if let Some(desc) = err.description() {
@@ -50,7 +50,7 @@ impl JmapSetError for JmapMailboxSetItemError {
             | Self::WillDestroy { description }
             | Self::InvalidProperties { description, .. }
             | Self::Singleton { description } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -61,7 +61,7 @@ impl JmapSetError for JmapMailboxSetItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
             Self::MailboxHasChild { .. } => "mailboxHasChild",
             Self::MailboxHasEmail { .. } => "mailboxHasEmail",
@@ -70,7 +70,7 @@ impl JmapSetError for JmapMailboxSetItemError {
             Self::WillDestroy { .. } => "willDestroy",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Singleton { .. } => "singleton",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }
@@ -86,7 +86,7 @@ impl JmapSetError for JmapEmailSetItemError {
             | Self::WillDestroy { description }
             | Self::InvalidProperties { description, .. }
             | Self::Singleton { description } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -97,7 +97,7 @@ impl JmapSetError for JmapEmailSetItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
             Self::TooManyKeywords { .. } => "tooManyKeywords",
             Self::TooManyMailboxes { .. } => "tooManyMailboxes",
@@ -107,7 +107,7 @@ impl JmapSetError for JmapEmailSetItemError {
             Self::WillDestroy { .. } => "willDestroy",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Singleton { .. } => "singleton",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }
@@ -115,10 +115,11 @@ impl JmapSetError for JmapEmailSetItemError {
 impl JmapSetError for JmapEmailImportItemError {
     fn description(&self) -> Option<&str> {
         match self {
-            Self::InvalidEmail { description }
+            Self::AlreadyExists { description, .. }
+            | Self::InvalidEmail { description }
             | Self::NotFound { description }
             | Self::InvalidProperties { description, .. } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -129,12 +130,13 @@ impl JmapSetError for JmapEmailImportItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
+            Self::AlreadyExists { .. } => "alreadyExists",
             Self::InvalidEmail { .. } => "invalidEmail",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }
@@ -142,10 +144,10 @@ impl JmapSetError for JmapEmailImportItemError {
 impl JmapSetError for JmapEmailCopyItemError {
     fn description(&self) -> Option<&str> {
         match self {
-            Self::AlreadyExists { description }
+            Self::AlreadyExists { description, .. }
             | Self::NotFound { description }
             | Self::InvalidProperties { description, .. } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -156,12 +158,12 @@ impl JmapSetError for JmapEmailCopyItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
             Self::AlreadyExists { .. } => "alreadyExists",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }
@@ -174,7 +176,7 @@ impl JmapSetError for JmapIdentitySetItemError {
             | Self::WillDestroy { description }
             | Self::InvalidProperties { description, .. }
             | Self::Singleton { description } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -185,14 +187,14 @@ impl JmapSetError for JmapIdentitySetItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
             Self::NotFound { .. } => "notFound",
             Self::InvalidPatch { .. } => "invalidPatch",
             Self::WillDestroy { .. } => "willDestroy",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Singleton { .. } => "singleton",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }
@@ -214,7 +216,7 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
             | Self::RateLimit { description }
             | Self::NotFound { description }
             | Self::InvalidProperties { description, .. } => description.as_deref(),
-            Self::Unknown => None,
+            Self::Other { description, .. } => description.as_deref(),
         }
     }
 
@@ -225,7 +227,7 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
         }
     }
 
-    fn type_name(&self) -> &'static str {
+    fn type_name(&self) -> &str {
         match self {
             Self::TooManyRecipients { .. } => "tooManyRecipients",
             Self::NoRecipients { .. } => "noRecipients",
@@ -241,7 +243,7 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
             Self::RateLimit { .. } => "rateLimit",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
-            Self::Unknown => "unknown",
+            Self::Other { type_name, .. } => type_name,
         }
     }
 }

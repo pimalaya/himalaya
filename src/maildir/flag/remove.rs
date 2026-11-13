@@ -17,7 +17,7 @@ use crate::{
     shared::receipt::IdsReceipt,
 };
 
-/// Remove MAILDIR flag(s) from message(s).
+/// Remove Maildir flags from messages.
 ///
 /// Removes the given info flags from the filename of each message
 /// identified by the given id(s).

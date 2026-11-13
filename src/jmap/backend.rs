@@ -18,11 +18,11 @@ use io_jmap::{
         email::{
             JmapEmail, JmapEmailAddress, JmapEmailProperty,
             get::JmapEmailGetOptions,
-            import::JmapEmailImportArgs,
+            import::{JmapEmailImportArgs, JmapEmailImportItemError, JmapEmailImportOutput},
             query::{
                 JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
             },
-            set::{JmapEmailPatch, JmapEmailSetArgs},
+            set::{JmapEmailPatch, JmapEmailSetArgs, JmapEmailSetItemError, JmapEmailSetOutput},
         },
         email_submission::{
             JMAP_SUBMISSION_CAPABILITY,
@@ -143,15 +143,26 @@ impl JmapClient {
         Ok(envelopes)
     }
 
-    /// Adds, sets, or removes `flags` (JMAP keywords) on an email id
-    /// set. `mailbox` is unused: JMAP keywords are global per email.
+    /// Adds, sets, or removes `flags` (JMAP keywords) on the ids of `ids`
+    /// that `mailbox` holds, returning how many were updated.
     pub fn store_flags(
         &mut self,
-        _mailbox: &str,
+        mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<usize> {
+        let found = self.emails_in(mailbox, ids)?;
+        let ids: Vec<&str> = found.keys().map(String::as_str).collect();
+        self.store_keywords(&ids, flags, op)
+    }
+
+    /// Writes `flags` as keywords on `ids`, wherever the emails are.
+    fn store_keywords(&mut self, ids: &[&str], flags: &[Flag], op: FlagOp) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
         let mut args = JmapEmailSetArgs::default();
 
         for id in ids {
@@ -176,15 +187,32 @@ impl JmapClient {
             }
         }
 
-        let output = self.email_set(args)?;
-        let count = output.updated.len();
-        bail_on_not_updated(output.not_updated)?;
-        Ok(count)
+        count_written(self.email_set(args)?)
+    }
+
+    /// The emails of `ids` that `mailbox` holds, each with the mailboxes
+    /// holding it (`Email/get` of `mailboxIds`). A JMAP id names an email
+    /// account-wide, so this is what scopes a write to the mailbox given.
+    fn emails_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<EmailMailboxes> {
+        if ids.is_empty() {
+            return Ok(EmailMailboxes::new());
+        }
+
+        let output = self.email_get(
+            ids.iter().map(ToString::to_string).collect(),
+            JmapEmailGetOptions {
+                properties: Some(vec![JmapEmailProperty::Id, JmapEmailProperty::MailboxIds]),
+                ..Default::default()
+            },
+        )?;
+
+        Ok(held_by(output.emails, mailbox))
     }
 
     /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the
-    /// blob id, then `Blob/download`.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    /// blob id, then `Blob/download`. The id names the email account-wide,
+    /// so `mailbox` is not checked.
+    pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let output = self.email_get(
             vec![id.to_string()],
             JmapEmailGetOptions {
@@ -222,7 +250,7 @@ impl JmapClient {
         // separate `Email/set` here.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
-            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+            self.store_keywords(&[id], &[seen], FlagOp::Add)?;
         }
 
         Ok(raw)
@@ -231,6 +259,12 @@ impl JmapClient {
     /// Uploads `raw` as a blob then imports it into `mailbox` with the
     /// requested keywords. Returns the created email id, when the server
     /// reports one.
+    ///
+    /// A server forbidding duplicates (Fastmail) refuses an import of
+    /// bytes the account holds with `alreadyExists` (RFC 8621 section
+    /// 4.8). An email being in several mailboxes at once, the existing one
+    /// is then filed into `mailbox` with the keywords, and its id
+    /// returned: the message ends up in the mailbox, as asked.
     pub fn add_message(
         &mut self,
         mailbox: &str,
@@ -250,7 +284,7 @@ impl JmapClient {
 
         let mut imports = BTreeMap::new();
         imports.insert(
-            "new".to_string(),
+            CREATED.to_string(),
             JmapEmailImportArgs {
                 blob_id,
                 mailbox_ids,
@@ -259,58 +293,70 @@ impl JmapClient {
             },
         );
 
-        let output = self.email_import(imports)?;
-        let email = output
-            .created
-            .get("new")
-            .ok_or_else(|| anyhow!("Email/import did not create the imported email"))?;
+        let existing_id = match imported(self.email_import(imports)?, CREATED)? {
+            Imported::Created(id) => return Ok(id),
+            Imported::Existing(id) => id,
+        };
 
-        Ok(email.id.clone())
-    }
-
-    /// Copies an email id set into `to` by adding `to`'s mailbox id.
-    /// `from` is unused (existing `mailboxIds` carry the source).
-    /// Returns the number of emails updated (any failure bails).
-    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let mut args = JmapEmailSetArgs::default();
-        for id in ids {
-            args.add_to_mailbox(id.to_string(), to.to_string());
+        args.add_to_mailbox(existing_id.clone(), mailbox.to_string());
+        for flag in flags {
+            args.set_keyword(existing_id.clone(), keyword_from(flag));
         }
 
-        let output = self.email_set(args)?;
-        let count = output.updated.len();
-        bail_on_not_updated(output.not_updated)?;
-        Ok(count)
+        if count_written(self.email_set(args)?)? == 0 {
+            bail!("JMAP server holds the message as `{existing_id}` but could not file it");
+        }
+
+        Ok(Some(existing_id))
     }
 
-    /// Moves an email id set from `from` to `to` in one `Email/set`.
-    /// Returns the number of emails updated (any failure bails).
+    /// Copies the ids of `ids` that `from` holds into `to`, adding `to`
+    /// to their mailboxes, and returns how many were copied.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+        let found = self.emails_in(from, ids)?;
+        if found.is_empty() {
+            return Ok(0);
+        }
+
+        let mut args = JmapEmailSetArgs::default();
+        for id in found.keys() {
+            args.add_to_mailbox(id.clone(), to.to_string());
+        }
+
+        count_written(self.email_set(args)?)
+    }
+
+    /// Moves the ids of `ids` that `from` holds to `to` in one
+    /// `Email/set`, and returns how many were moved.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let mut args = JmapEmailSetArgs::default();
-        for id in ids {
-            args.add_to_mailbox(id.to_string(), to.to_string());
-            args.remove_from_mailbox(id.to_string(), from.to_string());
+        let found = self.emails_in(from, ids)?;
+
+        // NOTE: the patch removing `from` would win over the one adding
+        // `to`, taking the emails out of the very mailbox they stay in.
+        if found.is_empty() || from == to {
+            return Ok(found.len());
         }
 
-        let output = self.email_set(args)?;
-        let count = output.updated.len();
-        bail_on_not_updated(output.not_updated)?;
-        Ok(count)
+        let mut args = JmapEmailSetArgs::default();
+        for id in found.keys() {
+            args.add_to_mailbox(id.clone(), to.to_string());
+            args.remove_from_mailbox(id.clone(), from.to_string());
+        }
+
+        count_written(self.email_set(args)?)
     }
 
-    /// Permanently destroys `ids` (`Email/set` destroy).
-    pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
-        let mut args = JmapEmailSetArgs::default();
-        for id in ids {
-            args.destroy(id.to_string());
+    /// Removes the ids of `ids` that `mailbox` holds from it, and returns
+    /// how many were removed: an email held there alone is destroyed, one
+    /// another mailbox holds too only leaves `mailbox`.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+        let found = self.emails_in(mailbox, ids)?;
+        if found.is_empty() {
+            return Ok(0);
         }
 
-        let output = self.email_set(args)?;
-        if !output.not_destroyed.is_empty() {
-            let ids: Vec<String> = output.not_destroyed.into_keys().collect();
-            bail!("JMAP Email/set destroy failed for: {}", ids.join(", "));
-        }
-        Ok(())
+        count_written(self.email_set(removal(mailbox, found))?)
     }
 
     /// Creates `name` at the top or under `parent` (`Mailbox/set`
@@ -423,8 +469,8 @@ impl JmapClient {
 
         let update = JmapVacationResponseUpdate {
             is_enabled: patch.enabled,
-            from_date: patch.from.map(format_date),
-            to_date: patch.to.map(format_date),
+            from_date: patch.from.map(|date| date.map(format_date)),
+            to_date: patch.to.map(|date| date.map(format_date)),
             subject: patch.subject,
             text_body: patch.text,
             html_body: patch.html,
@@ -502,15 +548,13 @@ impl JmapClient {
                 received_at: None,
             },
         );
-        let import = self.email_import(imports)?;
-        let email = import
-            .created
-            .get("outgoing")
-            .ok_or_else(|| anyhow!("Email/import did not stage the outgoing email"))?;
-        let email_id = email
-            .id
-            .clone()
-            .ok_or_else(|| anyhow!("Email/import response did not include an email id"))?;
+        // NOTE: bytes the account holds already (a draft added earlier, a
+        // retry) are refused with `alreadyExists` by a server forbidding
+        // duplicates; the existing email is then the one submitted.
+        let email_id = match imported(self.email_import(imports)?, "outgoing")? {
+            Imported::Created(Some(id)) | Imported::Existing(id) => id,
+            Imported::Created(None) => bail!("Email/import response did not include an email id"),
+        };
 
         let mut submissions = BTreeMap::new();
         submissions.insert(
@@ -534,8 +578,8 @@ impl JmapClient {
             on_success_update_email: Some(BTreeMap::from([("#outgoing".to_string(), sent)])),
             on_success_destroy_email: None,
         })?;
-        if !output.not_created.is_empty() {
-            bail!("EmailSubmission/set did not submit the email");
+        if let Some(err) = output.not_created.values().next() {
+            bail!("Submit JMAP message error{}", format_set_error(err));
         }
 
         Ok(())
@@ -612,15 +656,91 @@ impl JmapClient {
     }
 }
 
-/// Fails with the offending ids when an `Email/set` left some emails
-/// un-updated.
-fn bail_on_not_updated<E>(not_updated: BTreeMap<String, E>) -> Result<()> {
-    if not_updated.is_empty() {
-        return Ok(());
+/// What an `Email/import` of one message gave.
+#[derive(Debug, PartialEq)]
+enum Imported {
+    /// The email it created, with its id when the server named it.
+    Created(Option<String>),
+    /// The email holding the same bytes already, which a server forbidding
+    /// duplicates names on `alreadyExists` (RFC 8621 section 4.8).
+    Existing(String),
+}
+
+/// Reads the outcome of the import keyed `key`, failing on any refusal
+/// but `alreadyExists`.
+fn imported(mut output: JmapEmailImportOutput, key: &str) -> Result<Imported> {
+    match output.not_created.remove(key) {
+        None => output
+            .created
+            .remove(key)
+            .map(|email| Imported::Created(email.id))
+            .ok_or_else(|| anyhow!("Email/import did not create the imported email")),
+        Some(JmapEmailImportItemError::AlreadyExists { existing_id, .. }) => {
+            Ok(Imported::Existing(existing_id))
+        }
+        Some(err) => bail!("Import JMAP message error{}", format_set_error(&err)),
+    }
+}
+
+/// The mailboxes holding each email, keyed by email id.
+type EmailMailboxes = BTreeMap<String, BTreeMap<String, bool>>;
+
+/// Keeps the emails `mailbox` holds, each with the mailboxes holding it.
+fn held_by(emails: Vec<JmapEmail>, mailbox: &str) -> EmailMailboxes {
+    emails
+        .into_iter()
+        .filter_map(|email| {
+            let mailboxes = email.mailbox_ids.unwrap_or_default();
+            if !mailboxes.get(mailbox).copied().unwrap_or(false) {
+                return None;
+            }
+            Some((email.id?, mailboxes))
+        })
+        .collect()
+}
+
+/// The `Email/set` taking `found` out of `mailbox`: an email no other
+/// mailbox holds is destroyed, the others only lose `mailbox`.
+fn removal(mailbox: &str, found: EmailMailboxes) -> JmapEmailSetArgs {
+    let mut args = JmapEmailSetArgs::default();
+
+    for (id, mailboxes) in found {
+        let elsewhere = mailboxes
+            .iter()
+            .any(|(other, held)| *held && other != mailbox);
+
+        if elsewhere {
+            args.remove_from_mailbox(id, mailbox.to_string());
+        } else {
+            args.destroy(id);
+        }
     }
 
-    let ids: Vec<&str> = not_updated.keys().map(String::as_str).collect();
-    bail!("JMAP Email/set failed for: {}", ids.join(", "))
+    args
+}
+
+/// Counts the emails an `Email/set` updated or destroyed. One gone since
+/// it was looked up (`notFound`) counts as not found; any other refusal
+/// fails, saying how many landed beside it.
+fn count_written(output: JmapEmailSetOutput) -> Result<usize> {
+    let count = output.updated.len() + output.destroyed.len();
+
+    let refused: Vec<String> = output
+        .not_updated
+        .iter()
+        .chain(&output.not_destroyed)
+        .filter(|(_, err)| !matches!(err, JmapEmailSetItemError::NotFound { .. }))
+        .map(|(id, err)| format!("`{id}`{}", format_set_error(err)))
+        .collect();
+
+    if !refused.is_empty() {
+        bail!(
+            "Write JMAP messages error ({count} written): {}",
+            refused.join("; ")
+        );
+    }
+
+    Ok(count)
 }
 
 /// Primary mail account id; empty when the session has none.
@@ -643,6 +763,11 @@ fn mailbox_from(mailbox: JmapMailbox, with_counts: bool) -> Mailbox {
         total: with_counts.then_some(u64::from(mailbox.total_emails)),
         unread: with_counts.then_some(u64::from(mailbox.unread_emails)),
     }
+}
+
+/// A shared [`Flag`] as JMAP writes it, spelled as its keyword.
+pub(crate) fn written_flag(flag: &Flag) -> Flag {
+    Flag::from_raw(keyword_from(flag))
 }
 
 /// Maps a shared [`Flag`] to its JMAP keyword (RFC 8621 §4.1.1).
@@ -1038,5 +1163,119 @@ mod tests {
 
         assert!(rechecked("not after 2026-01-01", &december));
         assert!(rechecked("date 2026-01-01 or subject x", &december));
+    }
+
+    fn email(id: &str, mailboxes: &[&str]) -> JmapEmail {
+        let mailbox_ids: BTreeMap<&str, bool> = mailboxes.iter().map(|m| (*m, true)).collect();
+        serde_json::from_value(serde_json::json!({ "id": id, "mailboxIds": mailbox_ids })).unwrap()
+    }
+
+    fn set_output(updated: &[&str], not_updated: &[(&str, &str)]) -> JmapEmailSetOutput {
+        JmapEmailSetOutput {
+            new_state: String::new(),
+            created: BTreeMap::new(),
+            updated: updated.iter().map(|id| (id.to_string(), None)).collect(),
+            destroyed: Vec::new(),
+            not_created: BTreeMap::new(),
+            not_updated: not_updated
+                .iter()
+                .map(|(id, kind)| {
+                    let err = serde_json::from_value(serde_json::json!({ "type": kind })).unwrap();
+                    (id.to_string(), err)
+                })
+                .collect(),
+            not_destroyed: BTreeMap::new(),
+            keep_alive: true,
+        }
+    }
+
+    fn import_output(not_created: serde_json::Value) -> JmapEmailImportOutput {
+        JmapEmailImportOutput {
+            new_state: String::new(),
+            created: BTreeMap::new(),
+            not_created: BTreeMap::from([(
+                CREATED.to_string(),
+                serde_json::from_value(not_created).unwrap(),
+            )]),
+            keep_alive: true,
+        }
+    }
+
+    #[test]
+    fn an_id_another_mailbox_holds_is_not_in_the_mailbox() {
+        let emails = vec![
+            email("E1", &["A"]),
+            email("E2", &["B"]),
+            email("E3", &["A", "B"]),
+        ];
+
+        let found = held_by(emails, "A");
+
+        assert_eq!(found.keys().collect::<Vec<_>>(), ["E1", "E3"]);
+    }
+
+    #[test]
+    fn a_trash_removal_destroys_only_what_the_trash_alone_holds() {
+        let found = held_by(vec![email("E1", &["T"]), email("E2", &["T", "B"])], "T");
+
+        let args = serde_json::to_value(removal("T", found)).unwrap();
+
+        assert_eq!(args["destroy"], serde_json::json!(["E1"]));
+        assert_eq!(
+            args["update"],
+            serde_json::json!({ "E2": { "mailboxIds/T": null } })
+        );
+    }
+
+    #[test]
+    fn an_id_gone_beside_an_updated_one_counts_as_not_found() {
+        let output = set_output(&["E1"], &[("99999999", "notFound")]);
+
+        assert_eq!(count_written(output).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_refusal_beside_an_update_fails_saying_what_landed() {
+        let output = set_output(&["E1"], &[("E2", "tooManyKeywords")]);
+
+        let err = count_written(output).unwrap_err().to_string();
+
+        assert_eq!(
+            err,
+            "Write JMAP messages error (1 written): `E2`: tooManyKeywords"
+        );
+    }
+
+    #[test]
+    fn a_duplicate_import_names_the_existing_email() {
+        let output = import_output(serde_json::json!({
+            "type": "alreadyExists",
+            "existingId": "E1",
+        }));
+
+        assert_eq!(
+            imported(output, CREATED).unwrap(),
+            Imported::Existing(String::from("E1"))
+        );
+    }
+
+    #[test]
+    fn an_import_refusal_names_its_type() {
+        let output = import_output(serde_json::json!({
+            "type": "overQuota",
+            "description": "Mailbox full.",
+        }));
+
+        let err = imported(output, CREATED).unwrap_err().to_string();
+
+        assert_eq!(err, "Import JMAP message error: overQuota: Mailbox full");
+    }
+
+    #[test]
+    fn a_receipt_names_the_keyword_written() {
+        let flag = written_flag(&Flag::from_iana(IanaFlag::Flagged));
+
+        assert_eq!(flag.raw(), "$flagged");
+        assert_eq!(flag.iana(), Some(IanaFlag::Flagged));
     }
 }

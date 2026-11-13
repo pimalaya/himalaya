@@ -10,6 +10,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
+    capability::Capability,
     config::PostingStyle,
     email::flag::{Flag, FlagOp, IanaFlag},
     shared::{
@@ -29,7 +30,8 @@ use crate::{
 /// quote its text body. With `--all`, its other recipients go in `Cc`.
 ///
 /// The reply is printed, saved or sent as `message compose` does it.
-/// Once sent, the source is flagged as answered.
+/// Once sent, the source is flagged as answered, where the backend keeps
+/// that flag (`flags.answered`).
 ///
 /// Richer composition is `message read --raw <ID>` piped into a standalone
 /// composer, whose output feeds `message send` or `message add`.
@@ -114,7 +116,7 @@ pub struct MessageReplyCommand {
     pub save: Option<String>,
     /// With `--send`, keep no copy of the sent message, whatever
     /// `message.send.save-copy` says.
-    #[arg(long, conflicts_with = "save")]
+    #[arg(long, conflicts_with = "save", requires = "send")]
     pub no_save: bool,
     /// Send the message instead of printing it.
     ///
@@ -182,8 +184,10 @@ impl MessageReplyCommand {
 
         // NOTE: a draft that is only printed or saved answers nothing
         // yet, so the flag follows the send alone (RFC 3501 section
-        // 2.3.2).
-        if self.send {
+        // 2.3.2), and only where the backend keeps it, a send already
+        // done never failing for want of the flag.
+        let answered = client.resolution().support(Capability::FlagsAnswered);
+        if self.send && answered.is_served() {
             client
                 .store_flags(
                     &mailbox,

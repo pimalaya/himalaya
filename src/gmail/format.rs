@@ -1,6 +1,7 @@
 //! # Gmail format
 //!
-//! How much message detail the Gmail `get` commands ask for.
+//! How much message detail the Gmail `get` commands ask for, and how
+//! their text forms render the snippet Gmail returns.
 //!
 //! Gmail exposes the same `format` query parameter on `messages.get`,
 //! `drafts.get` and `threads.get`, so the three commands share one
@@ -35,5 +36,31 @@ impl From<FormatArg> for GmailMessageFormat {
             FormatArg::Raw => GmailMessageFormat::Raw,
             FormatArg::Metadata => GmailMessageFormat::Metadata,
         }
+    }
+}
+
+/// A Gmail snippet as plain text: Gmail escapes it as HTML and marks the
+/// words a query matched with `<b>`, which a terminal would show as is.
+pub fn snippet_text(snippet: &str) -> String {
+    snippet
+        .replace("<b>", "")
+        .replace("</b>", "")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::gmail::format::snippet_text;
+
+    #[test]
+    fn a_snippet_reads_as_plain_text() {
+        assert_eq!(
+            snippet_text("Hello <b>pelican</b> &gt; it&#39;s &amp;lt; &quot;x&quot;"),
+            "Hello pelican > it's &lt; \"x\""
+        );
     }
 }

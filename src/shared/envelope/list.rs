@@ -30,6 +30,7 @@ pub struct EnvelopeListCommand {
     /// envelopes.
     #[arg(long, short = 'p')]
     #[arg(value_name = "N", default_value = "1")]
+    #[arg(value_parser = clap::value_parser!(u32).range(1..))]
     pub page: u32,
     /// Maximum number of envelopes per page.
     ///
@@ -61,10 +62,12 @@ impl EnvelopeListCommand {
         let page = match &self.page_token.token {
             Some(token) => token
                 .parse()
+                .ok()
+                .filter(|page: &u32| *page > 0)
                 .with_context(|| format!("Invalid page token {token}"))?,
             None => self.page,
         };
-        let page = Some(page).filter(|p| *p > 0);
+        let page = Some(page);
         let page_size = self
             .page_size
             .or(Some(account.envelopes_list_page_size()))

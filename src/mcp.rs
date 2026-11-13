@@ -98,10 +98,16 @@ const TOOLS: &[McpTool] = &[
         .server(COMPOSER_ARGS),
     McpTool::read("attachment", "list"),
     // NOTE: always run with `--stdout`, which writes no file and reads
-    // exactly one part, whose bytes travel as an embedded resource.
+    // exactly one part, whose bytes travel as an embedded resource, so
+    // `--inline` (inline parts when no id is given) does nothing.
     McpTool::read("attachment", "download")
+        .without(&["inline"])
         .fixed(&["--stdout"])
         .one(&["attachment-id"])
+        .describe(&[(
+            "attachment-id",
+            "Identifier of the part to read, as attachment_list or message_read lists it",
+        )])
         .part(),
     McpTool::read("vacation", "get"),
     // NOTE: an auto-reply once on answers incoming mail, so setting it
@@ -234,6 +240,7 @@ struct McpTool {
     server: &'static [ServerArg],
     fixed: &'static [&'static str],
     one: &'static [&'static str],
+    describe: &'static [(&'static str, &'static str)],
     part: bool,
 }
 
@@ -299,6 +306,7 @@ impl McpTool {
             server: &[],
             fixed: &[],
             one: &[],
+            describe: &[],
             part: false,
         }
     }
@@ -328,6 +336,12 @@ impl McpTool {
     /// Repeatable arguments this tool takes exactly one value of.
     const fn one(self, one: &'static [&'static str]) -> Self {
         Self { one, ..self }
+    }
+
+    /// Descriptions replacing the command line help of arguments, by name,
+    /// where it does not hold for the tool.
+    const fn describe(self, describe: &'static [(&'static str, &'static str)]) -> Self {
+        Self { describe, ..self }
     }
 
     /// The command prints one part, `{id, mime, filename, size, data}`,
@@ -375,13 +389,18 @@ impl McpToolSpec {
                 continue;
             }
 
-            let served = capability::leaf(tool.group, tool.leaf)
-                .zip(resolution)
-                .is_none_or(|(leaf, resolution)| leaf.is_served(resolution));
+            let leaf = capability::leaf(tool.group, tool.leaf).zip(resolution);
+            let served = leaf.is_none_or(|(leaf, resolution)| leaf.is_served(resolution));
 
             if !served {
                 continue;
             }
+
+            // NOTE: an argument reaching what the account does not serve
+            // (`send` without a transport) is left out, the tool kept.
+            let unserved = leaf
+                .map(|(leaf, resolution)| leaf.unserved_args(resolution))
+                .unwrap_or_default();
 
             let Some(cmd) = cli
                 .find_subcommand(tool.group)
@@ -391,9 +410,15 @@ impl McpToolSpec {
             };
 
             let grammar = Grammar::new(&[tool.group, tool.leaf], cmd)
-                .retain(|name| !gated(name) && !tool.without.contains(&name))
+                .retain(|name| {
+                    !gated(name) && !tool.without.contains(&name) && !unserved.contains(&name)
+                })
                 .fixed(tool.fixed)
                 .one(tool.one);
+
+            let grammar = tool.describe.iter().fold(grammar, |grammar, (name, text)| {
+                grammar.describe(name, text)
+            });
 
             let mut input_schema = grammar.input_schema();
 
@@ -1070,12 +1095,16 @@ mod tests {
 
     #[cfg(any(backend, feature = "smtp"))]
     #[test]
-    fn an_argument_taking_one_value_is_a_required_array_of_one() {
+    fn an_argument_taking_one_value_is_a_required_string_described_for_the_tool() {
         let tool = spec("attachment_download");
         let schema = &tool.definition["inputSchema"];
+        let id = &schema["properties"]["attachment-id"];
 
-        assert_eq!(schema["properties"]["attachment-id"]["minItems"], json!(1));
-        assert_eq!(schema["properties"]["attachment-id"]["maxItems"], json!(1));
+        assert_eq!(id["type"], "string");
+        assert!(
+            !id["description"].as_str().unwrap().contains("all of them"),
+            "{id}"
+        );
         assert!(
             schema["required"]
                 .as_array()

@@ -5,7 +5,10 @@
 
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
-use io_msgraph::v1::rest::users::messages::{MsgraphImportance, MsgraphMessage};
+use io_msgraph::v1::{
+    field::MsgraphField,
+    rest::users::messages::{MsgraphImportance, MsgraphMessage},
+};
 use pimalaya_cli::printer::Printer;
 
 use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
@@ -30,15 +33,23 @@ pub struct MsgraphMessageUpdateCommand {
     /// existing categories.
     #[arg(long = "category", value_name = "NAME")]
     pub categories: Vec<String>,
+    /// Remove every category from the message.
+    #[arg(long, conflicts_with = "categories")]
+    pub no_categories: bool,
 }
 
 impl MsgraphMessageUpdateCommand {
     /// Applies the patches to the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
-        if !self.read && !self.unread && self.importance.is_none() && self.categories.is_empty() {
+        if !self.read
+            && !self.unread
+            && self.importance.is_none()
+            && self.categories.is_empty()
+            && !self.no_categories
+        {
             bail!(
                 "Nothing to update: pass at least one of \
-		 --read, --unread, --importance or --category"
+		 --read, --unread, --importance, --category or --no-categories"
             );
         }
 
@@ -56,7 +67,9 @@ impl MsgraphMessageUpdateCommand {
             patch.importance = Some(importance.into());
         }
 
-        patch.categories = self.categories;
+        if self.no_categories || !self.categories.is_empty() {
+            patch.categories = MsgraphField::Set(self.categories);
+        }
 
         let message = client.message_update(&self.id, &patch)?.response;
 

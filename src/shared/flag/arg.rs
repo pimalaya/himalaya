@@ -80,9 +80,23 @@ impl From<&FlagArg> for crate::email::flag::Flag {
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
     /// The identifiers of the messages to act on.
-    #[arg(name = "message_ids", value_name = "MESSAGE-IDS")]
+    #[arg(name = "message_ids", value_name = "MESSAGE-IDS", required = true)]
     #[arg(num_args = 1..)]
     pub inner: Vec<String>,
+}
+
+impl MessageIdsArg {
+    /// The ids, each once, in the order first given, so a repeated id is
+    /// neither acted on nor counted twice.
+    pub fn ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = Vec::with_capacity(self.inner.len());
+        for id in &self.inner {
+            if !ids.contains(&id.as_str()) {
+                ids.push(id);
+            }
+        }
+        ids
+    }
 }
 
 /// Repeatable option naming one or more flags.
@@ -92,4 +106,19 @@ pub struct FlagsArg {
     #[arg(name = "flags", value_name = "FLAG")]
     #[arg(long = "flag", short, required = true)]
     pub inner: Vec<FlagArg>,
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::MessageIdsArg;
+
+    #[test]
+    fn ids_are_required_and_a_repeated_one_counts_once() {
+        assert!(MessageIdsArg::try_parse_from(["ids"]).is_err());
+
+        let arg = MessageIdsArg::try_parse_from(["ids", "2", "1", "2"]).unwrap();
+        assert_eq!(arg.ids(), ["2", "1"]);
+    }
 }

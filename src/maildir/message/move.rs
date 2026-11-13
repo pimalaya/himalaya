@@ -27,7 +27,8 @@ pub struct MaildirMessageMoveCommand {
     pub source: MaildirPathFlag,
     #[command(flatten)]
     pub target: TargetMaildirPathFlag,
-    /// Move the message into a different subdirectory.
+    /// Move the message into a different subdirectory; a message moved
+    /// into `new` loses its flags, a Maildir keeping none there.
     #[arg(long, short, value_name = "DIR", value_enum)]
     pub subdir: Option<MaildirSubdirArg>,
 }

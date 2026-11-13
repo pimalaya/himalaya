@@ -17,7 +17,8 @@ use crate::{shared::raw::RawCommandArg, sieve::client::SieveClient};
 ///
 /// One line goes out without its trailing CRLF, which io-managesieve
 /// appends before reading the whole response back, literals included. A NO
-/// or a BYE comes back as output rather than as an error.
+/// or a BYE comes back as output rather than as an error. Under `--json`,
+/// each data line prints as an event before the completion.
 ///
 /// The exchange reads exactly one response, so batching is refused, and a
 /// literal-bearing command such as `PUTSCRIPT` has its own subcommand.
@@ -42,17 +43,23 @@ impl SieveRawCommand {
         }
 
         let response = client.raw(command.into())?;
+        let data: Vec<String> = response.data.iter().map(ToString::to_string).collect();
 
-        for line in &response.data {
-            printer.event(SieveRawEvent::Data {
-                text: line.to_string(),
-            })?;
+        // NOTE: a text event reaches a terminal only, and the data lines
+        // are what a raw command asks for, so the text form prints them
+        // within the result instead.
+        if printer.is_json() {
+            for text in &data {
+                let text = text.clone();
+                printer.event(SieveRawEvent::Data { text })?;
+            }
         }
 
         let completion = response.completion;
         let refused = completion.status != ManagesieveStatus::Ok;
 
         printer.out(SieveRawOutput {
+            data,
             status: completion.status.as_str(),
             code: completion.code.map(|code| code.to_string()),
             text: completion.text,
@@ -91,6 +98,9 @@ impl fmt::Display for SieveRawEvent {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SieveRawOutput {
+    /// The data lines, for the text form.
+    #[serde(skip)]
+    data: Vec<String>,
     /// `OK`, `NO` or `BYE`.
     status: &'static str,
     /// The response code, `null` when there is none.
@@ -101,6 +111,10 @@ pub(crate) struct SieveRawOutput {
 
 impl fmt::Display for SieveRawOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.data {
+            writeln!(f, "{line}")?;
+        }
+
         write!(f, "{}", self.status)?;
 
         if let Some(code) = &self.code {
@@ -111,5 +125,28 @@ impl fmt::Display for SieveRawOutput {
         }
 
         writeln!(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::sieve::raw::SieveRawOutput;
+
+    #[test]
+    fn the_text_form_prints_the_data_lines() {
+        let output = SieveRawOutput {
+            data: vec![String::from("\"IMPLEMENTATION\" \"Dovecot\"")],
+            status: "OK",
+            code: None,
+            text: None,
+        };
+
+        assert_eq!(output.to_string(), "\"IMPLEMENTATION\" \"Dovecot\"\nOK\n");
+        assert_eq!(
+            serde_json::to_value(&output).unwrap(),
+            json!({ "status": "OK", "code": null, "text": null })
+        );
     }
 }

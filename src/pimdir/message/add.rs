@@ -29,7 +29,7 @@ pub struct PimdirMessageAddCommand {
     #[arg(long = "mailbox", short = 'm', value_name = "NAME")]
     pub mailbox: String,
     /// Flags to set on the new message.
-    #[arg(long = "flag", short = 'f', value_name = "FLAG", num_args = 0..)]
+    #[arg(long = "flag", short = 'f', value_name = "FLAG")]
     pub flag: Vec<FlagArg>,
     #[command(flatten)]
     pub message: MessageArg,

@@ -9,6 +9,10 @@ use io_maildir::flag::MaildirFlag;
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FlagArg {
+    /// `D`: the message is an unsent draft.
+    Draft,
+    /// `F`: the message is marked for attention.
+    Flagged,
     /// `P`: the message has been resent or forwarded.
     Passed,
     /// `R`: the message has been replied to.
@@ -17,10 +21,6 @@ pub enum FlagArg {
     Seen,
     /// `T`: the message is marked for deletion.
     Trashed,
-    /// `D`: the message is an unsent draft.
-    Draft,
-    /// `F`: the message is marked for attention.
-    Flagged,
 }
 
 impl From<FlagArg> for MaildirFlag {

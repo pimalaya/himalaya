@@ -53,7 +53,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##imap.id.auto = true					# send one, as 163.com and QQ Mail want
 ##imap.id.fields = { name = true, version = false }	# ID sends name canned, version as NIL, no other
 ##imap.id.fields = {}					# send ID NIL, which 163.com refuses
-##imap.sort.fallback = true				# always sort on the client, unset doing so without SORT
+##imap.sort.fallback = true				# always sort on the client, unset doing so without SORT or on iCloud
 ##imap.sort.fallback = false				# always ask the server to SORT
 #imap.alpn = ["imap"]					# the ALPN id rustls offers
 ##imap.alpn = []					# none

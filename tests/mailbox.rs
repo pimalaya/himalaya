@@ -58,7 +58,8 @@ fn a_mailbox_is_created_renamed_under_its_parent_and_deleted() {
         &root,
         &["mailbox", "create", "2025", "--parent", "Archive"],
     );
-    assert_eq!(created["name"], "2025");
+    assert_eq!(created["name"], "Archive/2025");
+    assert_eq!(created["id"], root.join("Archive/2025").to_str().unwrap());
     assert!(root.join("Archive/2025/cur").is_dir(), "{created}");
 
     let renamed = himalaya(
@@ -66,11 +67,11 @@ fn a_mailbox_is_created_renamed_under_its_parent_and_deleted() {
         &root,
         &["mailbox", "rename", "Archive/2025", "2026"],
     );
-    assert_eq!(renamed["name"], "2026");
+    assert_eq!(renamed["name"], "Archive/2026");
     assert!(root.join("Archive/2026/cur").is_dir(), "{renamed}");
     assert!(!root.join("Archive/2025").exists(), "{renamed}");
 
     let deleted = himalaya(dir.path(), &root, &["mailbox", "delete", "Archive/2026"]);
-    assert!(deleted["id"].is_string(), "{deleted}");
+    assert_eq!(deleted["id"], root.join("Archive/2026").to_str().unwrap());
     assert!(!root.join("Archive/2026").exists(), "{deleted}");
 }

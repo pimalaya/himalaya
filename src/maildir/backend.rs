@@ -6,14 +6,16 @@
 //! Each method takes and returns the CLI's own [`crate::email`] types, so
 //! the work here is converting between those and io-maildir's.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use io_maildir::{
-    entry::MaildirFullEntry,
+    client::MaildirClientError,
+    entry::{MaildirFullEntry, locate::MaildirEntryLocateError},
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
 };
+use log::warn;
 
 use crate::{
     email::{
@@ -22,7 +24,7 @@ use crate::{
         mailbox::{Mailbox, child_path, renamed_path},
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    maildir::client::{MaildirClient, validate_maildir_name},
+    maildir::client::{MaildirClient, validate_maildir_level, validate_maildir_name},
 };
 
 impl MaildirClient {
@@ -30,6 +32,8 @@ impl MaildirClient {
     /// `with_counts` is ignored (Maildir does not surface counts
     /// cheaply).
     pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Vec<Mailbox>> {
+        self.ensure_root()?;
+
         let mut mailboxes: Vec<Mailbox> = self
             .list_maildirs()?
             .into_iter()
@@ -91,7 +95,8 @@ impl MaildirClient {
         Ok(paginate(hits, page, page_size))
     }
 
-    /// Adds, sets, or removes `flags` on a Maildir id set.
+    /// Adds, sets, or removes `flags` on the messages of `ids` the Maildir
+    /// holds, returning how many it found.
     pub fn store_flags(
         &self,
         mailbox: &str,
@@ -101,8 +106,9 @@ impl MaildirClient {
     ) -> Result<usize> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let maildir_flags = flags_to_maildir(flags);
+        let found = self.found(&maildir, ids)?;
 
-        for id in ids {
+        for id in &found {
             match op {
                 FlagOp::Add => self.add_flags(maildir.clone(), *id, maildir_flags.clone())?,
                 FlagOp::Set => self.set_flags(maildir.clone(), *id, maildir_flags.clone())?,
@@ -110,7 +116,7 @@ impl MaildirClient {
             }
         }
 
-        Ok(ids.len())
+        Ok(found.len())
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
@@ -138,33 +144,41 @@ impl MaildirClient {
         Ok(id)
     }
 
-    /// Copies every id from `from` to `to`.
+    /// Copies the messages of `ids` `from` holds to `to`, returning how
+    /// many it found.
     pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
+        let found = self.found(&source, ids)?;
 
-        for id in ids {
+        for id in &found {
             self.copy(*id, source.clone(), target.clone(), None)?;
         }
 
-        Ok(ids.len())
+        Ok(found.len())
     }
 
-    /// Moves every id from `from` to `to`.
+    /// Moves the messages of `ids` `from` holds to `to`, returning how
+    /// many it found.
     pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
+        let found = self.found(&source, ids)?;
 
-        for id in ids {
+        for id in &found {
             self.r#move(*id, source.clone(), target.clone(), None)?;
         }
 
-        Ok(ids.len())
+        Ok(found.len())
     }
 
     /// Creates the Maildir `name` at the top of the store, or under
-    /// `parent`, returning its id, its path on disk.
-    pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
+    /// `parent`, returning its id, its path on disk, and its name.
+    ///
+    /// An existing Maildir is refused, as IMAP's `CREATE` refuses one.
+    pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<(String, String)> {
+        validate_maildir_level(name)?;
+
         let path = match parent {
             Some(parent) => {
                 let parent = self.resolve_maildir(Path::new(parent))?;
@@ -174,39 +188,95 @@ impl MaildirClient {
         };
 
         validate_maildir_name(Path::new(&path))?;
+        if self.load_maildir(path.clone()).is_ok() {
+            bail!("Cannot create Maildir `{path}`: it already exists");
+        }
         self.create_maildir(path.clone())?;
 
-        Ok(self.resolve_maildir(Path::new(&path))?.path().to_string())
+        let id = self.resolve_maildir(Path::new(&path))?.path().to_string();
+        Ok((id, path))
     }
 
     /// Renames the last level of the Maildir `mailbox` to `name`, its
-    /// parent kept, returning its new id.
-    pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<String> {
+    /// parent kept, returning its new id and name. The target must not
+    /// exist.
+    pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<(String, String)> {
+        validate_maildir_level(name)?;
+
         let from = self.mailbox_name(&self.resolve_maildir(Path::new(mailbox))?);
         let to = renamed_path(&from, '/', name);
 
         validate_maildir_name(Path::new(&to))?;
+        let target = self.store.resolve(&to.as_str().into());
+        if Path::new(target.as_str()).exists() {
+            bail!("Cannot rename Maildir `{from}` to `{to}`: `{to}` already exists");
+        }
         self.rename_maildir(from, to.clone())?;
 
-        Ok(self.resolve_maildir(Path::new(&to))?.path().to_string())
+        let id = self.resolve_maildir(Path::new(&to))?.path().to_string();
+        Ok((id, to))
     }
 
-    /// Deletes the Maildir `mailbox` and every message in it.
-    pub fn delete_mailbox(&self, mailbox: &str) -> Result<()> {
-        let name = self.mailbox_name(&self.resolve_maildir(Path::new(mailbox))?);
-        self.delete_maildir(name)?;
-        Ok(())
-    }
-
-    /// Permanently deletes `ids` from `mailbox` by unlinking their files.
-    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<()> {
+    /// Deletes the Maildir `mailbox` and every message in it, returning
+    /// its id.
+    ///
+    /// A Maildir holding others is refused, naming them, rather than
+    /// removed with them, as IMAP servers keeping inferiors refuse it.
+    pub fn delete_mailbox(&self, mailbox: &str) -> Result<String> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
+        let name = self.mailbox_name(&maildir);
+        let prefix = format!("{name}/");
 
-        for id in ids {
+        let children: Vec<String> = self
+            .list_maildirs()?
+            .iter()
+            .map(|maildir| self.mailbox_name(maildir))
+            .filter(|child| child.starts_with(&prefix))
+            .collect();
+
+        if !children.is_empty() {
+            let children = children.join("`, `");
+            bail!("Cannot delete Maildir `{name}`: it holds `{children}`; delete them first");
+        }
+
+        self.delete_maildir(name)?;
+        Ok(maildir.path().to_string())
+    }
+
+    /// Permanently deletes the messages of `ids` `mailbox` holds by
+    /// unlinking their files, returning how many it found.
+    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+        let maildir = self.resolve_maildir(Path::new(mailbox))?;
+        let found = self.found(&maildir, ids)?;
+
+        for id in &found {
             self.delete_entry(maildir.clone(), *id)?;
         }
 
-        Ok(())
+        Ok(found.len())
+    }
+
+    /// The ids of `ids` `maildir` holds, each entry once, every id checked
+    /// before the first write. An unknown one is skipped with a warning.
+    fn found<'a>(&self, maildir: &Maildir, ids: &[&'a str]) -> Result<Vec<&'a str>> {
+        let mut paths = HashSet::new();
+        let mut found = Vec::with_capacity(ids.len());
+
+        for id in ids {
+            match self.locate(maildir.clone(), *id) {
+                Ok((path, _, _)) => {
+                    if paths.insert(path) {
+                        found.push(*id);
+                    }
+                }
+                Err(MaildirClientError::EntryLocate(MaildirEntryLocateError::NotFound(_))) => {
+                    warn!("skip message `{id}`: not found in {}", maildir.path());
+                }
+                Err(err) => return Err(err.into()),
+            }
+        }
+
+        Ok(found)
     }
 }
 
@@ -284,12 +354,100 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use io_maildir::path::MaildirFsPath;
+    use tempfile::tempdir;
 
     use super::*;
+    use crate::config::MaildirConfig;
 
     fn entry(name: &str, contents: &[u8]) -> MaildirFullEntry {
         MaildirFullEntry::from((MaildirFsPath::new(name), contents.to_vec()))
+    }
+
+    /// A client over a fresh store holding the Maildir `A` with one
+    /// message, returning its id.
+    fn fixture() -> (tempfile::TempDir, MaildirClient, String) {
+        let dir = tempdir().unwrap();
+        let client = MaildirClient::new(MaildirConfig {
+            root: dir.path().to_path_buf(),
+            keywords: Default::default(),
+        });
+        client.create_mailbox("A", None).unwrap();
+        let id = client
+            .add_message("A", &[], b"Subject: Hi\r\n\r\nbody".to_vec())
+            .unwrap();
+        (dir, client, id)
+    }
+
+    #[test]
+    fn unknown_ids_are_skipped_before_any_write_and_repeats_count_once() {
+        let (_dir, client, id) = fixture();
+        client.create_mailbox("B", None).unwrap();
+        let flagged = [Flag::from_iana(IanaFlag::Flagged)];
+
+        let count = client
+            .store_flags("A", &[&id, "nope", &id], &flagged, FlagOp::Add)
+            .unwrap();
+        assert_eq!(count, 1);
+
+        assert_eq!(client.copy_messages("A", "B", &["nope"]).unwrap(), 0);
+        assert!(
+            client
+                .list_envelopes("B", None, None, false)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(client.copy_messages("A", "B", &[&id, "nope"]).unwrap(), 1);
+        assert_eq!(client.delete_messages("B", &["nope"]).unwrap(), 0);
+    }
+
+    #[test]
+    fn a_store_with_dovecot_files_lists_and_a_missing_root_fails() {
+        let (dir, client, _) = fixture();
+        fs::write(dir.path().join("A/dovecot-uidlist"), b"").unwrap();
+        fs::write(dir.path().join("A/dovecot-keywords"), b"").unwrap();
+
+        let names: Vec<_> = client
+            .list_mailboxes(false)
+            .unwrap()
+            .into_iter()
+            .map(|mailbox| mailbox.name)
+            .collect();
+        assert_eq!(names, ["A"]);
+
+        let missing = MaildirClient::new(MaildirConfig {
+            root: dir.path().join("missing"),
+            keywords: Default::default(),
+        });
+        let err = missing.list_mailboxes(false).unwrap_err().to_string();
+        assert!(err.contains("does not exist"), "{err}");
+    }
+
+    #[test]
+    fn a_mailbox_write_keeps_one_listable_level() {
+        let (dir, client, _) = fixture();
+
+        for name in ["cur", ".hidden", "x/y"] {
+            assert!(client.create_mailbox(name, None).is_err(), "{name}");
+        }
+        assert!(client.create_mailbox("A", None).is_err());
+        assert!(!dir.path().join("cur").exists());
+
+        let (id, name) = client.create_mailbox("Kid", Some("A")).unwrap();
+        assert_eq!(name, "A/Kid");
+        assert_eq!(id, dir.path().join("A/Kid").to_string_lossy());
+
+        client.create_mailbox("B", None).unwrap();
+        assert!(client.rename_mailbox("B", "A").is_err());
+        assert!(client.rename_mailbox("B", "x/y").is_err());
+        let (_, renamed) = client.rename_mailbox("A/Kid", "Kid2").unwrap();
+        assert_eq!(renamed, "A/Kid2");
+
+        let err = client.delete_mailbox("A").unwrap_err().to_string();
+        assert!(err.contains("A/Kid2"), "{err}");
+        assert!(dir.path().join("A/Kid2/cur").is_dir());
     }
 
     #[test]

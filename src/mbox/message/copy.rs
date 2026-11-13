@@ -33,6 +33,7 @@ impl MboxMessageCopyCommand {
     /// Copies the messages to the target mbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
+        client.require_ids(&client.resolve_mbox(&self.source.inner), &ids)?;
         client.copy_messages(&self.source.inner, &self.target.inner, &ids)?;
         printer.out(IdsReceipt {
             ids: self.ids.inner.clone(),

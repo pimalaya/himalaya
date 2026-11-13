@@ -80,6 +80,16 @@ impl MboxClient {
         self.store.resolve(&MboxPath::from(mailbox))
     }
 
+    /// Fails when the root is no directory, so a mistyped `mbox.root` does
+    /// not list as an empty store.
+    pub fn check_root(&self) -> Result<()> {
+        let root = self.store.root.as_str();
+        if !Path::new(root).is_dir() {
+            bail!("Mbox root `{root}` does not exist or is not a directory");
+        }
+        Ok(())
+    }
+
     /// Loads the cache of the mbox at `path` and brings its index up to
     /// date, saving it back when the sync changed anything.
     ///

@@ -41,7 +41,7 @@ impl FlagAddCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
+        let ids = self.message_ids.ids();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
         let count = client.store_flags(&mailbox, &ids, &flags, FlagOp::Add)?;
@@ -51,7 +51,7 @@ impl FlagAddCommand {
 
         let queued = client.queues_writes();
         printer.out(FlagAddOutput {
-            flags,
+            flags: client.written_flags(flags),
             count,
             queued,
         })

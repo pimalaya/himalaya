@@ -17,7 +17,7 @@ use io_imap::{
         append::ImapMessageAppendError, close::ImapMailboxCloseError, copy::ImapMessageCopyError,
         create::ImapMailboxCreateError, delete::ImapMailboxDeleteError,
         expunge::ImapMailboxExpungeError, fetch::ImapMessageFetchError, list::ImapMailboxListError,
-        rename::ImapMailboxRenameError, search::ImapMessageSearchError,
+        lsub::ImapMailboxLsubError, rename::ImapMailboxRenameError, search::ImapMessageSearchError,
         select::ImapMailboxSelectError, status::ImapMailboxStatusError,
         store::ImapMessageStoreError, subscribe::ImapMailboxSubscribeError,
         unsubscribe::ImapMailboxUnsubscribeError,
@@ -139,6 +139,7 @@ fn refusal_of(err: &Error) -> Option<(ImapStatus, String)> {
         MailboxSubscribe(ImapMailboxSubscribeError),
         MailboxUnsubscribe(ImapMailboxUnsubscribeError),
         MailboxList(ImapMailboxListError),
+        MailboxLsub(ImapMailboxLsubError),
         MailboxStatus(ImapMailboxStatusError),
         MailboxClose(ImapMailboxCloseError),
         MailboxUnselect(ImapMailboxUnselectError),
@@ -188,7 +189,10 @@ impl fmt::Display for ImapDoneOutput {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use io_imap::{client::ImapClientError, rfc3501::select::ImapMailboxSelectError};
+    use io_imap::{
+        client::ImapClientError,
+        rfc3501::{lsub::ImapMailboxLsubError, select::ImapMailboxSelectError},
+    };
     use serde_json::json;
 
     use crate::imap::outcome::{ImapDoneOutput, ImapOutcome, ImapStatus, refusal_of};
@@ -205,6 +209,18 @@ mod tests {
             Some((ImapStatus::No, "Mailbox does not exist".into()))
         );
         assert_eq!(refusal_of(&anyhow::anyhow!("boom")), None);
+    }
+
+    #[test]
+    fn a_refused_lsub_reads_as_a_refusal() {
+        let err = Error::from(ImapClientError::MailboxLsub(ImapMailboxLsubError::Bad(
+            "Parse Error".into(),
+        )));
+
+        assert_eq!(
+            refusal_of(&err),
+            Some((ImapStatus::Bad, "Parse Error".into()))
+        );
     }
 
     #[test]

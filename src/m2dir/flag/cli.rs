@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-/// Manage M2DIR flags.
+/// Manage m2dir flags.
 ///
 /// A flag is a free-form UTF-8 string stored in the
 /// `.meta/<id>.flags` metadata file alongside the message.

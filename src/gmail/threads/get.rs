@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::gmail::{
     client::GmailClient,
-    format::FormatArg,
+    format::{FormatArg, snippet_text},
     messages::get::{GmailMessageHeaderOutput, message_headers},
 };
 
@@ -98,7 +98,7 @@ impl fmt::Display for GmailThreadGetOutput {
             fields.push("Message id", sanitize::text(&message.id));
 
             if let Some(snippet) = &message.snippet {
-                fields.push("Snippet", sanitize::text(snippet));
+                fields.push("Snippet", sanitize::text(&snippet_text(snippet)));
             }
 
             for (name, header) in names.iter().zip(&message.headers) {

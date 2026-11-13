@@ -953,8 +953,7 @@ dependencies = [
 [[package]]
 name = "io-gmail"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8de29a10a00cb5eabc1dc610823a1614f43d1e4cfed88a92f4b274bac6bd4c33"
+source = "git+https://github.com/pimalaya/io-gmail?rev=458f882874fb02f18d4ad54666a4f75587f43fdd#458f882874fb02f18d4ad54666a4f75587f43fdd"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -987,8 +986,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a2dce7ef04a2e48e6e65477a317cc95cf4ebea64fe4d3bcd2d25590916bb038"
+source = "git+https://github.com/pimalaya/io-imap?rev=dfe456f49e830ffd3742fd48328f1d5d4117ed3d#dfe456f49e830ffd3742fd48328f1d5d4117ed3d"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -996,6 +994,7 @@ dependencies = [
  "imap-codec",
  "io-sasl",
  "log",
+ "mime-rs",
  "pimalaya-stream",
  "secrecy",
  "thiserror",
@@ -1005,8 +1004,7 @@ dependencies = [
 [[package]]
 name = "io-jmap"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85710c72e0e7834323bdb580d654e7d5b47f80c8b112cd0397f857751211c186"
+source = "git+https://github.com/pimalaya/io-jmap?rev=359069519fcc750ad7ead0ea5bd727592a978dae#359069519fcc750ad7ead0ea5bd727592a978dae"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1036,8 +1034,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d790ef6241fdaefdf2c18035d7e38ceae51a04f0314067e9c65bc934f2a34bb7"
+source = "git+https://github.com/pimalaya/io-maildir?rev=ab6c2829ea7c05b5dbca0eec5f327faaba7ddc31#ab6c2829ea7c05b5dbca0eec5f327faaba7ddc31"
 dependencies = [
  "gethostname",
  "log",
@@ -1079,8 +1076,7 @@ dependencies = [
 [[package]]
 name = "io-msgraph"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a24cf1d3d017c3b29300fc056f8ad65d9b4af3fa22f48768c5a0bbeb63f65ff4"
+source = "git+https://github.com/pimalaya/io-msgraph?rev=7480799b808958d6ba289e02ec3d6da25b98f635#7480799b808958d6ba289e02ec3d6da25b98f635"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1395,8 +1391,7 @@ checksum = "d5848f5a9e8117cf94f2f90faac24a87ff81600ff8628c1e3deaab572e76bfa1"
 [[package]]
 name = "mime-rs"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44ca77080cce04174d6788fb762d0a5576a1a4902291da9f30862fa4180ec130"
+source = "git+https://github.com/pimalaya/mime?rev=2591e7fec9e3dd8b995d47323c6fa8868c558857#2591e7fec9e3dd8b995d47323c6fa8868c558857"
 dependencies = [
  "base64-codec",
  "encoding_rs",
@@ -1591,7 +1586,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.4.0"
-source = "git+https://github.com/pimalaya/cli?rev=0fbe5dd597ec48419eac87a9372c0c0d1f40f6f3#0fbe5dd597ec48419eac87a9372c0c0d1f40f6f3"
+source = "git+https://github.com/pimalaya/cli?rev=8cd41db5db8608bc6f76006c6564fa69edbe2e32#8cd41db5db8608bc6f76006c6564fa69edbe2e32"
 dependencies = [
  "anyhow",
  "base64-codec",

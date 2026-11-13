@@ -5,7 +5,7 @@
 
 use std::{fmt, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::Printer;
@@ -33,8 +33,9 @@ pub struct MaildirMessageSaveCommand {
     #[arg(long, short, value_name = "DIR", value_enum)]
     #[arg(default_value = "new")]
     pub subdir: MaildirSubdirArg,
-    /// The flags to add to the message.
-    #[arg(long = "flag", short, num_args = 0..)]
+    /// The flags to add to the message, which only `cur` keeps: they are
+    /// refused with `--subdir new`.
+    #[arg(long = "flag", short)]
     pub flags: Vec<FlagArg>,
     #[command(flatten)]
     pub message: MessageArg,
@@ -43,6 +44,10 @@ pub struct MaildirMessageSaveCommand {
 impl MaildirMessageSaveCommand {
     /// Delivers the raw message into the Maildir.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
+        if !self.flags.is_empty() && matches!(self.subdir, MaildirSubdirArg::New) {
+            bail!("A message saved to `new` carries no flags; pass `--subdir cur` to keep them");
+        }
+
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
         let msg = self.message.parse()?;
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));

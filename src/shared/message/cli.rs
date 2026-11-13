@@ -9,6 +9,7 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     capability::{self, Capability},
+    email::flag::Flag,
     shared::{
         client::EmailClient,
         message::{
@@ -38,7 +39,7 @@ pub enum MessageCommand {
     #[command(after_long_help = capability::help("message", "read"))]
     Read(MessageReadCommand),
     Parse(MessageParseCommand),
-    #[command(visible_alias = "write", alias = "new")]
+    #[command(visible_alias = "write", alias = "new", after_long_help = capability::help("message", "compose"))]
     Compose(MessageComposeCommand),
     #[command(after_long_help = capability::help("message", "reply"))]
     Reply(MessageReplyCommand),
@@ -66,7 +67,10 @@ impl MessageCommand {
         let composed = |read: bool, save: bool, send: bool| {
             [
                 (read, Capability::MessageRead),
-                (save, Capability::MessageAdd),
+                // NOTE: the copy of a sent message is the sending transport's
+                // to keep, which a backend filing it itself answers.
+                (save && !send, Capability::MessageAdd),
+                (save && send, Capability::SubmitCopy),
                 (send, Capability::Submit),
             ]
             .into_iter()
@@ -75,7 +79,12 @@ impl MessageCommand {
         };
 
         match self {
-            Self::Add(cmd) => composed(false, true, cmd.send),
+            Self::Add(cmd) => {
+                let mut capabilities: Vec<Capability> = composed(false, true, cmd.send);
+                let flags = cmd.flag.iter().map(Flag::from);
+                capabilities.extend(flags.filter_map(|flag| flag.capability()));
+                capabilities
+            }
             Self::Compose(cmd) => composed(false, cmd.save.is_some(), cmd.send),
             Self::Copy(_) => vec![Capability::MessageCopy],
             Self::Delete(_) => vec![Capability::MessageTrash],

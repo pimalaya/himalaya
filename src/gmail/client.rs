@@ -10,7 +10,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use io_gmail::v1::client::{GmailClientStd as Inner, GmailClientStdConnectOptions};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
@@ -50,8 +50,17 @@ impl GmailClient {
     /// Maps a label id, name or role onto its opaque Gmail label id.
     ///
     /// It lives here so every backend method stays a pure id consumer.
+    /// A value naming no label is refused, Gmail taking no label by any
+    /// other name.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
-        self.label_index()?.resolve(mailbox)
+        let index = self.label_index()?;
+        let id = index.resolve(mailbox)?;
+
+        if !index.0.iter().any(|label| label.id == id) {
+            bail!("Gmail has no label `{mailbox}`, by id, name or role");
+        }
+
+        Ok(id)
     }
 
     /// The id of the label carrying `role`, `None` when none does.

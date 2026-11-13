@@ -15,7 +15,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    gmail::{client::GmailClient, format::FormatArg},
+    gmail::{
+        client::GmailClient,
+        format::{FormatArg, snippet_text},
+    },
     shared::output::write_bytes_or_save,
 };
 
@@ -83,7 +86,7 @@ impl fmt::Display for GmailDraftGetOutput {
                 fields.push("Thread", sanitize::text(thread_id));
             }
             if let Some(snippet) = &message.snippet {
-                fields.push("Snippet", sanitize::text(snippet));
+                fields.push("Snippet", sanitize::text(&snippet_text(snippet)));
             }
         }
 

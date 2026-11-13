@@ -45,7 +45,7 @@ impl ImapMailboxSelectCommand {
                     .collect(),
                 exists: data.exists,
                 recent: data.recent,
-                unseen: data.unseen.map(NonZeroU32::get),
+                first_unseen: data.unseen.map(NonZeroU32::get),
                 permanent_flags: data
                     .permanent_flags
                     .unwrap_or_default()
@@ -76,8 +76,9 @@ pub(crate) struct ImapMailboxSelectOutput {
     exists: Option<u32>,
     /// How many messages are recent, `null` when not sent.
     recent: Option<u32>,
-    /// The number of the first unseen message, `null` when not sent.
-    unseen: Option<u32>,
+    /// The sequence number of the first unseen message (`[UNSEEN n]`, RFC
+    /// 3501 section 7.1), not a count, `null` when not sent.
+    first_unseen: Option<u32>,
     /// The flags a client can change permanently; `\\*` allows new
     /// keywords.
     permanent_flags: Vec<String>,
@@ -97,13 +98,54 @@ impl fmt::Display for ImapMailboxSelectOutput {
         if let Some(exists) = self.exists {
             fields.push("Messages", exists);
         }
+        if let Some(recent) = self.recent {
+            fields.push("Recent", recent);
+        }
+        if let Some(first_unseen) = self.first_unseen {
+            fields.push("First unseen", first_unseen);
+        }
+        if !self.flags.is_empty() {
+            fields.push("Flags", sanitize::text(&self.flags.join(" ")));
+        }
+        if !self.permanent_flags.is_empty() {
+            let permanent = self.permanent_flags.join(" ");
+            fields.push("Permanent flags", sanitize::text(&permanent));
+        }
         if let Some(uid_validity) = self.uid_validity {
             fields.push("UID validity", uid_validity);
         }
         if let Some(uid_next) = self.uid_next {
             fields.push("UID next", uid_next);
         }
+        if let Some(highest_mod_seq) = self.highest_mod_seq {
+            fields.push("Highest mod-seq", highest_mod_seq);
+        }
 
         write!(f, "{fields}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::imap::mailbox::select::ImapMailboxSelectOutput;
+
+    #[test]
+    fn the_first_unseen_number_is_not_named_as_a_count() {
+        let output = ImapMailboxSelectOutput {
+            mailbox: String::from("INBOX"),
+            flags: vec![String::from("\\Seen")],
+            exists: Some(6),
+            recent: Some(0),
+            first_unseen: Some(4),
+            permanent_flags: Vec::new(),
+            uid_next: None,
+            uid_validity: None,
+            highest_mod_seq: None,
+        };
+        let json = serde_json::to_value(&output).unwrap();
+
+        assert_eq!(json["firstUnseen"], 4);
+        assert!(json.get("unseen").is_none());
+        assert!(output.to_string().contains("First unseen"));
     }
 }

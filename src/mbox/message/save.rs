@@ -26,7 +26,7 @@ pub struct MboxMessageSaveCommand {
     #[command(flatten)]
     pub mbox: MboxPathFlag,
     /// The flags to store with the message.
-    #[arg(long = "flag", short, num_args = 0..)]
+    #[arg(long = "flag", short)]
     pub flags: Vec<FlagArg>,
     #[command(flatten)]
     pub message: MessageArg,

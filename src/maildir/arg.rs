@@ -13,7 +13,7 @@ const INBOX: &str = "Inbox";
 /// CLI argument carrying the name of a Maildir.
 #[derive(Debug, Parser)]
 pub struct MaildirNameArg {
-    /// Name of the Maildir.
+    /// Name of the Maildir, its path relative to the root.
     #[arg(name = "maildir_name", value_name = "NAME")]
     pub inner: String,
 }
@@ -63,7 +63,7 @@ pub struct MessageIdArg {
 pub struct MessageIdsArg {
     /// Identifier(s) of message(s).
     #[arg(name = "message_ids", value_name = "ID")]
-    #[arg(num_args = 1..)]
+    #[arg(num_args = 1.., required = true)]
     pub inner: Vec<String>,
 }
 

@@ -25,8 +25,9 @@ pub struct MailboxListCommand {
     /// Print the unread and total counts before the name, as `3/120`.
     ///
     /// JMAP and Graph return the counts in the same response, but IMAP
-    /// issues one extra `STATUS` per mailbox, which is slow on an account
-    /// with many. Maildir and m2dir do not implement counts at all.
+    /// issues one extra `STATUS` per mailbox and Gmail one `labels.get` per
+    /// label, which is slow on an account with many. Maildir and m2dir do
+    /// not implement counts at all.
     #[arg(long)]
     pub counts: bool,
 }

@@ -41,7 +41,8 @@ pub struct MsgraphMessageListCommand {
     /// OData `$filter` expression (e.g. `isRead eq false`).
     #[arg(long, value_name = "EXPR")]
     pub filter: Option<String>,
-    /// OData `$search` query, `subject:report` or a bare term.
+    /// OData `$search` query, `subject:report` or a bare term, quoted for
+    /// Graph unless it opens on a double quote.
     ///
     /// Graph forbids `$search` beside `$orderby` and ignores `$count`, so
     /// both are dropped here and the results come back in relevance
@@ -68,7 +69,8 @@ impl MsgraphMessageListCommand {
         account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
-        let search = self.search.as_deref();
+        let quoted = self.search.as_deref().map(quote_search);
+        let search = quoted.as_deref();
 
         // NOTE: Graph rejects `$search` beside `$orderby`, and pairing it
         // with `$count` wants a `ConsistencyLevel` header the client does
@@ -82,14 +84,7 @@ impl MsgraphMessageListCommand {
             None => self.count.then_some(true),
         };
 
-        // NOTE: the token is the `$skip` of the next link Graph returned, so
-        // a listing resumes with the same parameters.
-        let skip = match &self.page_token.token {
-            Some(token) => Some(token.parse::<u32>().map_err(|_| {
-                anyhow!("Cannot resume a Microsoft Graph listing from page token {token}")
-            })?),
-            None => self.skip,
-        };
+        let skip = page_skip(self.page_token.token.as_deref(), self.skip)?;
 
         let params = MsgraphMessagesListParams {
             top: self.top,
@@ -105,11 +100,7 @@ impl MsgraphMessageListCommand {
             .messages_list(self.folder.as_deref(), &params)?
             .response;
 
-        // NOTE: a next link without `$skip` (a `$search` page, resumed by
-        // `$skiptoken`) comes back whole, which `--page-token` refuses.
-        let next_page = response
-            .next_link
-            .map(|link| skip_of(&link).map_or(link, |skip| skip.to_string()));
+        let next_page = next_page_token(response.next_link, skip);
         printer.out(MsgraphMessageListOutput {
             account: account.name().to_string(),
             datetime_fmt: account.datetime_fmt().to_string(),
@@ -118,6 +109,7 @@ impl MsgraphMessageListCommand {
             search: self.search,
             filter: self.filter,
             messages: response.value,
+            count: response.count,
             next_page,
         })
     }
@@ -150,6 +142,8 @@ pub struct MsgraphMessageListOutput {
     #[serde(skip)]
     filter: Option<String>,
     messages: Vec<MsgraphMessage>,
+    /// How many messages match, with `--count`, `null` otherwise.
+    count: Option<u64>,
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     next_page: Option<String>,
@@ -171,6 +165,10 @@ impl fmt::Display for MsgraphMessageListOutput {
             }
         }
 
+        if let Some(count) = self.count {
+            listing.head("Count", &count.to_string());
+        }
+
         for message in &self.messages {
             let envelope = envelope_from(message.clone());
             let fmt = &self.datetime_fmt;
@@ -182,8 +180,55 @@ impl fmt::Display for MsgraphMessageListOutput {
         let next = self.next_page.as_deref();
         listing.page(ListingPage::Token, count, ["message", "messages"], next);
 
+        // NOTE: a whole next link is no page token, so it replaces the
+        // `Next page:` line `--page-token` would refuse.
+        if let Some(link) = next.filter(|next| next.parse::<u32>().is_err()) {
+            listing.header.pop();
+            listing.head("Next link", link);
+        }
+
         write!(f, "{listing}")
     }
+}
+
+/// The `$skip` a listing resumes from: the page token, the `$skip` of the
+/// next link Graph returned, so a listing resumes with the same
+/// parameters, else `skip`.
+pub(crate) fn page_skip(token: Option<&str>, skip: Option<u32>) -> Result<Option<u32>> {
+    let Some(token) = token else {
+        return Ok(skip);
+    };
+
+    let skip = token
+        .parse::<u32>()
+        .map_err(|_| anyhow!("Cannot resume a Microsoft Graph listing from page token {token}"))?;
+
+    Ok(Some(skip))
+}
+
+/// The page token of a Graph next link, its `$skip`, `None` without a
+/// link or when it leads back to the page at `skip` (a `$top` of 0).
+///
+/// A next link without one (a `$search` page, resumed by `$skiptoken`)
+/// comes back whole, which `--page-token` refuses.
+pub(crate) fn next_page_token(link: Option<String>, skip: Option<u32>) -> Option<String> {
+    let link = link?;
+
+    match skip_of(&link) {
+        Some(next) if next <= skip.unwrap_or(0) => None,
+        Some(next) => Some(next.to_string()),
+        None => Some(link),
+    }
+}
+
+/// Quotes a `$search` value as Graph wants it, unless already quoted:
+/// unquoted, a `:` or `-` is a syntax error.
+fn quote_search(search: &str) -> String {
+    if search.starts_with('"') {
+        return search.to_string();
+    }
+
+    format!("\"{}\"", search.replace('"', "\\\""))
 }
 
 /// The `$skip` query parameter of a Graph next link, percent-encoded or
@@ -199,7 +244,28 @@ fn skip_of(link: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use crate::msgraph::messages::list::skip_of;
+    use crate::msgraph::messages::list::{next_page_token, quote_search, skip_of};
+
+    #[test]
+    fn a_raw_search_is_quoted_once() {
+        assert_eq!(quote_search("subject:report"), r#""subject:report""#);
+        assert_eq!(quote_search(r#"a "b""#), r#""a \"b\"""#);
+        assert_eq!(quote_search(r#""subject:x""#), r#""subject:x""#);
+    }
+
+    #[test]
+    fn a_next_link_leading_back_is_no_next_page() {
+        let link = |skip: u32| {
+            Some(format!(
+                "https://graph.microsoft.com/v1.0/me/messages?%24top=0&%24skip={skip}"
+            ))
+        };
+        assert_eq!(next_page_token(link(0), None), None);
+        assert_eq!(next_page_token(link(20), Some(10)).as_deref(), Some("20"));
+
+        let search = String::from("https://graph.microsoft.com/v1.0/me/messages?%24skiptoken=x");
+        assert_eq!(next_page_token(Some(search.clone()), None), Some(search));
+    }
 
     #[test]
     fn the_skip_of_a_next_link_is_its_page_token() {

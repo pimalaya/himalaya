@@ -20,6 +20,7 @@ use mime::{
 /// unsplit: what reading a field costs.
 #[cfg(any(
     feature = "imap",
+    feature = "gmail",
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox"

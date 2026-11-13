@@ -74,7 +74,7 @@ use serde::{Deserialize, de::IgnoredAny};
 ))]
 use url::Url;
 
-use crate::backend::Backend;
+use crate::{backend::Backend, capability};
 
 // NOTE: these mirror the io-* crates' own `default_alpn()`, kept local so
 // the schema depends on no backend crate.
@@ -177,22 +177,34 @@ impl AccountConfig {
     /// caller being able to use `supported` alone.
     ///
     /// Names the v1 `backend` table when present, it being the likely
-    /// cause.
+    /// cause. A `--backend` naming a block the account lacks is refused
+    /// under `capability-missing`, as the resolver refuses a verb the
+    /// filter leaves unserved.
     pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
-        let reason = match backend {
+        let (reason, missing) = match backend {
             Backend::Auto => {
                 let supported: Vec<String> = supported.iter().map(|b| format!("`{b}`")).collect();
                 let supported = supported.join(", ");
-                format!("Account `{name}` configures no supported backend ({supported})")
+                let reason =
+                    format!("Account `{name}` configures no supported backend ({supported})");
+                (reason, false)
             }
             backend if !supported.contains(&backend) => {
-                format!("Backend `{backend}` is not supported by this command or build")
+                let reason =
+                    format!("Backend `{backend}` is not supported by this command or build");
+                (reason, false)
             }
-            backend => format!("Account `{name}` has no `{backend}` block"),
+            backend => (format!("Account `{name}` has no `{backend}` block"), true),
         };
 
-        if self.backend.is_some() {
-            anyhow!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
+        let reason = if self.backend.is_some() {
+            format!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
+        } else {
+            reason
+        };
+
+        if missing {
+            capability::missing(reason)
         } else {
             anyhow!(reason)
         }
@@ -510,8 +522,8 @@ pub struct ImapSortConfig {
     /// Forces the client-side sort fallback on or off.
     ///
     /// On, the client sorts with SEARCH and FETCH; off, it always issues a
-    /// server `SORT`. Unset, the fallback runs only when the server lacks
-    /// the SORT capability.
+    /// server `SORT`. Unset, the fallback runs when the server lacks the
+    /// SORT capability, and on iCloud, whose SORT ignores its keys.
     pub fallback: Option<bool>,
 }
 

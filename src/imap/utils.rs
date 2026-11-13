@@ -1,9 +1,10 @@
 //! # IMAP utils
 //!
 //! Envelope address conversion, shared by the `fetch` and `thread`
-//! commands.
+//! commands, and the sequence set argument the message commands take.
 
-use io_imap::types::envelope::Address;
+use anyhow::{Result, anyhow};
+use io_imap::types::{envelope::Address, sequence::SequenceSet};
 
 use crate::shared::message::header;
 
@@ -43,5 +44,25 @@ fn format_email(addr: &Address<'_>) -> String {
         format!("{mailbox}@{host}")
     } else {
         mailbox
+    }
+}
+
+/// Parses a sequence set argument, naming it when it is not one.
+pub fn parse_sequence_set(raw: &str) -> Result<SequenceSet> {
+    SequenceSet::try_from(raw).map_err(|_| {
+        anyhow!("Invalid sequence set `{raw}`: expected numbers as in `1`, `1,3` or `2:*`")
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::imap::utils::parse_sequence_set;
+
+    #[test]
+    fn a_bad_sequence_set_is_named() {
+        assert!(parse_sequence_set("1,3:*").is_ok());
+
+        let err = parse_sequence_set("abc").unwrap_err().to_string();
+        assert!(err.starts_with("Invalid sequence set `abc`"), "{err}");
     }
 }

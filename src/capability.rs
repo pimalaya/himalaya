@@ -346,6 +346,9 @@ pub struct Resolution {
     /// [`STORAGE_ORDER`] configured and allowed that serves them, else the
     /// storage backend, whose refusal then says what serves them instead.
     pub features: Option<Backend>,
+    /// Whether a Maildir keeps keywords, in its dovecot-keywords file:
+    /// `maildir.keywords.dovecot`, the header mode reading only.
+    pub maildir_keywords: bool,
 }
 
 impl Resolution {
@@ -378,12 +381,21 @@ impl Resolution {
             })
             .or(storage);
 
+        #[cfg(feature = "maildir")]
+        let maildir_keywords = config
+            .maildir
+            .as_ref()
+            .is_some_and(|maildir| maildir.keywords.dovecot);
+        #[cfg(not(feature = "maildir"))]
+        let maildir_keywords = false;
+
         Self {
             account: account.to_string(),
             filter,
             storage,
             sender,
             features,
+            maildir_keywords,
         }
     }
 
@@ -403,7 +415,7 @@ impl Resolution {
     /// answers it.
     pub fn support(&self, capability: Capability) -> Support {
         match self.transport(capability) {
-            Some(backend) => support(backend, capability),
+            Some(backend) => self.backend_support(backend, capability),
             None => Support::None("no transport"),
         }
     }
@@ -418,7 +430,7 @@ impl Resolution {
                 return Err(self.no_transport(*capability));
             };
 
-            let Support::None(detail) = support(backend, *capability) else {
+            let Support::None(detail) = self.backend_support(backend, *capability) else {
                 continue;
             };
 
@@ -435,6 +447,19 @@ impl Resolution {
         }
 
         Ok(())
+    }
+
+    /// How `backend` serves `capability` for this account: its row, the
+    /// Maildir keyword rows read from the account's configuration.
+    fn backend_support(&self, backend: Backend, capability: Capability) -> Support {
+        let keyword = matches!(
+            capability,
+            Capability::FlagsImportant | Capability::FlagsJunk
+        );
+        if backend == Backend::Maildir && keyword && !self.maildir_keywords {
+            return Support::None(MAILDIR_NO_KEYWORD);
+        }
+        support(backend, capability)
     }
 
     /// The refusal of a capability no configured transport answers.
@@ -517,14 +542,25 @@ const COPY_SHARED: &str = "the message is added to the target mailbox rather tha
 /// What the backends finding the trash by alias alone need.
 const TRASH_ALIAS: &str = "needs `mailbox.alias.trash`, the backend marking no trash";
 
+/// What deleting a mailbox holding others does on IMAP.
+const KEEPS_INFERIORS: &str = "a mailbox holding others is refused by the servers keeping inferior names (RFC 3501 section 6.3.4)";
+
+/// What deleting a mailbox holding others does in a local store.
+const LOCAL_INFERIORS: &str =
+    "a mailbox holding others is refused, naming them, rather than deleted with them";
+
 /// What a page-local sort leaves out.
 const PAGE_SORT: &str = "orders the fetched page only, the server answering in its own order";
 
 /// What a keyword flag needs on IMAP.
 const KEYWORD_PERMANENT: &str = "a keyword, kept only when the mailbox's `PERMANENTFLAGS` lists it or `\\*` (RFC 3501 section 7.1)";
 
-/// What a keyword flag is in a local store.
-const LOCAL_KEYWORD: &str = "a keyword, kept in the dovecot-keywords file or the configured header, which other readers may not see";
+/// What a keyword flag is in a Maildir, the header mode only reading.
+const MAILDIR_KEYWORD: &str = "a keyword, kept only with `maildir.keywords.dovecot` on, in the dovecot-keywords file, which other readers may not see";
+
+/// Why a Maildir account without dovecot keywords refuses a keyword flag.
+const MAILDIR_NO_KEYWORD: &str =
+    "a keyword is kept only in the dovecot-keywords file; set `maildir.keywords.dovecot = true`";
 
 /// Why a mail store holds no auto-reply.
 const NO_VACATION: &str = "the auto-reply lives on the provider; configure its JMAP or Gmail block";
@@ -553,10 +589,15 @@ macro_rules! storage_rows {
 
 /// IMAP (RFC 3501).
 const IMAP: &[Row] = storage_rows![
-    (C::EnvelopeSearch, Full),
+    (
+        C::EnvelopeSearch,
+        Partial(
+            "text as the server matches it: RFC 3501 asks for a case-insensitive substring, some servers (Cyrus, Fastmail) match whole words"
+        )
+    ),
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
-    (C::MailboxDelete, Full),
+    (C::MailboxDelete, Partial(KEEPS_INFERIORS)),
     (C::FlagsImportant, Server(KEYWORD_PERMANENT)),
     (C::FlagsJunk, Server(KEYWORD_PERMANENT)),
     (
@@ -573,7 +614,10 @@ const IMAP: &[Row] = storage_rows![
             "UIDPLUS (RFC 4315) removes them; without it they are flagged `\\Deleted`, the expunge left owing"
         )
     ),
-    (C::MessageTrash, Partial(TRASH_ALIAS)),
+    (
+        C::MessageTrash,
+        Server("`mailbox.alias.trash`, else the mailbox the server marks `\\Trash` (RFC 6154)")
+    ),
     (C::FlagsAnswered, Full),
     (C::FlagsDraft, Full),
     (C::Search(O::Date), Full),
@@ -645,7 +689,9 @@ const GMAIL: &[Row] = storage_rows![
     (C::MailboxRename, Full),
     (
         C::MailboxDelete,
-        Partial("the label goes, its messages staying under their other labels or in All Mail")
+        Partial(
+            "the label goes, its messages staying under their other labels or in All Mail and its sublabels under their full names"
+        )
     ),
     (C::FlagsImportant, Full),
     (
@@ -682,7 +728,10 @@ const GMAIL: &[Row] = storage_rows![
         C::Search(O::Flag),
         Partial("`seen`, `flagged`, `draft`, `important` and `junk` only")
     ),
-    (C::Search(O::Attachment), Full),
+    (
+        C::Search(O::Attachment),
+        Partial("Gmail's `has:attachment`, which counts inline images too")
+    ),
     (C::Search(O::SortDate), Partial(PAGE_SORT)),
     (C::Search(O::SortFrom), Partial(PAGE_SORT)),
     (C::Search(O::SortTo), Partial(PAGE_SORT)),
@@ -744,7 +793,12 @@ const MSGRAPH: &[Row] = storage_rows![
     (C::Search(O::SortTo), Partial(PAGE_SORT)),
     (C::Search(O::SortSubject), Partial(PAGE_SORT)),
     (C::Submit, Full),
-    (C::SubmitCopy, Full),
+    (
+        C::SubmitCopy,
+        Partial(
+            "Graph files every message it sends in Sent Items itself: the save options of a send (`--save`, `--no-save`, `message.send.save-copy`) are ignored"
+        )
+    ),
 ];
 
 /// The unified verbs the local backends serve alike, evaluating the query
@@ -778,20 +832,17 @@ macro_rules! local_rows {
 const MAILDIR: &[Row] = local_rows![
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
-    (C::MailboxDelete, Full),
-    (C::FlagsImportant, Partial(LOCAL_KEYWORD)),
-    (C::FlagsJunk, Partial(LOCAL_KEYWORD)),
+    (C::MailboxDelete, Partial(LOCAL_INFERIORS)),
+    (C::FlagsImportant, Partial(MAILDIR_KEYWORD)),
+    (C::FlagsJunk, Partial(MAILDIR_KEYWORD)),
     (C::Vacation, Not(NO_VACATION)),
 ];
 
 /// m2dir, whose flags are lines of their own, keywords included.
 const M2DIR: &[Row] = local_rows![
-    (
-        C::MailboxCreate,
-        Partial("m2dir folders are flat, so a `--parent` is refused")
-    ),
+    (C::MailboxCreate, Full),
     (C::MailboxRename, Not("m2dir has no rename yet")),
-    (C::MailboxDelete, Full),
+    (C::MailboxDelete, Partial(LOCAL_INFERIORS)),
     (C::FlagsImportant, Full),
     (C::FlagsJunk, Full),
     (C::Vacation, Not(NO_VACATION)),
@@ -799,7 +850,12 @@ const M2DIR: &[Row] = local_rows![
 
 /// mbox.
 const MBOX: &[Row] = local_rows![
-    (C::MailboxCreate, Full),
+    (
+        C::MailboxCreate,
+        Partial(
+            "a mailbox nests under an mbox file only with `mbox.thunderbird`; the plain layout refuses that `--parent`"
+        )
+    ),
     (C::MailboxRename, Full),
     (C::MailboxDelete, Full),
     (
@@ -866,6 +922,9 @@ pub struct Leaf {
     /// What it reaches, any one of which served making it usable; none
     /// for a leaf needing no transport.
     pub capabilities: &'static [Capability],
+    /// What an argument reaches beyond them, by its long name (`send`):
+    /// the argument is usable only where its capability is served.
+    pub optional: &'static [(&'static str, Capability)],
 }
 
 impl Leaf {
@@ -877,7 +936,23 @@ impl Leaf {
                 .iter()
                 .any(|capability| resolution.support(*capability).is_served())
     }
+
+    /// The arguments whose capability the account does not serve.
+    pub fn unserved_args(&self, resolution: &Resolution) -> Vec<&'static str> {
+        self.optional
+            .iter()
+            .filter(|(_, capability)| !resolution.support(*capability).is_served())
+            .map(|(name, _)| *name)
+            .collect()
+    }
 }
+
+/// What the composers reach beyond what they read: a send, a save.
+const COMPOSED: &[(&str, Capability)] = &[
+    ("send", C::Submit),
+    ("no-save", C::Submit),
+    ("save", C::MessageAdd),
+];
 
 /// The flag capabilities, which `flag add`, `set` and `remove` reach.
 const FLAGS: &[Capability] = &[
@@ -931,9 +1006,9 @@ pub const LEAVES: &[Leaf] = &[
     ),
     Leaf::new("message", "read", &[C::MessageRead]),
     Leaf::new("message", "send", &[C::Submit, C::SubmitCopy]),
-    Leaf::new("message", "compose", &[]),
-    Leaf::new("message", "reply", &[C::MessageRead]),
-    Leaf::new("message", "forward", &[C::MessageRead]),
+    Leaf::new("message", "compose", &[]).with(COMPOSED),
+    Leaf::new("message", "reply", &[C::MessageRead]).with(COMPOSED),
+    Leaf::new("message", "forward", &[C::MessageRead]).with(COMPOSED),
     Leaf::new("attachment", "list", &[C::AttachmentList]),
     Leaf::new("attachment", "download", &[C::AttachmentList]),
     Leaf::new("vacation", "get", &[C::Vacation]),
@@ -950,7 +1025,12 @@ impl Leaf {
             group,
             leaf,
             capabilities,
+            optional: &[],
         }
+    }
+
+    const fn with(self, optional: &'static [(&'static str, Capability)]) -> Self {
+        Self { optional, ..self }
     }
 }
 
@@ -959,7 +1039,15 @@ impl Leaf {
 pub fn all() -> Vec<Capability> {
     let mut all = Vec::new();
 
-    for capability in LEAVES.iter().flat_map(|leaf| leaf.capabilities) {
+    let optional = LEAVES
+        .iter()
+        .flat_map(|leaf| leaf.optional.iter().map(|(_, capability)| capability));
+
+    for capability in LEAVES
+        .iter()
+        .flat_map(|leaf| leaf.capabilities)
+        .chain(optional)
+    {
         if !all.contains(capability) {
             all.push(*capability);
         }
@@ -976,7 +1064,8 @@ pub fn leaf(group: &str, leaf: &str) -> Option<&'static Leaf> {
 }
 
 /// The `--help` footer of `group leaf`: for each capability it reaches,
-/// the backends declaring it by level, then what each detail says.
+/// the backends declaring it by level, then what each detail says. The
+/// capabilities an argument reaches follow, the argument named.
 ///
 /// Generated from the tables, so it never drifts from what the resolver
 /// enforces. Empty for a leaf reaching no transport.
@@ -987,7 +1076,21 @@ pub fn help(group: &str, leaf: &str) -> String {
 
     let mut help = String::from("Backends:");
 
-    for capability in leaf.capabilities {
+    // NOTE: each capability once, with the arguments reaching it.
+    let mut reached: Vec<(&Capability, Vec<&str>)> = leaf
+        .capabilities
+        .iter()
+        .map(|capability| (capability, Vec::new()))
+        .collect();
+
+    for (name, capability) in leaf.optional {
+        match reached.iter_mut().find(|(known, _)| *known == capability) {
+            Some((_, names)) => names.push(name),
+            None => reached.push((capability, vec![name])),
+        }
+    }
+
+    for (capability, args) in reached {
         let rows: Vec<(Backend, Support)> = Backend::ALL
             .iter()
             .filter_map(|backend| {
@@ -1013,7 +1116,11 @@ pub fn help(group: &str, leaf: &str) -> String {
             .map(|(level, backends)| format!("{level} on {}", backends.join(", ")))
             .collect();
 
-        help.push_str(&format!("\n  {capability}: {}", levels.join("; ")));
+        let with = match args.as_slice() {
+            [] => String::new(),
+            names => format!(" (with --{})", names.join(", --")),
+        };
+        help.push_str(&format!("\n  {capability}{with}: {}", levels.join("; ")));
 
         for (detail, backends) in details {
             help.push_str(&format!("\n    {}: {detail}", backends.join(", ")));
@@ -1035,6 +1142,17 @@ fn group_by<'a>(groups: &mut Vec<(&'a str, Vec<String>)>, key: &'a str, item: St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The footer names the capability an argument reaches, after those
+    /// the command reaches whatever it is given.
+    #[test]
+    fn the_footer_names_what_an_argument_reaches() {
+        let help = help("message", "reply");
+        let read = help.find("message.read:").unwrap();
+        let send = help.find("submit (with --send, --no-save):").unwrap();
+        assert!(read < send, "{help}");
+        assert!(help.contains("message.add (with --save):"), "{help}");
+    }
 
     #[test]
     fn every_storage_backend_declares_the_verbs_exchanging_ids() {
@@ -1126,6 +1244,35 @@ mod resolution_tests {
         assert_eq!(imap.transport(C::Vacation), Some(Backend::Imap));
         let refused = imap.require(&[C::Vacation]).unwrap_err().to_string();
         assert!(refused.contains("himalaya sieve"), "{refused}");
+    }
+
+    #[test]
+    fn a_maildir_keyword_flag_needs_the_dovecot_keywords_file() {
+        use pimalaya_cli::error::code_of;
+
+        use crate::error::ErrorCode;
+
+        let config = account(&format!(
+            "{MAILDIR_BLOCK}maildir.keywords.header = \"x-label\"\n"
+        ));
+        let resolution = Resolution::of("a", &config, Backend::Auto);
+        let err = resolution.require(&[C::FlagsImportant]).unwrap_err();
+        assert_eq!(
+            code_of::<ErrorCode>(&err),
+            Some(ErrorCode::CapabilityMissing)
+        );
+        assert!(
+            err.to_string().contains("maildir.keywords.dovecot"),
+            "{err}"
+        );
+
+        let config = account(&format!("{MAILDIR_BLOCK}maildir.keywords.dovecot = true\n"));
+        let resolution = Resolution::of("a", &config, Backend::Auto);
+        assert!(
+            resolution
+                .require(&[C::FlagsImportant, C::FlagsJunk])
+                .is_ok()
+        );
     }
 
     #[test]

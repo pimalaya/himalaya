@@ -27,7 +27,7 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
-        utils::to_address,
+        utils::{parse_sequence_set, to_address},
     },
     shared::{base64, envelope::list::format_addresses, message::header},
 };
@@ -82,7 +82,7 @@ impl ImapFetchCommand {
                 client.select(mailbox, ImapMailboxSelectOptions::default())?;
             }
 
-            let sequence_set = self.sequence_set.parse()?;
+            let sequence_set = parse_sequence_set(&self.sequence_set)?;
             let data = client.fetch(
                 sequence_set,
                 MacroOrMessageDataItemNames::MessageDataItemNames(names),
@@ -297,7 +297,7 @@ fn build_part(structure: &BodyStructure<'_>) -> BodyPart {
             };
 
             BodyPart {
-                content_type: content_type(&body.specific),
+                content_type: content_type(&body.specific).to_ascii_lowercase(),
                 name: part_name(&body.basic),
                 size: Some(body.basic.size as usize),
                 parts,
@@ -306,7 +306,7 @@ fn build_part(structure: &BodyStructure<'_>) -> BodyPart {
         BodyStructure::Multi {
             bodies, subtype, ..
         } => BodyPart {
-            content_type: format!("multipart/{}", istring(subtype)),
+            content_type: format!("multipart/{}", istring(subtype)).to_ascii_lowercase(),
             name: None,
             size: None,
             parts: bodies.as_ref().iter().map(build_part).collect(),
@@ -480,9 +480,13 @@ fn write_body_tree(
 #[cfg(test)]
 mod tests {
     use clap::Parser;
-    use io_imap::types::{
-        core::{Literal, NString},
-        fetch::{MessageDataItem, MessageDataItemName},
+    use io_imap::{
+        codec::{ResponseCodec, decode::Decoder},
+        types::{
+            core::{Literal, NString},
+            fetch::{MessageDataItem, MessageDataItemName},
+            response::{Data, Response},
+        },
     };
 
     use super::{FetchedMessage, ImapFetchCommand};
@@ -547,5 +551,27 @@ mod tests {
         };
         let json = serde_json::to_value(&message).unwrap();
         assert_eq!(json["body"], "U3ViamVjdDogeA0KDQrw0snXxdQg//v/vw0=");
+    }
+
+    #[test]
+    fn structure_types_print_in_lowercase() {
+        const LINE: &[u8] = b"* 1 FETCH (BODYSTRUCTURE (\
+            (\"TEXT\" \"PLAIN\" NIL NIL NIL \"7BIT\" 5 1)\
+            (\"APPLICATION\" \"OCTET-STREAM\" NIL NIL NIL \"BASE64\" 10) \"MIXED\"))\r\n";
+
+        let (_, response) = ResponseCodec::new().decode(LINE).unwrap();
+        let Response::Data(Data::Fetch { items, .. }) = response else {
+            panic!("not a FETCH answer");
+        };
+        let message = FetchedMessage::from_items(1, items.into_inner().into_iter());
+        let structure = message.structure.unwrap();
+        let types: Vec<&str> = structure
+            .parts
+            .iter()
+            .map(|part| part.content_type.as_str())
+            .collect();
+
+        assert_eq!(structure.content_type, "multipart/mixed");
+        assert_eq!(types, ["text/plain", "application/octet-stream"]);
     }
 }

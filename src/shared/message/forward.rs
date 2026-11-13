@@ -113,7 +113,7 @@ pub struct MessageForwardCommand {
     pub save: Option<String>,
     /// With `--send`, keep no copy of the sent message, whatever
     /// `message.send.save-copy` says.
-    #[arg(long, conflicts_with = "save")]
+    #[arg(long, conflicts_with = "save", requires = "send")]
     pub no_save: bool,
     /// Send the message instead of printing it.
     ///

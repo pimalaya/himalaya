@@ -23,7 +23,8 @@ use crate::{
 /// List flags set on an m2dir message.
 ///
 /// Reads the `.meta/<id>.flags` metadata file and prints one flag per
-/// row. Returns an empty list when the file is missing.
+/// row, an empty list when the file is missing. The id must name a message
+/// of the folder.
 #[derive(Debug, Parser)]
 pub struct M2dirFlagListCommand {
     #[command(flatten)]
@@ -43,6 +44,7 @@ impl M2dirFlagListCommand {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;
         let m2dir = client.open_m2dir(path)?;
+        client.entries(&m2dir, &[&self.id.inner])?;
         let flags = client.read_flags(&m2dir, &self.id.inner)?;
 
         printer.out(M2dirFlagListOutput {

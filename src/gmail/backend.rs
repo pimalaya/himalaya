@@ -9,26 +9,32 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, FixedOffset};
-use io_gmail::v1::rest::{
-    labels::GmailLabel,
-    messages::{
-        GmailInternalDateSource, GmailMessage, GmailMessageFormat, decode_raw, encode_raw,
-        insert::GmailMessageInsert, list::GmailMessagesListParams,
+use chrono::{DateTime, FixedOffset, Utc};
+use io_gmail::v1::{
+    client::GmailClientStdError,
+    rest::{
+        labels::GmailLabel,
+        messages::{
+            GmailInternalDateSource, GmailMessage, GmailMessageFormat, decode_raw, encode_raw,
+            insert::GmailMessageInsert, list::GmailMessagesListParams,
+        },
+        settings::{get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate},
     },
-    settings::{get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate},
+    send::GmailSendError,
 };
+use mime::header::marker::IN_REPLY_TO;
 
 use crate::{
     email::{
         address::Address,
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
-        search::query::SearchEmailsQuery,
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
+        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
         vacation::{Vacation, VacationPatch, date_from_millis},
     },
     gmail::{client::GmailClient, search},
+    shared::message::header::parse_headers,
 };
 
 /// Gmail system label marking an unread message; its absence means seen.
@@ -41,6 +47,8 @@ const IMPORTANT: &str = "IMPORTANT";
 const DRAFT: &str = "DRAFT";
 /// Gmail system label backing the shared `$Junk` flag.
 const SPAM: &str = "SPAM";
+/// Gmail system label every sent message carries.
+const SENT: &str = "SENT";
 
 impl GmailClient {
     /// Lists every Gmail label as a mailbox. With `with_counts`, issues
@@ -173,42 +181,66 @@ impl GmailClient {
             envelopes.push(envelope_from(message));
         }
 
-        if let Some(sorters) = query.and_then(|query| query.sort.as_deref()) {
-            search::sort_envelopes(&mut envelopes, sorters);
+        if let Some(sort) = query.and_then(|query| query.sort.as_deref()) {
+            sort_envelopes(&mut envelopes, Some(sort));
         }
 
         Ok(envelopes)
     }
 
-    /// Adds, sets, or removes `flags` on a message id set via
-    /// `messages.modify`. `mailbox` is unused: Gmail labels are global.
+    /// Adds, sets, or removes `flags` via `messages.modify` on the ids
+    /// carrying the `mailbox` label, returning how many do.
     pub fn store_flags(
         &mut self,
-        _mailbox: &str,
+        mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<usize> {
         let (add, remove) = label_patch(flags, op);
+        let ids = self.ids_in(mailbox, ids)?;
 
         // NOTE: an IANA flag without a label (`$Forwarded`) leaves nothing
         // to patch, and an empty `messages.modify` is a wasted request that
-        // could still fail. The ids are then not checked and all count as
-        // found. `\Answered` and `\Draft` never get here: the unified API
-        // refuses them up front (`flags.answered`, `flags.draft`).
+        // could still fail.
         if add.is_empty() && remove.is_empty() {
             return Ok(ids.len());
         }
 
-        for id in ids {
+        for id in &ids {
             self.message_modify(id, &add, &remove)?;
         }
         Ok(ids.len())
     }
 
+    /// The ids of `ids` whose message carries the `mailbox` label, one
+    /// `messages.get` (minimal) each, Gmail ids being account-wide. An id
+    /// Gmail does not know is left out, as is a repeated one.
+    fn ids_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Vec<String>> {
+        let mut found: Vec<String> = Vec::with_capacity(ids.len());
+
+        for id in ids {
+            if found.iter().any(|known| known == id) {
+                continue;
+            }
+
+            let message = match self.message_get(id, GmailMessageFormat::Minimal, &[]) {
+                Ok(output) => output.response,
+                Err(GmailClientStdError::Send(err)) if is_unknown_id(&err) => continue,
+                Err(err) => return Err(err.into()),
+            };
+
+            if message.label_ids.iter().any(|label| label == mailbox) {
+                found.push(id.to_string());
+            }
+        }
+
+        Ok(found)
+    }
+
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
     /// (format=RAW), base64url-decoded.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let message = self.message_get(id, GmailMessageFormat::Raw, &[])?.response;
         let raw = message
             .raw
@@ -220,7 +252,8 @@ impl GmailClient {
         // a separate `messages.modify` removing the `UNREAD` label.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
-            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+            let (add, remove) = label_patch(&[seen], FlagOp::Add);
+            self.message_modify(id, &add, &remove)?;
         }
 
         Ok(raw)
@@ -231,12 +264,14 @@ impl GmailClient {
     ///
     /// The flags become labels, an unseen message carrying `UNREAD`, and
     /// the message's own `Date:` dates it, as an IMAP `APPEND` would.
-    /// Inserting files the message without sending it or running filters.
+    /// Inserting files the message without sending it or running filters,
+    /// in the thread of the message it answers.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let (mut label_ids, _) = label_patch(flags, FlagOp::Set);
         label_ids.insert(0, mailbox.to_string());
 
         let message = GmailMessage {
+            thread_id: self.reply_thread_id(&raw)?,
             raw: Some(encode_raw(&raw)),
             label_ids,
             ..Default::default()
@@ -252,38 +287,49 @@ impl GmailClient {
         Ok(self.run(coroutine)?.response.id)
     }
 
-    /// Copies a message id set into `to` by adding `to`'s label. `from`
-    /// is unused (labels are additive).
-    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// Copies the ids carrying the `from` label into `to` by adding `to`'s
+    /// label, returning how many do.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+        let ids = self.ids_in(from, ids)?;
         let add = vec![to.to_string()];
-        for id in ids {
+        for id in &ids {
             self.message_modify(id, &add, &[])?;
         }
         Ok(ids.len())
     }
 
-    /// Moves a message id set from `from` to `to` by adding `to`'s label
-    /// and removing `from`'s.
+    /// Moves the ids carrying the `from` label to `to` by adding `to`'s
+    /// label and removing `from`'s, returning how many do. A move onto
+    /// the same label changes nothing.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+        let ids = self.ids_in(from, ids)?;
+        if from == to {
+            return Ok(ids.len());
+        }
+
         let add = vec![to.to_string()];
         let remove = vec![from.to_string()];
-        for id in ids {
+        for id in &ids {
             self.message_modify(id, &add, &remove)?;
         }
         Ok(ids.len())
     }
 
-    /// Permanently deletes `ids` (`users.messages.delete`).
-    pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
-        for id in ids {
+    /// Permanently deletes the ids carrying the `mailbox` label
+    /// (`users.messages.delete`), returning how many do.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+        let ids = self.ids_in(mailbox, ids)?;
+        for id in &ids {
             self.message_delete(id)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Creates the label `name` at the top, or under `parent` as
     /// `<parent>/<name>`, Gmail nesting labels by name, returning its id.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        validate_level(name, '/')?;
+
         let name = match parent {
             Some(parent) => {
                 let parent = self.label_get(parent)?.response.name;
@@ -305,16 +351,28 @@ impl GmailClient {
     /// Renames the last level of the label `mailbox` to `name`, its parent
     /// kept (`labels.patch`, so its colour and visibility survive),
     /// returning its id, which a rename leaves as it is.
+    ///
+    /// Gmail nests labels by name alone, so each sublabel is renamed too,
+    /// as IMAP `RENAME` moves the inferiors.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
+        validate_level(name, '/')?;
+
         let current = self.label_get(mailbox)?.response.name;
+        let renamed = renamed_path(&current, '/', name);
+        let labels = self.labels_list()?.response.labels;
 
-        let label = GmailLabel {
-            id: mailbox.to_string(),
-            name: renamed_path(&current, '/', name),
-            ..Default::default()
-        };
+        let mut renames = vec![(mailbox.to_string(), renamed.clone())];
+        renames.extend(sublabel_renames(&labels, &current, &renamed));
 
-        self.label_patch(&label)?;
+        for (id, name) in renames {
+            let label = GmailLabel {
+                id,
+                name,
+                ..Default::default()
+            };
+            self.label_patch(&label)?;
+        }
+
         self.forget_mailboxes();
         Ok(mailbox.to_string())
     }
@@ -352,20 +410,22 @@ impl GmailClient {
         if let Some(enabled) = patch.enabled {
             settings.enable_auto_reply = enabled;
         }
+        let millis = |date: DateTime<Utc>| date.timestamp_millis().to_string();
+
         if let Some(from) = patch.from {
-            settings.start_time = Some(from.timestamp_millis().to_string());
+            settings.start_time = from.map(millis);
         }
         if let Some(to) = patch.to {
-            settings.end_time = Some(to.timestamp_millis().to_string());
+            settings.end_time = to.map(millis);
         }
         if let Some(subject) = patch.subject {
-            settings.response_subject = Some(subject);
+            settings.response_subject = subject;
         }
         if let Some(text) = patch.text {
-            settings.response_body_plain_text = Some(text);
+            settings.response_body_plain_text = text;
         }
         if let Some(html) = patch.html {
-            settings.response_body_html = Some(html);
+            settings.response_body_html = html;
         }
 
         let update = GmailVacationUpdate::new(&self.auth, &self.user_id, settings)?;
@@ -375,21 +435,102 @@ impl GmailClient {
     }
 
     /// Sends a raw RFC 5322 message via `messages.send` (Gmail both
-    /// stores it in Sent and delivers it).
-    pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
+    /// stores it in Sent and delivers it), in the thread of the message
+    /// it answers, returning the id Gmail gave the sent message.
+    pub fn send_message(&mut self, raw: Vec<u8>) -> Result<String> {
         let message = GmailMessage {
+            thread_id: self.reply_thread_id(&raw)?,
             raw: Some(encode_raw(&raw)),
             ..Default::default()
         };
-        self.message_send(&message)?;
+        Ok(self.message_send(&message)?.response.id)
+    }
+
+    /// Files the sent message `id` under the `mailbox` label with `flags`,
+    /// in place of a second copy: Gmail already files it under `SENT`.
+    pub fn file_sent(&mut self, id: &str, mailbox: &str, flags: &[Flag]) -> Result<()> {
+        let (mut add, remove) = label_patch(flags, FlagOp::Add);
+        if mailbox != SENT {
+            add.push(mailbox.to_string());
+        }
+
+        if !add.is_empty() || !remove.is_empty() {
+            self.message_modify(id, &add, &remove)?;
+        }
+
         Ok(())
     }
+
+    /// The thread of the first `In-Reply-To:` parent of `raw` the account
+    /// holds, found by `rfc822msgid:`, `None` when none is.
+    ///
+    /// Gmail threads a message given its `threadId` only, headers alone
+    /// starting a new thread.
+    fn reply_thread_id(&mut self, raw: &[u8]) -> Result<Option<String>> {
+        for parent in reply_parents(raw) {
+            let q = format!("rfc822msgid:{parent}");
+            let params = GmailMessagesListParams {
+                q: Some(&q),
+                max_results: Some(1),
+                include_spam_trash: true,
+                ..Default::default()
+            };
+
+            let messages = self.messages_list(&params)?.response.messages;
+            if let Some(thread_id) = messages.into_iter().find_map(|m| m.thread_id) {
+                return Ok(Some(thread_id));
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+/// The `In-Reply-To:` message ids of `raw` a Gmail query can carry as
+/// they are, an id holding a space, a quote, a brace or a parenthesis
+/// being skipped rather than read as an operator.
+fn reply_parents(raw: &[u8]) -> Vec<String> {
+    let message = parse_headers(raw);
+
+    message
+        .root
+        .header::<IN_REPLY_TO>()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|id| normalize_message_id(id))
+        .filter(|id| {
+            id.chars()
+                .all(|c| c.is_ascii_graphic() && !matches!(c, '"' | '{' | '}' | '(' | ')'))
+        })
+        .collect()
 }
 
 /// Whether listing `mailbox` requires `includeSpamTrash`: Gmail hides
 /// SPAM and TRASH messages from `messages.list` unless asked.
 fn include_spam_trash(mailbox: &str) -> bool {
     matches!(mailbox, SPAM | "TRASH")
+}
+
+/// The `(id, name)` patches moving the sublabels of the label `old` under
+/// `new`, Gmail nesting labels by their `/`-separated names.
+fn sublabel_renames(labels: &[GmailLabel], old: &str, new: &str) -> Vec<(String, String)> {
+    let prefix = format!("{old}/");
+
+    labels
+        .iter()
+        .filter_map(|label| {
+            let rest = label.name.strip_prefix(&prefix)?;
+            Some((label.id.clone(), format!("{new}/{rest}")))
+        })
+        .collect()
+}
+
+/// Whether Gmail refused a message id as unknown: `404` for an id of the
+/// right shape, `400 Invalid id value` for one it cannot parse.
+fn is_unknown_id(err: &GmailSendError) -> bool {
+    err.api().is_some_and(|err| {
+        err.status == 404 || (err.status == 400 && err.message == "Invalid id value")
+    })
 }
 
 /// Converts one Gmail label into the shared [`Mailbox`] shape.
@@ -409,7 +550,7 @@ fn mailbox_from(label: GmailLabel) -> Mailbox {
 fn label_role(id: &str) -> Option<MailboxRole> {
     match id {
         "INBOX" => Some(MailboxRole::Inbox),
-        "SENT" => Some(MailboxRole::Sent),
+        SENT => Some(MailboxRole::Sent),
         DRAFT => Some(MailboxRole::Drafts),
         "TRASH" => Some(MailboxRole::Trash),
         SPAM => Some(MailboxRole::Junk),
@@ -525,13 +666,8 @@ fn label_patch(flags: &[Flag], op: FlagOp) -> (Vec<String>, Vec<String>) {
                 &mut add,
                 &mut remove,
             );
-            target(
-                flags.iter().any(Flag::is_draft),
-                DRAFT,
-                false,
-                &mut add,
-                &mut remove,
-            );
+            // NOTE: no `DRAFT` target: Gmail refuses it from a client in
+            // either list, failing the whole request.
             target(
                 flags.iter().any(Flag::is_junk),
                 SPAM,
@@ -611,4 +747,79 @@ fn parse_rfc2822(raw: &str) -> Option<DateTime<FixedOffset>> {
         return None;
     }
     DateTime::parse_from_rfc2822(trimmed).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use io_gmail::v1::{
+        rest::labels::GmailLabel,
+        send::{GmailApiError, GmailSendError},
+    };
+
+    use crate::{
+        email::flag::{Flag, FlagOp, IanaFlag},
+        gmail::backend::{is_unknown_id, label_patch, reply_parents, sublabel_renames},
+    };
+
+    fn label(id: &str, name: &str) -> GmailLabel {
+        GmailLabel {
+            id: id.into(),
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    fn api_error(status: u16, message: &str) -> GmailSendError {
+        GmailSendError::Api(GmailApiError {
+            status,
+            message: message.into(),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn a_flag_set_leaves_the_draft_label_alone() {
+        let flagged = Flag::from_iana(IanaFlag::Flagged);
+        let (add, remove) = label_patch(&[flagged], FlagOp::Set);
+
+        assert_eq!(add, ["UNREAD", "STARRED"]);
+        assert_eq!(remove, ["IMPORTANT", "SPAM"]);
+    }
+
+    #[test]
+    fn a_rename_moves_the_sublabels_and_only_them() {
+        let labels = [
+            label("1", "A/Sub"),
+            label("2", "A/Sub/Deep"),
+            label("3", "A/Sub/Deep/Er"),
+            label("4", "A/Subway"),
+            label("5", "B/A/Sub/X"),
+        ];
+
+        assert_eq!(
+            sublabel_renames(&labels, "A/Sub", "A/Sub2"),
+            [
+                ("2".to_string(), "A/Sub2/Deep".to_string()),
+                ("3".to_string(), "A/Sub2/Deep/Er".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_ids_are_told_from_other_failures() {
+        assert!(is_unknown_id(&api_error(
+            404,
+            "Requested entity was not found."
+        )));
+        assert!(is_unknown_id(&api_error(400, "Invalid id value")));
+        assert!(!is_unknown_id(&api_error(400, "Invalid label: DRAFT")));
+        assert!(!is_unknown_id(&api_error(403, "Forbidden")));
+    }
+
+    #[test]
+    fn a_reply_names_the_parents_a_query_can_carry() {
+        let raw = b"In-Reply-To: <a@x.org> <{d}@x.org> <e@x.org>\r\n\r\nbody\r\n";
+        assert_eq!(reply_parents(raw), ["a@x.org", "e@x.org"]);
+        assert!(reply_parents(b"Subject: hi\r\n\r\nbody\r\n").is_empty());
+    }
 }

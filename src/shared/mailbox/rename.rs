@@ -38,11 +38,11 @@ impl MailboxRenameCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = account.resolve_mailbox(&self.mailbox).to_string();
-        let id = client.rename_mailbox(&mailbox, &self.name)?;
+        let (id, name) = client.rename_mailbox(&mailbox, &self.name)?;
 
         printer.out(MailboxRenameOutput {
             id,
-            name: self.name,
+            name,
             mailbox,
             queued: client.queues_writes(),
         })
@@ -56,7 +56,8 @@ pub struct MailboxRenameOutput {
     /// The mailbox's id once renamed, which a backend naming mailboxes by
     /// path changes, `null` when the backend queued the rename.
     pub id: Option<String>,
-    /// Its new name.
+    /// Its new full name, the parent kept where the backend names the
+    /// hierarchy by path.
     pub name: String,
     /// The mailbox as it was given, for the confirmation.
     #[serde(skip)]

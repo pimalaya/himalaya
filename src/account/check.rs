@@ -9,7 +9,7 @@ use std::fs::File;
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
-#[cfg(any(feature = "maildir", feature = "mbox", feature = "m2dir"))]
+#[cfg(any(feature = "mbox", feature = "m2dir"))]
 use anyhow::bail;
 use clap::Parser;
 use pimalaya_cli::{error::PartialOutcome, fields::Fields, printer::Printer};
@@ -307,15 +307,12 @@ fn connect_msgraph(
     Ok(())
 }
 
-/// Checks that the Maildir root is a directory.
+/// Checks that the Maildir root is a directory and lists its Maildirs, so
+/// a store the listing cannot walk fails here rather than on first use.
 #[cfg(feature = "maildir")]
 fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> {
-    if !maildir_config.root.is_dir() {
-        bail!(
-            "Maildir root `{}` does not exist or is not a directory",
-            maildir_config.root.display()
-        );
-    }
+    let client = crate::maildir::client::MaildirClient::new(maildir_config.clone());
+    client.list_mailboxes(false)?;
 
     Ok(())
 }
@@ -340,7 +337,8 @@ fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
     Ok(())
 }
 
-/// Checks that the m2dir root is a directory.
+/// Checks that the m2dir root is an initialised store and lists its
+/// folders, so a store the listing cannot walk fails here.
 #[cfg(feature = "m2dir")]
 fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
     if !m2dir_config.root.is_dir() {
@@ -349,6 +347,15 @@ fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
             m2dir_config.root.display()
         );
     }
+
+    let client = crate::m2dir::client::M2dirClient::new(m2dir_config.clone());
+    if client.open_store().is_err() {
+        bail!(
+            "m2dir root `{}` holds no `.m2store` marker; `mailbox create` or `m2dir create` initialises it",
+            m2dir_config.root.display()
+        );
+    }
+    client.list_mailboxes(false)?;
 
     Ok(())
 }

@@ -16,7 +16,7 @@ use crate::{
     shared::receipt::IdsReceipt,
 };
 
-/// Add MAILDIR flag(s) to message(s).
+/// Add Maildir flags to messages.
 ///
 /// Appends the given info flags to the filename of each message
 /// identified by the given id(s).

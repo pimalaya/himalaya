@@ -18,24 +18,20 @@
 //! local evaluator read the day written in `Date:`.
 //!
 //! The sort half has no server-side counterpart, `messages.list`
-//! ordering being fixed newest-first, so it orders the fetched page
-//! client-side. The caveat: sorting a page is not sorting the result
-//! set, page boundaries staying in Gmail's default order.
-
-use std::cmp::Ordering;
+//! ordering being fixed newest-first, so the backend orders the fetched
+//! page with the shared evaluator. The caveat: sorting a page is not
+//! sorting the result set, page boundaries staying in Gmail's default
+//! order.
+//!
+//! A pattern is a literal: what Gmail would read as an operator inside it
+//! is neutralised (see [`value_q`]).
 
 use anyhow::Result;
 use chrono::{Duration, NaiveDate, NaiveTime};
 
 use crate::email::{
-    address::Address,
-    envelope::Envelope,
     flag::{Flag, IanaFlag},
-    search::{
-        error::unsupported,
-        filter::query::SearchEmailsFilterQuery,
-        sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
-    },
+    search::{error::unsupported, filter::query::SearchEmailsFilterQuery},
 };
 
 /// Translates the filter half of a shared query into a Gmail `q` value.
@@ -57,18 +53,20 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             Ok(format!("after:{}", since_q(next_day(*date))))
         }
         SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("before:{}", day_start(*date))),
-        SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("bcc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("bcc:{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Address(pattern) => {
-            let value = value_q(pattern);
+            let value = value_q(filter, pattern)?;
             Ok(format!(
                 "{{from:{value} to:{value} cc:{value} bcc:{value}}}"
             ))
         }
-        SearchEmailsFilterQuery::Subject(pattern) => Ok(format!("subject:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Body(pattern) => Ok(value_q(pattern)),
+        SearchEmailsFilterQuery::Subject(pattern) => {
+            Ok(format!("subject:{}", value_q(filter, pattern)?))
+        }
+        SearchEmailsFilterQuery::Body(pattern) => value_q(filter, pattern),
         SearchEmailsFilterQuery::Flag(flag) => flag_q(filter, flag),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("has:attachment")),
     }
@@ -95,30 +93,60 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             Ok(format!("-after:{}", since_q(next_day(*date))))
         }
         SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("-before:{}", day_start(*date))),
-        SearchEmailsFilterQuery::From(pattern) => Ok(format!("-from:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("-bcc:{}", value_q(pattern))),
+        SearchEmailsFilterQuery::From(pattern) => {
+            Ok(format!("-from:{}", value_q(filter, pattern)?))
+        }
+        SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("-bcc:{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Address(pattern) => {
-            let value = value_q(pattern);
+            let value = value_q(filter, pattern)?;
             Ok(format!(
                 "-from:{value} -to:{value} -cc:{value} -bcc:{value}"
             ))
         }
-        SearchEmailsFilterQuery::Subject(pattern) => Ok(format!("-subject:{}", value_q(pattern))),
-        SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(pattern))),
+        SearchEmailsFilterQuery::Subject(pattern) => {
+            Ok(format!("-subject:{}", value_q(filter, pattern)?))
+        }
+        SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(filter, flag)?)),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("-has:attachment")),
     }
 }
 
-/// Renders a pattern as a Gmail query value, quoting whitespace and
-/// escaping embedded double quotes.
-fn value_q(pattern: &str) -> String {
-    if pattern.contains([' ', '\t', '"']) {
-        format!("\"{}\"", pattern.replace('"', "\\\""))
-    } else {
-        pattern.to_string()
+/// Renders the pattern of `clause` as a Gmail query value matching it
+/// literally, refusing a pattern left with no word.
+///
+/// Gmail reads `OR`, `AND`, braces and parentheses even inside quotes and
+/// has no escape, so quotes, braces and parentheses become spaces (Gmail
+/// matches words, skipping punctuation) and a standalone `OR` or `AND` is
+/// lowercased (its operators are case-sensitive). Anything but a bare word
+/// is then quoted, so no `-` or `:` reads as an operator.
+fn value_q(clause: &SearchEmailsFilterQuery, pattern: &str) -> Result<String> {
+    let words: Vec<&str> = pattern
+        .split(|c: char| c.is_whitespace() || matches!(c, '"' | '{' | '}' | '(' | ')'))
+        .filter(|word| !word.is_empty())
+        .collect();
+
+    if words.is_empty() {
+        return Err(unsupported(
+            clause,
+            "Gmail search matches words, and it holds none",
+        ));
+    }
+
+    let words: Vec<String> = words
+        .into_iter()
+        .map(|word| match word {
+            "OR" | "AND" => word.to_lowercase(),
+            word => word.to_string(),
+        })
+        .collect();
+
+    let bare = |c: char| c.is_alphanumeric() || matches!(c, '@' | '.' | '_' | '+');
+    match words.as_slice() {
+        [word] if word.chars().all(bare) => Ok(word.clone()),
+        words => Ok(format!("\"{}\"", words.join(" "))),
     }
 }
 
@@ -163,40 +191,6 @@ fn flag_q(clause: &SearchEmailsFilterQuery, flag: &Flag) -> Result<String> {
     }
 }
 
-/// Orders a fetched page of envelopes by the sort half of a shared
-/// query, keys applying left to right, the first sorter being the
-/// primary key. Unset dates sort first ascending, address sorts look at
-/// the first address, subjects compare case-insensitively.
-pub(super) fn sort_envelopes(envelopes: &mut [Envelope], sorters: &[SearchEmailsSorter]) {
-    envelopes.sort_by(|lhs, rhs| {
-        for sorter in sorters {
-            let ordering = match sorter.0 {
-                SearchEmailsSorterKind::Date => lhs.date.cmp(&rhs.date),
-                SearchEmailsSorterKind::From => compare_addresses(&lhs.from, &rhs.from),
-                SearchEmailsSorterKind::To => compare_addresses(&lhs.to, &rhs.to),
-                SearchEmailsSorterKind::Subject => {
-                    lhs.subject.to_lowercase().cmp(&rhs.subject.to_lowercase())
-                }
-            };
-            let ordering = match sorter.1 {
-                SearchEmailsSorterOrder::Ascending => ordering,
-                SearchEmailsSorterOrder::Descending => ordering.reverse(),
-            };
-            if ordering != Ordering::Equal {
-                return ordering;
-            }
-        }
-        Ordering::Equal
-    });
-}
-
-/// Compares two address lists by their first address, the email being
-/// the key, case-insensitively, a missing address sorting first.
-fn compare_addresses(lhs: &[Address], rhs: &[Address]) -> Ordering {
-    let key = |addrs: &[Address]| addrs.first().map(|addr| addr.email.to_lowercase());
-    key(lhs).cmp(&key(rhs))
-}
-
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -226,10 +220,36 @@ mod tests {
 
     #[test]
     fn patterns_with_spaces_get_quoted() {
-        assert_eq!(value_q("john doe"), "\"john doe\"");
-        assert_eq!(value_q("said \"hi\""), "\"said \\\"hi\\\"\"");
-        assert_eq!(value_q("alice"), "alice");
-        assert_eq!(q("from alice"), "from:alice");
+        assert_eq!(q("from \"john doe\""), "from:\"john doe\"");
+        assert_eq!(q("from alice@example.org"), "from:alice@example.org");
+    }
+
+    #[test]
+    fn patterns_cannot_widen_the_search() {
+        assert_eq!(
+            q("subject \"rapport OR kangaroo\""),
+            "subject:\"rapport or kangaroo\""
+        );
+        assert_eq!(
+            q("subject \"rapport} OR {kangaroo\""),
+            "subject:\"rapport or kangaroo\""
+        );
+        assert_eq!(q("from \"alice) AND (dave\""), "from:\"alice and dave\"");
+        assert_eq!(
+            q(r#"body "zebrafish\" OR kangaroo""#),
+            "\"zebrafish or kangaroo\""
+        );
+    }
+
+    #[test]
+    fn operator_lookalikes_get_quoted() {
+        assert_eq!(q("body \"from:alice\""), "\"from:alice\"");
+        assert_eq!(q("not body \"-draft\""), "-\"-draft\"");
+    }
+
+    #[test]
+    fn patterns_without_a_word_bail() {
+        assert!(q_err("subject \"()\"").contains("holds none"));
     }
 
     #[test]

@@ -4,14 +4,10 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_mbox::mbox::delete::MboxDelete;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    mbox::{
-        arg::RequiredMboxPathFlag,
-        client::{MboxClient, validate_mbox_name},
-    },
+    mbox::{arg::RequiredMboxPathFlag, client::MboxClient},
     shared::receipt::IdReceipt,
 };
 
@@ -19,7 +15,8 @@ use crate::{
 ///
 /// The file and every message in it go, under lock so no delivery lands
 /// in it meanwhile. The target is named explicitly, with no default,
-/// deletion being destructive.
+/// deletion being destructive. In the Thunderbird layout an mbox holding
+/// others is refused.
 #[derive(Debug, Parser)]
 pub struct MboxMailboxDeleteCommand {
     #[command(flatten)]
@@ -29,9 +26,7 @@ pub struct MboxMailboxDeleteCommand {
 impl MboxMailboxDeleteCommand {
     /// Deletes the mbox and every message in it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
-        validate_mbox_name(&self.mbox_path.inner)?;
-        let path = client.resolve_mbox(&self.mbox_path.inner);
-        client.run(MboxDelete::new(path, client.lock.clone()))?;
+        client.delete_mailbox(&self.mbox_path.inner)?;
         printer.out(IdReceipt {
             id: self.mbox_path.inner,
             done: "Mbox successfully deleted",

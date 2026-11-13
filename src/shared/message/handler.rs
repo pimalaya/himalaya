@@ -18,6 +18,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use log::debug;
 use mime::{
     header::marker::{BCC, CC, FROM, SUBJECT, TO},
     tree::cst::MimeCst,
@@ -31,7 +32,11 @@ use crate::{
     account::context::Account,
     capability::Capability,
     email::flag::{Flag, IanaFlag},
-    shared::{client::EmailClient, message::part},
+    shared::{
+        attachment::list::attachments,
+        client::{EmailClient, SentCopy},
+        message::part,
+    },
 };
 
 /// What [`apply`] did with the bytes.
@@ -72,29 +77,42 @@ pub fn apply(
 
     let mailbox = save.map(|name| account.resolve_mailbox(name));
 
+    // NOTE: a backend filing every sent message itself (Graph) keeps that
+    // copy whatever is asked, so the save options of a send are moot there.
+    if send && client.files_sent_copy() {
+        if let Some(mailbox) = mailbox {
+            debug!("the backend files the sent copy itself, ignoring `{mailbox}`");
+        }
+        client.send_message(None, flags, raw, false)?;
+        return Ok(Outcome::Saved {
+            id: None,
+            sent: true,
+        });
+    }
+
     // NOTE: checked before the send, so a backend that cannot hold the
     // copy refuses the whole command rather than send and then fail.
     if mailbox.is_some() {
         client.require(&[Capability::MessageAdd])?;
     }
 
-    let carried = match send {
+    let copy = match send {
         true => {
             let sent = mailbox.or_else(|| account.mailbox_alias.get("sent").map(String::as_str));
-            client.send_message(sent, raw.clone(), mailbox.is_some())?
+            client.send_message(sent, flags, raw.clone(), mailbox.is_some())?
         }
-        false => false,
+        false => SentCopy::Owed,
     };
 
-    let saved_id = match mailbox {
-        Some(_) if carried => Some(None),
-        Some(mailbox) if send => Some(
+    let saved_id = match (mailbox, copy) {
+        (Some(_), SentCopy::Filed(id)) => Some(id),
+        (Some(mailbox), SentCopy::Owed) if send => Some(
             client
                 .add_message(mailbox, flags, raw)
                 .with_context(|| format!("Message sent, but saving a copy to {mailbox} failed"))?,
         ),
-        Some(mailbox) => Some(client.add_message(mailbox, flags, raw)?),
-        None => None,
+        (Some(mailbox), SentCopy::Owed) => Some(client.add_message(mailbox, flags, raw)?),
+        (None, _) => None,
     };
 
     Ok(match saved_id {
@@ -205,7 +223,24 @@ pub struct MessageTemplateOutput {
     pub cc: Vec<String>,
     pub bcc: Vec<String>,
     pub subject: Option<String>,
+    /// The text body, its line breaks LF, as an editor shows them.
     pub body: String,
+    /// The attached files, which ride along with the message: the template
+    /// carries their names, not their bytes, so handing it back means
+    /// passing them again through `--attach`.
+    pub attachments: Vec<TemplateAttachment>,
+}
+
+/// A file attached to a composed message.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateAttachment {
+    /// The file name it is attached under, `None` when it has none.
+    pub filename: Option<String>,
+    /// The MIME type, `None` when the part carries no `Content-Type`.
+    pub mime: Option<String>,
+    /// The size of its content, in bytes.
+    pub size: u64,
 }
 
 impl MessageTemplateOutput {
@@ -220,7 +255,15 @@ impl MessageTemplateOutput {
                 .unwrap_or_default()
         };
 
-        let body = part::body_text(&message);
+        // NOTE: the text is read back from the CRLF bytes the builder wrote.
+        let body = part::body_text(&message).replace("\r\n", "\n");
+        let attachments = attachments(&message)
+            .map(|attachment| TemplateAttachment {
+                filename: attachment.filename,
+                mime: attachment.mime,
+                size: attachment.size,
+            })
+            .collect();
 
         Ok(Self {
             from: root
@@ -233,6 +276,7 @@ impl MessageTemplateOutput {
             bcc: mailboxes(root.header::<BCC>()),
             subject: root.header::<SUBJECT>(),
             body,
+            attachments,
         })
     }
 }
@@ -300,6 +344,40 @@ mod tests {
         );
         assert!(template.cc.is_empty());
         assert_eq!(template.subject.as_deref(), Some("Réunion"));
-        assert_eq!(template.body, "à demain\r\n");
+        assert_eq!(template.body, "à demain\n");
+        assert!(template.attachments.is_empty());
+    }
+
+    #[test]
+    fn template_lists_the_attachments_and_writes_lf() {
+        let raw = concat!(
+            "To: a@example.org\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/mixed; boundary=b\r\n",
+            "\r\n",
+            "--b\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "\r\n",
+            "> quoted\r\n",
+            ">\r\n",
+            "mine\r\n",
+            "--b\r\n",
+            "Content-Type: message/rfc822\r\n",
+            "Content-Disposition: attachment; filename=inner.eml\r\n",
+            "\r\n",
+            "Subject: inner\r\n",
+            "\r\n",
+            "body\r\n",
+            "--b--\r\n",
+        );
+
+        let template = MessageTemplateOutput::parse(raw.as_bytes()).unwrap();
+
+        assert_eq!(template.body, "> quoted\n>\nmine");
+        assert_eq!(template.attachments.len(), 1);
+        let attachment = &template.attachments[0];
+        assert_eq!(attachment.filename.as_deref(), Some("inner.eml"));
+        assert_eq!(attachment.mime.as_deref(), Some("message/rfc822"));
+        assert!(attachment.size > 0);
     }
 }

@@ -4,6 +4,7 @@
 //! from a string, and its client-side evaluation.
 
 #[cfg(any(
+    feature = "gmail",
     feature = "maildir",
     feature = "m2dir",
     feature = "mbox",

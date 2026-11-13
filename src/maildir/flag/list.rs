@@ -17,7 +17,7 @@ use crate::{account::context::Account, email::flag::IanaFlag};
 /// List the standard Maildir flags.
 ///
 /// Displays the six standard Maildir info flags with their
-/// single-letter codes (P, R, S, T, D, F).
+/// single-letter codes (D, F, P, R, S, T).
 #[derive(Debug, Parser)]
 pub struct MaildirFlagListCommand;
 
@@ -26,12 +26,12 @@ impl MaildirFlagListCommand {
     pub fn execute(self, printer: &mut impl Printer, _account: &mut Account) -> Result<()> {
         let table = MaildirFlagListOutput {
             flags: vec![
+                FlagRow::new(MaildirFlag::Draft, IanaFlag::Draft),
+                FlagRow::new(MaildirFlag::Flagged, IanaFlag::Flagged),
                 FlagRow::new(MaildirFlag::Passed, IanaFlag::Forwarded),
                 FlagRow::new(MaildirFlag::Replied, IanaFlag::Answered),
                 FlagRow::new(MaildirFlag::Seen, IanaFlag::Seen),
                 FlagRow::new(MaildirFlag::Trashed, IanaFlag::Deleted),
-                FlagRow::new(MaildirFlag::Draft, IanaFlag::Draft),
-                FlagRow::new(MaildirFlag::Flagged, IanaFlag::Flagged),
             ],
         };
 

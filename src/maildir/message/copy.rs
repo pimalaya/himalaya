@@ -18,7 +18,7 @@ use crate::{
 /// Copy Maildir message(s) to another folder.
 ///
 /// Writes a copy of each message file identified by the given id(s)
-/// into the target folder.
+/// into the target folder, printing the ids the copies got.
 #[derive(Debug, Parser)]
 pub struct MaildirMessageCopyCommand {
     #[command(flatten)]
@@ -27,7 +27,8 @@ pub struct MaildirMessageCopyCommand {
     pub source: MaildirPathFlag,
     #[command(flatten)]
     pub target: TargetMaildirPathFlag,
-    /// Copy the message into a different subdirectory.
+    /// Copy the message into a different subdirectory; a copy into `new`
+    /// carries no flags, a Maildir keeping none there.
     #[arg(long, short, value_name = "DIR", value_enum)]
     pub subdir: Option<MaildirSubdirArg>,
 }
@@ -38,17 +39,18 @@ impl MaildirMessageCopyCommand {
         let source = client.resolve_maildir(&self.source.inner)?;
         let target = client.resolve_maildir(&self.target.inner)?;
 
-        for id in self.ids.inner.clone() {
-            client.copy(
+        let mut ids = Vec::with_capacity(self.ids.inner.len());
+        for id in self.ids.inner {
+            ids.push(client.copy(
                 id,
                 source.clone(),
                 target.clone(),
                 self.subdir.clone().map(Into::into),
-            )?;
+            )?);
         }
 
         printer.out(IdsReceipt {
-            ids: self.ids.inner,
+            ids,
             done: "Message(s) successfully copied",
         })
     }

@@ -10,15 +10,18 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::{self, Listing},
-    msgraph::client::MsgraphClient,
+    listing::{self, Listing, ListingPage},
+    msgraph::{
+        client::MsgraphClient,
+        messages::list::{next_page_token, page_skip},
+    },
 };
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).
@@ -30,6 +33,8 @@ pub struct MsgraphMailFolderListCommand {
     /// Number of folders to skip (OData `$skip`).
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
     #[arg(long, value_name = "FIELDS")]
@@ -49,13 +54,18 @@ impl MsgraphMailFolderListCommand {
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
             top: self.top,
-            skip: self.skip,
+            skip: page_skip(self.page_token.token.as_deref(), self.skip)?,
             select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
-        let folders = client.mail_folders_list(&params)?.response.value;
+        let response = client.mail_folders_list(&params)?.response;
+        let next = next_page_token(response.next_link, params.skip);
 
-        printer.out(MsgraphMailFolderListOutput::new(account, folders))
+        printer.out(MsgraphMailFolderListOutput::page(
+            account,
+            response.value,
+            next,
+        ))
     }
 }
 
@@ -67,6 +77,11 @@ pub struct MsgraphMailFolderListOutput {
     #[serde(skip)]
     account: String,
     folders: Vec<MsgraphMailFolder>,
+    /// The cursor of the next page, `null` once the listing is complete
+    /// and for `get`, given back through `--page-token`.
+    next_page: Option<String>,
+    #[serde(skip)]
+    paged: bool,
 }
 
 impl MsgraphMailFolderListOutput {
@@ -75,6 +90,18 @@ impl MsgraphMailFolderListOutput {
         Self {
             account: account.name().to_string(),
             folders,
+            next_page: None,
+            paged: false,
+        }
+    }
+
+    /// Wraps one page of the folders the server listed for `account`,
+    /// `next` resuming the listing.
+    pub fn page(account: &Account, folders: Vec<MsgraphMailFolder>, next: Option<String>) -> Self {
+        Self {
+            next_page: next,
+            paged: true,
+            ..Self::new(account, folders)
         }
     }
 }
@@ -90,6 +117,12 @@ impl fmt::Display for MsgraphMailFolderListOutput {
                 count(folder.child_folder_count),
                 sanitize::text(&folder.display_name).into_owned(),
             ]);
+        }
+
+        if self.paged {
+            let count = self.folders.len();
+            let next = self.next_page.as_deref();
+            listing.page(ListingPage::Token, count, ["folder", "folders"], next);
         }
 
         write!(f, "{listing}")

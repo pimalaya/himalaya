@@ -89,8 +89,32 @@ fn graph_refuses_adding_a_message() {
 }
 
 #[test]
-fn graph_refuses_a_send_whose_copy_it_cannot_hold() {
-    refused(
+fn gmail_refuses_adding_a_message_with_a_flag_it_cannot_keep() {
+    for (flag, capability) in [("answered", "flags.answered"), ("draft", "flags.draft")] {
+        refused(
+            GMAIL,
+            &[
+                "message",
+                "add",
+                "-m",
+                "INBOX",
+                "--flag",
+                flag,
+                "--",
+                "From: a@example.org\r\n\r\nx\r\n",
+            ],
+            "capability-missing",
+            capability,
+        );
+    }
+}
+
+/// Graph files every message it sends in Sent Items itself, so the save
+/// of a send is no capability it lacks: the command goes on to connect,
+/// here failing on the token.
+#[test]
+fn graph_lets_a_send_keep_its_own_copy() {
+    let (ok, json) = run(
         MSGRAPH,
         &[
             "message",
@@ -100,9 +124,11 @@ fn graph_refuses_a_send_whose_copy_it_cannot_hold() {
             "--",
             "From: a@example.org\r\nTo: b@example.org\r\n\r\nx\r\n",
         ],
-        "capability-missing",
-        "message.add",
     );
+
+    assert!(!ok, "{json}");
+    assert_eq!(json["code"], Value::Null, "{json}");
+    assert!(json.to_string().contains("Secret command"), "{json}");
 }
 
 #[test]
@@ -132,6 +158,16 @@ fn a_backend_filter_narrows_the_resolution() {
         &["--backend", "smtp", "message", "read", "1"],
         "capability-missing",
         "`--backend smtp`",
+    );
+}
+
+#[test]
+fn a_backend_filter_naming_an_absent_block_is_a_missing_capability() {
+    refused(
+        GMAIL,
+        &["--backend", "imap", "envelope", "list"],
+        "capability-missing",
+        "has no `imap` block",
     );
 }
 

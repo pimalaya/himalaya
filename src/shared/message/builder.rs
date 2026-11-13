@@ -20,12 +20,13 @@ use mime::{
     build::MimeBuildOptions,
     builder::{MimeAttachment, MimeBuilder},
     header::marker::{
-        BCC, CC, DATE, FROM, IN_REPLY_TO, MESSAGE_ID, REFERENCES, REPLY_TO, SUBJECT, TO,
+        BCC, CC, CONTENT_TYPE, DATE, FROM, IN_REPLY_TO, MESSAGE_ID, REFERENCES, REPLY_TO, SUBJECT,
+        TO,
     },
     tree::{cst::MimeCst, entity::MimeEntity, field::address::parse_addresses},
     value::{
         address::{MimeAddress, MimeAddressList, MimeMailbox},
-        content_type::MimeContentType,
+        content_type::{MimeContentType, MimeParam},
         datetime::MimeDateTime,
         message_id::MimeMessageId,
     },
@@ -279,10 +280,26 @@ fn carry_source_attachments(builder: &mut MimeBuilder, parsed: &MimeCst) -> Resu
         let file_name =
             part::filename(leaf.part).unwrap_or_else(|| fallback_attachment_name(leaf.part, &mime));
         let bytes = part::bytes(leaf.part).into_owned();
-        builder.attachment(attachment(&mime, file_name, bytes))?;
+        let mut attachment = attachment(&mime, file_name, bytes);
+        attachment.content_type.params = source_params(leaf.part, &mime);
+        builder.attachment(attachment)?;
     }
 
     Ok(())
+}
+
+/// The parameters of the part's `Content-Type` (`charset`...), none when
+/// the type read is not the one the part was taken for.
+fn source_params(part: &MimeEntity, mime: &str) -> Vec<MimeParam> {
+    let Some(content_type) = part.header::<CONTENT_TYPE>() else {
+        return Vec::new();
+    };
+    let (top, sub) = mime.split_once('/').unwrap_or_default();
+
+    match content_type.is(top, sub) {
+        true => content_type.params,
+        false => Vec::new(),
+    }
 }
 
 /// Names an attached email from its subject, or a file from its MIME type.
@@ -462,6 +479,9 @@ fn read_signature(
 
 /// Lays out the final text body: the written text, the quoted source
 /// under its headline, and the signature after its separator.
+///
+/// A body that is not empty ends with a line break, so a single-part
+/// message, once printed, ends on one.
 fn compose_body(
     user_body: &str,
     source_text: &str,
@@ -470,7 +490,7 @@ fn compose_body(
     signature_delim: &str,
     style: PostingStyle,
 ) -> String {
-    let user_body = user_body.trim_end_matches('\n');
+    let user_body = user_body.trim_end_matches(['\r', '\n']);
     let source_text = source_text.trim();
 
     let quote = if source_text.is_empty() {
@@ -483,7 +503,7 @@ fn compose_body(
         }
         for line in source_text.lines() {
             buf.push('>');
-            if !line.starts_with('>') {
+            if !line.is_empty() && !line.starts_with('>') {
                 buf.push(' ');
             }
             buf.push_str(line);
@@ -518,6 +538,10 @@ fn compose_body(
         body.push_str("\n\n");
         body.push_str(signature_delim);
         body.push_str(signature.trim_end_matches('\n'));
+    }
+
+    if !body.is_empty() {
+        body.push('\n');
     }
 
     body
@@ -1077,7 +1101,7 @@ Body.\r\n";
     #[test]
     fn compose_body_honours_posting_style_and_signature() {
         let top = compose_body("mine", "theirs", "wrote:", "", "-- \n", PostingStyle::Top);
-        assert_eq!(top, "mine\n\nwrote:\n> theirs");
+        assert_eq!(top, "mine\n\nwrote:\n> theirs\n");
 
         let bottom = compose_body(
             "mine",
@@ -1087,13 +1111,13 @@ Body.\r\n";
             "-- \n",
             PostingStyle::Bottom,
         );
-        assert_eq!(bottom, "wrote:\n> theirs\n\nmine");
+        assert_eq!(bottom, "wrote:\n> theirs\n\nmine\n");
 
         let unquoted = compose_body("mine", "theirs", "wrote:", "", "-- \n", PostingStyle::None);
-        assert_eq!(unquoted, "mine");
+        assert_eq!(unquoted, "mine\n");
 
         let signed = compose_body("mine", "", "", "Alice", "-- \n", PostingStyle::Top);
-        assert_eq!(signed, "mine\n\n-- \nAlice");
+        assert_eq!(signed, "mine\n\n-- \nAlice\n");
     }
 
     #[test]
@@ -1101,9 +1125,106 @@ Body.\r\n";
         // NOTE: a delimiter meant to stand on its own line carries its own
         // newline; one that does not, does not.
         let custom = compose_body("mine", "", "", "Alice", "~~~\n", PostingStyle::Top);
-        assert_eq!(custom, "mine\n\n~~~\nAlice");
+        assert_eq!(custom, "mine\n\n~~~\nAlice\n");
 
         let inline = compose_body("mine", "", "", "Alice", "", PostingStyle::Top);
-        assert_eq!(inline, "mine\n\nAlice");
+        assert_eq!(inline, "mine\n\nAlice\n");
+    }
+    #[test]
+    fn compose_body_quotes_an_empty_line_without_a_trailing_blank() {
+        let quoted = compose_body("", "a\r\n\r\n> b", "", "", "-- \n", PostingStyle::Top);
+        assert_eq!(quoted, "> a\n>\n>> b\n");
+    }
+
+    #[test]
+    fn a_single_part_message_ends_with_a_line_break() {
+        let empty: Vec<String> = Vec::new();
+        let raw = build(args("bob@example.com", &empty, None, "hi"), None).unwrap();
+        assert!(
+            raw.ends_with(b"\r\nhi\r\n"),
+            "{}",
+            String::from_utf8_lossy(&raw)
+        );
+    }
+
+    /// Builds a message attaching `content` as a `.eml`, then returns it.
+    fn attaching_a_message(content: &[u8]) -> String {
+        let empty: Vec<String> = Vec::new();
+        let mut a = args("bob@example.com", &empty, None, "see attached");
+        a.attach_data = vec![InlineAttachment {
+            filename: "inner.eml".into(),
+            mime: None,
+            content: content.to_vec(),
+        }];
+
+        String::from_utf8(build(a, None).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn an_attached_message_is_not_base64() {
+        let lf = attaching_a_message(b"Subject: inner\nFrom: a@example.org\n\nbody\n");
+        assert!(lf.contains("Content-Type: message/rfc822\r\n"), "{lf}");
+        assert!(!lf.contains("base64"), "{lf}");
+        assert!(lf.contains("\r\nSubject: inner\r\nFrom: a@example.org\r\n\r\nbody\r\n"));
+
+        let eight_bit = attaching_a_message(
+            "Subject: inner\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\u{e9}t\u{e9}\r\n"
+                .as_bytes(),
+        );
+        assert!(eight_bit.is_ascii(), "{eight_bit}");
+        assert!(!eight_bit.contains("base64"), "{eight_bit}");
+    }
+
+    /// A source carrying a Latin-1 text attachment and an attached
+    /// message, both to be carried by a forward.
+    const ATTACHING_SOURCE: &[u8] = b"From: Alice <alice@example.com>\r\n\
+Subject: Files\r\n\
+Message-ID: <files@example.com>\r\n\
+MIME-Version: 1.0\r\n\
+Content-Type: multipart/mixed; boundary=b\r\n\
+\r\n\
+--b\r\n\
+Content-Type: text/plain\r\n\
+\r\n\
+See attached.\r\n\
+--b\r\n\
+Content-Type: text/plain; charset=iso-8859-1; format=flowed\r\n\
+Content-Disposition: attachment; filename=note.txt\r\n\
+Content-Transfer-Encoding: quoted-printable\r\n\
+\r\n\
+caf=E9\r\n\
+--b\r\n\
+Content-Type: message/rfc822\r\n\
+Content-Disposition: attachment; filename=inner.eml\r\n\
+\r\n\
+Subject: inner\r\n\
+\r\n\
+inner body\r\n\
+--b--\r\n";
+
+    #[test]
+    fn forward_carries_the_attachments_with_their_parameters_unencoded() {
+        let to = vec!["dave@example.com".to_string()];
+        let mut source = source(SourceMode::Forward);
+        source.raw = ATTACHING_SOURCE;
+        source.no_attachments = false;
+
+        let raw = build(args("bob@example.com", &to, None, "FYI"), Some(source)).unwrap();
+        let text = String::from_utf8_lossy(&raw);
+
+        assert!(
+            text.contains("Content-Type: text/plain; charset=iso-8859-1; format=flowed\r\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("filename=inner.eml\r\n\r\nSubject: inner\r\n\r\ninner body"),
+            "{text}"
+        );
+
+        let msg = parse(&raw);
+        let note = part::leaves(&msg.0)
+            .find(|leaf| part::filename(leaf.part).as_deref() == Some("note.txt"))
+            .unwrap();
+        assert_eq!(part::text(note.part), "caf\u{e9}");
     }
 }

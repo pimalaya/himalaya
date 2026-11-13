@@ -37,7 +37,7 @@ pub struct ImapMessageSaveCommand {
     /// --seen` will not match it.
     ///
     /// The unified `message add -f seen` is the enum-mapped behaviour.
-    #[arg(short, long, num_args = 0..)]
+    #[arg(short, long)]
     pub flag: Vec<String>,
     #[command(flatten)]
     pub message: MessageArg,

@@ -29,6 +29,7 @@ use serde::{Serialize, Serializer, ser::SerializeStruct};
 use crate::{
     account::context::Account,
     backend::Backend,
+    capability::missing,
     email::{address::Address, envelope::Envelope, flag::Flag},
     imap::{
         backend::envelope_from,
@@ -44,7 +45,8 @@ use crate::{
 /// Thread messages (THREAD, RFC 5256).
 ///
 /// Groups the matching messages into conversations. The server has to
-/// advertise the THREAD extension.
+/// advertise the THREAD extension with the algorithm, or the command is
+/// refused before anything is sent.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeThreadCommand {
     #[command(flatten)]
@@ -77,6 +79,16 @@ impl ImapEnvelopeThreadCommand {
     ) -> Result<()> {
         let selected = (!self.mailbox_no_select.inner).then(|| self.mailbox_name.inner.clone());
         let mailbox = self.mailbox_name.inner.try_into()?;
+        let algorithm: ThreadingAlgorithm = self.algorithm.into();
+
+        // NOTE: a server without the extension answers with a bare parse
+        // error (iCloud's `BAD Parse Error`), so the refusal is local.
+        if !client.supports_thread(&algorithm) {
+            let algorithm = algorithm.to_string().to_ascii_uppercase();
+            return Err(missing(format!(
+                "The IMAP server does not advertise `THREAD={algorithm}` (RFC 5256)"
+            )));
+        }
 
         let result = (|| -> Result<_> {
             if !self.mailbox_no_select.inner {
@@ -86,7 +98,7 @@ impl ImapEnvelopeThreadCommand {
             let search_criteria = self.criteria.into_criteria()?;
 
             let threads = client.thread(
-                self.algorithm.into(),
+                algorithm,
                 search_criteria,
                 ImapMessageThreadOptions { uid: !self.seq },
             )?;
