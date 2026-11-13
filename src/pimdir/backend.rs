@@ -3327,14 +3327,23 @@ mod tests {
     }
 
     /// A row filed under another key than its date sends the search back
-    /// to the whole-mailbox read, which answers as before.
+    /// to the whole-mailbox read, which answers as before. io-pimdir files
+    /// every row it writes under its date, so the row is filed elsewhere as
+    /// a writer of its own could.
     #[test]
     fn a_row_out_of_date_order_searches_the_whole_mailbox() {
         let dir = tempfile::tempdir().unwrap();
-        let mut seeded = mails("in", 40);
-        let summary = seeded[1].summary.as_mut().unwrap();
-        summary.date = Some("2026-05-12T10:00:00+02:00".into());
+        let seeded = mails("in", 40);
         seed(dir.path(), "imap/INBOX", &seeded);
+        let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        let moved = db
+            .execute(
+                "UPDATE items SET sort_key = '2026-05-12T10:00:00+02:00' WHERE link_id = 'in1@x.test'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(moved, 1);
+        drop(db);
         let mut client = PimdirClient::new(PimdirConfig {
             root: dir.path().to_path_buf(),
             account: None,

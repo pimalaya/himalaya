@@ -61,7 +61,7 @@ io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.7", default-features = false, optional = true }
-io-pimdir = { version = "0.11", default-features = false, features = ["client"], optional = true }
+io-pimdir = { version = "0.12", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.6", default-features = false, optional = true }
 jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
@@ -87,6 +87,5 @@ io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "dfe456f49e830ffd
 io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "359069519fcc750ad7ead0ea5bd727592a978dae" }
 io-maildir = { git = "https://github.com/pimalaya/io-maildir", rev = "01552733c853784514578338f0059e28d4277656" }
 io-msgraph = { git = "https://github.com/pimalaya/io-msgraph", rev = "7480799b808958d6ba289e02ec3d6da25b98f635" }
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "cd33f0e51c93a6276d3b2089e409780bcfbda006" }
 mime-rs = { git = "https://github.com/pimalaya/mime", rev = "2591e7fec9e3dd8b995d47323c6fa8868c558857" }
 io-mbox = { git = "https://github.com/pimalaya/io-mbox", rev = "161d84fb691d6954d15d7e3739793251f499d05f" }
