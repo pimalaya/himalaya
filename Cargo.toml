@@ -37,7 +37,7 @@ panic = "abort"
 pimalaya-cli = { version = "0.4", default-features = false, features = ["build"] }
 
 [dev-dependencies]
-io-oauth = { version = "0.6", default-features = false, features = ["client", "jwt-bearer", "rustls-ring"] }
+io-oauth = { version = "0.7", default-features = false, features = ["client", "jwt-bearer", "rustls-ring"] }
 pimalaya-config = { version = "0.4", default-features = false, features = ["sample"] }
 rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
 tempfile = { version = "3", default-features = false }
@@ -54,16 +54,16 @@ dirs = { version = "7", default-features = false }
 gethostname = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 idna_adapter = { version = "=1.0.0", default-features = false }
-io-gmail = { version = "0.7", default-features = false, optional = true }
-io-imap = { version = "0.9", default-features = false, optional = true }
-io-jmap = { version = "0.8", default-features = false, optional = true }
+io-gmail = { version = "0.8", default-features = false, optional = true }
+io-imap = { version = "0.10", default-features = false, optional = true }
+io-jmap = { version = "0.9", default-features = false, optional = true }
 io-maildir = { version = "0.4", default-features = false, optional = true }
 io-mbox = { version = "0.2", default-features = false, optional = true }
-io-managesieve = { version = "0.3", default-features = false, optional = true }
-io-msgraph = { version = "0.8", default-features = false, optional = true }
+io-managesieve = { version = "0.4", default-features = false, optional = true }
+io-msgraph = { version = "0.9", default-features = false, optional = true }
 io-pimdir = { version = "0.12", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.2", default-features = false, features = ["scram"] }
-io-smtp = { version = "0.8", default-features = false, optional = true }
+io-smtp = { version = "0.9", default-features = false, optional = true }
 jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
 log = { version = "0.4", default-features = false }
 mime-rs = { version = "0.1", default-features = false, features = ["base64", "encoding", "parser"], optional = true }
@@ -71,7 +71,7 @@ mime_guess = { version = "2", default-features = false, features = ["rev-mapping
 percent-encoding = { version = "2", default-features = false }
 pimalaya-cli = { version = "0.4", default-features = false, features = ["mcp", "repl", "terminal"] }
 pimalaya-config = { version = "0.4", default-features = false, features = ["toml", "secret"] }
-pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
+pimalaya-stream = { version = "0.4", default-features = false, features = ["std"] }
 schemars = { version = "1", default-features = false, features = ["chrono04", "derive", "std"] }
 secrecy = { version = "0.10", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "std"] }

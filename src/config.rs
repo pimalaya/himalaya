@@ -54,7 +54,7 @@ use pimalaya_config::{
 ))]
 use pimalaya_stream::{
     proxy::{Proxy, ProxyAuth},
-    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+    tls::{Rustls, RustlsCrypto, Tls, TlsProvider, TlsServer},
 };
 #[cfg(any(
     feature = "imap",
@@ -957,7 +957,8 @@ impl TlsConfig {
                 }),
                 alpn,
             },
-            cert: self.cert,
+            server: self.cert.map(|cert| TlsServer { cert }),
+            client: None,
         }
     }
 }
