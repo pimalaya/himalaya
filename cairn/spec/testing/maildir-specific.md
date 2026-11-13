@@ -50,7 +50,9 @@ store/copy/move, filename flags).
   subfolder exists (the default is a Maildir++ assumption). The raw
   commands intentionally do not consult the configurable `inbox` alias.
   The default is kept, but the `-m` help now states it: pass `-m .` for
-  the root maildir, or a real subfolder.
+  the root maildir, or a real subfolder. Since 2026-11-13 the default
+  `Inbox` resolves to a top-level folder of that name in any case, else
+  to the root maildir.
 - **D5: `flags add/set/remove --flag` swallowed a trailing message id.
   FIXED.** `--flag` was declared `num_args = 1..` (greedy variadic), so
   `flags add -m Drafts -f seen -f flagged <id>` consumed `<id>` as a flag

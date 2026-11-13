@@ -61,11 +61,12 @@ throwaway Maildir tree in `/tmp`.
 - Maildir **supports the unified `envelope search`** (it lists then
   filters/sorts client-side against the already-read bytes), unlike the
   Gmail and Graph backends which bail.
-- The root maildir is INBOX; `mailbox list` shows its `name` as the root
-  directory's basename (e.g. `himalaya-maildir`). Select it by the
-  `inbox` alias, by `.`, or by its full path: not by that basename
-  (there is no `<root>/<basename>` folder). Subfolders are addressed by
-  their relative name (`-m Archive`, `-m Projects/Work`).
+- The root maildir is INBOX: `mailbox list` names it `INBOX` with the
+  inbox role (`.` when a top-level `Inbox` folder takes the role, see
+  backends.md "A Maildir is named relative to the root"). Select it by
+  that name, by `.`, by its full path or by omitting `-m`. Subfolders
+  are addressed by their relative name (`-m Archive`, `-m
+  Projects/Work`).
 - `message send` bails with `No send-capable backend (JMAP/Gmail/Graph)
   or SMTP is configured`: correct: Maildir cannot send, and the fixture
   has no `[smtp]` block. Add `[smtp]` to send from a Maildir account.

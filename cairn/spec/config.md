@@ -65,6 +65,9 @@ An account MAY map friendly mailbox names to backend-native ids under `[accounts
 ### Requirement: Config never written
 Himalaya SHALL NOT write a configuration file: the user writes it, from the documented sample.
 
+### Requirement: The Maildir block
+A `maildir` block SHALL name `root`, and MAY name `keywords.dovecot`, `keywords.header` (`x-keywords` or `x-label`) and `layout`: `fs` by default, a directory per Maildir nested as the hierarchy is, or `maildir++`, the root being the inbox and the others dot-named beside it (Dovecot, Courier). Any other `layout` SHALL fail the load.
+
 ### Requirement: The mbox block
 An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `inbox` (the spool), `format` (`mboxo`, `mboxrd` by default, `mboxcl`, `mboxcl2`, which also decides whether `Content-Length` is trusted on read), `thunderbird` (the `.sbd` layout, off by default) and `lock.dotlock`, `lock.fcntl` (both on by default) and `lock.timeout`.
 

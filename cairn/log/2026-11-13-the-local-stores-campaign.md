@@ -1,0 +1,15 @@
+---
+cairn: log
+change: the-local-stores-campaign
+landed: 2026-11-13
+---
+
+# The local stores campaign
+
+The fixes of the 2026-11-13 Maildir and mbox test campaign landed. On Maildir, the root lists as `INBOX` with the inbox role (`.` beside a top-level `Inbox` folder) and an omitted mailbox reaches it; every spelling of a mailbox resolves to one id, so `message delete` recognises a trash named by path, slash or alias; `maildir.layout` selects the fs layout or Maildir++; the root is never deleted or renamed (`mailbox delete .` used to empty the store) and a Maildir holding unlisted folders is not deleted; a missing Maildir is coded `mailbox-not-found`; a unified move within one Maildir keeps the ids; the raw id-taking commands refuse a set holding an unknown id under `message-not-found`, `maildir message move` prints the new ids, `--subdir tmp` is gone, `maildir flag set` requires `-f`, `maildir create` and `rename` apply the unified guards. Every "no id matched" refusal of the unified commands and of `pimdir flag` carries `message-not-found`. A role alias names a mailbox by its unique name too. On mbox, the spool and directories are never deleted or renamed, `INBOX` without a usable spool names `mbox.inbox` (in `account check` too), files that are no mbox are hidden and refuse appends, hidden and side-file names are refused, the Thunderbird layout creates missing parents and keeps `X-Mozilla-Status` and the `.msf` in step, a busy lock fails with `store-busy` and a forbidden dotlock names `mbox.lock.dotlock = false`, a stale index is rebuilt once in listings and searches, the raw copy and move print the target ids, and the cache version is 2, so older caches are rebuilt. The local `body` clause lowercases Unicode text as `subject` does.
+
+Capabilities moved: config ("The Maildir block" added), backends ("A Maildir is named relative to the root", "Local storage backends", "mbox backend", "An mbox message is its content id", "mbox flags interoperate", "mbox writes lock and rewrite in place", "mbox reads go through a cache", "Mailbox role"), commands ("The raw Maildir folder commands guard the store" added; the code table, "A command given message ids says how many it found", "Unified mailbox writes"), search ("What a backend searches is declared").
+
+Library fixes ride on path patches in Cargo.toml, each uncommitted in its repository and needing a release before its patch goes: io-maildir (store-guards: root and outside names refused by delete and rename, only `2,` read as flags, dovecot keyword letters renamed on copy and move, unreadable entries, folders and symlink loops skipped; `r#move` and `MaildirEntryMove` returning the minted id is breaking) and io-mbox (himalaya-live-test-fixes: `Content-Length` bounds, lock wait saturating, `X-Mozilla-Status` bits, `.msf` removal, non-mbox files left out and refused, `lock_busy`; a new public field and error variant make the next release 0.2.0).
+
+Left open: an exactly full last page still leads to an empty next page on every backend (F13, the paging contract), and an undefined `$VAR` in a root stays raw, as pimalaya-config expands it.

@@ -41,7 +41,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **Keys are camelCase.** `messages-total` is `messagesTotal`, `next_page` is `nextPage`, `thread-id` is `threadId`. Values keep their spelling: error codes, flags and mailbox roles stay kebab-case or lowercase, provider passthrough keeps the provider's keys.
 - **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message. `message parse` prints the same view.
 - **Piped `--json` prints one value per line**, and every schema `json-schema` writes carries an `$id` naming the contract version.
-- **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, the pimdir store codes), described by the `himalaya-error` schema, and `null` otherwise. Match on the code, never on the message, which may be reworded.
+- **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, `message-not-found`, `mailbox-not-found`, the pimdir store codes), described by the `himalaya-error` schema, and `null` otherwise. Match on the code, never on the message, which may be reworded.
 - **No output is a sentence any more.** The `{"message": "..."}` confirmations are gone: every write prints what it acted on. `message copy|move` print `{count, queued}`; `message send` and a composer's `--save`/`--send` print `{id, saved, sent, queued}`; a protocol write prints `{id}` or `{ids}` (a Gmail label's id, the UIDs of an IMAP append or copy, a Sieve script's name). A unified write's `queued` is `true` when a sync engine applies it later (pimdir).
 - **Bytes never reach a JSON stdout raw.** `message read --raw`, `jmap email export`, the raw Gmail and Graph `get`s and their attachment downloads print `{data, size, mime}`, `data` in base64.
 - **Absent values are `null`**, every key printed.
@@ -61,6 +61,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`-f/--flag` takes one value per occurrence** on `message add`, `imap append`, `imap store`, `maildir message save` and `mbox message save`: `-f seen flagged msg.eml` read the path as a flag. Repeat the flag, `-f seen -f flagged msg.eml`.
 - **A message argument naming no file must be a message.** `message add`, `message send` and the protocol saves refuse a positional that is neither a file nor a message opening on a header field, where they stored a mistyped path as a message.
 - **`maildir message save -f` needs `--subdir cur`**: a message saved to `new`, the default, carries no flags, and the flags are now refused there rather than written.
+- **`maildir flag set` needs `-f`**, where it cleared every flag without one: drop the flags with `maildir flag remove`, naming them. **`--subdir tmp` is gone** from `maildir message save|copy|move`: pass `cur` or `new`.
+- **mbox `INBOX` needs `mbox.inbox`** unless the root holds a file of that name: set the spool, or pass the mailbox by name.
 - **`--page 0` is refused** by `envelope list` and `envelope search`, where it listed every envelope: pass `--page-size 0` for the whole mailbox.
 - **`--no-save` needs `--send`** on `message compose`, `reply` and `forward`.
 
@@ -73,6 +75,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 ### Commands that act differently
 
 - **`attachment download` without an id skips the inline parts**, as `attachment list` does: pass `--inline` (`-i`) to write them too.
+- **The root Maildir is named `INBOX`**, or `.` when a top-level `Inbox` folder is a Maildir, in `mailbox list` and `maildir list`, where it listed under its folder's basename: a script matching that name matches `INBOX` or the id (its path), which is unchanged.
+- **The raw local-store copies and moves print the target ids.** `maildir message copy|move` and `mbox message copy|move` print `{ids}` the messages got in the target, each once, where they echoed the source ids: read a moved message by the printed id.
 
 ### New
 
