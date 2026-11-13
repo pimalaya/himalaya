@@ -33,8 +33,10 @@ use crate::{
 /// Staged flags, moves and deletions need no such view, addressing messages
 /// that already exist. A row of any kind the sync engine parked, refusing to
 /// apply it without an operator, is listed `parked` with why: cancel it, or
-/// fix what parked it. One the engine sent without learning its outcome is
-/// listed `unconfirmed` instead: it may have taken effect.
+/// fix what parked it. A move or a deletion of a message a sync left in
+/// conflict parks so, listed in the mailbox the message stays in. One the
+/// engine sent without learning its outcome is listed `unconfirmed`
+/// instead: it may have taken effect.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     #[command(flatten)]

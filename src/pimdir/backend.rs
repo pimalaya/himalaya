@@ -871,6 +871,10 @@ impl PimdirClient {
 
     /// Moves each id between two mailboxes, staged as one server-side move
     /// for the next sync.
+    ///
+    /// A move states no resolution (pimdir SYNC §7): the owner parks it
+    /// over a message a sync left in conflict, as it does a remove, and
+    /// the message stays listed where it was (STORAGE §15.4).
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         self.refile(from, to, ids, |seq, target| PimdirAction::Move {
             seq,
@@ -2452,7 +2456,7 @@ mod tests {
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        stamp_format(dir.path(), "storage-draft-09");
+        stamp_format(dir.path(), "storage-draft-10");
 
         let err = client.cancel_queued(staged.queue_id).unwrap_err();
 
@@ -2475,7 +2479,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            version, "storage-draft-09",
+            version, "storage-draft-10",
             "the cancel restamped the store"
         );
         assert_eq!(queued, 1, "the cancel dropped the row");
@@ -2525,7 +2529,7 @@ mod tests {
     /// deleting the store.
     #[test]
     fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
-        for version in ["storage-draft-09", "storage-draft-11"] {
+        for version in ["storage-draft-10", "storage-draft-12"] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
 
@@ -4156,5 +4160,120 @@ mod tests {
 
         assert_eq!(client.cancel_queued(twin.queue_id).unwrap(), "add");
         assert!(client.parked_actions("imap/Sent").unwrap().is_empty());
+    }
+
+    /// A store whose `imap/Drafts` holds one draft a sync left in conflict
+    /// beside an empty `imap/Trash`, the client reading it, and the hash
+    /// of the diverging body.
+    fn conflicted_store() -> (tempfile::TempDir, PimdirClient, PimdirHash) {
+        use io_pimdir::{
+            change::PimdirWriteOp,
+            object::PimdirObject,
+            placement::{PimdirBase, PimdirHandle, PimdirPlacement, PimdirStatus},
+        };
+
+        const THEIRS: &[u8] = b"Message-ID: <d1@x.org>\r\nSubject: hi\r\n\r\nhello there";
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        for id in ["imap/Drafts", "imap/Trash"] {
+            store.ensure_collection(id, MAIL_KIND).unwrap();
+        }
+        let object = |bytes: &[u8]| PimdirObject {
+            hash: store.hash(bytes),
+            size: bytes.len(),
+        };
+        let body = |bytes: &[u8]| PimdirWriteOp::StoreObject {
+            object: object(bytes),
+            body: Some(bytes.to_vec()),
+        };
+        let (ours, theirs) = (object(DRAFT).hash, object(THEIRS).hash);
+        let derived = mail::derive(DRAFT);
+        let draft = PimdirPlacement {
+            collection: PimdirCollectionId("imap/Drafts".into()),
+            handle: PimdirHandle("1".into()),
+            link_id: Some(derived.link_id),
+            object: Some(ours.clone()),
+            level: PimdirLevel::Full,
+            summary: derived.summary,
+            sort_key: derived.sort_key,
+            flags: known(&[]),
+            status: PimdirStatus::Conflict,
+            conflict_revision: Some("r2".into()),
+            conflict_object: Some(theirs.clone()),
+            base: Some(PimdirBase {
+                flags: known(&[]),
+                revision: Some("r1".into()),
+                object: Some(ours),
+            }),
+            origin: None,
+        };
+        store
+            .write(vec![
+                body(DRAFT),
+                body(THEIRS),
+                PimdirWriteOp::UpsertPlacement(draft),
+            ])
+            .unwrap();
+        drop(store);
+
+        let config = crate::config::PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        };
+        (dir, PimdirClient::new(config).unwrap(), theirs)
+    }
+
+    /// A move states no resolution, so the owner parks one queued on a
+    /// message a sync left in conflict (pimdir SYNC §7, STORAGE §15.3) and
+    /// the reader folds nothing for it (§15.4): the message stays listed
+    /// where it was, and its row reads parked, naming the diverging body,
+    /// in the mailbox it was queued in.
+    #[test]
+    fn a_move_over_a_conflicted_message_stays_listed_and_parks() {
+        use crate::pimdir::queue::show::{PimdirQueueShowOutput, PimdirQueueState};
+
+        let (dir, mut client, theirs) = conflicted_store();
+        let listed = |client: &mut PimdirClient, mailbox: &str| -> Vec<String> {
+            client
+                .list_envelopes(mailbox, None, None, false)
+                .unwrap()
+                .into_iter()
+                .map(|envelope| envelope.id)
+                .collect()
+        };
+        let drafts = listed(&mut client, "imap/Drafts");
+        assert_eq!(drafts.len(), 1);
+
+        let moved = client
+            .move_messages("imap/Drafts", "imap/Trash", &[drafts[0].as_str()])
+            .unwrap();
+        assert_eq!(moved, 1, "the move is queued");
+        let row = client.store.pending_actions("imap/Drafts").unwrap()[0].id;
+        assert_eq!(listed(&mut client, "imap/Drafts"), drafts, "taken out");
+        assert!(listed(&mut client, "imap/Trash").is_empty(), "brought in");
+
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        let report = owner.drain().unwrap();
+        drop(owner);
+        assert_eq!((report.applied, report.parked), (0, 1));
+
+        let parked = client.parked_actions("imap/Drafts").unwrap();
+        assert_eq!(parked.len(), 1, "{parked:?}");
+        assert_eq!((parked[0].id, parked[0].action.as_str()), (row, "move"));
+        assert!(parked[0].error.contains(&theirs.0), "{}", parked[0].error);
+        assert!(client.parked_actions("imap/Trash").unwrap().is_empty());
+
+        let shown = PimdirQueueShowOutput::new(row, client.queue_row(row).unwrap());
+        assert_eq!(shown.state, PimdirQueueState::Parked);
+        assert_eq!(shown.kind.as_deref(), Some("move"));
+        assert_eq!(shown.error.as_deref(), Some(parked[0].error.as_str()));
+
+        assert_eq!(listed(&mut client, "imap/Drafts"), drafts);
+        assert!(listed(&mut client, "imap/Trash").is_empty());
     }
 }

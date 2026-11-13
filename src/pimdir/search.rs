@@ -334,6 +334,7 @@ mod tests {
             more: false,
             coverage: PimdirMailCoverage {
                 bodiless: 1,
+                reads: true,
                 ..Default::default()
             },
         };

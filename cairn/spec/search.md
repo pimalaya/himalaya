@@ -42,7 +42,7 @@ Each backend SHALL translate the shared query into its native surface. IMAP tran
 Graph SHALL refuse a filter holding a flag clause with the code `search-unsupported`, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
 
 ### Requirement: pimdir searches through the store's index
-`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-10 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
+`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-11 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
 
 Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page carries `more`, whether hits or threads follow it.
 
@@ -72,13 +72,19 @@ A `date:` term's years, months and days, `today` and `yesterday` SHALL be read i
 - THEN one `set-flags` row is queued for the other one, and the flagged one is reported unchanged
 
 ### Requirement: A pimdir search says what it did not cover
-The output of `pimdir search`, `count` and `tag` SHALL carry the coverage of the answer (SEARCH §8.2): `bodiless`, the messages in scope whose body is not local, matched on their summary alone; `missing`, `unparseable` and `encrypted`, those whose body the index could not read, could not parse, or holds encrypted, indexed from their headers; `unindexed`, those whose last change the index has not folded in; `behind`, how many changes the store drew above the index, store-wide; `since` and `until`, the range below or above which the store is not known to hold every message; `filling`, whether a first round is still listing a mailbox in scope; and `complete`, as io-pimdir's `is_complete` answers it. `missing`, `unparseable` and `encrypted` SHALL be the counts of the scope whatever the query, and SHALL leave the answer incomplete only while a term reads what they hide: a `missing` or an `unparseable` body while a term reads mail bodies, an `encrypted` one while a text term is matched in a body or an attachment. The coverage carries no zone member: a mail date is an instant, which the index's zone does not read. The plain output SHALL print one line under its list naming what left the answer incomplete, a count no term reads left out, and nothing when the answer is complete; an index behind the store is named with how far and that the sync engine refreshes it.
+The output of `pimdir search`, `count` and `tag` SHALL carry the coverage of the answer (SEARCH §8.2): `bodiless`, the messages in scope whose body is not local, matched on their summary alone; `missing`, `unparseable` and `encrypted`, those whose body the index could not read, could not parse, or holds encrypted, indexed from their headers; `unindexed`, those whose last change the index has not folded in; `behind`, how many changes the store drew above the index, store-wide; `since` and `until`, the range below or above which the store is not known to hold every message; `filling`, whether a first round is still listing a mailbox in scope; and `complete`, as io-pimdir's `is_complete` answers it. `bodiless`, `missing`, `unparseable` and `encrypted` SHALL be the counts of the scope whatever the query, and SHALL leave the answer incomplete only while a term reads what they hide: a `bodiless`, a `missing` or an `unparseable` body while a term reads mail bodies, `thread:` among them; a `bodiless` one under `has:attachment` too, a message holding no body answering it by a mark its body corrects; an `encrypted` one while a text term is matched in a body or an attachment. A mailbox listed and not fetched so answers a flag, a date or an address whole. Himalaya SHALL take what a term reads from io-pimdir (`PimdirSearchLocal::reads`, `PimdirSearchReads::counts_bodiless`) and restate none of it. The coverage carries no zone member: a mail date is an instant, which the index's zone does not read. The plain output SHALL print one line under its list naming what left the answer incomplete, a count no term reads left out, and nothing when the answer is complete; an index behind the store is named with how far and that the sync engine refreshes it.
 
 #### Scenario: An unparseable body under a header query
 - GIVEN a pimdir mailbox holding one message whose body no parser accepted
 - WHEN `himalaya --json pimdir search from:alice@x.org` runs
 - THEN the coverage carries `"unparseable":1` and `"complete":true`, and the plain output prints no `Incomplete:` line
 - AND `himalaya --json pimdir search body:invoice` over the same mailbox carries `"complete":false`
+
+#### Scenario: A body not local under a flag query
+- GIVEN a pimdir mailbox whose round is closed, holding one message whose body is not local
+- WHEN `himalaya --json pimdir search is:flagged` runs
+- THEN the coverage carries `"bodiless":1` and `"complete":true`, and the plain output prints no `Incomplete:` line
+- AND `subject:lunch`, `thread:a@x.org` and `has:attachment` over the same mailbox each carry `"complete":false`, the `Incomplete:` line naming the message with no local body
 
 #### Scenario: Mail before the coverage
 - GIVEN a pimdir mailbox listed since 2026-03-01
@@ -94,7 +100,7 @@ A store with no search index SHALL fail every index command with the code `index
 - THEN the command exits 1 with the code `index-missing`
 
 #### Scenario: An index of an earlier draft
-- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-09`
+- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-10`
 - WHEN `himalaya --json pimdir search lunch` runs
 - THEN the command exits 1 with the code `index-version`, and the index is left as it is
 
