@@ -91,7 +91,7 @@ impl MboxClient {
             return Ok(MboxFsPath::from(path));
         }
 
-        let resolved = self.store.resolve(&MboxPath::from(mailbox));
+        let resolved = self.resolve_name(mailbox)?;
         if mailbox.eq_ignore_ascii_case(INBOX) {
             match &self.store.inbox {
                 Some(spool) if Path::new(spool.as_str()).is_dir() => {
@@ -107,6 +107,13 @@ impl MboxClient {
         }
 
         Ok(resolved)
+    }
+
+    /// Resolves a name through the store, which refuses one that is empty
+    /// or holds a NUL, a `.` or `..` level, or a `.lock` or `.msf` one.
+    pub fn resolve_name(&self, name: &str) -> Result<MboxFsPath> {
+        let path = self.store.resolve(&MboxPath::from(name));
+        path.ok_or_else(|| MboxClientError::InvalidName(name.to_string()).into())
     }
 
     /// Resolves a mailbox argument to the mbox file a message command

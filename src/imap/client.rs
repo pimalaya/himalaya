@@ -65,6 +65,7 @@ impl ImapClient {
                 starttls: config.starttls,
                 auto_id,
                 sasl_ir: config.sasl_ir,
+                ..Default::default()
             },
         };
         let (inner, capabilities) = Inner::connect(&server, opts)?;

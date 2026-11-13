@@ -13,7 +13,7 @@ use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome};
+use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome, utils::output_data};
 
 /// Select the given mailbox (SELECT, RFC 3501).
 ///
@@ -35,6 +35,7 @@ impl ImapMailboxSelectCommand {
         let result = client
             .select(mailbox, ImapMailboxSelectOptions::default())
             .map_err(Into::into)
+            .map(|output| output_data("SELECT", output))
             .map(|data| ImapMailboxSelectOutput {
                 mailbox: name,
                 flags: data

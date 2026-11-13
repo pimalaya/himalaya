@@ -37,6 +37,8 @@ use io_jmap::{
         vacation_response::{JMAP_VACATION_RESPONSE_CAPABILITY, set::JmapVacationResponseUpdate},
     },
 };
+use log::warn;
+use pimalaya_cli::sanitize;
 use url::Url;
 
 use crate::{
@@ -580,6 +582,24 @@ impl JmapClient {
         })?;
         if let Some(err) = output.not_created.values().next() {
             bail!("Submit JMAP message error{}", format_set_error(err));
+        }
+
+        // NOTE: the message went out whatever the Email/set answers.
+        match output.email_set {
+            Some(Err(err)) => {
+                let err = err.to_string();
+                warn!(
+                    "message sent, but it stays a draft: {}",
+                    sanitize::text(&err)
+                );
+            }
+            Some(Ok(set)) => {
+                for err in set.not_updated.values() {
+                    let err = format_set_error(err);
+                    warn!("message sent, but it stays a draft{err}");
+                }
+            }
+            None => {}
         }
 
         Ok(())

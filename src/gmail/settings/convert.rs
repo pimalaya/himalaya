@@ -108,6 +108,7 @@ pub fn disposition_wire(disposition: GmailDisposition) -> &'static str {
         GmailDisposition::Archive => "archive",
         GmailDisposition::Trash => "trash",
         GmailDisposition::MarkRead => "markRead",
+        GmailDisposition::Unknown => "unknown",
     }
 }
 
@@ -118,6 +119,7 @@ pub fn expunge_behavior_wire(behavior: GmailExpungeBehavior) -> &'static str {
         GmailExpungeBehavior::Archive => "archive",
         GmailExpungeBehavior::Trash => "trash",
         GmailExpungeBehavior::DeleteForever => "deleteForever",
+        GmailExpungeBehavior::Unknown => "unknown",
     }
 }
 
@@ -128,6 +130,7 @@ pub fn access_window_wire(access_window: GmailPopAccessWindow) -> &'static str {
         GmailPopAccessWindow::Disabled => "disabled",
         GmailPopAccessWindow::FromNowOn => "fromNowOn",
         GmailPopAccessWindow::AllMail => "allMail",
+        GmailPopAccessWindow::Unknown => "unknown",
     }
 }
 
@@ -139,5 +142,6 @@ pub fn verification_status_wire(status: GmailVerificationStatus) -> &'static str
         GmailVerificationStatus::Pending => "pending",
         GmailVerificationStatus::Rejected => "rejected",
         GmailVerificationStatus::Expired => "expired",
+        GmailVerificationStatus::Unknown => "unknown",
     }
 }

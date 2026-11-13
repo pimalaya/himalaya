@@ -144,7 +144,7 @@ impl MsgraphClient {
     /// `$batch`, since Graph v1.0 lists folders without them. A name the
     /// mailbox lacks, such as `archive`, is skipped.
     fn folder_roles(&mut self) -> Result<Vec<(String, MailboxRole)>> {
-        let user = user_path(&self.user_id);
+        let user = user_path(&self.user_id)?;
         let requests: Vec<_> = WELL_KNOWN_FOLDERS
             .iter()
             .map(|(name, _)| MsgraphBatchRequest {
@@ -208,7 +208,7 @@ impl MsgraphClient {
     /// no folder, so without this a command would act on a message of
     /// another folder.
     fn ids_in_folder<'a>(&mut self, mailbox: &str, ids: &[&'a str]) -> Result<Vec<&'a str>> {
-        let user = user_path(&self.user_id);
+        let user = user_path(&self.user_id)?;
         let mut unique: Vec<&str> = Vec::with_capacity(ids.len());
         let mut requests = Vec::with_capacity(ids.len());
 
@@ -602,7 +602,9 @@ pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     let from = message.from.map(address_from).into_iter().collect();
     let to = message
         .to_recipients
+        .into_option()
         .into_iter()
+        .flatten()
         .map(address_from)
         .collect();
 

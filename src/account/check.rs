@@ -222,6 +222,7 @@ fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Resu
             starttls: imap_config.starttls,
             auto_id,
             sasl_ir: imap_config.sasl_ir,
+            ..Default::default()
         },
     };
     let _ = ImapClientStd::connect(&server, opts)?;
@@ -391,6 +392,7 @@ fn connect_smtp(
         sasl,
         session: SmtpSessionOpenOptions {
             starttls: smtp_config.starttls,
+            ..Default::default()
         },
     };
     let _client = SmtpClientStd::connect(&server, domain, opts)?;

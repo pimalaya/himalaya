@@ -37,6 +37,7 @@ use crate::{
         envelope::search::SearchCriteriaArgs,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
+        utils::output_data,
     },
     listing::Listing,
     shared::envelope::list::{format_date, format_flags, format_names},
@@ -102,6 +103,7 @@ impl ImapEnvelopeThreadCommand {
                 search_criteria,
                 ImapMessageThreadOptions { uid: !self.seq },
             )?;
+            let threads = output_data("THREAD", threads);
 
             let ids = collect_thread_ids(&threads);
             let envelopes = fetch_envelopes(client, &ids, !self.seq)?;
@@ -201,7 +203,7 @@ fn fetch_envelopes(
         },
     )?;
 
-    let envelopes = data
+    let envelopes = output_data("FETCH", data)
         .into_iter()
         .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
         .filter_map(|envelope| Some((envelope.id.parse().ok()?, envelope)))

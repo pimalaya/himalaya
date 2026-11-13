@@ -117,9 +117,17 @@ impl JmapQueryCommand {
 
         let response = client.send_raw(request)?;
 
-        printer.out(JmapQueryOutput {
-            method_responses: response.method_responses,
-        })
+        let method_responses = response
+            .method_responses
+            .into_iter()
+            .map(|(name, result, call_id)| {
+                let result = serde_json::from_str(result.get())
+                    .with_context(|| format!("Response to call `{call_id}` is not valid JSON"))?;
+                Ok((name, result, call_id))
+            })
+            .collect::<Result<_>>()?;
+
+        printer.out(JmapQueryOutput { method_responses })
     }
 }
 

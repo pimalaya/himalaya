@@ -5,20 +5,17 @@
 //! (RFC 3461).
 
 use io_smtp::client::SmtpClient as _;
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use io_smtp::{
-    message::SmtpMessageSendOptions,
+    message::{SmtpMessageSend, SmtpMessageSendOptions},
     rfc3461::{
         capability::DSN,
         parameter::{SmtpDsnNotify, SmtpDsnRet},
     },
-    rfc5321::{
-        SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpParameter,
-        SmtpReversePath,
-    },
+    rfc5321::{SmtpForwardPath, SmtpMailbox, SmtpParameter, SmtpReversePath},
 };
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -44,10 +41,10 @@ pub struct SmtpSendCommand {
     ///
     /// Pass an empty value or `<>` for the null reverse path.
     #[arg(long, short = 'f', value_name = "ADDR", value_parser = reverse_path_parser)]
-    pub mail_from: SmtpReversePath<'static>,
+    pub mail_from: String,
     /// The envelope recipient(s) (RCPT TO forward path); repeatable.
-    #[arg(long, short = 't', value_name = "ADDR", required = true, value_parser = forward_path_parser)]
-    pub rcpt_to: Vec<SmtpForwardPath<'static>>,
+    #[arg(long, short = 't', value_name = "ADDR", required = true, value_parser = mailbox_parser)]
+    pub rcpt_to: Vec<String>,
     /// The conditions a notification is sent on, for every recipient
     /// (RFC 3461 4.1); comma-separated.
     ///
@@ -79,7 +76,7 @@ impl SmtpSendCommand {
         }
 
         if let Some(envid) = self.envid {
-            mail_parameters.push(SmtpParameter::envid(envid));
+            mail_parameters.push(SmtpParameter::envid(envid)?);
         }
 
         if !self.notify.is_empty() {
@@ -113,14 +110,27 @@ impl SmtpSendCommand {
             keep_bcc: true,
             mail_parameters,
             rcpt_parameters,
+            ..Default::default()
         };
+
+        // NOTE: an empty reverse path is the null one, see
+        // `reverse_path_parser`.
+        let mail_from = match self.mail_from.as_str() {
+            "" => SmtpReversePath::Null,
+            addr => SmtpReversePath::SmtpMailbox(SmtpMailbox::try_from(addr)?),
+        };
+        let rcpt_to = self
+            .rcpt_to
+            .iter()
+            .map(|addr| Ok(SmtpForwardPath(SmtpMailbox::try_from(addr.as_str())?)))
+            .collect::<Result<Vec<_>>>()?;
 
         let output = SmtpSendOutput {
-            mail_from: self.mail_from.to_string(),
-            rcpt_to: self.rcpt_to.iter().map(ToString::to_string).collect(),
+            mail_from: mail_from.to_string(),
+            rcpt_to: rcpt_to.iter().map(ToString::to_string).collect(),
         };
 
-        client.send(self.mail_from, self.rcpt_to, message, options)?;
+        client.run(SmtpMessageSend::new(mail_from, rcpt_to, message, options))?;
         printer.out(output)
     }
 }
@@ -211,34 +221,51 @@ fn envid_parser(envid: &str) -> Result<String, String> {
 }
 
 /// Clap value parser for MAIL FROM: maps an empty value or `<>` to the
-/// null reverse path, otherwise parses a `local-part@domain` mailbox.
-fn reverse_path_parser(addr: &str) -> Result<SmtpReversePath<'static>, String> {
+/// null reverse path, kept empty, otherwise checks a mailbox.
+fn reverse_path_parser(addr: &str) -> Result<String, String> {
     let addr = addr.trim();
 
     if addr.is_empty() || addr == "<>" {
-        return Ok(SmtpReversePath::Null);
+        return Ok(String::new());
     }
 
-    Ok(SmtpReversePath::SmtpMailbox(mailbox_parser(addr)?))
+    mailbox_parser(addr)
 }
 
-/// Clap value parser for RCPT TO: parses a `local-part@domain` mailbox.
-fn forward_path_parser(addr: &str) -> Result<SmtpForwardPath<'static>, String> {
-    Ok(SmtpForwardPath(mailbox_parser(addr)?))
-}
+/// Clap value parser for RCPT TO: checks a `local-part@domain` mailbox
+/// as the transaction takes it (RFC 5321 4.1.2), and keeps it trimmed.
+fn mailbox_parser(addr: &str) -> Result<String, String> {
+    let addr = addr.trim();
 
-/// Builds an SMTP [`SmtpMailbox`] from a `local-part@domain` string.
-fn mailbox_parser(addr: &str) -> Result<SmtpMailbox<'static>, String> {
-    let Some((local, domain)) = addr.trim().rsplit_once('@') else {
-        return Err(format!("expected local-part@domain, got `{addr}`"));
-    };
-
-    if local.is_empty() || domain.is_empty() {
-        return Err(format!("expected local-part@domain, got `{addr}`"));
+    match SmtpMailbox::try_from(addr) {
+        Ok(_) => Ok(addr.to_owned()),
+        Err(err) => Err(format!(
+            "expected local-part@domain, got `{}`: {err}",
+            addr.escape_debug()
+        )),
     }
+}
 
-    Ok(SmtpMailbox {
-        local_part: SmtpLocalPart(Cow::Owned(local.to_owned())),
-        domain: SmtpEhloDomain::SmtpDomain(SmtpDomain(Cow::Owned(domain.to_owned()))),
-    })
+#[cfg(test)]
+mod tests {
+    use crate::smtp::send::{mailbox_parser, reverse_path_parser};
+
+    #[test]
+    fn an_envelope_address_is_checked_as_the_transaction_takes_it() {
+        assert_eq!(mailbox_parser(" a@example.org ").unwrap(), "a@example.org");
+        assert_eq!(reverse_path_parser("<>").unwrap(), "");
+
+        for refused in [
+            "a",
+            "@example.org",
+            "a@",
+            "a b@example.org",
+            "a@example.org\r\nRCPT TO:<eve@example.net>",
+            "a\u{7}@example.org",
+        ] {
+            let err = mailbox_parser(refused).unwrap_err();
+            assert!(err.starts_with("expected local-part@domain"), "{err}");
+            assert!(!err.contains(['\r', '\n', '\u{7}']), "{err:?}");
+        }
+    }
 }

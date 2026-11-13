@@ -448,14 +448,15 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 mod tests {
     use std::fs;
 
-    use io_maildir::path::MaildirFsPath;
+    use io_maildir::{entry::MaildirEntry, path::MaildirFsPath};
     use tempfile::tempdir;
 
     use super::*;
     use crate::config::MaildirConfig;
 
     fn entry(name: &str, contents: &[u8]) -> MaildirFullEntry {
-        MaildirFullEntry::from((MaildirFsPath::new(name), contents.to_vec()))
+        let entry = MaildirEntry::from_path(MaildirFsPath::new(name));
+        MaildirFullEntry::from((entry, contents.to_vec()))
     }
 
     /// A client over a fresh store holding the Maildir `A` with one

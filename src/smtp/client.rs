@@ -66,6 +66,7 @@ impl SmtpClient {
             sasl,
             session: SmtpSessionOpenOptions {
                 starttls: config.starttls,
+                ..Default::default()
             },
         };
         let (inner, capabilities) = Inner::connect(&server, domain, opts)?;

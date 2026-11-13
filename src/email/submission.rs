@@ -7,6 +7,8 @@
 //! Every path that sends a raw message derives it here, so the SMTP
 //! transport and the pimdir queue cannot disagree on who receives it.
 
+use std::iter;
+
 use anyhow::{Result, anyhow, bail};
 use mime::{
     header::marker::{BCC, CC, FROM, SUBJECT, TO},
@@ -29,7 +31,8 @@ impl SubmissionEnvelope {
     /// Derives the envelope from the headers of a raw RFC 5322 message.
     ///
     /// A message with no `From:` address or no recipient is refused, since
-    /// no transport can submit it.
+    /// no transport can submit it, and so is an address holding a control
+    /// character.
     pub fn parse(raw: &[u8]) -> Result<Self> {
         // NOTE: the header block alone, the body left unsplit.
         let opts = MimeParseOptions {
@@ -56,6 +59,14 @@ impl SubmissionEnvelope {
 
         if rcpts.is_empty() {
             bail!("No `To:` / `Cc:` / `Bcc:` recipients found in raw message");
+        }
+
+        let mut all = iter::once(&from).chain(&rcpts);
+        if let Some(address) = all.find(|address| address.contains(char::is_control)) {
+            bail!(
+                "Invalid email address `{}` in envelope: it holds a control character",
+                address.escape_debug()
+            );
         }
 
         Ok(Self {
@@ -105,5 +116,29 @@ mod tests {
 
         assert!(no_from.unwrap_err().to_string().contains("From:"));
         assert!(no_rcpt.unwrap_err().to_string().contains("recipients"));
+    }
+
+    #[test]
+    fn an_address_holding_a_control_character_is_refused() {
+        let headers: [&[u8]; 4] = [
+            b"From: a@x.org\r\nTo: \"b\rc\"@y.org\r\n\r\nbody",
+            b"From: a@x.org\r\nTo: b\x07c@y.org\r\n\r\nbody",
+            b"From: a@x.org\r\nTo: b@y.org>\r\n RCPT TO:<eve@z.org\r\n\r\nbody",
+            b"From: \"a\nb\"@x.org\r\nTo: b@y.org\r\n\r\nbody",
+        ];
+
+        for raw in headers {
+            match SubmissionEnvelope::parse(raw) {
+                Ok(envelope) => {
+                    let control = |address: &String| address.contains(char::is_control);
+                    assert!(!control(&envelope.from), "{envelope:?}");
+                    assert!(!envelope.rcpts.iter().any(control), "{envelope:?}");
+                }
+                Err(err) => assert!(!err.to_string().contains(char::is_control), "{err:?}"),
+            }
+        }
+
+        let err = SubmissionEnvelope::parse(headers[1]).unwrap_err();
+        assert!(err.to_string().contains("`b\\u{7}c@y.org`"), "{err}");
     }
 }

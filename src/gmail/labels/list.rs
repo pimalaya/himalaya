@@ -80,5 +80,6 @@ fn label_type_wire(label_type: GmailLabelType) -> &'static str {
     match label_type {
         GmailLabelType::System => "system",
         GmailLabelType::User => "user",
+        GmailLabelType::Unknown => "unknown",
     }
 }

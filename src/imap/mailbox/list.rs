@@ -16,7 +16,7 @@ use crate::{
     account::context::Account,
     backend::Backend,
     email::mailbox::MailboxRole,
-    imap::{client::ImapClient, outcome},
+    imap::{client::ImapClient, outcome, utils::output_data},
     listing::Listing,
 };
 
@@ -50,9 +50,9 @@ impl ImapMailboxListCommand {
 
         let result = (|| -> Result<_> {
             let mailboxes = if self.all {
-                client.list(reference, pattern)?
+                output_data("LIST", client.list(reference, pattern)?)
             } else {
-                client.lsub(reference, pattern)?
+                output_data("LSUB", client.lsub(reference, pattern)?)
             };
 
             Ok(ImapMailboxListOutput {

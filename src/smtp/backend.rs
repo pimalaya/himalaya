@@ -8,14 +8,11 @@
 //! it transmits.
 
 use io_smtp::client::SmtpClient as _;
-use std::borrow::Cow;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use io_smtp::{
-    message::SmtpMessageSendOptions,
-    rfc5321::{
-        SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
-    },
+    message::{SmtpMessageSend, SmtpMessageSendOptions},
+    rfc5321::{SmtpForwardPath, SmtpMailbox, SmtpReversePath},
 };
 
 use crate::{email::submission::SubmissionEnvelope, smtp::client::SmtpClient};
@@ -23,6 +20,9 @@ use crate::{email::submission::SubmissionEnvelope, smtp::client::SmtpClient};
 impl SmtpClient {
     /// Runs the RFC 5321 mail transaction (MAIL FROM / RCPT TO / DATA)
     /// for `raw`, deriving the envelope from its headers.
+    ///
+    /// An address the transaction cannot carry fails the send before
+    /// anything is written.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
         let envelope = SubmissionEnvelope::parse(&raw)?;
         let reverse_path = SmtpReversePath::SmtpMailbox(parse_smtp_mailbox(&envelope.from)?);
@@ -31,28 +31,47 @@ impl SmtpClient {
             .iter()
             .map(|rcpt| Ok(SmtpForwardPath::from(parse_smtp_mailbox(rcpt)?)))
             .collect::<Result<Vec<_>>>()?;
+        let options = SmtpMessageSendOptions::default();
 
-        self.send(
+        self.run(SmtpMessageSend::new(
             reverse_path,
             forward_paths,
             raw,
-            SmtpMessageSendOptions::default(),
-        )?;
+            options,
+        ))?;
         Ok(())
     }
 }
 
-/// Parses `local-part@domain` into an owned SMTP mailbox.
-fn parse_smtp_mailbox(address: &str) -> Result<SmtpMailbox<'static>> {
-    let (local, domain) = address
-        .rsplit_once('@')
-        .ok_or_else(|| anyhow!("Invalid email address `{address}` in envelope"))?;
-    if local.is_empty() || domain.is_empty() {
-        bail!("Invalid email address `{address}` in envelope");
-    }
-
-    Ok(SmtpMailbox {
-        local_part: SmtpLocalPart(Cow::Owned(local.to_string())),
-        domain: SmtpEhloDomain::SmtpDomain(SmtpDomain(Cow::Owned(domain.to_string()))),
+/// Parses `local-part@domain` into an SMTP mailbox (RFC 5321 4.1.2).
+fn parse_smtp_mailbox(address: &str) -> Result<SmtpMailbox<'_>> {
+    SmtpMailbox::try_from(address).map_err(|err| {
+        anyhow!(
+            "Invalid email address `{}` in envelope: {err}",
+            address.escape_debug()
+        )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::smtp::backend::parse_smtp_mailbox;
+
+    #[test]
+    fn an_address_the_transaction_cannot_carry_is_refused() {
+        assert!(parse_smtp_mailbox("alice@example.org").is_ok());
+
+        for refused in [
+            "alice",
+            "@example.org",
+            "alice@",
+            "alice smith@example.org",
+            "alice@example.org\r\nRCPT TO:<eve@example.net>",
+            "alice\u{0}@example.org",
+        ] {
+            let err = parse_smtp_mailbox(refused).unwrap_err().to_string();
+            assert!(err.starts_with("Invalid email address `"), "{err}");
+            assert!(!err.contains(['\r', '\n', '\u{0}']), "{err:?}");
+        }
+    }
 }

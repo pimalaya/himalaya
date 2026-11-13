@@ -12,7 +12,7 @@ Himalaya is an application, the top layer of the Pimalaya stack. It writes no pr
 Himalaya SHALL build as a binary with no public library API and no lib target. A user needing the protocol or storage logic reaches for the io-* library that owns it (io-imap, io-jmap, io-gmail, io-msgraph, io-smtp, io-managesieve, io-maildir, io-mbox, io-pimdir).
 
 ### Requirement: Feature-gated backends
-Every backend SHALL sit behind its own cargo feature (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `mbox`, `pimdir`), so a build ships only the protocols it needs. A protocol command and its backend adapter compile only when its feature is on.
+Every backend SHALL sit behind its own cargo feature (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `mbox`, `pimdir`), so a build ships only the protocols it needs. A protocol command and its backend adapter compile only when its feature is on. The `imap`, `smtp` and `sieve` features SHALL enable the `scram` feature of io-imap, io-smtp and io-managesieve, so `scram-sha-256` runs wherever the configuration takes it.
 
 ### Requirement: TLS provider features
 The TLS providers SHALL be cargo features forwarded to pimalaya-stream and every network backend: `rustls-ring` (default), `rustls-aws`, `native-tls`.

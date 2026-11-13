@@ -19,7 +19,7 @@ use crate::imap::{
     fetch::{FetchedMessage, ImapFetchOutput},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
     outcome,
-    utils::parse_sequence_set,
+    utils::{output_data, parse_sequence_set},
 };
 
 /// Store flags on messages (STORE, RFC 3501).
@@ -98,7 +98,7 @@ impl ImapStoreCommand {
                 ImapMessageStoreOptions { uid: !self.seq },
             )?;
 
-            let messages = data
+            let messages = output_data("STORE", data)
                 .into_iter()
                 .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
                 .collect();

@@ -27,7 +27,7 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
-        utils::{parse_sequence_set, to_address},
+        utils::{output_data, parse_sequence_set, to_address},
     },
     shared::{base64, envelope::list::format_addresses, message::header},
 };
@@ -92,7 +92,7 @@ impl ImapFetchCommand {
                 },
             )?;
 
-            let messages = data
+            let messages = output_data("FETCH", data)
                 .into_iter()
                 .map(|(seq, items)| FetchedMessage::from_items(seq.get(), items.into_iter()))
                 .collect();

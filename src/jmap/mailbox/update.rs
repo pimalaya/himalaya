@@ -61,8 +61,8 @@ impl JmapMailboxUpdateCommand {
 
         let patch = JmapMailboxUpdate {
             name: self.name,
-            parent_id: self.parent_id,
-            role: role_from_args(self.role, self.custom_role),
+            parent_id: self.parent_id.map(Some),
+            role: role_from_args(self.role, self.custom_role).map(Some),
             sort_order: self.sort_order,
             is_subscribed,
         };

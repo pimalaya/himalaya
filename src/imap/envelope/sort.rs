@@ -27,6 +27,7 @@ use crate::{
         envelope::search::SearchCriteriaArgs,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
+        utils::output_data,
     },
     listing::Listing,
 };
@@ -85,6 +86,7 @@ impl ImapEnvelopeSortCommand {
                     fallback,
                 },
             )?;
+            let ids = output_data("SORT", ids);
 
             Ok(ImapSortOutput {
                 account: account.name().to_string(),

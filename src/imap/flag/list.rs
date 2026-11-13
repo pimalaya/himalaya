@@ -19,7 +19,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     account::context::Account,
     backend::Backend,
-    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome, utils::output_data},
     listing::Listing,
 };
 
@@ -45,6 +45,7 @@ impl ImapFlagListCommand {
 
         let result = (|| -> Result<_> {
             let data = client.select(mailbox, ImapMailboxSelectOptions::default())?;
+            let data = output_data("SELECT", data);
             let flags = data.flags.unwrap_or_default();
             let permanent_flags = data.permanent_flags.unwrap_or_default();
 

@@ -58,7 +58,7 @@ use crate::{
         },
     },
     error::{mailbox_not_found, message_not_found},
-    imap::client::ImapClient,
+    imap::{client::ImapClient, utils::output_data},
     shared::message::{header, part},
 };
 
@@ -73,7 +73,7 @@ impl ImapClient {
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
 
-        let rows = self.list(reference, pattern)?;
+        let rows = output_data("LIST", self.list(reference, pattern)?);
 
         let mut mailboxes: Vec<Mailbox> = rows
             .into_iter()
@@ -88,7 +88,7 @@ impl ImapClient {
                     mbox,
                     vec![StatusDataItemName::Messages, StatusDataItemName::Unseen].into(),
                 )?;
-                apply_status(mailbox, items);
+                apply_status(mailbox, output_data("STATUS", items));
             }
         }
 
@@ -126,7 +126,7 @@ impl ImapClient {
     ) -> Result<Vec<Envelope>> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
-        let exists = select.exists.unwrap_or(0);
+        let exists = output_data("SELECT", select).exists.unwrap_or(0);
 
         let Some(window) = compute_window(exists, page, page_size) else {
             return Ok(Vec::new());
@@ -142,7 +142,7 @@ impl ImapClient {
             ImapMessageFetchOptions::default(),
         )?;
 
-        let envelopes = data
+        let envelopes = output_data("FETCH", data)
             .into_iter()
             .rev()
             .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
@@ -166,7 +166,7 @@ impl ImapClient {
     ) -> Result<Vec<Envelope>> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
-        if select.exists.unwrap_or(0) == 0 {
+        if output_data("SELECT", select).exists.unwrap_or(0) == 0 {
             return Ok(Vec::new());
         }
 
@@ -182,6 +182,7 @@ impl ImapClient {
                 fallback,
             },
         )?;
+        let uids = output_data("SORT", uids);
         if uids.is_empty() {
             return Ok(Vec::new());
         }
@@ -209,7 +210,7 @@ impl ImapClient {
             },
         )?;
 
-        Ok(reorder_envelopes(data, &page_uids))
+        Ok(reorder_envelopes(output_data("FETCH", data), &page_uids))
     }
 
     /// Adds, sets or removes flags on a UID set, returning how many of
@@ -237,6 +238,7 @@ impl ImapClient {
         };
 
         let selected = self.select(mbox, ImapMailboxSelectOptions::default())?;
+        let selected = output_data("SELECT", selected);
 
         // NOTE: a server sending no PERMANENTFLAGS lets every flag be
         // changed permanently (RFC 3501 section 7.1).
@@ -251,7 +253,7 @@ impl ImapClient {
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        if echoes.len() >= ids.len() {
+        if output_data("STORE", echoes).len() >= ids.len() {
             return Ok(ids.len());
         }
 
@@ -274,7 +276,7 @@ impl ImapClient {
                 partial: None,
                 peek: !seen,
             }]);
-        let data = self.fetch(
+        let output = self.fetch(
             sequence_set,
             item_names,
             ImapMessageFetchOptions {
@@ -282,6 +284,14 @@ impl ImapClient {
                 ..Default::default()
             },
         )?;
+        let unreadable = !output.skipped.is_empty();
+        let data = output_data("FETCH", output);
+
+        if data.is_empty() && unreadable {
+            bail!(
+                "Cannot read message `{id}` of mailbox `{mailbox}`: its FETCH response does not decode"
+            );
+        }
 
         if data.is_empty() {
             return Err(message_not_found(format!(
@@ -347,6 +357,7 @@ impl ImapClient {
             .map_err(|_| anyhow!("Invalid IMAP search Message-ID value"))?;
         let criteria = Vec1::from(SearchKey::Header(field, value));
         let uids = self.search(criteria, ImapMessageSearchOptions { uid: true })?;
+        let uids = output_data("SEARCH", uids);
 
         let uid = uids.into_iter().max().map(|uid| uid.to_string());
         if uid.is_none() {
@@ -369,7 +380,7 @@ impl ImapClient {
             ImapMessageCopyOptions { uid: true },
         )?;
 
-        Ok(self.copied_uids(copy_uid, sequence_set)?.len())
+        Ok(self.copied_uids(copy_uid, sequence_set, ids.len())?.len())
     }
 
     /// Moves a UID set between two mailboxes.
@@ -402,9 +413,13 @@ impl ImapClient {
                 target,
                 ImapMessageMoveOptions { uid: true },
             )?;
+            // NOTE: a COPYUID counting more messages than were sent is
+            // not believed.
             return Ok(match copy_uid {
-                Some((_, source_uids, _)) => source_uids.len(),
-                None => present.len(),
+                Some(copy_uid) if copy_uid.count() <= present.len() as u64 => {
+                    copy_uid.count() as usize
+                }
+                _ => present.len(),
             });
         }
 
@@ -413,7 +428,7 @@ impl ImapClient {
             target,
             ImapMessageCopyOptions { uid: true },
         )?;
-        let copied = self.copied_uids(copy_uid, sequence_set)?;
+        let copied = self.copied_uids(copy_uid, sequence_set, ids.len())?;
         if copied.is_empty() {
             return Ok(0);
         }
@@ -560,7 +575,7 @@ impl ImapClient {
             .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
 
         let rows = self.list(reference, pattern)?;
-        let delimiter = rows
+        let delimiter = output_data("LIST", rows)
             .into_iter()
             .next()
             .and_then(|(_, delimiter, _)| delimiter);
@@ -584,8 +599,7 @@ impl ImapClient {
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
 
-        let rows = self
-            .list(reference, pattern)?
+        let rows = output_data("LIST", self.list(reference, pattern)?)
             .into_iter()
             .map(|(mailbox, _, attrs)| {
                 let name = match mailbox {
@@ -621,7 +635,7 @@ impl ImapClient {
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        let count = if echoes.len() >= ids.len() {
+        let count = if output_data("STORE", echoes).len() >= ids.len() {
             ids.len()
         } else {
             self.present_uids(sequence_set.clone())?.len()
@@ -646,13 +660,21 @@ impl ImapClient {
     /// RFC 9051 §6.4.9), and one malformed beyond that deviation is
     /// reported as missing. `COPY` leaves the source untouched, so a
     /// `UID SEARCH` of the requested UIDs still there finds the ones
-    /// copied.
+    /// copied. A `COPYUID` counting more than the `limit` UIDs asked is
+    /// read as missing too, a server being free to announce billions.
     ///
     /// [#781]: https://github.com/pimalaya/himalaya/issues/781
-    fn copied_uids(&mut self, copy_uid: ImapCopyUid, requested: SequenceSet) -> Result<Vec<u32>> {
+    fn copied_uids(
+        &mut self,
+        copy_uid: Option<ImapCopyUid>,
+        requested: SequenceSet,
+        limit: usize,
+    ) -> Result<Vec<u32>> {
         match copy_uid {
-            Some((_, source_uids, _)) => Ok(source_uids),
-            None => self.present_uids(requested),
+            Some(copy_uid) if copy_uid.count() <= limit as u64 => {
+                Ok(copy_uid.pairs().map(|(source, _)| source.get()).collect())
+            }
+            _ => self.present_uids(requested),
         }
     }
 
@@ -661,6 +683,7 @@ impl ImapClient {
     fn present_uids(&mut self, requested: SequenceSet) -> Result<Vec<u32>> {
         let criteria = Vec1::from(SearchKey::Uid(requested));
         let uids = self.search(criteria, ImapMessageSearchOptions { uid: true })?;
+        let uids = output_data("SEARCH", uids);
         let mut uids: Vec<u32> = uids.into_iter().map(NonZeroU32::get).collect();
         uids.sort_unstable();
         uids.dedup();

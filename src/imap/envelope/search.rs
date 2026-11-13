@@ -26,6 +26,7 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
+        utils::output_data,
     },
     listing::Listing,
 };
@@ -66,6 +67,7 @@ impl ImapEnvelopeSearchCommand {
 
             let criteria = self.criteria.into_criteria()?;
             let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
+            let ids = output_data("SEARCH", ids);
 
             Ok(ImapSearchOutput {
                 account: account.name().to_string(),

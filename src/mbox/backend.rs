@@ -24,12 +24,14 @@ use io_mbox::{
         copy::{MboxEntryCopy, MboxEntryCopyOptions},
         get::{MboxEntryGet, MboxEntryGetError, MboxEntryGetOptions},
         r#move::{MboxEntryMove, MboxEntryMoveOptions},
-        update::{MboxEntryUpdate, MboxEntryUpdateEdit, MboxEntryUpdateOptions},
+        update::{
+            MboxEntryUpdate, MboxEntryUpdateEdit, MboxEntryUpdateError, MboxEntryUpdateOptions,
+        },
     },
-    flag::{MboxFlag, MboxFlags},
+    flag::{MboxFlag, MboxFlags, MboxKeyword},
     index::MboxIndex,
     mbox::{create::MboxCreate, delete::MboxDelete, rename::MboxRename},
-    path::{MboxFsPath, MboxPath},
+    path::MboxFsPath,
     store::{INBOX, SBD},
 };
 use log::warn;
@@ -163,16 +165,7 @@ impl MboxClient {
         op: FlagOp,
     ) -> Result<usize> {
         let path = self.open_mbox(mailbox)?;
-        let flags = flags_to_mbox(flags);
-        let (index, mut cache) = self.index(&path, false)?;
-
-        let found: Vec<String> = found(&index, ids, &path)
-            .into_iter()
-            .map(|entry| entry.id.clone())
-            .collect();
-        if found.is_empty() {
-            return Ok(0);
-        }
+        let flags = flags_to_mbox(flags)?;
 
         let edit = |current: &MboxFlags| {
             let mut next = current.clone();
@@ -194,9 +187,16 @@ impl MboxClient {
             next
         };
 
-        let ids: Vec<&str> = found.iter().map(String::as_str).collect();
-        self.rewrite_flags(&path, &ids, edit, index, &mut cache)?;
-        Ok(found.len())
+        self.update(&path, |index| {
+            let edits = found(index, ids, &path)
+                .into_iter()
+                .map(|entry| {
+                    let flags = MboxEntryUpdateEdit::Flags(edit(&entry.flags));
+                    (entry.id.clone(), flags)
+                })
+                .collect();
+            Ok(edits)
+        })
     }
 
     /// Rewrites the flags of messages of the mbox at `path` to what `edit`
@@ -208,9 +208,19 @@ impl MboxClient {
         ids: &[&str],
         edit: impl Fn(&MboxFlags) -> MboxFlags,
     ) -> Result<()> {
-        let (index, mut cache) = self.index(path, false)?;
-        require_all(&index, ids, path)?;
-        self.rewrite_flags(path, ids, edit, index, &mut cache)
+        self.update(path, |index| {
+            require_all(index, ids, path)?;
+            let edits = ids
+                .iter()
+                .filter_map(|id| index.get(id))
+                .map(|entry| {
+                    let flags = MboxEntryUpdateEdit::Flags(edit(&entry.flags));
+                    (entry.id.clone(), flags)
+                })
+                .collect();
+            Ok(edits)
+        })?;
+        Ok(())
     }
 
     /// Reads one message's raw RFC 5322 bytes, unquoted, from `mailbox`,
@@ -244,7 +254,7 @@ impl MboxClient {
     /// Appends `raw` to `mailbox` with `flags`, returning its id.
     pub fn add_message(&self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let path = self.open_mbox(mailbox)?;
-        let mut flags = flags_to_mbox(flags);
+        let mut flags = flags_to_mbox(flags)?;
         read_is_old(&mut flags);
         self.append(&path, flags, raw)
     }
@@ -364,19 +374,14 @@ impl MboxClient {
     /// found writes nothing.
     pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<usize> {
         let path = self.open_mbox(mailbox)?;
-        let (index, mut cache) = self.index(&path, false)?;
 
-        let edits: BTreeMap<String, MboxEntryUpdateEdit> = found(&index, ids, &path)
-            .into_iter()
-            .map(|entry| (entry.id.clone(), MboxEntryUpdateEdit::Remove))
-            .collect();
-        let count = edits.len();
-        if count == 0 {
-            return Ok(0);
-        }
-
-        self.update(&path, edits, index, &mut cache)?;
-        Ok(count)
+        self.update(&path, |index| {
+            let edits = found(index, ids, &path)
+                .into_iter()
+                .map(|entry| (entry.id.clone(), MboxEntryUpdateEdit::Remove))
+                .collect();
+            Ok(edits)
+        })
     }
 
     /// Creates the empty mbox `name` at the top of the store, or under
@@ -397,7 +402,7 @@ impl MboxClient {
         let components: Vec<&str> = name.split('/').collect();
         for depth in 1..components.len() {
             let parent = components[..depth].join("/");
-            let path = self.store.resolve(&MboxPath::from(parent.as_str()));
+            let path = self.resolve_name(&parent)?;
             let path = Path::new(path.as_str());
 
             if self.store.thunderbird && !path.exists() {
@@ -409,7 +414,7 @@ impl MboxClient {
             }
         }
 
-        let path = self.store.resolve(&MboxPath::from(name.as_str()));
+        let path = self.resolve_name(&name)?;
         self.exec(MboxCreate::new(path))?;
         Ok(name)
     }
@@ -433,7 +438,7 @@ impl MboxClient {
         validate_mbox_name(to, self.store.thunderbird)?;
 
         let from_path = self.resolve_mbox(from)?;
-        let to_path = self.store.resolve(&MboxPath::from(to));
+        let to_path = self.resolve_name(to)?;
         self.refuse_spool(&from_path, "rename", from)?;
         self.refuse_spool(&to_path, "rename a mailbox to", to)?;
         refuse_dir(&from_path, "rename", from)?;
@@ -545,40 +550,42 @@ impl MboxClient {
         Ok(message.contents)
     }
 
-    /// Rewrites the flags of the messages of `index` among `ids` to what
-    /// `edit` makes of their current ones, under lock, and caches the
-    /// rewritten index.
-    fn rewrite_flags(
-        &self,
-        path: &MboxFsPath,
-        ids: &[&str],
-        edit: impl Fn(&MboxFlags) -> MboxFlags,
-        index: MboxIndex,
-        cache: &mut MboxCache,
-    ) -> Result<()> {
-        let edits = ids
-            .iter()
-            .filter_map(|id| index.get(id))
-            .map(|entry| {
-                let flags = MboxEntryUpdateEdit::Flags(edit(&entry.flags));
-                (entry.id.clone(), flags)
-            })
-            .collect();
-
-        self.update(path, edits, index, cache)
-    }
-
-    /// Applies `edits` to `path` under lock, and caches the rewritten
-    /// index.
+    /// Applies to `path`, under lock, the edits `plan` makes from its
+    /// index, caches the rewritten index and returns how many messages
+    /// were edited. No edit writes nothing.
+    ///
+    /// An update finding the index stale, another client having rewritten
+    /// the file meanwhile, rebuilds it and starts over once.
     fn update(
         &self,
         path: &MboxFsPath,
-        edits: BTreeMap<String, MboxEntryUpdateEdit>,
-        index: MboxIndex,
-        cache: &mut MboxCache,
-    ) -> Result<()> {
+        plan: impl Fn(&MboxIndex) -> Result<BTreeMap<String, MboxEntryUpdateEdit>>,
+    ) -> Result<usize> {
+        match self.update_once(path, &plan, false) {
+            Err(err) if err.downcast_ref().is_some_and(is_stale) => {
+                self.update_once(path, &plan, true)
+            }
+            result => result,
+        }
+    }
+
+    /// One pass of [`Self::update`], over the index rebuilt from scratch
+    /// when `rebuild`, the file then being scanned whole under the lock.
+    fn update_once(
+        &self,
+        path: &MboxFsPath,
+        plan: &impl Fn(&MboxIndex) -> Result<BTreeMap<String, MboxEntryUpdateEdit>>,
+        rebuild: bool,
+    ) -> Result<usize> {
+        let (index, mut cache) = self.index(path, rebuild)?;
+        let edits = plan(&index)?;
+        let count = edits.len();
+        if count == 0 {
+            return Ok(0);
+        }
+
         let opts = MboxEntryUpdateOptions {
-            index: Some(index),
+            index: (!rebuild).then_some(index),
             lock: self.lock.clone(),
             scanner: self.scanner.clone(),
             chunk_size: self.chunk_size,
@@ -587,7 +594,7 @@ impl MboxClient {
 
         cache.index = Some(output.index);
         cache.save(self.cache_dir.as_deref(), path);
-        Ok(())
+        Ok(count)
     }
 
     /// The envelope of every message of `path`, pseudo message aside, in
@@ -663,9 +670,13 @@ fn refuse_dir(path: &MboxFsPath, verb: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Whether a read failed on an entry another client moved.
+/// Whether a read or an update failed on an entry another client moved.
 fn is_stale(err: &MboxClientError) -> bool {
-    matches!(err, MboxClientError::EntryGet(MboxEntryGetError::Stale(_)))
+    matches!(
+        err,
+        MboxClientError::EntryGet(MboxEntryGetError::Stale(_))
+            | MboxClientError::EntryUpdate(MboxEntryUpdateError::Stale(_))
+    )
 }
 
 /// Finds the entry `id` names in `index`.
@@ -758,15 +769,18 @@ fn envelope_from(contents: &[u8]) -> Envelope {
 
 /// Maps a shared [`Flag`] to an [`MboxFlag`]; a flag with no `Status`
 /// or `X-Status` letter goes to `X-Keywords`.
-fn flag_to_mbox(flag: &Flag) -> MboxFlag {
-    match flag.iana() {
+///
+/// A keyword `X-Keywords` would not give back is refused.
+fn flag_to_mbox(flag: &Flag) -> Result<MboxFlag> {
+    let flag = match flag.iana() {
         Some(IanaFlag::Seen) => MboxFlag::Seen,
         Some(IanaFlag::Answered) => MboxFlag::Answered,
         Some(IanaFlag::Flagged) => MboxFlag::Flagged,
         Some(IanaFlag::Draft) => MboxFlag::Draft,
         Some(IanaFlag::Deleted) => MboxFlag::Deleted,
-        Some(_) | None => MboxFlag::Keyword(flag.raw().to_string()),
-    }
+        Some(_) | None => MboxFlag::Keyword(MboxKeyword::new(flag.raw())?),
+    };
+    Ok(flag)
 }
 
 /// Marks a seen message old too, as mutt writes `Status: RO`: GNU mail
@@ -778,7 +792,7 @@ fn read_is_old(flags: &mut MboxFlags) {
 }
 
 /// Shared flag slice to [`MboxFlags`].
-fn flags_to_mbox(flags: &[Flag]) -> MboxFlags {
+fn flags_to_mbox(flags: &[Flag]) -> Result<MboxFlags> {
     flags.iter().map(flag_to_mbox).collect()
 }
 
@@ -791,7 +805,7 @@ fn flag_from_mbox(flag: &MboxFlag) -> Option<Flag> {
         MboxFlag::Flagged => Flag::from_iana(IanaFlag::Flagged),
         MboxFlag::Draft => Flag::from_iana(IanaFlag::Draft),
         MboxFlag::Deleted => Flag::from_iana(IanaFlag::Deleted),
-        MboxFlag::Keyword(keyword) => Flag::from_raw(keyword),
+        MboxFlag::Keyword(keyword) => Flag::from_raw(keyword.as_str()),
         MboxFlag::Old => return None,
     };
     Some(flag)
@@ -993,16 +1007,37 @@ mod tests {
             MboxFlag::Flagged,
             MboxFlag::Draft,
             MboxFlag::Deleted,
-            MboxFlag::Keyword("NonJunk".into()),
-            MboxFlag::Keyword("$Junk".into()),
+            MboxFlag::Keyword(MboxKeyword::new("NonJunk").unwrap()),
+            MboxFlag::Keyword(MboxKeyword::new("$Junk").unwrap()),
         ];
 
         for flag in flags {
             let shared = flag_from_mbox(&flag).unwrap();
-            assert_eq!(flag_to_mbox(&shared), flag);
+            assert_eq!(flag_to_mbox(&shared).unwrap(), flag);
         }
 
         assert_eq!(flag_from_mbox(&MboxFlag::Old), None);
+    }
+
+    #[test]
+    fn a_keyword_the_file_would_not_give_back_is_refused() {
+        let (_root, client) = client(MboxFormatConfig::Mboxrd, false);
+        client.create_mailbox("A", None).unwrap();
+        let id = client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
+
+        for keyword in ["two words", "a,b", "line\nbreak"] {
+            let flags = [Flag::from_raw(keyword)];
+            assert!(
+                client
+                    .store_flags("A", &[&id], &flags, FlagOp::Add)
+                    .is_err()
+            );
+            assert!(client.add_message("A", &flags, MESSAGE.to_vec()).is_err());
+        }
+
+        let envelopes = client.list_envelopes("A", None, None, false).unwrap();
+        assert_eq!(envelopes.len(), 1);
+        assert!(envelopes[0].flags.is_empty());
     }
 
     #[test]
@@ -1073,6 +1108,42 @@ mod tests {
         let query = "body body".parse::<SearchEmailsQuery>().unwrap();
         let hits = client.search_envelopes("A", Some(&query), None, None, false);
         assert_eq!(hits.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_write_rebuilds_a_stale_index_once() {
+        let (_root, mut client) = client(MboxFormatConfig::Mboxrd, false);
+        let cache_dir = tempfile::tempdir().unwrap();
+        client.cache_dir = Some(cache_dir.path().to_path_buf());
+        client.create_mailbox("A", None).unwrap();
+        let first = client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
+        let other = b"From: b@x.org\nSubject: two\n\nbody two\n";
+        let second = client.add_message("A", &[], other.to_vec()).unwrap();
+        let path = client.resolve_mbox("A").unwrap();
+
+        // NOTE: see `a_listing_rebuilds_a_stale_index_once`.
+        let move_an_entry = || {
+            let mut cache = MboxCache::load(client.cache_dir.as_deref(), &path);
+            let index = cache.index.as_mut().unwrap();
+            index.entries[0].len -= 1;
+            index.entries[1].offset -= 1;
+            cache.save(client.cache_dir.as_deref(), &path);
+        };
+
+        move_an_entry();
+        let flagged = [Flag::from_iana(IanaFlag::Flagged)];
+        let count = client.store_flags("A", &[&first, &second], &flagged, FlagOp::Add);
+        assert_eq!(count.unwrap(), 2);
+
+        let envelopes = client.list_envelopes("A", None, None, false).unwrap();
+        assert!(envelopes.iter().all(|envelope| envelope.flags.len() == 1));
+
+        move_an_entry();
+        assert_eq!(client.delete_messages("A", &[&second]).unwrap(), 1);
+
+        let envelopes = client.list_envelopes("A", None, None, false).unwrap();
+        assert_eq!(envelopes.len(), 1);
+        assert_eq!(envelopes[0].id, first);
     }
 
     #[test]

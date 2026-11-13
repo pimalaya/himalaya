@@ -16,6 +16,7 @@ use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameArg, MailboxNoSelectFlag},
     outcome,
+    utils::output_data,
 };
 
 /// Expunge the given mailbox (EXPUNGE, RFC 3501).
@@ -39,7 +40,7 @@ impl ImapMailboxExpungeCommand {
                 client.select(mailbox, ImapMailboxSelectOptions::default())?;
             }
 
-            let expunged = client.expunge()?;
+            let expunged = output_data("EXPUNGE", client.expunge()?);
 
             Ok(ImapMailboxExpungeOutput {
                 expunged: expunged.into_iter().map(NonZeroU32::get).collect(),

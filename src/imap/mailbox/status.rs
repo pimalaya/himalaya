@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome, utils::output_data},
 };
 
 /// Get the status of the given mailbox (STATUS, RFC 3501).
@@ -46,7 +46,7 @@ impl ImapMailboxStatusCommand {
         let result = (|| -> Result<_> {
             let items = client.status(mailbox, item_names.into())?;
 
-            Ok(ImapMailboxStatusOutput::from(items))
+            Ok(ImapMailboxStatusOutput::from(output_data("STATUS", items)))
         })();
 
         outcome::print(printer, result)

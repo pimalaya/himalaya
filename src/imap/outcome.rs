@@ -118,11 +118,11 @@ fn refusal_of(err: &Error) -> Option<(ImapStatus, String)> {
         ($($variant:ident($ty:ident)),* $(,)?) => {
             match err {
                 $(
-                    ImapClientError::$variant($ty::No(text)) => {
-                        Some((ImapStatus::No, text.clone()))
+                    ImapClientError::$variant($ty::No(status)) => {
+                        Some((ImapStatus::No, status.text.clone()))
                     }
-                    ImapClientError::$variant($ty::Bad(text)) => {
-                        Some((ImapStatus::Bad, text.clone()))
+                    ImapClientError::$variant($ty::Bad(status)) => {
+                        Some((ImapStatus::Bad, status.text.clone()))
                     }
                 )*
                 _ => None,
@@ -192,15 +192,25 @@ mod tests {
     use io_imap::{
         client::ImapClientError,
         rfc3501::{lsub::ImapMailboxLsubError, select::ImapMailboxSelectError},
+        send::ImapStatusError,
+        types::response::StatusKind,
     };
     use serde_json::json;
 
     use crate::imap::outcome::{ImapDoneOutput, ImapOutcome, ImapStatus, refusal_of};
 
+    fn status(kind: StatusKind, text: &str) -> ImapStatusError {
+        ImapStatusError {
+            kind,
+            code: None,
+            text: text.into(),
+        }
+    }
+
     #[test]
     fn a_tagged_no_reads_as_a_refusal() {
         let err = Error::from(ImapClientError::MailboxSelect(ImapMailboxSelectError::No(
-            "Mailbox does not exist".into(),
+            status(StatusKind::No, "Mailbox does not exist"),
         )))
         .context("Select mailbox");
 
@@ -214,7 +224,7 @@ mod tests {
     #[test]
     fn a_refused_lsub_reads_as_a_refusal() {
         let err = Error::from(ImapClientError::MailboxLsub(ImapMailboxLsubError::Bad(
-            "Parse Error".into(),
+            status(StatusKind::Bad, "Parse Error"),
         )));
 
         assert_eq!(

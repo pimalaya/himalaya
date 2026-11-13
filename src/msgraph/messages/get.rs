@@ -38,7 +38,7 @@ impl MsgraphMessageGetCommand {
             return write_bytes_or_save(printer, None, bytes, "message/rfc822");
         }
 
-        let msg = client.message_get(&self.id)?.response;
+        let msg = client.message_get(&self.id, None, None)?.response;
 
         printer.out(MsgraphMessageGetOutput(msg))
     }
@@ -65,7 +65,8 @@ impl fmt::Display for MsgraphMessageGetOutput {
             fields.push("From", sanitize::text(&from));
         }
 
-        let to: Vec<String> = self.0.to_recipients.iter().map(recipient).collect();
+        let to = self.0.to_recipients.as_option().into_iter().flatten();
+        let to: Vec<String> = to.map(recipient).collect();
         if !to.is_empty() {
             fields.push("To", sanitize::text(&to.join(", ")));
         }

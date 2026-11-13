@@ -61,6 +61,7 @@ impl SieveClient {
             session: ManagesieveSessionOpenOptions {
                 starttls: config.starttls.unwrap_or(server.scheme() == "sieve"),
                 allow_cleartext_auth: config.allow_cleartext_auth,
+                ..Default::default()
             },
         };
         let (inner, _capabilities) = Inner::connect(&server, opts)?;
