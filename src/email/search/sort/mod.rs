@@ -6,7 +6,6 @@
 #[cfg(any(
     feature = "gmail",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox",
     feature = "pimdir",
     feature = "msgraph"

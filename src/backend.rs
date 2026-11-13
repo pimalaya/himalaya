@@ -28,8 +28,6 @@ pub enum Backend {
     Msgraph,
     /// Pin the command to the account's Maildir backend.
     Maildir,
-    /// Pin the command to the account's m2dir backend.
-    M2dir,
     /// Pin the command to the account's mbox backend.
     Mbox,
     /// Pin the command to the account's pimdir backend.
@@ -49,7 +47,6 @@ impl Backend {
         Self::Gmail,
         Self::Msgraph,
         Self::Maildir,
-        Self::M2dir,
         Self::Mbox,
         Self::Pimdir,
         Self::Smtp,
@@ -68,8 +65,6 @@ impl Backend {
         Self::Msgraph,
         #[cfg(feature = "maildir")]
         Self::Maildir,
-        #[cfg(feature = "m2dir")]
-        Self::M2dir,
         #[cfg(feature = "mbox")]
         Self::Mbox,
         #[cfg(feature = "pimdir")]
@@ -105,11 +100,6 @@ impl Backend {
         matches!(self, Self::Auto | Self::Maildir)
     }
 
-    /// Whether the m2dir arm of a unified command may run.
-    pub fn allows_m2dir(self) -> bool {
-        matches!(self, Self::Auto | Self::M2dir)
-    }
-
     /// Whether the mbox arm of a unified command may run.
     pub fn allows_mbox(self) -> bool {
         matches!(self, Self::Auto | Self::Mbox)
@@ -140,7 +130,6 @@ impl fmt::Display for Backend {
             Self::Gmail => write!(f, "gmail"),
             Self::Msgraph => write!(f, "msgraph"),
             Self::Maildir => write!(f, "maildir"),
-            Self::M2dir => write!(f, "m2dir"),
             Self::Mbox => write!(f, "mbox"),
             Self::Pimdir => write!(f, "pimdir"),
             Self::Smtp => write!(f, "smtp"),

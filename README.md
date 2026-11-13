@@ -38,7 +38,7 @@ Himalaya is a low-level CLI: plain text for a human to glance at, JSON for scrip
 - **Unified API** for `mailboxes`, `envelopes`, `flags`, `messages` and `attachments`
 - **Protocol-specific APIs** exposing each backend's full surface
 - **IMAP**, **SMTP**, **ManageSieve**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
-- **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>, **mbox** <sup>[specs](https://manpages.debian.org/bookworm/mutt/mbox.5.en.html)</sup>, **pimdir** <sup>[specs](https://github.com/pimalaya/pimdir)</sup> support
+- **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **mbox** <sup>[specs](https://manpages.debian.org/bookworm/mutt/mbox.5.en.html)</sup>, **pimdir** <sup>[specs](https://github.com/pimalaya/pimdir)</sup> support
 - **Simple auth** support for IMAP, SMTP and ManageSieve (anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256)
 - **HTTP auth** support for JMAP: basic, bearer
 - **TLS** support:
@@ -170,7 +170,7 @@ The binary lands at target/release/himalaya.
 
 ## Configuration
 
-Himalaya reads a TOML configuration you write, and never writes one. [config.sample.toml](./config.sample.toml) holds one account: the options every account shares with their values, then one commented section per backend or provider, yours to uncomment: IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox and pimdir. The OAuth 2.0 sections read their token from [Ortie](https://github.com/pimalaya/ortie), whose sample has the matching sections. Releases and packages ship it as share/doc/himalaya/config.sample.toml.
+Himalaya reads a TOML configuration you write, and never writes one. [config.sample.toml](./config.sample.toml) holds one account: the options every account shares with their values, then one commented section per backend or provider, yours to uncomment: IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, mbox and pimdir. The OAuth 2.0 sections read their token from [Ortie](https://github.com/pimalaya/ortie), whose sample has the matching sections. Releases and packages ship it as share/doc/himalaya/config.sample.toml.
 
 Run without a configuration at a terminal, Himalaya welcomes you with the commands copying the shipped sample in place, or downloading it when none ships, then the first command to run. Under `--json` or in a script, it fails naming the path it looked at and the sample.
 

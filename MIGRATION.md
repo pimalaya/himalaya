@@ -2,7 +2,7 @@
 
 ## From v2 to v3
 
-v3 makes Himalaya a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. Daily mail is a frontend's job: see the interfaces listed in README.md. v3 drops the configuration wizard, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, sets `envelope.list.datetime-relative` or marks several accounts default.
+v3 makes Himalaya a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. Daily mail is a frontend's job: see the interfaces listed in README.md. v3 drops the configuration wizard and the m2dir backend, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, sets `envelope.list.datetime-relative` or marks several accounts default.
 
 What a script or a frontend reads off `--json` and the text output changes, and a few commands that used to report a success they did not achieve now fail. The CHANGELOG lists every change; these are the ones to act on.
 
@@ -17,6 +17,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`envelope.list.datetime-relative` is gone**, refused as an unknown key: remove it. Dates print as `envelope.list.datetime-fmt` and `datetime-local-tz` configure them.
 - **Dates default to `%F %R` in the local timezone**, where v2 printed `%F %R%:z` at the offset a message was sent with. Set `envelope.list.datetime-fmt = "%F %R%:z"` and `envelope.list.datetime-local-tz = false` to keep the v2 dates.
 - **`http` and `https` hosts are ASCII.** A JMAP `server` or an HTTP proxy `url` with an internationalised host is refused: write the host in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers are unchanged.
+- **m2dir is gone.** The `m2dir` backend, its `himalaya m2dir` commands, the `m2dir` cargo feature and `-b m2dir` no longer exist: io-m2dir left the Pimalaya family, pimdir superseding it. An `m2dir` block still loads, ignored, and an account left with no other backend fails naming it. Move the account to a Maildir (`maildir.root`, filled by a sync tool such as mbsync or OfflineIMAP) or to a pimdir store (`pimdir.root`, synced by neverest), syncing it from the server; then delete the `m2dir` block and drop `m2dir` from a build's `--features`.
 
 ### Text output
 
@@ -72,7 +73,6 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 ### Commands that act differently
 
 - **`attachment download` without an id skips the inline parts**, as `attachment list` does: pass `--inline` (`-i`) to write them too.
-- **m2dir flags are written in the m2dir spelling**, `$seen`, `$answered`, `$flagged`, `$draft` and `$Deleted`, where v2 wrote `\Seen` and the other IMAP spellings. Both spellings are read, and a removal drops both.
 
 ### New
 

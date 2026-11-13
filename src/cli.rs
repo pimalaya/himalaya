@@ -28,8 +28,6 @@ use crate::gmail::{cli::GmailCommand, client::build_gmail_client};
 use crate::imap::{cli::ImapCommand, client::build_imap_client};
 #[cfg(feature = "jmap")]
 use crate::jmap::{cli::JmapCommand, client::build_jmap_client};
-#[cfg(feature = "m2dir")]
-use crate::m2dir::{cli::M2dirCommand, client::build_m2dir_client};
 #[cfg(feature = "maildir")]
 use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
 #[cfg(feature = "mbox")]
@@ -142,9 +140,6 @@ pub enum Command {
     #[cfg(feature = "maildir")]
     #[command(subcommand)]
     Maildir(MaildirCommand),
-    #[cfg(feature = "m2dir")]
-    #[command(subcommand)]
-    M2dir(M2dirCommand),
     #[cfg(feature = "mbox")]
     #[command(subcommand)]
     Mbox(MboxCommand),
@@ -380,13 +375,6 @@ impl Command {
                 printer,
                 &mut session.maildir,
                 build_maildir_client,
-                |printer, account, client| cmd.execute(printer, account, client),
-            ),
-            #[cfg(feature = "m2dir")]
-            Self::M2dir(cmd) => account.run(
-                printer,
-                &mut session.m2dir,
-                build_m2dir_client,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(feature = "mbox")]

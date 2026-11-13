@@ -108,7 +108,6 @@ impl Flag {
         feature = "jmap",
         feature = "gmail",
         feature = "maildir",
-        feature = "m2dir",
         feature = "mbox",
         feature = "msgraph",
         feature = "pimdir"

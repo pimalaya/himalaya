@@ -176,8 +176,8 @@ impl AccountConfig {
     /// The error of account `name` where nothing matches `backend`, the
     /// caller being able to use `supported` alone.
     ///
-    /// Names the v1 `backend` table when present, it being the likely
-    /// cause. A `--backend` naming a block the account lacks is refused
+    /// Names the v1 `backend` table or the removed `m2dir` block when
+    /// present, it being the likely cause. A `--backend` naming a block the account lacks is refused
     /// under `capability-missing`, as the resolver refuses a verb the
     /// filter leaves unserved.
     pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
@@ -199,6 +199,10 @@ impl AccountConfig {
 
         let reason = if self.backend.is_some() {
             format!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
+        } else if self.m2dir.is_some() {
+            format!(
+                "{reason}: its `m2dir` block is ignored since v3 removed m2dir, see MIGRATION.md"
+            )
         } else {
             reason
         };
@@ -284,9 +288,6 @@ pub struct AccountConfig {
     /// The Maildir backend of this account.
     #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
-    /// The m2dir backend of this account.
-    #[allow(unused)]
-    pub m2dir: Option<M2dirConfig>,
     /// The mbox backend of this account.
     #[allow(unused)]
     pub mbox: Option<MboxConfig>,
@@ -302,6 +303,10 @@ pub struct AccountConfig {
     /// The v1 `backend` table, kept only to point at MIGRATION.md.
     #[serde(default)]
     pub backend: Option<IgnoredAny>,
+    /// The `m2dir` block, whose backend was removed, kept only to point
+    /// at MIGRATION.md.
+    #[serde(default)]
+    pub m2dir: Option<IgnoredAny>,
 }
 
 /// Envelope-level rendering options.
@@ -585,16 +590,6 @@ pub struct MaildirConfig {
     /// How custom, non-IANA keywords are read, if at all.
     #[serde(default)]
     pub keywords: MaildirKeywordsConfig,
-}
-
-/// m2dir configuration.
-#[allow(unused)]
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct M2dirConfig {
-    /// The m2dir root, one directory per mailbox below it.
-    #[serde(deserialize_with = "shell_expanded_path")]
-    pub root: PathBuf,
 }
 
 /// mbox configuration: a directory of mbox files, plus the spool.
@@ -1352,6 +1347,21 @@ mod tests {
         assert!(err.contains("unknown field `list`"), "{err}");
     }
 
+    /// An `m2dir` block loads as if absent, whatever it holds, and the
+    /// error of an account left with no backend names its removal.
+    #[test]
+    fn m2dir_block_names_its_removal() {
+        let toml =
+            "[accounts.example]\ndefault = true\nm2dir.root = \"~/Mail\"\nm2dir.unknown = true\n";
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let (name, account) = config.take_account(None).unwrap();
+
+        let err = account.no_backend_error(&name, Backend::Auto, &[]);
+        let err = err.to_string();
+        assert!(err.contains("`m2dir` block is ignored"), "{err}");
+        assert!(err.contains("MIGRATION.md"), "{err}");
+    }
+
     #[test]
     fn relative_dates_are_refused() {
         let toml = "[envelope.list]\ndatetime-relative = true\n[accounts]\n";
@@ -1546,7 +1556,6 @@ mod tests {
         let home = PathBuf::from(var("HOME").expect("HOME must be set"));
 
         let maildir: MaildirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
-        let m2dir: M2dirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
         let pimdir: PimdirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
         let mbox: MboxConfig = toml::from_str(
             r#"root = "~/Mail"
@@ -1555,7 +1564,6 @@ inbox = "~/spool""#,
         .unwrap();
 
         assert_eq!(maildir.root, home.join("Mail"));
-        assert_eq!(m2dir.root, home.join("Mail"));
         assert_eq!(pimdir.root, home.join("Mail"));
         assert_eq!(mbox.root, home.join("Mail"));
         assert_eq!(mbox.inbox, Some(home.join("spool")));
@@ -1587,7 +1595,7 @@ inbox = "~/spool""#,
 
     /// The sections of config.sample.toml, one of which a user
     /// uncomments.
-    const SECTIONS: [&str; 11] = [
+    const SECTIONS: [&str; 10] = [
         "# IMAP and SMTP",
         "# ManageSieve",
         "# JMAP",
@@ -1596,7 +1604,6 @@ inbox = "~/spool""#,
         "# Microsoft IMAP and SMTP",
         "# Fastmail",
         "# Maildir",
-        "# m2dir",
         "# mbox",
         "# pimdir",
     ];
@@ -1630,7 +1637,6 @@ inbox = "~/spool""#,
                 account_config.gmail.is_some(),
                 account_config.msgraph.is_some(),
                 account_config.maildir.is_some(),
-                account_config.m2dir.is_some(),
                 account_config.mbox.is_some(),
                 account_config.pimdir.is_some(),
                 account_config.sieve.is_some(),

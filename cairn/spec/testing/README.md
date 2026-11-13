@@ -40,7 +40,6 @@ single combined report sufficed.
 | Backend | Unified | Specific |
 | --- | --- | --- |
 | Maildir | [maildir.md](maildir.md) | [maildir-specific.md](maildir-specific.md) |
-| m2dir | [m2dir.md](m2dir.md) | [m2dir-specific.md](m2dir-specific.md) |
 
 ## Provider-agnostic
 
@@ -51,8 +50,8 @@ single combined report sufficed.
 ## Status
 
 Every bug surfaced by these runs was fixed in-tree (mailbox name→id
-resolution across JMAP/Gmail/Graph/Maildir/m2dir, copy/move counts,
-CRLF/empty-body handling, the Maildir/m2dir double-join and variadic-flag
+resolution across JMAP/Gmail/Graph/Maildir, copy/move counts,
+CRLF/empty-body handling, the Maildir double-join and variadic-flag
 issues, the `has_prefix` reply/forward subject bug, …). The only
 library-level fixes were in io-imap (untagged MOVE `COPYUID`; and the
 fallback `Date:`-sort fix below) and io-gmail (empty 2xx body parsing),

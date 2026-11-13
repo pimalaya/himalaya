@@ -784,7 +784,6 @@ dependencies = [
  "io-gmail",
  "io-imap",
  "io-jmap",
- "io-m2dir",
  "io-maildir",
  "io-managesieve",
  "io-mbox",
@@ -1016,19 +1015,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
-]
-
-[[package]]
-name = "io-m2dir"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "529b8f918c7dbc62de65f56540c441388f44eaf3aba97601bda56c24be178fb6"
-dependencies = [
- "base64",
- "log",
- "mail-parser",
- "percent-encoding",
- "thiserror",
 ]
 
 [[package]]

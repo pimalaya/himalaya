@@ -17,8 +17,8 @@
 //! ## Backends and plumbing
 //!
 //! The network backends are io-imap, io-jmap, io-gmail, io-msgraph,
-//! io-smtp and io-managesieve, the local ones io-maildir, io-m2dir, io-mbox
-//! and io-pimdir.
+//! io-smtp and io-managesieve, the local ones io-maildir, io-mbox and
+//! io-pimdir.
 //!
 //! The CLI plumbing, TOML loading and blocking stream runtime come from
 //! pimalaya-cli, pimalaya-config and pimalaya-stream. Every backend sits
@@ -33,11 +33,11 @@
 //! meaning one thing wherever it runs, a backend that cannot give that
 //! result declaring it unserved ([`capability`]).
 //!
-//! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir,
-//! m2dir, mbox, pimdir, smtp, sieve) each expose the full surface of one
-//! backend, including operations the unified API cannot model. The meta
-//! commands cover the accounts, the sessions (repl, mcp), completions, man
-//! pages and JSON Schemas.
+//! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, mbox,
+//! pimdir, smtp, sieve) each expose the full surface of one backend,
+//! including operations the unified API cannot model. The meta commands
+//! cover the accounts, the sessions (repl, mcp), completions, man pages
+//! and JSON Schemas.
 //!
 //! ## Unified commands and backend selection
 //!
@@ -122,8 +122,6 @@ mod imap;
 mod jmap;
 mod json_schema;
 mod listing;
-#[cfg(feature = "m2dir")]
-mod m2dir;
 #[cfg(feature = "maildir")]
 mod maildir;
 #[cfg(feature = "mbox")]

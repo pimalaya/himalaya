@@ -22,7 +22,6 @@ use mime::{
     feature = "imap",
     feature = "gmail",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox"
 ))]
 pub fn parse_headers(raw: &[u8]) -> mime::tree::cst::MimeCst<'_> {

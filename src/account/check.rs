@@ -9,7 +9,7 @@ use std::fs::File;
 use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
-#[cfg(any(feature = "mbox", feature = "m2dir"))]
+#[cfg(feature = "mbox")]
 use anyhow::bail;
 use clap::Parser;
 use pimalaya_cli::{error::PartialOutcome, fields::Fields, printer::Printer};
@@ -52,7 +52,6 @@ impl AccountCheckCommand {
                 feature = "gmail",
                 feature = "msgraph",
                 feature = "maildir",
-                feature = "m2dir",
                 feature = "mbox",
                 feature = "pimdir",
                 feature = "smtp",
@@ -128,15 +127,6 @@ impl AccountCheckCommand {
                 "maildir",
                 connect_maildir(maildir_config),
             ));
-        }
-
-        #[cfg(feature = "m2dir")]
-        if backend.allows_m2dir()
-            && let Some(m2dir_config) = &account_config.m2dir
-        {
-            report
-                .backends
-                .push(BackendCheck::from("m2dir", connect_m2dir(m2dir_config)));
         }
 
         #[cfg(feature = "mbox")]
@@ -337,29 +327,6 @@ fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
     Ok(())
 }
 
-/// Checks that the m2dir root is an initialised store and lists its
-/// folders, so a store the listing cannot walk fails here.
-#[cfg(feature = "m2dir")]
-fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
-    if !m2dir_config.root.is_dir() {
-        bail!(
-            "m2dir root `{}` does not exist or is not a directory",
-            m2dir_config.root.display()
-        );
-    }
-
-    let client = crate::m2dir::client::M2dirClient::new(m2dir_config.clone());
-    if client.open_store().is_err() {
-        bail!(
-            "m2dir root `{}` holds no `.m2store` marker; `mailbox create` or `m2dir create` initialises it",
-            m2dir_config.root.display()
-        );
-    }
-    client.list_mailboxes(false)?;
-
-    Ok(())
-}
-
 /// Opens the pimdir store as a reader, lists its mailboxes, then opens a
 /// producer and probes it, so a missing, foreign or busy store fails here
 /// rather than on the first read or write.
@@ -465,7 +432,6 @@ impl BackendCheck {
         feature = "gmail",
         feature = "msgraph",
         feature = "maildir",
-        feature = "m2dir",
         feature = "mbox",
         feature = "pimdir",
         feature = "smtp",

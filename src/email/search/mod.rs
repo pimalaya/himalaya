@@ -5,12 +5,7 @@
 //! and sort for the local backends, the sort alone after a Graph search).
 
 pub mod error;
-#[cfg(any(
-    feature = "maildir",
-    feature = "m2dir",
-    feature = "mbox",
-    feature = "pimdir"
-))]
+#[cfg(any(feature = "maildir", feature = "mbox", feature = "pimdir"))]
 pub mod eval;
 pub mod filter;
 pub mod parser;

@@ -285,7 +285,6 @@ pub fn declared(backend: Backend) -> &'static [Row] {
         Backend::Gmail => GMAIL,
         Backend::Msgraph => MSGRAPH,
         Backend::Maildir => MAILDIR,
-        Backend::M2dir => M2DIR,
         Backend::Mbox => MBOX,
         Backend::Pimdir => PIMDIR,
         Backend::Smtp => SMTP,
@@ -307,7 +306,6 @@ pub fn support(backend: Backend, capability: Capability) -> Support {
 /// one is picked: local before network.
 pub const STORAGE_ORDER: &[Backend] = &[
     Backend::Maildir,
-    Backend::M2dir,
     Backend::Mbox,
     Backend::Pimdir,
     Backend::Jmap,
@@ -503,7 +501,6 @@ fn allows(filter: Backend, backend: Backend) -> bool {
         feature = "gmail",
         feature = "msgraph",
         feature = "maildir",
-        feature = "m2dir",
         feature = "mbox",
         feature = "pimdir",
         feature = "smtp"
@@ -522,8 +519,6 @@ fn configures(config: &AccountConfig, backend: Backend) -> bool {
         Backend::Msgraph => config.msgraph.is_some(),
         #[cfg(feature = "maildir")]
         Backend::Maildir => config.maildir.is_some(),
-        #[cfg(feature = "m2dir")]
-        Backend::M2dir => config.m2dir.is_some(),
         #[cfg(feature = "mbox")]
         Backend::Mbox => config.mbox.is_some(),
         #[cfg(feature = "pimdir")]
@@ -835,16 +830,6 @@ const MAILDIR: &[Row] = local_rows![
     (C::MailboxDelete, Partial(LOCAL_INFERIORS)),
     (C::FlagsImportant, Partial(MAILDIR_KEYWORD)),
     (C::FlagsJunk, Partial(MAILDIR_KEYWORD)),
-    (C::Vacation, Not(NO_VACATION)),
-];
-
-/// m2dir, whose flags are lines of their own, keywords included.
-const M2DIR: &[Row] = local_rows![
-    (C::MailboxCreate, Full),
-    (C::MailboxRename, Not("m2dir has no rename yet")),
-    (C::MailboxDelete, Partial(LOCAL_INFERIORS)),
-    (C::FlagsImportant, Full),
-    (C::FlagsJunk, Full),
     (C::Vacation, Not(NO_VACATION)),
 ];
 

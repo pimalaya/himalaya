@@ -248,7 +248,6 @@ pub fn role(part: &MimeEntity) -> PartRole {
 #[cfg(any(
     feature = "imap",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox",
     feature = "pimdir"
 ))]
@@ -274,7 +273,6 @@ pub fn marks_attachment(
 #[cfg(any(
     feature = "imap",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox",
     feature = "pimdir"
 ))]
@@ -300,23 +298,13 @@ pub fn media_type(kind: &[u8], subtype: &[u8]) -> String {
 ///
 /// The leaves are the ones [`leaves`] walks, a `message/rfc822` part
 /// being one, so the parts of an attached message are not read.
-#[cfg(any(
-    feature = "maildir",
-    feature = "m2dir",
-    feature = "mbox",
-    feature = "pimdir"
-))]
+#[cfg(any(feature = "maildir", feature = "mbox", feature = "pimdir"))]
 pub fn has_attachment(message: &MimeCst) -> bool {
     part_has_attachment(&message.root, false)
 }
 
 /// Whether a part, or a leaf under it, marks its message.
-#[cfg(any(
-    feature = "maildir",
-    feature = "m2dir",
-    feature = "mbox",
-    feature = "pimdir"
-))]
+#[cfg(any(feature = "maildir", feature = "mbox", feature = "pimdir"))]
 fn part_has_attachment(part: &MimeEntity, is_protocol: bool) -> bool {
     let MimeBodyNode::Multipart(multipart) = &part.body else {
         return marks_attachment(
@@ -635,7 +623,7 @@ mod tests {
         raw.into_bytes()
     }
 
-    #[cfg(any(feature = "maildir", feature = "m2dir", feature = "mbox"))]
+    #[cfg(any(feature = "maildir", feature = "mbox"))]
     #[test]
     fn a_multipart_without_a_boundary_does_not_count() {
         let raw = b"Content-Type: multipart/mixed\r\n\r\nno parts here\r\n";
@@ -813,8 +801,8 @@ mod tests {
 }
 
 /// The `hasAttachment` rows, read through the envelope reader the
-/// Maildir, m2dir and mbox backends share.
-#[cfg(all(test, any(feature = "maildir", feature = "m2dir", feature = "mbox")))]
+/// Maildir and mbox backends share.
+#[cfg(all(test, any(feature = "maildir", feature = "mbox")))]
 mod attachment_rows {
     use crate::email::envelope;
 

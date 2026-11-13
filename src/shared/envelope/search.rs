@@ -23,7 +23,7 @@ use crate::{
 ///
 /// A date clause reads the `Date:` header, the sent-at. A text clause is
 /// matched as the backend matches text: a case-insensitive substring on
-/// Maildir, m2dir, mbox and pimdir, as the server matches it on IMAP (RFC
+/// Maildir, mbox and pimdir, as the server matches it on IMAP (RFC
 /// 3501 asks for a substring, some servers match whole words), whole words
 /// over the whole message on Gmail, KQL terms on Microsoft Graph, and as the
 /// server defines it on JMAP.

@@ -34,8 +34,7 @@ impl fmt::Display for IdReceipt {
     feature = "gmail",
     feature = "jmap",
     feature = "maildir",
-    feature = "mbox",
-    feature = "m2dir"
+    feature = "mbox"
 ))]
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IdsReceipt {
@@ -50,8 +49,7 @@ pub struct IdsReceipt {
     feature = "gmail",
     feature = "jmap",
     feature = "maildir",
-    feature = "mbox",
-    feature = "m2dir"
+    feature = "mbox"
 ))]
 impl fmt::Display for IdsReceipt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -23,7 +23,6 @@ gmail = ["dep:io-gmail", "dep:mime-rs", "io-gmail/client", "io-gmail/schemars"]
 msgraph = ["dep:io-msgraph", "dep:mime-rs", "io-msgraph/client", "io-msgraph/schemars"]
 maildir = ["dep:io-maildir", "dep:mime-rs", "io-maildir/client"]
 mbox = ["dep:io-mbox", "dep:mime-rs", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
-m2dir = ["dep:io-m2dir", "dep:mime-rs", "io-m2dir/client"]
 sieve = ["dep:io-managesieve", "io-managesieve/client", "io-managesieve/scram"]
 pimdir = ["dep:io-pimdir", "dep:jiff", "dep:mime-rs", "io-pimdir/search", "pimalaya-cli/prompt"]
 vendored = ["pimalaya-stream/vendored", "io-pimdir?/vendored"]
@@ -58,7 +57,6 @@ idna_adapter = { version = "=1.0.0", default-features = false }
 io-gmail = { version = "0.6", default-features = false, optional = true }
 io-imap = { version = "0.8", default-features = false, optional = true }
 io-jmap = { version = "0.7", default-features = false, optional = true }
-io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
 io-mbox = { version = "0.1", default-features = false, optional = true }
 io-managesieve = { version = "0.2", default-features = false, optional = true }

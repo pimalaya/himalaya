@@ -24,8 +24,6 @@ use crate::gmail::client::GmailClient;
 use crate::imap::client::ImapClient;
 #[cfg(feature = "jmap")]
 use crate::jmap::client::JmapClient;
-#[cfg(feature = "m2dir")]
-use crate::m2dir::client::M2dirClient;
 #[cfg(feature = "maildir")]
 use crate::maildir::client::MaildirClient;
 #[cfg(feature = "mbox")]
@@ -70,9 +68,6 @@ pub struct Session<'a> {
     /// The client of the `maildir` commands.
     #[cfg(feature = "maildir")]
     pub maildir: Option<(Account, MaildirClient)>,
-    /// The client of the `m2dir` commands.
-    #[cfg(feature = "m2dir")]
-    pub m2dir: Option<(Account, M2dirClient)>,
     /// The client of the `mbox` commands.
     #[cfg(feature = "mbox")]
     pub mbox: Option<(Account, MboxClient)>,

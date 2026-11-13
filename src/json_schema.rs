@@ -22,7 +22,6 @@ use crate::error::ErrorCode;
     feature = "jmap",
     feature = "maildir",
     feature = "mbox",
-    feature = "m2dir",
     feature = "sieve"
 ))]
 use crate::shared::receipt::IdReceipt;
@@ -30,8 +29,7 @@ use crate::shared::receipt::IdReceipt;
     feature = "gmail",
     feature = "jmap",
     feature = "maildir",
-    feature = "mbox",
-    feature = "m2dir"
+    feature = "mbox"
 ))]
 use crate::shared::receipt::IdsReceipt;
 
@@ -430,19 +428,6 @@ pub fn registry() -> JsonSchemaRegistry {
         );
     }
 
-    #[cfg(feature = "m2dir")]
-    {
-        insert!("himalaya-m2dir-list", crate::m2dir::list::M2dirListOutput);
-        insert!(
-            "himalaya-m2dir-flag-list",
-            crate::m2dir::flag::list::M2dirFlagListOutput
-        );
-        insert!(
-            "himalaya-m2dir-message-save",
-            crate::m2dir::message::save::M2dirMessageSaveOutput
-        );
-    }
-
     #[cfg(feature = "pimdir")]
     {
         insert!(
@@ -755,21 +740,6 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-mbox-flag-set",
             "himalaya-mbox-message-copy",
             "himalaya-mbox-message-move",
-        ] {
-            insert!(key, IdsReceipt);
-        }
-    }
-
-    #[cfg(feature = "m2dir")]
-    {
-        for key in ["himalaya-m2dir-create", "himalaya-m2dir-delete"] {
-            insert!(key, IdReceipt);
-        }
-
-        for key in [
-            "himalaya-m2dir-flag-add",
-            "himalaya-m2dir-flag-remove",
-            "himalaya-m2dir-flag-set",
         ] {
             insert!(key, IdsReceipt);
         }

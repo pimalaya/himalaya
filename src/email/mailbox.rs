@@ -19,8 +19,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub struct Mailbox {
     /// The identifier a follow-up command names the mailbox by.
     ///
-    /// JMAP exposes an opaque id of its own, where IMAP, Maildir and
-    /// m2dir repeat [`Self::name`].
+    /// JMAP exposes an opaque id of its own, where IMAP and Maildir
+    /// repeat [`Self::name`].
     pub id: String,
     /// The human-readable name.
     pub name: String,
@@ -130,7 +130,6 @@ impl MailboxIndex {
     feature = "imap",
     feature = "gmail",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox"
 ))]
 pub fn child_path(parent: &str, delimiter: char, name: &str) -> String {
@@ -175,7 +174,6 @@ pub fn validate_name(name: &str) -> Result<()> {
     feature = "imap",
     feature = "gmail",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox"
 ))]
 pub fn validate_level(name: &str, delimiter: char) -> Result<()> {

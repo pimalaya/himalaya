@@ -34,7 +34,6 @@ pub mod raw;
     feature = "jmap",
     feature = "maildir",
     feature = "mbox",
-    feature = "m2dir",
     feature = "sieve"
 ))]
 pub mod receipt;

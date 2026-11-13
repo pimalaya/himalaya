@@ -89,7 +89,6 @@ pub fn parse_message_ids(raw: &str) -> Vec<String> {
     feature = "gmail",
     feature = "msgraph",
     feature = "maildir",
-    feature = "m2dir",
     feature = "mbox"
 ))]
 pub fn normalize_message_id(raw: &str) -> Option<String> {
@@ -114,7 +113,7 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
 /// attachment ([`crate::shared::message::part::has_attachment`]); left
 /// `None` otherwise. The subject is read as the read view reads it, raw
 /// 8-bit bytes included.
-#[cfg(any(feature = "maildir", feature = "m2dir", feature = "mbox"))]
+#[cfg(any(feature = "maildir", feature = "mbox"))]
 pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
     use chrono::TimeZone;
     use mime::{

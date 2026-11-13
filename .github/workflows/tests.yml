@@ -70,9 +70,9 @@ jobs:
             "--all-features"
             "--no-default-features --features rustls-ring"
             "--no-default-features --features native-tls,jmap"
-            "--no-default-features --features rustls-ring,maildir,mbox,m2dir,pimdir"
+            "--no-default-features --features rustls-ring,maildir,mbox,pimdir"
           )
-          for backend in imap smtp jmap gmail msgraph maildir mbox m2dir sieve pimdir; do
+          for backend in imap smtp jmap gmail msgraph maildir mbox sieve pimdir; do
             sets+=("--no-default-features --features rustls-ring,$backend")
           done
           for set in "${sets[@]}"; do

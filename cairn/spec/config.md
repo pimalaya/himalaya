@@ -9,7 +9,7 @@ status: current
 Himalaya is configured through TOML: a top-level block plus named account blocks, one table per account under `[accounts.<name>]`, each carrying optional per-backend sub-blocks. The config schema is a set of pure DTOs (`*Config` types) mirroring the nested TOML shape; the selected account is flattened into a runtime `Account` view that commands consume. Config files stay user-owned: Himalaya never writes them.
 
 ### Requirement: Multi-account schema
-The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`, `mbox`, `pimdir`) and optional service sub-blocks for `smtp` and `sieve`.
+The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `mbox`, `pimdir`) and optional service sub-blocks for `smtp` and `sieve`.
 
 The `sieve` block SHALL accept `sieve://`, `sieves://`, and `unix://` servers, and SHALL expose the shared TLS and SASL vocabulary, every mechanism the other backends accept reaching ManageSieve too.
 
@@ -69,7 +69,7 @@ Himalaya SHALL NOT write a configuration file: the user writes it, from the docu
 An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `inbox` (the spool), `format` (`mboxo`, `mboxrd` by default, `mboxcl`, `mboxcl2`, which also decides whether `Content-Length` is trusted on read), `thunderbird` (the `.sbd` layout, off by default) and `lock.dotlock`, `lock.fcntl` (both on by default) and `lock.timeout`.
 
 ### Requirement: Path keys expand as the configuration is read
-Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `m2dir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
+Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
 
 An expansion that fails, an undefined variable being the case, SHALL leave the raw value untouched rather than fail the load.
 
@@ -89,6 +89,14 @@ An account's `proxy` SHALL apply to every network backend of that account (IMAP,
 
 ### Requirement: A v1 account layout is named, not silently ignored
 Unknown keys SHALL stay tolerated, the file being shared with himalaya-tui. When no configured backend matches `--backend`, the error SHALL name the account and, under `auto`, the backends the command supports in this build; under a named backend, the missing block, or that the backend is unsupported. An account carrying the v1 `backend` table, which no binary reads since v2, SHALL load as if the table were absent, and that error SHALL name the table and point at MIGRATION.md.
+
+### Requirement: An m2dir block is named, not loaded
+Himalaya SHALL NOT read m2dir stores. An account carrying an `m2dir` block, whatever it holds, SHALL load as if the block were absent, so a file shared with himalaya-tui or written for v2 keeps loading. When no configured backend matches `--backend`, that error SHALL name the `m2dir` block as ignored since v3 removed m2dir and point at MIGRATION.md. `m2dir` SHALL NOT be a `--backend` value, clap refusing it as any unknown value.
+
+#### Scenario: An m2dir-only account
+- GIVEN an account whose only storage block is `m2dir.root = "~/Mail"`
+- WHEN `envelope list` runs against it
+- THEN the configuration loads and the command fails naming the account, the ignored `m2dir` block and MIGRATION.md
 
 ### Requirement: Sent copies are configured per account
 `message.send.save-copy`, global or per account, SHALL be the mailbox a sending command (`message send`, and `message compose`, `message reply` and `message forward` with `--send`) appends a copy to when `--save` is not passed. It takes a mailbox name, alias or role, resolved as `--save` is; `true` SHALL stand for `sent` and `false` for no copy. `--no-save` SHALL skip it for one call and conflict with `--save`. The `message` table SHALL accept unknown keys, so a v1 `[message]` table keeps loading.
@@ -110,7 +118,7 @@ The configuration SHALL hold no colour, no table shape and no glyph: `*.list.tab
 - THEN it is refused naming `datetime-fnt`
 
 ### Requirement: One sample configuration, with a section per backend
-The repository SHALL ship config.sample.toml holding one `[accounts.example]` table with dotted keys and no other table header. It SHALL list the options every account shares and each of their values, the default active and the others commented as `#key = value`, every line ending in one tab-aligned comment, and every password command a failing `exit 127` placeholder. It SHALL end with one section per backend or provider (IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, m2dir, mbox, pimdir), each a paragraph of commented code headed by its name, its own alternatives commented twice, an OAuth 2.0 token read through `ortie token show -a example`, so the file holds a working account once one section is uncommented. The test suite SHALL parse config.sample.toml through the loader `-c` uses with each section uncommented whole, then on top of it each line commented twice inside it and each line of commented code outside the sections, in place of the active lines of its field, and SHALL resolve `example` as the default account each time, so a configuration change breaking one fails the build.
+The repository SHALL ship config.sample.toml holding one `[accounts.example]` table with dotted keys and no other table header. It SHALL list the options every account shares and each of their values, the default active and the others commented as `#key = value`, every line ending in one tab-aligned comment, and every password command a failing `exit 127` placeholder. It SHALL end with one section per backend or provider (IMAP and SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph, Microsoft IMAP and SMTP, Fastmail, Maildir, mbox, pimdir), each a paragraph of commented code headed by its name, its own alternatives commented twice, an OAuth 2.0 token read through `ortie token show -a example`, so the file holds a working account once one section is uncommented. The test suite SHALL parse config.sample.toml through the loader `-c` uses with each section uncommented whole, then on top of it each line commented twice inside it and each line of commented code outside the sections, in place of the active lines of its field, and SHALL resolve `example` as the default account each time, so a configuration change breaking one fails the build.
 
 #### Scenario: A field is renamed
 - GIVEN config.sample.toml, whose IMAP and SMTP section sets `imap.sort.fallback`

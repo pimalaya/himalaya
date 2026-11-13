@@ -165,10 +165,6 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##maildir.keywords.header = "x-keywords"	# read keywords from X-Keywords, as mbsync writes
 ##maildir.keywords.header = "x-label"		# from X-Label, as mutt and notmuch write
 
-# m2dir
-#
-#m2dir.root = "~/Mail"			# an m2dir per mailbox below it
-
 # mbox
 #
 #mbox.root = "~/Mail"			# the mbox files, one per mailbox, walked recursively
