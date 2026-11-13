@@ -91,6 +91,12 @@ pub enum ErrorCode {
     /// The pimdir store is a link, or another user can read or write it:
     /// restrict it to its user.
     StoreExposed,
+    /// The pimdir store is not the one that answered the queue row's
+    /// handle, a copy restored since: nothing was done with the row.
+    StoreReset,
+    /// The lock file of the pimdir store was removed or replaced under a
+    /// write: nothing was written. Retry.
+    LockReplaced,
     /// The mailbox already holds the message, or has its creation
     /// queued: nothing was staged.
     ItemDuplicate,
@@ -168,6 +174,8 @@ const PIMDIR_CODES: &[(&str, ErrorCode)] = &[
     ("store-staging", ErrorCode::StoreStaging),
     ("store-in-flight", ErrorCode::StoreInFlight),
     ("store-exposed", ErrorCode::StoreExposed),
+    ("store-reset", ErrorCode::StoreReset),
+    ("lock-replaced", ErrorCode::LockReplaced),
     ("item-duplicate", ErrorCode::ItemDuplicate),
     ("flag-invalid", ErrorCode::FlagInvalid),
     ("action-malformed", ErrorCode::ActionMalformed),

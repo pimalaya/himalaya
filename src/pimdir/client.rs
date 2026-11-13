@@ -82,7 +82,11 @@ impl PimdirClient {
     }
 
     /// Queues `action` through `producer`, warning about each capability
-    /// its source supports in part (pimdir STORAGE §15.6).
+    /// its source supports in part (pimdir STORAGE §15.6), and answers
+    /// the row it waits in.
+    ///
+    /// The enqueue runs the gate of §15.6 itself, once, and answers the
+    /// partial supports it passed the action with.
     pub(crate) fn enqueue(
         &self,
         producer: &mut PimdirProducer,
@@ -90,12 +94,11 @@ impl PimdirClient {
         action: &PimdirAction,
         object: Option<&PimdirObject>,
     ) -> Result<i64, PimdirError> {
-        let partials = producer.check(collection, action)?;
-        let id = producer.enqueue(collection, action, object)?;
-        for partial in &partials {
+        let enqueued = producer.enqueue(collection, action, object)?;
+        for partial in &enqueued.partial {
             warn!("{partial}");
         }
-        Ok(id)
+        Ok(enqueued.handle.id)
     }
 
     /// Opens a producer for the length of one staging batch.
@@ -118,6 +121,10 @@ impl PimdirClient {
     /// Cancels one pending or parked row of the account's queue, returning
     /// its action kind.
     ///
+    /// A row parked unconfirmed (pimdir STORAGE §15.2) is cancelled as any
+    /// parked row is: its request was sent and may have taken effect, which
+    /// cancelling does not undo, so the caller says so before it asks.
+    ///
     /// Cancelling is an owner write, and the only retraction a queued
     /// creation has. The role is entered and released inside this call, so
     /// Himalaya never holds a handle that could drain the queue or collect
@@ -133,11 +140,13 @@ impl PimdirClient {
     /// by the time the user reads the message.
     pub fn cancel_queued(&self, id: i64) -> Result<String> {
         let kind = match self.queue_row(id)? {
-            PimdirActionStatus::Pending { kind, .. } | PimdirActionStatus::Parked { kind, .. } => {
-                kind
-            }
+            PimdirActionStatus::Pending { kind, .. }
+            | PimdirActionStatus::Parked { kind, .. }
+            | PimdirActionStatus::Unconfirmed { kind, .. } => kind,
             PimdirActionStatus::Applied { .. } => bail!("Row {id} was applied already"),
-            PimdirActionStatus::Unknown => bail!(
+            // NOTE: a bare row id states no store, so io-pimdir follows
+            // it unchecked and never answers a reset for it.
+            PimdirActionStatus::Unknown | PimdirActionStatus::Reset => bail!(
                 "No queued action with row {id} in this account's queue; \
                  it may have been synced already"
             ),

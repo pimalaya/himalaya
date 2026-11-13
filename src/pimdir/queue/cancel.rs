@@ -20,6 +20,11 @@ use crate::pimdir::client::PimdirClient;
 /// undone by doing the opposite, where a message that does not exist yet
 /// cannot be deleted. Only a row of the account's queue is taken.
 ///
+/// An unconfirmed row, a send or a mailbox change the sync engine sent
+/// without learning its outcome, is cancelled the same way, which undoes
+/// nothing: the message may have been sent, and both the question and the
+/// answer say so.
+///
 /// Cancelling is the store owner's write, so this takes that role for the
 /// length of the call and fails while a sync holds it. A store another
 /// version of the sync engine wrote is refused rather than reshaped.
@@ -36,27 +41,36 @@ pub struct PimdirQueueCancelCommand {
 impl PimdirQueueCancelCommand {
     /// Retracts the queued action the row id names.
     pub fn execute(self, printer: &mut impl Printer, client: &mut PimdirClient) -> Result<()> {
-        let named = match client.queue_row(self.id)? {
+        let (named, unconfirmed) = match client.queue_row(self.id)? {
             PimdirActionStatus::Pending { kind, .. } | PimdirActionStatus::Parked { kind, .. } => {
-                kind
+                (kind, false)
             }
-            _ => String::from("action"),
+            PimdirActionStatus::Unconfirmed { kind, .. } => (kind, true),
+            _ => (String::from("action"), false),
         };
-        if !self.yes
-            && !prompt::bool(
-                format!(
-                    "Cancel the {} queued as row {}?",
-                    sanitize::text(&named),
-                    self.id
-                ),
-                false,
-            )?
-        {
+        let question = match unconfirmed {
+            true => format!(
+                "The {} queued as row {} was sent and may have taken effect, which \
+                 cancelling does not undo. Cancel it?",
+                sanitize::text(&named),
+                self.id
+            ),
+            false => format!(
+                "Cancel the {} queued as row {}?",
+                sanitize::text(&named),
+                self.id
+            ),
+        };
+        if !self.yes && !prompt::bool(question, false)? {
             bail!("Cancellation aborted");
         }
 
         let kind = client.cancel_queued(self.id)?;
-        printer.out(PimdirQueueCancelOutput { id: self.id, kind })
+        printer.out(PimdirQueueCancelOutput {
+            id: self.id,
+            kind,
+            unconfirmed,
+        })
     }
 }
 
@@ -69,15 +83,46 @@ pub struct PimdirQueueCancelOutput {
     pub id: i64,
     /// The action kind it held: `add`, `submit`, `set-flags`, ...
     pub kind: String,
+    /// Whether the row was unconfirmed, its request sent and its outcome
+    /// unknown: the action may have taken effect all the same.
+    pub unconfirmed: bool,
 }
 
 impl fmt::Display for PimdirQueueCancelOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "Queued {} cancelled (row {})",
-            sanitize::text(&self.kind),
-            self.id
-        )
+        let kind = sanitize::text(&self.kind);
+        let id = self.id;
+        match self.unconfirmed {
+            true => writeln!(
+                f,
+                "Unconfirmed {kind} cancelled (row {id}); it was sent and may have taken effect"
+            ),
+            false => writeln!(f, "Queued {kind} cancelled (row {id})"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Cancelling an unconfirmed row drops it from the queue and undoes
+    /// nothing its performer sent (pimdir STORAGE §15.2), so the output
+    /// never reads as a plain cancellation.
+    #[test]
+    fn cancelling_an_unconfirmed_row_says_it_may_have_taken_effect() {
+        let cancelled = PimdirQueueCancelOutput {
+            id: 9,
+            kind: "submit".into(),
+            unconfirmed: true,
+        };
+
+        let json = serde_json::to_value(&cancelled).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"row": 9, "kind": "submit", "unconfirmed": true})
+        );
+        let line = cancelled.to_string();
+        assert!(line.contains("may have taken effect"), "{line}");
     }
 }

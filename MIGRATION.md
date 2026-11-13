@@ -50,6 +50,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`account check` prints every backend and exits 2** when one fails, each row carrying the failure's `code`, where v2 exited 0 whatever failed.
 - **A protocol command prints its completion.** Every `imap` command prints `status` (`OK`, or `NO`/`BAD` with `text`, exiting 2). `imap select` prints the mailbox state beside it, the number of the first unseen message as `firstUnseen`. `imap raw` and `sieve raw` print the server's untagged or data responses as events, one JSON line each, then the completion; `smtp raw` prints `{code, text}`. Exit 2 means the server refused; exit 1 still means no answer.
 - **pimdir names a queue row `row`** (`queueId`, `copyQueueId` and the queue view's `id` before); `pimdir flag add|set|remove` print `{messages: [{id, row}]}`; tag statuses are kebab-case (`unknown-flags`, `ambiguous-source`).
+- **`pimdir queue show` has two more states**, `unconfirmed` (a send or a mailbox change the sync engine sent without learning its outcome: it may have taken effect, and is no longer `parked`) and `reset`, and its `collection` is `null` for an applied row whose mailbox was deleted since, which read `unknown` before. `pimdir queue list` carries `unconfirmed` on each parked row, `pimdir queue cancel` prints it beside `row` and `kind`, and the pimdir coverage carries `missing`, `unparseable` and `encrypted`.
 - **Gmail lists use the provider's key**: `messages list` prints `messages` (not `ids`), the settings lists `delegates`, `filter` and `forwardingAddresses` (not `response`); settings writes print the settings.
 
 ### Commands that now fail instead of pretending
@@ -74,6 +75,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 
 ### Commands that act differently
 
+- **A pimdir store of an earlier draft is refused** with `store-version`, and its search index with `index-version`: Himalaya reads pimdir storage-draft-10, and a draft opens only the stores it wrote. Reinstall the store with a neverest writing draft-10, as neverest's MIGRATION.md says, which syncs out what is still queued before moving the store aside.
+- **A pimdir `flag add` or `flag remove` no longer overwrites a flag a sync changed meanwhile**: the queued change is applied to the flags the message holds when the sync engine reaches it. `flag set` still replaces them all. A `message delete` queued on a message a sync left in conflict is parked rather than applied.
 - **`attachment download` without an id skips the inline parts**, as `attachment list` does: pass `--inline` (`-i`) to write them too.
 - **The root Maildir is named `INBOX`**, or `.` when a top-level `Inbox` folder is a Maildir, in `mailbox list` and `maildir list`, where it listed under its folder's basename: a script matching that name matches `INBOX` or the id (its path), which is unchanged.
 - **The raw local-store copies and moves print the target ids.** `maildir message copy|move` and `mbox message copy|move` print `{ids}` the messages got in the target, each once, where they echoed the source ids: read a moved message by the printed id.

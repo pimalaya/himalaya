@@ -23,7 +23,7 @@ use io_pimdir::{
         PimdirSearchThread,
     },
     search::{
-        coverage::{PimdirSearchCoverage, PimdirSearchTemporal},
+        coverage::{PimdirSearchCoverage, PimdirSearchTemporal, PimdirSearchUnread},
         query::{
             PimdirQuery, PimdirQueryError, PimdirQueryErrorCode, PimdirQueryKind,
             PimdirQueryPredicate, PimdirQueryTerm,
@@ -182,7 +182,7 @@ impl PimdirClient {
                 .map_err(pimdir_error)
                 .context("Stage the pimdir tag")?
             {
-                rows.insert((action.collection, action.seq), action.action);
+                rows.insert((action.collection, action.seq), action.action.id);
             }
         }
 
@@ -528,6 +528,15 @@ pub struct PimdirMailCoverage {
     /// Messages in scope whose body is not local, matched on their
     /// headers alone.
     pub bodiless: u64,
+    /// Messages in scope whose body the indexer could not read, indexed
+    /// from their headers, counted whatever the query reads.
+    pub missing: u64,
+    /// Messages in scope whose body no parser accepted, indexed from
+    /// their headers, counted whatever the query reads.
+    pub unparseable: u64,
+    /// Messages in scope whose body is encrypted, indexed by their
+    /// headers alone, counted whatever the query reads.
+    pub encrypted: u64,
     /// Messages in scope whose last change the index has not folded in.
     pub unindexed: u64,
     /// How many changes the store drew since the index was refreshed,
@@ -540,6 +549,14 @@ pub struct PimdirMailCoverage {
     pub until: Option<String>,
     /// Whether a first sync is still listing a mailbox in scope.
     pub filling: bool,
+    /// Whether a term of the query reads a mail body, so a `missing` or
+    /// an `unparseable` one leaves the answer incomplete.
+    #[serde(skip)]
+    pub reads: bool,
+    /// Whether a text term is matched in a body or an attachment, so an
+    /// `encrypted` one leaves the answer incomplete.
+    #[serde(skip)]
+    pub reads_content: bool,
 }
 
 impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
@@ -552,14 +569,32 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
                 filling,
             } => (since.clone(), until.clone(), *filling),
         };
+
+        // NOTE: every query is scoped to mail, so the kinds are mail's.
+        let unread = |count: fn(&PimdirSearchUnread) -> u64| -> u64 {
+            coverage.local.kinds.values().map(count).sum()
+        };
+        let reads = coverage
+            .local
+            .kinds
+            .keys()
+            .any(|kind| coverage.local.reads.kinds.contains(kind));
+
+        // NOTE: a zone that differs is never reported: a mail date is an
+        // instant, which no zone of the index reads otherwise.
         Self {
-            complete: coverage.is_complete() && coverage.local.behind == 0,
-            bodiless: coverage.local.bodiless.values().sum(),
+            complete: coverage.is_complete(),
+            bodiless: unread(|unread| unread.bodiless),
+            missing: unread(|unread| unread.missing),
+            unparseable: unread(|unread| unread.unparseable),
+            encrypted: unread(|unread| unread.encrypted),
             unindexed: coverage.local.unindexed,
             behind: coverage.local.behind,
             since,
             until,
             filling,
+            reads,
+            reads_content: coverage.local.reads.content,
         }
     }
 }
@@ -572,6 +607,27 @@ impl PimdirMailCoverage {
             parts.push(format!(
                 "{} message(s) have no local body and matched on their headers alone",
                 self.bodiless
+            ));
+        }
+        // NOTE: a count no term of the query reads leaves it complete.
+        if self.missing > 0 && self.reads {
+            parts.push(format!(
+                "{} message(s) have a body the index could not read and matched on their \
+                 headers alone",
+                self.missing
+            ));
+        }
+        if self.unparseable > 0 && self.reads {
+            parts.push(format!(
+                "{} message(s) have a body the index could not parse and matched on their \
+                 headers alone",
+                self.unparseable
+            ));
+        }
+        if self.encrypted > 0 && self.reads_content {
+            parts.push(format!(
+                "{} message(s) are encrypted and matched on their headers alone",
+                self.encrypted
             ));
         }
         if let Some(since) = &self.since {
@@ -1178,7 +1234,7 @@ mod tests {
         let (dir, client) = indexed_store();
         let conn = rusqlite::Connection::open(dir.path().join("index.db")).unwrap();
         conn.execute(
-            "UPDATE index_meta SET format_version = 'search-draft-08'",
+            "UPDATE index_meta SET format_version = 'search-draft-09'",
             [],
         )
         .unwrap();
@@ -1194,7 +1250,7 @@ mod tests {
             "{err:#}"
         );
         let err = format!("{err:#}");
-        assert!(err.contains("search-draft-08"), "{err}");
+        assert!(err.contains("search-draft-09"), "{err}");
         assert!(err.contains("sync engine"), "{err}");
         assert!(!err.contains("delete"), "{err}");
         let version: String = conn
@@ -1202,7 +1258,7 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(version, "search-draft-08", "the index was rebuilt");
+        assert_eq!(version, "search-draft-09", "the index was rebuilt");
     }
 
     #[test]
@@ -1254,11 +1310,16 @@ mod tests {
         let coverage = PimdirMailCoverage {
             complete: false,
             bodiless: 2,
+            missing: 4,
+            unparseable: 5,
+            encrypted: 6,
             unindexed: 1,
             behind: 3,
             since: Some("2026-05-15T00:00:00Z".into()),
             until: None,
             filling: true,
+            reads: false,
+            reads_content: false,
         };
 
         assert_eq!(
@@ -1266,6 +1327,9 @@ mod tests {
             serde_json::json!({
                 "complete": false,
                 "bodiless": 2,
+                "missing": 4,
+                "unparseable": 5,
+                "encrypted": 6,
                 "unindexed": 1,
                 "behind": 3,
                 "since": "2026-05-15T00:00:00Z",
@@ -1283,6 +1347,57 @@ mod tests {
         ] {
             assert!(line.contains(part), "{line}");
         }
+        // NOTE: no term reads a body, so the three counts are not said.
+        for part in ["could not read", "could not parse", "encrypted"] {
+            assert!(!line.contains(part), "{line}");
+        }
+    }
+
+    /// A body the index could not read, parse or decrypt is counted
+    /// whatever the query (pimdir SEARCH §8.2), and leaves the answer
+    /// incomplete only while a term reads bodies: a header query over the
+    /// same mailbox is whole.
+    #[test]
+    fn an_unread_body_is_incomplete_only_while_a_term_reads_bodies() {
+        use io_pimdir::search::coverage::PimdirSearchReads;
+
+        let mut coverage = PimdirSearchCoverage::default();
+        coverage.local.kinds.insert(
+            "message/rfc822".into(),
+            PimdirSearchUnread {
+                bodiless: 0,
+                missing: 1,
+                unparseable: 2,
+                encrypted: 3,
+            },
+        );
+
+        let headers = PimdirMailCoverage::from(&coverage);
+        assert!(headers.complete);
+        assert_eq!(
+            (headers.missing, headers.unparseable, headers.encrypted),
+            (1, 2, 3)
+        );
+        assert_eq!(headers.summary(), None);
+
+        coverage.local.reads = PimdirSearchReads {
+            kinds: ["message/rfc822".to_string()].into(),
+            content: false,
+        };
+        let structure = PimdirMailCoverage::from(&coverage);
+        assert!(!structure.complete);
+        let line = structure.to_string();
+        assert!(line.contains("1 message(s) have a body the index could not read"));
+        assert!(line.contains("2 message(s) have a body the index could not parse"));
+        assert!(!line.contains("encrypted"), "{line}");
+
+        coverage.local.reads.content = true;
+        let body = PimdirMailCoverage::from(&coverage);
+        assert!(!body.complete);
+        assert!(
+            body.to_string().contains("3 message(s) are encrypted"),
+            "{body}"
+        );
     }
 
     #[test]

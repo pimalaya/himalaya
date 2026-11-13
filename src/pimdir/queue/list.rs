@@ -33,7 +33,8 @@ use crate::{
 /// Staged flags, moves and deletions need no such view, addressing messages
 /// that already exist. A row of any kind the sync engine parked, refusing to
 /// apply it without an operator, is listed `parked` with why: cancel it, or
-/// fix what parked it.
+/// fix what parked it. One the engine sent without learning its outcome is
+/// listed `unconfirmed` instead: it may have taken effect.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     #[command(flatten)]
@@ -68,6 +69,7 @@ impl PimdirQueueListCommand {
             parked: parked
                 .into_iter()
                 .map(|parked| PimdirParkedRow {
+                    unconfirmed: parked.unconfirmed().is_some(),
                     id: parked.id,
                     queued_at: parked.created_at,
                     producer: parked.producer,
@@ -116,7 +118,11 @@ pub struct PimdirParkedRow {
     pub kind: String,
     /// How many times the engine tried it before parking it.
     pub attempts: i64,
-    /// Why it was parked.
+    /// Whether the row is unconfirmed: the engine sent its request and
+    /// cannot tell whether it took effect, so it may have.
+    pub unconfirmed: bool,
+    /// Why it was parked, as the store records it: an unconfirmed row's
+    /// starts with `unconfirmed: `.
     pub error: String,
 }
 
@@ -162,7 +168,10 @@ impl fmt::Display for PimdirQueueListOutput {
         for parked in &self.parked {
             listing.items.push([
                 parked.id.to_string(),
-                String::from("parked"),
+                String::from(match parked.unconfirmed {
+                    true => "unconfirmed",
+                    false => "parked",
+                }),
                 String::from("    "),
                 sanitize::text(&parked.queued_at).into_owned(),
                 sanitize::text(&parked.kind).into_owned(),

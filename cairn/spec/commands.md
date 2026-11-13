@@ -88,7 +88,7 @@ A list of messages SHALL print each the way `mscan` prints a mailbox: its id; fo
 - `imap thread`: each thread from its first message, the subject indented two spaces per level: a run of members nests each under the one before, the answers sit under the last, and the answers of a message the mailbox lacks stand side by side at its level. A message whose envelope could not be fetched prints its id, its other cells empty. Above: `Mailbox:` unless `--no-select`.
 - `pimdir thread`: each message after the earlier one its `In-Reply-To` names, its subject indented one level further, one whose parent the account lacks standing at the margin; its mailboxes, joined with `,`, before the senders. Above: `Thread:` when a thread holds the message.
 
-`pimdir tag` and `pimdir queue list` SHALL print the same shape with what they carry. `pimdir tag`: the message id; the flags once the tag applies, blank where they were never read; the status (`planned`, `queued`, `unchanged`, `flags-unknown`, `several-sources`, `not-synced`, `unsupported`); the mailbox; the queue row; the subject. Above: `Query:` and `Incomplete:` as for a search. `pimdir queue list`: the row; `queued` or `parked`; the staged flags, blank for a parked row; when it was queued; the action (`save` or `send`, a parked row's kind); `to ` and the recipients' names; then the subject, or why the row was parked. Above: `Mailbox:` and `Cancel:` with the command cancelling a row, when any is listed.
+`pimdir tag` and `pimdir queue list` SHALL print the same shape with what they carry. `pimdir tag`: the message id; the flags once the tag applies, blank where they were never read; the status (`planned`, `queued`, `unchanged`, `flags-unknown`, `several-sources`, `not-synced`, `unsupported`); the mailbox; the queue row; the subject. Above: `Query:` and `Incomplete:` as for a search. `pimdir queue list`: the row; `queued`, `parked` or `unconfirmed`; the staged flags, blank for a parked row; when it was queued; the action (`save` or `send`, a parked row's kind); `to ` and the recipients' names; then the subject, or why the row was parked. Above: `Mailbox:` and `Cancel:` with the command cancelling a row, when any is listed.
 
 The other lists SHALL print these cells, in this order:
 
@@ -162,6 +162,8 @@ A failure a caller is expected to act on SHALL carry a stable code, printed unde
 | `store-staging` | a producer is staging a body in a pimdir store; retry |
 | `store-in-flight` | a pimdir store verb is between two of its chunks; retry |
 | `store-exposed` | a pimdir store is a link or another user can read or write it; restrict it |
+| `store-reset` | a pimdir store is not the one that answered the queue row's handle, a copy restored since; nothing is done with the row |
+| `lock-replaced` | a pimdir store's lock file was removed or replaced under a write; nothing is written; retry |
 | `item-duplicate` | a pimdir mailbox holds the message already, or has its creation queued; nothing is staged |
 | `flag-invalid` | a flag a pimdir store cannot hold: empty, or holding whitespace, a control or a non-ASCII character; nothing is staged |
 | `action-malformed` | a pimdir action's payload breaks its schema; nothing is staged |

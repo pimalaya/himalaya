@@ -25,7 +25,10 @@ use io_pimdir::{
     capability,
     client::{
         PimdirError,
-        producer::{PimdirActionStatus, PimdirParkedAction, PimdirPendingAction},
+        producer::{
+            PimdirActionStatus, PimdirEnqueue, PimdirEnqueued, PimdirParkedAction,
+            PimdirPendingAction,
+        },
         reader::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
@@ -583,8 +586,12 @@ impl PimdirClient {
 
     /// Adds, sets, or removes `flags` on an id set, staged as `SetFlags`.
     ///
-    /// The action carries the whole replacement set, never a delta, so an
-    /// owner applying it twice lands the same state.
+    /// The action carries the whole set the message is left with. An add
+    /// or a remove also states the set it was read from (pimdir STORAGE
+    /// §15.3), so the owner applies the change alone to the set the
+    /// message holds by then, and a flag a sync landed or removed while
+    /// the row waited survives. A set states none: it replaces whatever
+    /// the message holds.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -600,13 +607,11 @@ impl PimdirClient {
     /// for one the op leaves as it shows, for which nothing is staged.
     ///
     /// An id the mailbox does not hold is skipped, so the caller reports
-    /// how many messages it found. Every found message is checked against
-    /// the sources' declarations (pimdir STORAGE §15.6) before the first
-    /// row is queued, so a change the check refuses on any of them leaves
-    /// nothing staged. A partial support passes, its warning logged once
-    /// the row is queued. Each row is still its own transaction: an
-    /// enqueue that fails after the check, a declaration changing in
-    /// between or the store failing, leaves the rows queued before it.
+    /// how many messages it found. The rows are appended as one batch
+    /// (pimdir STORAGE §15.1), each passing the gate of the sources'
+    /// declarations (§15.6) once: a change the gate refuses on any
+    /// message, or the store failing, leaves nothing staged. A partial
+    /// support passes, its warning logged once the batch is queued.
     pub fn stage_flags(
         &mut self,
         mailbox: &str,
@@ -617,7 +622,8 @@ impl PimdirClient {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
 
-        let mut checked = Vec::with_capacity(ids.len());
+        let mut staged = Vec::with_capacity(ids.len());
+        let mut changes = Vec::with_capacity(ids.len());
         for id in ids {
             let Some(item) = self.get(&collection, id)? else {
                 warn!("Message `{id}` not found in `{collection}`, skipped");
@@ -625,42 +631,64 @@ impl PimdirClient {
             };
             let replacement = apply_flag_op(&item.flags, flags, op)
                 .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
-            if replacement == item.flags {
-                checked.push((*id, None));
-                continue;
+            let changed = replacement != item.flags;
+            if changed {
+                // NOTE: a set replaces a set it never read, where an add
+                // or a remove changes the one read here.
+                let base = match op {
+                    FlagOp::Set => None,
+                    FlagOp::Add | FlagOp::Remove => Some(item.flags),
+                };
+                let action = PimdirAction::SetFlags {
+                    seq: item.seq,
+                    flags: replacement,
+                    base,
+                };
+                changes.push((*id, action));
             }
-            let action = PimdirAction::SetFlags {
-                seq: item.seq,
-                flags: replacement,
-            };
-            let partials = producer
-                .check(&collection, &action)
-                .map_err(pimdir_error)
-                .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
-            checked.push((*id, Some((action, partials))));
+            staged.push((*id, changed));
         }
 
-        let mut staged = Vec::with_capacity(checked.len());
-        for (id, change) in checked {
-            let queue_id = match change {
-                Some((action, partials)) => {
-                    let queue_id = producer
-                        .enqueue(&collection, &action, None)
-                        .map_err(pimdir_error)
-                        .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
-                    for partial in &partials {
-                        warn!("{partial}");
+        // NOTE: a batch changing nothing takes no write transaction.
+        let rows = match changes.is_empty() {
+            true => Vec::new(),
+            false => {
+                let batch: Vec<PimdirEnqueue> = changes
+                    .iter()
+                    .map(|(_, action)| PimdirEnqueue::new(&collection, action.clone()))
+                    .collect();
+                match producer.enqueue_batch(&batch) {
+                    Ok(rows) => rows,
+                    Err(err) => {
+                        // NOTE: a batch refused says why, not on which
+                        // action: the gate run alone names the message.
+                        let refused = changes
+                            .iter()
+                            .find(|(_, action)| producer.check(&collection, action).is_err());
+                        let context = match refused {
+                            Some((id, _)) => format!("Stage flags on `{id}` in `{mailbox}`"),
+                            None => format!("Stage flags in `{mailbox}`"),
+                        };
+                        return Err(pimdir_error(err).context(context));
                     }
-                    Some(queue_id)
                 }
-                None => None,
-            };
-            staged.push(PimdirFlagged {
-                id: id.to_owned(),
-                queue_id,
-            });
-        }
-        Ok(staged)
+            }
+        };
+        let mut rows = rows.into_iter();
+
+        Ok(staged
+            .into_iter()
+            .map(|(id, changed)| {
+                let row = changed.then(|| rows.next()).flatten();
+                for partial in row.iter().flat_map(|row| &row.partial) {
+                    warn!("{partial}");
+                }
+                PimdirFlagged {
+                    id: id.to_owned(),
+                    queue_id: row.map(|row| row.handle.id),
+                }
+            })
+            .collect())
     }
 
     /// The flags a message carries as the store shows it, staged changes
@@ -697,7 +725,7 @@ impl PimdirClient {
         let flags: PimdirFlags = flags.iter().map(Flag::raw).collect();
         let enqueued = self
             .producer()?
-            .enqueue_with_body_checked(&collection, &raw, |hash| PimdirAction::Add {
+            .enqueue_with_body(&collection, &raw, |hash| PimdirAction::Add {
                 link_id: Some(link_id.clone()),
                 flags,
                 object: Some(hash),
@@ -710,7 +738,7 @@ impl PimdirClient {
         }
 
         Ok(PimdirStaged {
-            queue_id: enqueued.id,
+            queue_id: enqueued.handle.id,
             message_id: link_id.0,
         })
     }
@@ -774,13 +802,13 @@ impl PimdirClient {
             .with_context(|| format!("Queue send in `{mailbox}`"))?;
 
         let enqueued = producer
-            .enqueue_with_body_checked(&collection, &raw, |_| action)
+            .enqueue_with_body(&collection, &raw, |_| action)
             .map_err(pimdir_error)
             .with_context(|| format!("Queue send in `{mailbox}`"))?;
         for partial in &enqueued.partial {
             warn!("{partial}");
         }
-        let id = enqueued.id;
+        let id = enqueued.handle.id;
         info!("message queued for sending as action {id}, see `himalaya pimdir queue list`");
         Ok(PimdirSubmitted {
             staged: PimdirStaged {
@@ -792,8 +820,11 @@ impl PimdirClient {
     }
 
     /// Where queue row `id` stands (pimdir STORAGE §15.4): pending, parked,
-    /// applied with the item an `add` created, or unknown. A row anchored on
-    /// another account's collection reads as unknown.
+    /// unconfirmed, applied with the item an `add` created, or unknown. A
+    /// row anchored on another account's collection reads as unknown.
+    ///
+    /// A row applied on a collection gone since (§15.4) names none, so no
+    /// account can be told from it and it reads as applied.
     pub fn queue_row(&self, id: i64) -> Result<PimdirActionStatus> {
         let status = self
             .store
@@ -803,8 +834,16 @@ impl PimdirClient {
         let collection = match &status {
             PimdirActionStatus::Pending { collection, .. }
             | PimdirActionStatus::Parked { collection, .. }
-            | PimdirActionStatus::Applied { collection, .. } => collection,
-            PimdirActionStatus::Unknown => return Ok(status),
+            | PimdirActionStatus::Unconfirmed { collection, .. }
+            | PimdirActionStatus::Applied {
+                collection: Some(collection),
+                ..
+            } => collection,
+            PimdirActionStatus::Applied {
+                collection: None, ..
+            }
+            | PimdirActionStatus::Unknown
+            | PimdirActionStatus::Reset => return Ok(status),
         };
 
         let ours = self
@@ -880,11 +919,11 @@ impl PimdirClient {
             );
         };
 
-        let queue_id = producer
+        let enqueued = producer
             .enqueue_collection_create(&anchor, name, parent.as_deref(), Some(&source))
             .map_err(pimdir_error)
             .with_context(|| format!("Queue the creation of `{name}`"))?;
-        Ok(PimdirQueuedIntent { queue_id, source })
+        Ok(PimdirQueuedIntent::new(enqueued, source))
     }
 
     /// Queues the renaming of `mailbox` to `name` for the store's owner,
@@ -910,11 +949,11 @@ impl PimdirClient {
             );
         };
 
-        let queue_id = producer
+        let enqueued = producer
             .enqueue_collection_rename(&collection, name, Some(&source))
             .map_err(pimdir_error)
             .with_context(|| format!("Queue the renaming of `{collection}` to `{name}`"))?;
-        Ok(PimdirQueuedIntent { queue_id, source })
+        Ok(PimdirQueuedIntent::new(enqueued, source))
     }
 
     /// Queues the deletion of `mailbox` and the messages it holds for the
@@ -940,11 +979,11 @@ impl PimdirClient {
             );
         };
 
-        let queue_id = producer
+        let enqueued = producer
             .enqueue_collection_delete(&collection, Some(&source))
             .map_err(pimdir_error)
             .with_context(|| format!("Queue the deletion of `{collection}`"))?;
-        Ok(PimdirQueuedIntent { queue_id, source })
+        Ok(PimdirQueuedIntent::new(enqueued, source))
     }
 
     /// Deletes each id `mailbox` holds, staged as `Remove` (the next sync
@@ -952,6 +991,11 @@ impl PimdirClient {
     ///
     /// Every id is checked before the first row is staged, an unknown one
     /// skipped, so the caller reports how many messages it found.
+    ///
+    /// The remove names no body it read and resolves no conflict (pimdir
+    /// STORAGE §15.3): it deletes whatever the message holds, and the
+    /// owner parks it over a message a sync left in conflict, Himalaya
+    /// deciding none.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
         let collection = self.hub_id(mailbox)?;
         let found = self.found(&collection, ids)?;
@@ -961,7 +1005,11 @@ impl PimdirClient {
             self.enqueue(
                 &mut producer,
                 &collection,
-                &PimdirAction::Remove { seq: *seq },
+                &PimdirAction::Remove {
+                    seq: *seq,
+                    if_match: None,
+                    resolves: None,
+                },
                 None,
             )
             .map_err(pimdir_error)
@@ -1280,6 +1328,20 @@ pub struct PimdirQueuedIntent {
     pub queue_id: i64,
     /// The source that performs it on its server.
     pub source: String,
+}
+
+impl PimdirQueuedIntent {
+    /// The intent `enqueued` queued for `source`, warning about each
+    /// capability the source supports in part (pimdir STORAGE §15.6).
+    fn new(enqueued: PimdirEnqueued, source: String) -> Self {
+        for partial in &enqueued.partial {
+            warn!("{partial}");
+        }
+        Self {
+            queue_id: enqueued.handle.id,
+            source,
+        }
+    }
 }
 
 /// A flag change staged on one message for the owner.
@@ -1960,7 +2022,11 @@ mod tests {
             created_at: "2026-08-27T10:00:00Z".into(),
             producer: "himalaya".into(),
             collection: "INBOX".into(),
-            action: PimdirAction::Remove { seq: 42 },
+            action: PimdirAction::Remove {
+                seq: 42,
+                if_match: None,
+                resolves: None,
+            },
             attempts: 0,
         };
 
@@ -2386,7 +2452,7 @@ mod tests {
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        stamp_format(dir.path(), "storage-draft-08");
+        stamp_format(dir.path(), "storage-draft-09");
 
         let err = client.cancel_queued(staged.queue_id).unwrap_err();
 
@@ -2409,7 +2475,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            version, "storage-draft-08",
+            version, "storage-draft-09",
             "the cancel restamped the store"
         );
         assert_eq!(queued, 1, "the cancel dropped the row");
@@ -2459,7 +2525,7 @@ mod tests {
     /// deleting the store.
     #[test]
     fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
-        for version in ["storage-draft-08", "storage-draft-10"] {
+        for version in ["storage-draft-09", "storage-draft-11"] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
 
@@ -2637,7 +2703,7 @@ mod tests {
         else {
             panic!("expected a sent row to read applied");
         };
-        assert_eq!(collection, "imap/Sent");
+        assert_eq!(collection.as_deref(), Some("imap/Sent"));
         assert_eq!(seq, None);
     }
 
@@ -2660,7 +2726,7 @@ mod tests {
         else {
             panic!("expected an applied row");
         };
-        assert_eq!(collection, "imap/Sent");
+        assert_eq!(collection.as_deref(), Some("imap/Sent"));
         let seq = seq.expect("an add names the item it created");
         let item = client.get("imap/Sent", &seq.to_string()).unwrap().unwrap();
         assert_eq!(item.seq, seq);
@@ -2864,15 +2930,15 @@ mod tests {
         else {
             panic!("expected a performed renaming to read applied");
         };
-        assert_eq!(collection, "imap/Envoyés");
+        assert_eq!(collection.as_deref(), Some("imap/Envoyés"));
         assert_eq!(seq, None);
     }
 
     /// What the sync engine does once the server deleted the mailbox: the
-    /// receipt leaves the store with the collection, so the row reads as
-    /// one never known.
+    /// receipt outlives the collection (pimdir STORAGE §15.4), so the row
+    /// still reads applied, naming no collection.
     #[test]
-    fn a_performed_deletion_reads_unknown_once_the_mailbox_left() {
+    fn a_performed_deletion_reads_applied_once_the_mailbox_left() {
         let (dir, mut client) = sent_store();
         declare(dir.path(), &[capability::COLLECTION_DELETE]);
         let deleted = client.delete_mailbox("imap/Sent").unwrap();
@@ -2888,7 +2954,10 @@ mod tests {
 
         assert!(matches!(
             client.queue_row(deleted.queue_id).unwrap(),
-            PimdirActionStatus::Unknown
+            PimdirActionStatus::Applied {
+                collection: None,
+                ..
+            }
         ));
     }
 
@@ -3894,6 +3963,57 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    /// An add or a remove states the set it was read from (pimdir STORAGE
+    /// §15.3), so the owner applies the change alone: a flag a sync lands
+    /// on the message while the row waits in the queue survives the
+    /// drain. A set states none and replaces whatever the message holds.
+    #[test]
+    fn a_flag_synced_while_a_change_waits_survives_all_but_a_set() {
+        let cases = [
+            (
+                0,
+                FlagOp::Add,
+                "act",
+                &["\\Seen"][..],
+                &["\\Seen", "act"][..],
+            ),
+            (2, FlagOp::Remove, "\\Seen", &["\\Seen", "act"], &["act"]),
+            (0, FlagOp::Set, "act", &["\\Seen"], &["act"]),
+        ];
+
+        for (n, op, flag, synced, expected) in cases {
+            let (dir, mut client) = flag_store(None);
+            let id = id_of(&mut client, n);
+            client
+                .store_flags("imap/INBOX", &[id.as_str()], &[keyword(flag)], op)
+                .unwrap();
+
+            // NOTE: a sync lands the server's set while the row waits.
+            let landed = Seeded {
+                handle: format!("k{n}"),
+                flags: known(synced),
+                summary: Some(PimdirMailSummary {
+                    message_id: Some(format!("k{n}@x.test")),
+                    subject: format!("keyword {n}"),
+                    date: Some(format!("2026-05-1{n}T10:00:00Z")),
+                    ..Default::default()
+                }),
+            };
+            seed(dir.path(), "imap/INBOX", &[landed]);
+
+            let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+                .unwrap()
+                .for_source("imap");
+            let report = owner.drain().unwrap();
+            assert_eq!((report.applied, report.parked), (1, 0), "{op:?}");
+            drop(owner);
+
+            let mut held = client.read_flags("imap/INBOX", &id).unwrap().unwrap();
+            held.sort();
+            assert_eq!(held, expected, "{op:?}");
+        }
     }
 
     /// An id the mailbox does not hold is skipped and counted out, as the
