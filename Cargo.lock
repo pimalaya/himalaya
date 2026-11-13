@@ -1126,12 +1126,13 @@ dependencies = [
 
 [[package]]
 name = "io-proxy"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "155d6f9416bdcf3a147e156ad92c94ec772b3684276e6405b2d3319d610922e5"
+checksum = "6b8a1b3698a70ea041d11dea1532276cf270aa289388bce8c68b27d949eb3506"
 dependencies = [
  "base64-codec",
  "log",
+ "secrecy",
  "thiserror",
 ]
 
@@ -1618,9 +1619,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-stream"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2390fbe42466eda5498c913b7558a76376e982915ed3aad3a19758a86c46c098"
+checksum = "6a863f89f3c3eb4799bb4d6ae33bd8b4c399769bced7d7660d97065bd4163d81"
 dependencies = [
  "anyhow",
  "io-proxy",
