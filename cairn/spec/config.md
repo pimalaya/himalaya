@@ -71,8 +71,11 @@ A `maildir` block SHALL name `root`, and MAY name `keywords.dovecot`, `keywords.
 ### Requirement: The mbox block
 An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `inbox` (the spool), `format` (`mboxo`, `mboxrd` by default, `mboxcl`, `mboxcl2`, which also decides whether `Content-Length` is trusted on read), `thunderbird` (the `.sbd` layout, off by default) and `lock.dotlock`, `lock.fcntl` (both on by default) and `lock.timeout`.
 
+### Requirement: A client certificate per backend
+Every network backend's `tls` block MAY name a `client` table holding `cert` and `key`, the PEM certificate (optionally followed by its intermediates) and its private key, presented when the server asks for a client certificate. Both keys SHALL be required once the table is present.
+
 ### Requirement: Path keys expand as the configuration is read
-Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
+Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert`, `tls.client.cert` and `tls.client.key` of every backend.
 
 An expansion that fails, an undefined variable being the case, SHALL leave the raw value untouched rather than fail the load.
 
