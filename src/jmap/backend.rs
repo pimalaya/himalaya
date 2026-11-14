@@ -571,7 +571,8 @@ impl JmapClient {
     /// `drafts`- and `sent`-role mailboxes otherwise. Once submitted, the
     /// server moves the email to the sent mailbox, unsets `$draft` and sets
     /// `$seen` (RFC 8621 section 7.5 `onSuccessUpdateEmail`), so it does
-    /// not stay behind as a draft.
+    /// not stay behind as a draft. A refused submission destroys the email
+    /// the import created.
     ///
     /// A server whose session lacks `urn:ietf:params:jmap:submission`
     /// (RFC 8621 section 7) is refused under `capability-missing` before
@@ -614,8 +615,9 @@ impl JmapClient {
         // NOTE: bytes the account holds already (a draft added earlier, a
         // retry) are refused with `alreadyExists` by a server forbidding
         // duplicates; the existing email is then the one submitted.
-        let email_id = match imported(self.email_import(imports)?, "outgoing")? {
-            Imported::Created(Some(id)) | Imported::Existing(id) => id,
+        let (email_id, created) = match imported(self.email_import(imports)?, "outgoing")? {
+            Imported::Created(Some(id)) => (id, true),
+            Imported::Existing(id) => (id, false),
             Imported::Created(None) => bail!("Email/import response did not include an email id"),
         };
 
@@ -624,7 +626,7 @@ impl JmapClient {
             "outgoing".to_string(),
             JmapEmailSubmissionCreate {
                 identity_id,
-                email_id,
+                email_id: email_id.clone(),
                 envelope: None,
             },
         );
@@ -636,12 +638,45 @@ impl JmapClient {
             sent = sent.remove_from_mailbox(drafts_id).add_to_mailbox(sent_id);
         }
 
-        let output = self.email_submission_set(JmapEmailSubmissionSetArgs {
+        let submission = self.email_submission_set(JmapEmailSubmissionSetArgs {
             create: submissions,
             on_success_update_email: Some(BTreeMap::from([("#outgoing".to_string(), sent)])),
             on_success_destroy_email: None,
-        })?;
+        });
+
+        let draft = sanitize::text(&email_id).into_owned();
+
+        // NOTE: without an answer the message may have gone out.
+        let output = match submission {
+            Ok(output) => output,
+            Err(err) if created => {
+                warn!("send failed and may have gone out, the draft {draft} is kept");
+                return Err(err.into());
+            }
+            Err(err) => return Err(err.into()),
+        };
+
         if let Some(err) = output.not_created.values().next() {
+            if created {
+                let destroy = JmapEmailSetArgs {
+                    destroy: Some(vec![email_id.clone()]),
+                    ..Default::default()
+                };
+
+                match self.email_set(destroy) {
+                    Ok(set) => {
+                        if let Some(err) = set.not_destroyed.get(&email_id) {
+                            let err = format_set_error(err);
+                            warn!("send refused, but the draft {draft} stays{err}");
+                        }
+                    }
+                    Err(err) => {
+                        let err = sanitize::text(&err.to_string()).into_owned();
+                        warn!("send refused, but the draft {draft} stays: {err}");
+                    }
+                }
+            }
+
             return Err(submission_error(err));
         }
 
@@ -1487,5 +1522,192 @@ mod tests {
 
         assert_eq!(flag.raw(), "$flagged");
         assert_eq!(flag.iana(), Some(IanaFlag::Flagged));
+    }
+
+    /// `message send` against a scripted JMAP server.
+    mod send {
+        use std::{
+            io::{BufRead, BufReader, Read, Write},
+            net::TcpListener,
+            thread::{self, JoinHandle},
+        };
+
+        use pimalaya_config::secret::Secret;
+        use secrecy::SecretString;
+        use serde_json::{Value, json};
+
+        use crate::{
+            config::jmap::{JmapAuthConfig, JmapConfig},
+            error::ErrorCode,
+            jmap::client::JmapClient,
+        };
+
+        /// The response a scripted server gives a method call: its name
+        /// (`error` for a method error) and its arguments.
+        type Answer = (&'static str, Value);
+
+        fn created() -> Answer {
+            let email = json!({ "id": "E1", "blobId": "B1", "threadId": "T1", "size": 4 });
+            ("Email/import", json!({ "created": { "outgoing": email } }))
+        }
+
+        fn refused() -> Answer {
+            let err = json!({
+                "type": "invalidRecipients",
+                "invalidRecipients": ["nobody@example.org"],
+            });
+            (
+                "EmailSubmission/set",
+                json!({ "notCreated": { "outgoing": err } }),
+            )
+        }
+
+        /// Serves one connection, answering the method calls in order from
+        /// `answers`, and returns the calls it was sent as `[name, args]`.
+        fn serve(answers: Vec<Answer>) -> (String, JoinHandle<Vec<Value>>) {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let session = json!({
+                "username": "user",
+                "accounts": {},
+                "primaryAccounts": { "urn:ietf:params:jmap:mail": "A" },
+                "capabilities": {
+                    "urn:ietf:params:jmap:core": {},
+                    "urn:ietf:params:jmap:mail": {},
+                    "urn:ietf:params:jmap:submission": {},
+                },
+                "apiUrl": format!("{url}/api"),
+                "downloadUrl": format!("{url}/download/{{accountId}}/{{blobId}}"),
+                "uploadUrl": format!("{url}/upload/{{accountId}}"),
+                "eventSourceUrl": format!("{url}/events"),
+                "state": "s",
+            });
+
+            let handle = thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut out = stream;
+                let mut answers = answers.into_iter();
+                let mut calls = Vec::new();
+
+                let mut line = String::new();
+                while reader.read_line(&mut line).unwrap() > 0 {
+                    let path = line.split(' ').nth(1).unwrap().to_string();
+                    let mut len = 0;
+                    loop {
+                        line.clear();
+                        reader.read_line(&mut line).unwrap();
+                        if line == "\r\n" {
+                            break;
+                        }
+                        let (name, value) = line.split_once(':').unwrap();
+                        if name.eq_ignore_ascii_case("content-length") {
+                            len = value.trim().parse().unwrap();
+                        }
+                    }
+                    let mut body = vec![0; len];
+                    reader.read_exact(&mut body).unwrap();
+                    line.clear();
+
+                    let reply = if path == "/session" {
+                        session.clone()
+                    } else if path.starts_with("/upload/") {
+                        json!({ "accountId": "A", "blobId": "B1", "type": "message/rfc822", "size": len })
+                    } else {
+                        let request: Value = serde_json::from_slice(&body).unwrap();
+                        let call = &request["methodCalls"][0];
+                        calls.push(json!([call[0], call[1]]));
+                        let (name, args) = answers.next().unwrap();
+                        json!({ "methodResponses": [[name, args, call[2]]], "sessionState": "s" })
+                    };
+
+                    let reply = reply.to_string();
+                    write!(
+                        out,
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+                         Content-Length: {}\r\n\r\n{reply}",
+                        reply.len()
+                    )
+                    .unwrap();
+                }
+
+                calls
+            });
+
+            (url, handle)
+        }
+
+        /// Sends a message through the scripted server, returning the
+        /// send's result and the method calls the server was sent.
+        fn send(answers: Vec<Answer>) -> (anyhow::Result<()>, Vec<Value>) {
+            let (url, server) = serve(answers);
+            let config = JmapConfig {
+                server: format!("{url}/session"),
+                tls: Default::default(),
+                proxy: None,
+                alpn: Vec::new(),
+                auth: JmapAuthConfig::Header(Secret::Raw(SecretString::from("token"))),
+                identity_id: Some(String::from("I1")),
+                drafts_mailbox_id: Some(String::from("D")),
+                sent_mailbox_id: Some(String::from("S")),
+            };
+
+            let mut client = JmapClient::new(config).unwrap();
+            let result = client.send_message(b"To: nobody@example.org\r\n\r\nbody\r\n".to_vec());
+            drop(client);
+
+            (result, server.join().unwrap())
+        }
+
+        fn names(calls: &[Value]) -> Vec<&str> {
+            calls.iter().map(|call| call[0].as_str().unwrap()).collect()
+        }
+
+        fn recipient_refused(result: anyhow::Result<()>) {
+            let err = result.unwrap_err();
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::RecipientRefused), "{err}");
+        }
+
+        #[test]
+        fn a_refused_submission_destroys_the_email_it_created() {
+            let destroyed = ("Email/set", json!({ "destroyed": ["E1"] }));
+
+            let (result, calls) = send(vec![created(), refused(), destroyed]);
+
+            recipient_refused(result);
+            assert_eq!(
+                names(&calls),
+                ["Email/import", "EmailSubmission/set", "Email/set"]
+            );
+            assert_eq!(calls[2][1]["destroy"], json!(["E1"]));
+        }
+
+        #[test]
+        fn a_refused_submission_keeps_an_existing_email() {
+            let err = json!({ "type": "alreadyExists", "existingId": "E9" });
+            let existing = ("Email/import", json!({ "notCreated": { "outgoing": err } }));
+
+            let (result, calls) = send(vec![existing, refused()]);
+
+            recipient_refused(result);
+            assert_eq!(names(&calls), ["Email/import", "EmailSubmission/set"]);
+        }
+
+        #[test]
+        fn a_failed_destroy_keeps_the_refusal() {
+            let not_destroyed = json!({ "notDestroyed": { "E1": { "type": "forbidden" } } });
+            let failures = [
+                ("Email/set", not_destroyed),
+                ("error", json!({ "type": "serverFail" })),
+            ];
+
+            for failure in failures {
+                let (result, calls) = send(vec![created(), refused(), failure]);
+
+                recipient_refused(result);
+                assert_eq!(calls[2][1]["destroy"], json!(["E1"]));
+            }
+        }
     }
 }

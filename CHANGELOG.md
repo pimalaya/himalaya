@@ -232,6 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an IMAP answer holding lines that do not decode being printed as whole: a warning says how many were skipped, a `message read` whose message was among them fails rather than report it missing, and a server `ALERT` is logged as a warning (io-imap).
 - Fixed an mbox flag change or removal failing, or editing the wrong bytes, on an index another client made stale: the index is rebuilt and the write planned again, once (io-mbox).
 - Fixed a JMAP send saying nothing when the server sends the message and refuses to move it out of the drafts: a warning says it stays a draft (io-jmap).
+- Fixed a JMAP send the server refused leaving the imported message in the drafts mailbox, one more on each retry where duplicates are allowed: the email the send created is destroyed, an email the account already held is kept, and a destroy that fails is a warning naming its id.
 - Fixed a Gmail label type or setting value Himalaya does not know failing the whole answer: the text form prints it as `unknown` (io-gmail).
 - Fixed IMAP commands failing with `Decode IMAP response error` when a server answers `NO` with UTF-8 in its text (Dovecot naming a non-ASCII mailbox): the refusal is printed, its 8-bit bytes read as `?` (io-imap).
 - Fixed `mailbox create` and `rename` accepting a blank NAME, and the unified mbox writes a NAME holding `/`.
