@@ -3,194 +3,109 @@ default = true				# the account commands run on without -a
 #email = "alice@example.org"		# the address it sends as, also spelled from
 #display-name = "Alice"			# the name that address carries, also spelled from-name
 #signature = "Regards,\nAlice"		# appended to the messages it composes
-signature-delim = "-- \n"		# the RFC 3676 separator before the signature
-#signature-delim = ""			# no separator, a blank line before the signature
+#signature-delim = "-- \n"		# the RFC 3676 separator before the signature, "" for a blank line
 #downloads-dir = "~/Downloads/example"	# where attachments go, the system's downloads otherwise
 
-message.send.save-copy = false			# keep no copy, as JMAP, Gmail and Graph file one
-#message.send.save-copy = true			# copy a sent message to the sent mailbox
-#message.send.save-copy = "Sent"		# copy it to this mailbox, a name, alias or role
-message.reply.posting-style = "top"		# write a reply above the quoted message
-#message.reply.posting-style = "bottom"		# write it below
-#message.reply.posting-style = "none"		# quote nothing
-message.forward.posting-style = "top"		# write a forward above the forwarded message
-#message.forward.posting-style = "bottom"	# write it below
-#message.forward.posting-style = "none"		# quote nothing
-
-envelope.list.page-size = 25			# envelopes per page, absent -s
-envelope.list.datetime-fmt = "%F %R"		# the chrono strftime format of an envelope date
-#envelope.list.datetime-fmt = "%F %R%:z"	# with its offset
-envelope.list.datetime-local-tz = true		# show a date in the local timezone
-#envelope.list.datetime-local-tz = false	# show it at the offset it was sent with
+#message.send.save-copy = false		# keep no copy; true for the sent mailbox, or a mailbox name, alias or role
+#message.reply.posting-style = "top"	# where a reply sits around the quote [bottom, none]
+#message.forward.posting-style = "top"	# where a forward sits around the source [bottom, none]
+#envelope.list.page-size = 25		# envelopes per page, absent -s
+#envelope.list.datetime-fmt = "%F %R"	# the chrono strftime format of a date, "%F %R%:z" adding the offset
+#envelope.list.datetime-local-tz = true	# show a date in the local timezone, or at the offset it was sent with
 
 #mailbox.alias.inbox = "INBOX"		# the mailbox commands read without -m
 #mailbox.alias.sent = "Sent"		# the sent role, over the backend's own
 #mailbox.alias.drafts = "Drafts"	# the drafts role
 #mailbox.alias.trash = "Trash"		# the trash role, where message delete moves
-#mailbox.alias.junk = "Junk"		# the junk role
-#mailbox.alias.archive = "Archive"	# the archive role
-#mailbox.alias.lists = "INBOX/Lists"	# any other name, for -m lists
 
-#proxy.url = "socks5h://localhost:1080"	# a SOCKS5 proxy for every network backend
-#proxy.url = "http://localhost:3128"	# an HTTP one, all_proxy and https_proxy otherwise
+#proxy.url = "socks5h://localhost:1080"	# a socks5, socks5h or http proxy for every network backend
+#proxy.username = "alice"		# its username
+#proxy.password.command = "exit 127"	# prints its password
 
-#proxy = { url = "socks5h://localhost:1080", username = "alice", password.command = "exit 127" }	# with credentials
+# IMAP
+#imap.server = "imap.example.org"	# implicit TLS on 993; imap://host is cleartext on 143, unix://path a local proxy
+#imap.starttls = false			# upgrade an imap:// connection with STARTTLS
+#imap.id.auto = false			# send ID once signed in, as 163.com and QQ Mail want
+#imap.id.fields.name = true		# what ID sends: true the canned value, false NIL, an empty table ID NIL
+#imap.id.fields.version = true		# the canned version
+#imap.id.fields.vendor = true		# the canned vendor
+#imap.id.fields.support-url = true	# the canned support URL
+#imap.sasl-ir = false			# inline the credentials, unset following SASL-IR, false for Coremail
+#imap.sort.fallback = true		# sort on the client, unset doing so without SORT or on iCloud
 
-# IMAP and SMTP
-#
-#imap.server = "imap.example.org"			# implicit TLS, on port 993 unless given
-##imap.server = "imap://imap.example.org"		# cleartext, on port 143 unless given
-##imap.server = "unix:///path/to/imap.sock"		# a local proxy such as sirup, signed in already
-#imap.starttls = false					# keep an imap:// connection as it is
-##imap.starttls = true					# upgrade it with STARTTLS
-#imap.sasl.plain.username = "alice@example.org"		# PLAIN; login and scram-sha-256 take the same keys
-#imap.sasl.plain.password.command = "exit 127"		# prints it; oauthbearer and xoauth2 take a token
-##imap.sasl.plain.password.raw = "secret"		# the password itself
-##imap.sasl.plain.authzid = "bob@example.org"		# the identity to act as, when another
-##imap.sasl-ir = false					# never inline the credentials, for Coremail (163.com)
-##imap.sasl-ir = true					# always inline them, unset following SASL-IR
-#imap.id.auto = false					# send no ID once signed in
-##imap.id.auto = true					# send one, as 163.com and QQ Mail want
-##imap.id.fields = { name = true, version = false }	# ID sends name canned, version as NIL, no other
-##imap.id.fields = {}					# send ID NIL, which 163.com refuses
-##imap.sort.fallback = true				# always sort on the client, unset doing so without SORT or on iCloud
-##imap.sort.fallback = false				# always ask the server to SORT
-#imap.alpn = ["imap"]					# the ALPN id rustls offers
-##imap.alpn = []					# none
-##imap.tls.provider = "rustls"				# rustls, the build's first TLS otherwise
-##imap.tls.provider = "native-tls"			# the platform's TLS
-##imap.tls.rustls.crypto = "ring"			# rustls on ring, the build's first otherwise
-##imap.tls.rustls.crypto = "aws"			# rustls on aws-lc-rs
-##imap.tls.cert = "/path/to/cert.pem"			# a PEM certificate to trust, such as Proton Bridge's
-##imap.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# a client certificate and its key, when the server asks for one
-##imap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for IMAP alone
-#
-#smtp.server = "smtp.example.org"		# implicit TLS, on port 465 unless given
-##smtp.server = "smtp://smtp.example.org:587"	# cleartext, on port 25 unless given
-##smtp.server = "unix:///path/to/smtp.sock"	# a local proxy such as sirup, signed in already
-#smtp.starttls = false				# keep an smtp:// connection as it is
-##smtp.starttls = true				# upgrade it with STARTTLS
-#smtp.sasl.plain.username = "alice@example.org"	# as the imap keys
+#imap.sasl.plain.username = "alice@example.org"	# PLAIN; login and scram-sha-256 take the same keys, anonymous an optional message
+#imap.sasl.plain.password.command = "exit 127"	# prints the password
+#imap.sasl.plain.password.raw = "secret"	# the password itself
+#imap.sasl.plain.authzid = "bob@example.org"	# the identity to act as, when another
+
+#imap.sasl.xoauth2.username = "alice@example.org"	# XOAUTH2, for Microsoft 365; oauthbearer takes the same keys
+#imap.sasl.xoauth2.token.command = "exit 127"		# prints an OAuth 2.0 access token
+
+# Network, the same keys under smtp, sieve, jmap, gmail and msgraph
+#imap.alpn = ["imap"]					# the ALPN ids rustls offers, empty for none
+#imap.tls.provider = "rustls"				# the build's first otherwise [native-tls]
+#imap.tls.rustls.crypto = "ring"			# the build's first otherwise [aws]
+#imap.tls.cert = "/path/to/cert.pem"			# a PEM certificate to trust, such as Proton Bridge's
+#imap.tls.client.cert = "/path/to/client.pem"		# a PEM client certificate, for mutual TLS
+#imap.tls.client.key = "/path/to/client.key.pem"	# its PEM private key, PKCS#8 under native-tls
+#imap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for IMAP alone
+
+# SMTP
+#smtp.server = "smtp.example.org"	# implicit TLS on 465; smtp://host is cleartext on 25, unix://path a local proxy
+#smtp.starttls = false			# upgrade an smtp:// connection with STARTTLS
+
+#smtp.sasl.plain.username = "alice@example.org"	# as imap.sasl
 #smtp.sasl.plain.password.command = "exit 127"	# prints the password
-##smtp.sasl.plain.password.raw = "secret"	# the password itself
-#smtp.alpn = ["smtp"]				# the ALPN id rustls offers
-##smtp.alpn = []				# none
-##smtp.tls.provider = "native-tls"		# as imap.tls
-##smtp.tls.rustls.crypto = "aws"		# as imap.tls.rustls
-##smtp.tls.cert = "/path/to/cert.pem"		# as imap.tls
-##smtp.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
-##smtp.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for SMTP alone
-#message.send.save-copy = "Sent"		# SMTP files no copy of what it sends
+#smtp.sasl.plain.password.raw = "secret"	# the password itself
+
+#smtp.sasl.xoauth2.username = "alice@example.org"	# XOAUTH2, for Microsoft 365
+#smtp.sasl.xoauth2.token.command = "exit 127"		# the same token
 
 # ManageSieve
-#
-#sieve.server = "imap.example.org"			# STARTTLS, on port 4190 unless given
-##sieve.server = "sieves://imap.example.org:4190"	# implicit TLS, for the servers listening so
-##sieve.server = "unix:///path/to/sieve.sock"		# a local proxy, signed in already
-##sieve.starttls = false				# keep a sieve:// connection in cleartext
-#sieve.allow-cleartext-auth = false			# refuse a replayable credential in cleartext
-##sieve.allow-cleartext-auth = true			# allow it over a link you trust
-#sieve.sasl.plain.username = "alice@example.org"	# as the imap keys
+#sieve.server = "imap.example.org"			# STARTTLS on 4190; sieves://host is implicit TLS, unix://path a local proxy
+#sieve.starttls = false					# unset following the scheme
+#sieve.allow-cleartext-auth = false			# allow a replayable credential in cleartext
+#sieve.sasl.plain.username = "alice@example.org"	# as imap.sasl
 #sieve.sasl.plain.password.command = "exit 127"		# prints the password
-##sieve.sasl.plain.password.raw = "secret"		# the password itself
-#sieve.alpn = []					# no ALPN id, ManageSieve registering none
-##sieve.tls.provider = "native-tls"			# as imap.tls
-##sieve.tls.rustls.crypto = "aws"			# as imap.tls.rustls
-##sieve.tls.cert = "/path/to/cert.pem"			# as imap.tls
-##sieve.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
-##sieve.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for ManageSieve alone
 
 # JMAP
-#
-#jmap.server = "https://jmap.example.org/jmap/session"	# the session URL, fetched as is
-##jmap.server = "jmap.example.org"			# its /.well-known/jmap, which must not redirect
-#jmap.auth.basic.username = "alice@example.org"		# HTTP Basic; or bearer.token, or header
-#jmap.auth.basic.password.command = "exit 127"		# prints the password
-##jmap.auth.basic.password.raw = "secret"		# the password itself
-##jmap.identity-id = "I0123abc"				# the identity message send submits under, the first otherwise
-##jmap.drafts-mailbox-id = "M0123abc"			# where it stages, the drafts role otherwise
-##jmap.sent-mailbox-id = "M4567def"			# where it files, the sent role otherwise
-#jmap.alpn = ["http/1.1"]				# the ALPN id rustls offers
-##jmap.alpn = []					# none
-##jmap.tls.provider = "native-tls"			# as imap.tls
-##jmap.tls.rustls.crypto = "aws"			# as imap.tls.rustls
-##jmap.tls.cert = "/path/to/cert.pem"			# as imap.tls
-##jmap.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
-##jmap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for JMAP alone
+#jmap.server = "https://jmap.example.org/jmap/session"	# the session URL, or a host whose /.well-known/jmap does not redirect
+#jmap.identity-id = "I0123abc"		# the identity message send submits under, the first otherwise
+#jmap.drafts-mailbox-id = "M0123abc"	# where it stages, the drafts role otherwise
+#jmap.sent-mailbox-id = "M4567def"	# where it files, the sent role otherwise
+
+#jmap.auth.basic.username = "alice@example.org"	# HTTP Basic
+#jmap.auth.basic.password.command = "exit 127"	# prints the password
+#jmap.auth.basic.password.raw = "secret"	# the password itself
+
+#jmap.auth.bearer.token.command = "exit 127"	# prints a bearer token, an OAuth 2.0 or a Fastmail API one
 
 # Gmail
-#
-#gmail.auth.token.command = ["ortie", "token", "show", "-a", "example"]	# an access token, from Ortie's Google section
-##gmail.auth.token.raw = "secret"					# the token itself, short-lived
-#
-#gmail.user-id = "me"				# the signed-in user's mailbox
-##gmail.user-id = "alice@example.org"		# the same, by its address
-#gmail.alpn = ["http/1.1"]			# the ALPN id rustls offers
-##gmail.alpn = []				# none
-##gmail.tls.provider = "native-tls"		# as imap.tls
-##gmail.tls.rustls.crypto = "aws"		# as imap.tls.rustls
-##gmail.tls.cert = "/path/to/cert.pem"		# as imap.tls
-##gmail.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
-##gmail.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for Gmail alone
+#gmail.user-id = "me"			# the mailbox owner, by address otherwise [alice@example.org]
+#gmail.auth.token.command = "exit 127"	# prints an OAuth 2.0 access token
+#gmail.auth.token.raw = "secret"	# the token itself, short-lived
 
 # Microsoft Graph
-#
-#msgraph.auth.token.command = ["ortie", "token", "show", "-a", "example"]	# an access token, from Ortie's Graph section
-##msgraph.auth.token.raw = "secret"						# the token itself, short-lived
-#
-#msgraph.user-id = "me"					# the signed-in user's mailbox
-##msgraph.user-id = "bob@example.org"			# another one, by user id or principal name
-#msgraph.alpn = ["http/1.1"]				# the ALPN id rustls offers
-##msgraph.alpn = []					# none
-##msgraph.tls.provider = "native-tls"			# as imap.tls
-##msgraph.tls.rustls.crypto = "aws"			# as imap.tls.rustls
-##msgraph.tls.cert = "/path/to/cert.pem"		# as imap.tls
-##msgraph.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
-##msgraph.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for Graph alone
-
-# Microsoft IMAP and SMTP
-#
-#imap.server = "outlook.office365.com"						# Exchange, implicit TLS
-#imap.sasl.xoauth2.username = "alice@example.org"				# XOAUTH2, Exchange refusing OAUTHBEARER
-#imap.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "example"]	# Ortie's Microsoft IMAP and SMTP token
-#smtp.server = "smtp://smtp.office365.com:587"					# Exchange, cleartext then STARTTLS
-#smtp.starttls = true								# upgrade it with STARTTLS
-#smtp.sasl.xoauth2.username = "alice@example.org"				# the same
-#smtp.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "example"]	# the same token
-
-# Fastmail
-#
-#jmap.server = "https://api.fastmail.com/jmap/session"				# Fastmail's JMAP session
-#jmap.auth.bearer.token.command = ["ortie", "token", "show", "-a", "example"]	# Ortie's Fastmail token, or an API token
+#msgraph.user-id = "me"				# the mailbox owner, by user id or principal name otherwise [bob@example.org]
+#msgraph.auth.token.command = "exit 127"	# prints an OAuth 2.0 access token
+#msgraph.auth.token.raw = "secret"		# the token itself, short-lived
 
 # Maildir
-#
-#maildir.root = "~/Mail"			# a Maildir per mailbox, named by its path below
-#maildir.keywords.dovecot = false		# leave the custom keyword letters unread
-##maildir.keywords.dovecot = true		# read them through each mailbox's dovecot-keywords
-##maildir.keywords.header = "x-keywords"	# read keywords from X-Keywords, as mbsync writes
-##maildir.keywords.header = "x-label"		# from X-Label, as mutt and notmuch write
-#maildir.layout = "fs"			# a directory per Maildir, nested as the hierarchy is
-##maildir.layout = "maildir++"		# the root is INBOX, the others dot-named beside it (Dovecot, Courier)
+#maildir.root = "~/Mail"		# a Maildir per mailbox, named by its path below
+#maildir.layout = "fs"			# a directory per Maildir, or Maildir++ as Dovecot and Courier lay it out [maildir++]
+#maildir.keywords.dovecot = false	# read custom keywords through each mailbox's dovecot-keywords
+#maildir.keywords.header = "x-keywords"	# read keywords from a body header, as mbsync or mutt write it [x-label]
 
 # mbox
-#
-#mbox.root = "~/Mail"			# the mbox files, one per mailbox, walked recursively
-##mbox.inbox = "$MAIL"			# the spool, shown as INBOX
-#mbox.format = "mboxrd"			# From lines quoted reversibly
-##mbox.format = "mboxo"			# quoted with one >, lossy
-##mbox.format = "mboxcl"		# as mboxo, with a Content-Length header
-##mbox.format = "mboxcl2"		# not quoted, a Content-Length header
-#mbox.thunderbird = false		# the children of mailbox a in a/
-##mbox.thunderbird = true		# in a.sbd/, as Thunderbird lays them out
-#mbox.lock.dotlock = true		# take the <mbox>.lock dotlock to write
-##mbox.lock.dotlock = false		# skip it, for a spool directory you cannot write
-#mbox.lock.fcntl = true			# take the fcntl lock to write
-##mbox.lock.fcntl = false		# skip it
-#mbox.lock.timeout = 10			# seconds to wait for a lock another process holds
+#mbox.root = "~/Mail"		# the mbox files, one per mailbox, walked recursively
+#mbox.inbox = "$MAIL"		# the spool, shown as INBOX
+#mbox.format = "mboxrd"		# how From lines are quoted [mboxo, mboxcl, mboxcl2]
+#mbox.thunderbird = false	# the children of mailbox a in a.sbd/, as Thunderbird lays them out
+#mbox.lock.dotlock = true	# take the dotlock, which a spool directory you cannot write refuses
+#mbox.lock.fcntl = true		# take the fcntl lock
+#mbox.lock.timeout = 10		# seconds to wait for a lock another process holds
 
 # pimdir
-#
-#pimdir.root = "~/.local/state/neverest"	# the store neverest syncs, on Linux
-##pimdir.account = "example"			# the account to read, for a store holding several
-#mailbox.alias.sent = "imap/Sent"		# where message send queues, a collection id
+#pimdir.root = "/path/to/store"		# the pimdir store a sync engine fills
+#pimdir.account = "example"		# the account to read, for a store holding several
+#mailbox.alias.sent = "imap/Sent"	# where message send queues, a collection id
