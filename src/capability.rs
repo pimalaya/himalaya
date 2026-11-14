@@ -99,6 +99,7 @@ pub enum SearchOption {
     Body,
     Flag,
     Attachment,
+    MessageId,
     SortDate,
     SortFrom,
     SortTo,
@@ -122,6 +123,7 @@ impl SearchOption {
             Self::Body => "body",
             Self::Flag => "flag",
             Self::Attachment => "attachment",
+            Self::MessageId => "message-id",
             Self::SortDate => "sort.date",
             Self::SortFrom => "sort.from",
             Self::SortTo => "sort.to",
@@ -625,6 +627,12 @@ const IMAP: &[Row] = storage_rows![
         C::Search(O::Attachment),
         Not("IMAP SEARCH has no attachment key")
     ),
+    (
+        C::Search(O::MessageId),
+        Partial(
+            "exact on the chain of `and` from the root, a substring match under `or` and `not`"
+        )
+    ),
     (C::Search(O::SortDate), Full),
     (C::Search(O::SortFrom), Full),
     (C::Search(O::SortTo), Full),
@@ -665,6 +673,10 @@ const JMAP: &[Row] = storage_rows![
     (C::Search(O::Body), Full),
     (C::Search(O::Flag), Full),
     (C::Search(O::Attachment), Full),
+    (
+        C::Search(O::MessageId),
+        Not("io-jmap has no `header` condition yet")
+    ),
     (C::Search(O::SortDate), Full),
     (C::Search(O::SortFrom), Full),
     (C::Search(O::SortTo), Full),
@@ -728,6 +740,7 @@ const GMAIL: &[Row] = storage_rows![
         C::Search(O::Attachment),
         Partial("Gmail's `has:attachment`, which counts inline images too")
     ),
+    (C::Search(O::MessageId), Full),
     (C::Search(O::SortDate), Partial(PAGE_SORT)),
     (C::Search(O::SortFrom), Partial(PAGE_SORT)),
     (C::Search(O::SortTo), Partial(PAGE_SORT)),
@@ -784,6 +797,10 @@ const MSGRAPH: &[Row] = storage_rows![
         Not("KQL has no flag property, and Graph takes no `$filter` beside `$search`")
     ),
     (C::Search(O::Attachment), Full),
+    (
+        C::Search(O::MessageId),
+        Partial("alone, Graph taking no `$filter` beside `$search`")
+    ),
     (C::Search(O::SortDate), Partial(PAGE_SORT)),
     (C::Search(O::SortFrom), Partial(PAGE_SORT)),
     (C::Search(O::SortTo), Partial(PAGE_SORT)),
@@ -815,6 +832,7 @@ macro_rules! local_rows {
             (C::Search(O::Body), Full),
             (C::Search(O::Flag), Full),
             (C::Search(O::Attachment), Full),
+            (C::Search(O::MessageId), Full),
             (C::Search(O::SortDate), Full),
             (C::Search(O::SortFrom), Full),
             (C::Search(O::SortTo), Full),
@@ -881,6 +899,7 @@ const PIMDIR: &[Row] = storage_rows![
     ),
     (C::Search(O::Flag), Full),
     (C::Search(O::Attachment), Full),
+    (C::Search(O::MessageId), Full),
     (C::Search(O::SortDate), Full),
     (C::Search(O::SortFrom), Full),
     (C::Search(O::SortTo), Full),
@@ -965,6 +984,7 @@ const SEARCH: &[Capability] = &[
     C::Search(O::Body),
     C::Search(O::Flag),
     C::Search(O::Attachment),
+    C::Search(O::MessageId),
     C::Search(O::SortDate),
     C::Search(O::SortFrom),
     C::Search(O::SortTo),
@@ -1168,6 +1188,7 @@ mod tests {
     fn a_name_follows_pimdirs_grammar_without_the_domain_word() {
         assert_eq!(C::MessageMove.name(), "message.move");
         assert_eq!(C::FlagsAnswered.name(), "flags.answered");
+        assert_eq!(C::Search(O::MessageId).name(), "envelope.search.message-id");
         assert_eq!(C::Search(O::SortDate).name(), "envelope.search.sort.date");
     }
 }

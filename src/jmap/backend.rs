@@ -1023,6 +1023,9 @@ fn convert_filter(
             has_attachment: Some(true),
             ..Default::default()
         }),
+        // NOTE: JMAP declares `message-id` `none`, refused before connecting,
+        // so this never runs; were it reached, it matches nothing.
+        Q::MessageId(_) => JmapFilter::not(vec![condition(JmapEmailFilter::default())]),
 
         // NOTE: a message is received no earlier than it is sent, so the
         // start of the day bounds the received-at from below.

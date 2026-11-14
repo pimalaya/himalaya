@@ -47,6 +47,9 @@ pub enum SearchEmailsFilterQuery {
     Flag(Flag),
     /// Emails holding at least one attachment.
     Attachment,
+    /// The email whose `Message-ID:` is the id, held bare, without its
+    /// angle brackets.
+    MessageId(String),
 }
 
 /// Renders the filter in the query language, so an error can quote the
@@ -71,6 +74,7 @@ impl fmt::Display for SearchEmailsFilterQuery {
             Q::Body(pattern) => write!(f, "body {}", Pattern(pattern)),
             Q::Flag(flag) => write!(f, "flag {}", flag.raw()),
             Q::Attachment => write!(f, "attachment"),
+            Q::MessageId(id) => write!(f, "message-id {}", Pattern(id)),
         }
     }
 }
@@ -103,6 +107,8 @@ mod tests {
             "not subject \"weekly report\"",
             "(cc bob or attachment)",
             "(before 2026-01-01 and address \"say \\\"hi\\\"\")",
+            "message-id id@example.com",
+            "not message-id \"a b@example.com\"",
         ];
 
         for query in queries {

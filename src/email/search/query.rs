@@ -71,6 +71,7 @@ fn filter_options(filter: &SearchEmailsFilterQuery, options: &mut Vec<SearchOpti
         Q::Body(_) => SearchOption::Body,
         Q::Flag(_) => SearchOption::Flag,
         Q::Attachment => SearchOption::Attachment,
+        Q::MessageId(_) => SearchOption::MessageId,
     };
 
     push_once(options, option);
@@ -157,15 +158,17 @@ mod options_tests {
 
     #[test]
     fn a_query_names_each_option_it_uses_once() {
-        let query: SearchEmailsQuery = "not (from a or attachment) and from b order by date"
-            .parse()
-            .unwrap();
+        let query: SearchEmailsQuery =
+            "not (from a or attachment) and from b and message-id id order by date"
+                .parse()
+                .unwrap();
 
         assert_eq!(
             query.options(),
             [
                 SearchOption::From,
                 SearchOption::Attachment,
+                SearchOption::MessageId,
                 SearchOption::SortDate
             ],
         );

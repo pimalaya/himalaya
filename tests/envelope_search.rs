@@ -21,6 +21,7 @@ const COPIED: &str = "From: alice@example.org\r\n\
     To: bob@example.org\r\n\
     Cc: Carol <carol@example.org>\r\n\
     Subject: Copied\r\n\
+    Message-ID: <copied-123@example.org>\r\n\
     Date: Mon, 02 Mar 2026 10:00:00 +0000\r\n\
     \r\n\
     hello\r\n";
@@ -29,6 +30,7 @@ const COPIED: &str = "From: alice@example.org\r\n\
 const ATTACHED: &str = "From: dave@example.org\r\n\
     To: bob@example.org\r\n\
     Subject: Attached\r\n\
+    Message-ID: <attached-456@example.org>\r\n\
     Date: Mon, 04 May 2026 10:00:00 +0000\r\n\
     Content-Type: multipart/mixed; boundary=\"m\"\r\n\
     \r\n\
@@ -116,6 +118,23 @@ fn new_clauses_select_their_messages() {
     );
     assert_eq!(subjects(&config, home, &["attachment"]), ["Attached"]);
     assert_eq!(subjects(&config, home, &["not", "attachment"]), ["Copied"]);
+    assert_eq!(
+        subjects(&config, home, &["message-id", "copied-123@example.org"]),
+        ["Copied"]
+    );
+    assert_eq!(
+        subjects(&config, home, &["message-id", "<attached-456@example.org>"]),
+        ["Attached"]
+    );
+    assert!(subjects(&config, home, &["message-id", "copied-123"]).is_empty());
+    assert_eq!(
+        subjects(
+            &config,
+            home,
+            &["not", "message-id", "copied-123@example.org"]
+        ),
+        ["Attached"]
+    );
 }
 
 #[test]

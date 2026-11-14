@@ -112,6 +112,7 @@ fn matches(
         Q::Body(pattern) => body_contains(raw, pattern),
         Q::Flag(flag) => envelope.flags.contains(flag),
         Q::Attachment => has_attachment(envelope, raw),
+        Q::MessageId(id) => envelope.message_id.as_deref() == Some(id.as_str()),
     }
 }
 
@@ -240,6 +241,20 @@ mod tests {
             &raw,
             &SearchEmailsFilterQuery::Subject("release".into())
         ));
+    }
+
+    #[test]
+    fn message_id_matches_the_whole_bare_id() {
+        let mut env = envelope();
+        env.message_id = Some("msg-123@example.org".into());
+        let id = |id: &str| SearchEmailsFilterQuery::MessageId(id.into());
+
+        assert!(matches_filter(&env, None, b"", &id("msg-123@example.org")));
+        assert!(!matches_filter(&env, None, b"", &id("123@example.org")));
+        assert!(!matches_filter(&env, None, b"", &id("MSG-123@example.org")));
+
+        env.message_id = None;
+        assert!(!matches_filter(&env, None, b"", &id("msg-123@example.org")));
     }
 
     #[test]

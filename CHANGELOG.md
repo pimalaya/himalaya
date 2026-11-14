@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `message-id <id>` clause to `envelope search`, finding a message by its whole `Message-ID:`, angle brackets optional: `HEADER Message-ID` re-checked exactly on IMAP, `rfc822msgid:` on Gmail, a `$filter` on `internetMessageId` on Microsoft Graph (the clause alone), the envelope's id on Maildir, mbox and pimdir; JMAP refuses it. Added `imap search --header NAME TEXT`, one `HEADER` key per pair ([#797](https://github.com/pimalaya/himalaya/issues/797), [#811](https://github.com/pimalaya/himalaya/pull/811)).
 - Added `tls.client.cert` and `tls.client.key` to every network backend, a client certificate presented when the server asks for one (mutual TLS). native-tls reads a PKCS#8 key only.
 - Added `--no-from`, `--no-to`, `--no-subject`, `--no-text` and `--no-html` to `vacation set`, clearing a field of the auto-reply (JMAP sends `null`, Gmail unsets it), so an auto-reply can go back to having nothing set.
 - Added the capabilities an argument reaches to the `Backends:` footer of `--help` (`submit (with --send, --no-save)`, `message.add (with --save)` on `message compose`, `reply` and `forward`, `compose` getting its footer), and left out of an MCP tool the argument the account cannot serve (`send` on an account with no transport), the tool kept.

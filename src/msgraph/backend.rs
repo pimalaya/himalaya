@@ -273,7 +273,8 @@ impl MsgraphClient {
     }
 
     /// Searches the `mailbox` folder with the shared query, its filter
-    /// translated to a KQL `$search`.
+    /// translated to a KQL `$search`, or a lone `message-id` clause to a
+    /// `$filter` on `internetMessageId`.
     ///
     /// Graph refuses `$skip` and `$orderby` beside `$search`, so a page is
     /// reached through the paging links and sorted locally, newest first
@@ -295,11 +296,15 @@ impl MsgraphClient {
             return Ok(envelopes);
         };
 
-        let search = search::filter_to_search(filter)?;
+        let (search, odata_filter) = match search::message_id_filter(filter) {
+            Some(odata_filter) => (None, Some(odata_filter)),
+            None => (Some(search::filter_to_search(filter)?), None),
+        };
         let params = MsgraphMessagesListParams {
             top: Some(page_size.unwrap_or(MESSAGES_MAX_TOP)),
             select: Some(ENVELOPE_SELECT),
-            search: Some(&search),
+            search: search.as_deref(),
+            filter: odata_filter.as_deref(),
             ..Default::default()
         };
         let mut response = self.messages_list(Some(mailbox), &params)?.response;

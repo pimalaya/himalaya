@@ -84,10 +84,13 @@ impl ImapEnvelopeSearchCommand {
 /// The `SEARCH` criteria flags, each one IMAP search key, several ANDed
 /// together and none resolving to `ALL`.
 ///
-/// The keys not exposed here, `OR`, `NOT` and `HEADER` among them, are
+/// The keys not exposed here, `OR` and `NOT` among them, are
 /// reachable through `imap raw`.
 #[derive(Debug, Parser)]
 pub struct SearchCriteriaArgs {
+    /// Match messages whose header NAME contains TEXT.
+    #[arg(long, value_names = ["NAME", "TEXT"], num_args = 2, action = clap::ArgAction::Append)]
+    pub header: Vec<String>,
     /// Match messages whose From header contains TEXT.
     #[arg(long, value_name = "TEXT")]
     pub from: Option<String>,
@@ -191,6 +194,13 @@ impl SearchCriteriaArgs {
         }
         if let Some(text) = self.text {
             keys.push(SearchKey::Text(AString::try_from(text)?));
+        }
+
+        for [name, value] in self.header.as_chunks::<2>().0 {
+            keys.push(SearchKey::Header(
+                AString::try_from(name.clone())?,
+                AString::try_from(value.clone())?,
+            ));
         }
 
         if let Some(date) = self.before {
