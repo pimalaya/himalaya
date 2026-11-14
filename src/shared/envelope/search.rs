@@ -56,7 +56,7 @@ pub struct EnvelopeSearchCommand {
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
     /// Query: date, after, before, from, to, cc, bcc, address, subject, body,
-    /// flag, attachment, header; and, or, not, ( ); order by. See --help.
+    /// flag, attachment, message-id; and, or, not, ( ); order by. See --help.
     ///
     /// Clauses:
     ///
@@ -74,9 +74,11 @@ pub struct EnvelopeSearchCommand {
     ///
     /// - `flag <name>`: carrying the flag, `seen`, `answered`, `flagged`,
     ///   `draft` or a keyword;
-    /// - `attachment`: holding an attachment;
-    /// - `header <name> <pattern>`: that header holds the pattern.
     ///
+    /// - `attachment`: holding an attachment;
+    ///
+    /// - `message-id <id>`: the message whose `Message-ID:` is the id, its
+    ///   angle brackets optional.
     ///
     /// Dates also read `yyyy/mm/dd`, `dd-mm-yyyy` and `dd/mm/yyyy`. A pattern
     /// holding spaces is quoted, `"weekly report"`, or its spaces are
@@ -328,7 +330,7 @@ mod tests {
             .filter(|line| line.trim_start().starts_with("- `"))
             .count();
 
-        assert_eq!(bullets, 7, "{help}");
+        assert_eq!(bullets, 8, "{help}");
     }
 
     #[test]

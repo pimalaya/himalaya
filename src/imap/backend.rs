@@ -210,7 +210,17 @@ impl ImapClient {
             },
         )?;
 
-        Ok(reorder_envelopes(output_data("FETCH", data), &page_uids))
+        let mut envelopes = reorder_envelopes(output_data("FETCH", data), &page_uids);
+
+        // NOTE: HEADER matches a substring, so a `message-id` clause on the
+        // chain of `and` from the root is checked whole once fetched.
+        let ids = root_message_ids(query.and_then(|q| q.filter.as_ref()));
+        envelopes.retain(|envelope| {
+            let id = envelope.message_id.as_deref();
+            ids.iter().all(|wanted| id == Some(*wanted))
+        });
+
+        Ok(envelopes)
     }
 
     /// Adds, sets or removes flags on a UID set, returning how many of
@@ -1170,7 +1180,7 @@ fn convert_filter_with(
         Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
-        Q::Header(name, pattern) => SearchKey::Header(astring(name)?, astring(pattern)?),
+        Q::MessageId(id) => SearchKey::Header(astring("Message-ID")?, astring(id)?),
         Q::Attachment => {
             return Err(unsupported(
                 filter,
@@ -1184,6 +1194,20 @@ fn convert_filter_with(
         Ok(SearchKey::Not(Box::new(key)))
     } else {
         Ok(key)
+    }
+}
+
+/// The ids of the `message-id` clauses on the chain of `and` from the root,
+/// which a fetched envelope is checked against.
+fn root_message_ids(filter: Option<&SearchEmailsFilterQuery>) -> Vec<&str> {
+    match filter {
+        Some(SearchEmailsFilterQuery::And(left, right)) => {
+            let mut ids = root_message_ids(Some(left));
+            ids.extend(root_message_ids(Some(right)));
+            ids
+        }
+        Some(SearchEmailsFilterQuery::MessageId(id)) => vec![id.as_str()],
+        _ => Vec::new(),
     }
 }
 
@@ -1342,7 +1366,7 @@ mod tests {
 
     use super::{
         SearchKey, body_structure_has_attachment, convert_filter, envelope_from, paginate_uids,
-        parse_rfc2822_date, refuse_impermanent, search_keys,
+        parse_rfc2822_date, refuse_impermanent, root_message_ids, search_keys,
     };
     use crate::{
         email::{
@@ -1420,6 +1444,19 @@ mod tests {
             search_line("from a and not (subject b or not (to c and cc d))"),
             "A UID SEARCH FROM a NOT SUBJECT b TO c CC d",
         );
+    }
+
+    #[test]
+    fn a_message_id_is_a_header_key_rechecked_on_the_root_chain() {
+        assert_eq!(
+            search_line("message-id <a@b.org> and from c"),
+            "A UID SEARCH HEADER Message-ID a@b.org FROM c",
+        );
+
+        let query: SearchEmailsQuery = "message-id a@b.org and (message-id c@d.org or from e)"
+            .parse()
+            .unwrap();
+        assert_eq!(root_message_ids(query.filter.as_ref()), ["a@b.org"]);
     }
 
     #[test]

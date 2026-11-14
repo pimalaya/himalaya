@@ -51,6 +51,7 @@ const GMAIL: &str = "gmail.auth.token.command = [\"false\"]\n";
 const MSGRAPH: &str = "msgraph.auth.token.command = [\"false\"]\n";
 const SMTP: &str = "smtp.server = \"127.0.0.1:1\"\n";
 const IMAP: &str = "imap.server = \"imap://127.0.0.1:1\"\n";
+const JMAP: &str = "jmap.server = \"http://127.0.0.1:1\"\njmap.auth.bearer.token.raw = \"x\"\n";
 
 /// Asserts a failure under `code` whose message holds `needle`.
 fn refused(blocks: &str, args: &[&str], code: &str, needle: &str) {
@@ -152,12 +153,12 @@ fn imap_refuses_an_attachment_clause_before_connecting() {
 }
 
 #[test]
-fn graph_refuses_a_header_clause_before_connecting() {
+fn jmap_refuses_a_message_id_clause_before_connecting() {
     refused(
-        MSGRAPH,
-        &["envelope", "search", "header Message-ID <id>"],
+        JMAP,
+        &["envelope", "search", "message-id", "<id@example.org>"],
         "search-unsupported",
-        "header",
+        "message-id",
     );
 }
 

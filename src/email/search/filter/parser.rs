@@ -35,7 +35,7 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserEr
             body(),
             flag(),
             attachment(),
-            header(),
+            message_id(),
             filter
                 .delimited_by(lparen().then_ignore(blanks()), rparen())
                 .labelled("(nested filter)"),
@@ -154,17 +154,28 @@ fn attachment<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserE
         .to(SearchEmailsFilterQuery::Attachment)
 }
 
-fn header<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
-    keyword("header", "`header`", "space after `header`")
-        .ignore_then(pattern().labelled("header name after `header`"))
-        .then_ignore(
-            space()
-                .labelled("space after header name")
-                .repeated()
-                .at_least(1),
-        )
-        .then(pattern().labelled("pattern after header name"))
-        .map(|(name, pattern)| SearchEmailsFilterQuery::Header(name, pattern))
+/// `message-id` and the id, held bare, its angle brackets optional. The
+/// grammar's words stop at a hyphen, so the keyword reads in three parts.
+fn message_id<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
+    keyword("message", "`message-id`")
+        .ignore_then(just('-').labelled("`message-id`"))
+        .ignore_then(keyword("id", "`message-id`"))
+        .ignore_then(blanks1("space after `message-id`"))
+        .ignore_then(pattern().labelled("id after `message-id`"))
+        .try_map(|raw, span| {
+            let trimmed = raw.trim();
+            let bare = trimmed
+                .strip_prefix('<')
+                .and_then(|id| id.strip_suffix('>'))
+                .unwrap_or(trimmed)
+                .trim();
+
+            if bare.is_empty() {
+                Err(mismatch(span))
+            } else {
+                Ok(SearchEmailsFilterQuery::MessageId(bare.to_owned()))
+            }
+        })
 }
 
 /// A clause keyword followed by the spaces separating it from its value.
@@ -418,19 +429,34 @@ mod tests {
     }
 
     #[test]
-    fn header() {
-        assert_eq!(
-            super::query()
-                .parse("header Message-ID \"<id@example.com>\"")
-                .into_result(),
-            Ok(Header("Message-ID".into(), "<id@example.com>".into())),
-        );
+    fn message_id_is_held_bare() {
+        let id = || Ok(MessageId("id@example.com".into()));
 
         assert_eq!(
             super::query()
-                .parse("header \"X-Custom-Header\" unquoted-val")
+                .parse("message-id id@example.com")
                 .into_result(),
-            Ok(Header("X-Custom-Header".into(), "unquoted-val".into())),
+            id()
         );
+        assert_eq!(
+            super::query()
+                .parse("message-id <id@example.com>")
+                .into_result(),
+            id()
+        );
+        assert_eq!(
+            super::query()
+                .parse("message-id \" <id@example.com> \"")
+                .into_result(),
+            id()
+        );
+    }
+
+    #[test]
+    fn message_id_needs_its_whole_word_and_an_id() {
+        assert!(super::query().parse("message id").into_result().is_err());
+        assert!(super::query().parse("message-ids x").into_result().is_err());
+        assert!(super::query().parse("message-id <>").into_result().is_err());
+        assert!(super::query().parse("message-id").into_result().is_err());
     }
 }

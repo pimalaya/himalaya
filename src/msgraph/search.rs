@@ -19,6 +19,18 @@ pub(super) fn filter_to_search(filter: &SearchEmailsFilterQuery) -> Result<Strin
     Ok(format!("\"{}\"", filter_to_kql(filter)?))
 }
 
+/// The `$filter` of a filter that is one `message-id` clause, the one shape
+/// Graph answers through `$filter`, quotes doubled as OData escapes them.
+pub(super) fn message_id_filter(filter: &SearchEmailsFilterQuery) -> Option<String> {
+    match filter {
+        SearchEmailsFilterQuery::MessageId(id) => Some(format!(
+            "internetMessageId eq '<{}>'",
+            id.replace('\'', "''")
+        )),
+        _ => None,
+    }
+}
+
 /// Translates a filter into KQL, every combination parenthesized.
 fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
     Ok(match filter {
@@ -51,10 +63,10 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
                 "Microsoft Graph search has no flag property; use `himalaya msgraph messages list --filter`",
             ));
         }
-        SearchEmailsFilterQuery::Header(_, _) => {
+        SearchEmailsFilterQuery::MessageId(_) => {
             return Err(unsupported(
                 filter,
-                "Microsoft Graph search has no arbitrary header property",
+                "Microsoft Graph matches a Message-ID through `$filter` alone, which takes no other clause beside it",
             ));
         }
     })
@@ -85,6 +97,23 @@ fn date_kql(date: NaiveDate) -> String {
 mod tests {
     use super::*;
     use crate::email::flag::{Flag, IanaFlag};
+
+    #[test]
+    fn a_lone_message_id_is_a_filter_and_refused_in_a_search() {
+        let id = SearchEmailsFilterQuery::MessageId("o'neil@example.org".into());
+
+        assert_eq!(
+            message_id_filter(&id).unwrap(),
+            "internetMessageId eq '<o''neil@example.org>'"
+        );
+
+        let both = SearchEmailsFilterQuery::And(
+            Box::new(id),
+            Box::new(SearchEmailsFilterQuery::From("alice".into())),
+        );
+        assert_eq!(message_id_filter(&both), None);
+        assert!(filter_to_search(&both).is_err());
+    }
 
     #[test]
     fn a_shared_filter_becomes_a_kql_search() {
@@ -150,12 +179,6 @@ mod tests {
     #[test]
     fn a_flag_clause_is_refused_by_name() {
         let filter = SearchEmailsFilterQuery::Flag(Flag::from_iana(IanaFlag::Seen));
-        assert!(filter_to_kql(&filter).is_err());
-    }
-
-    #[test]
-    fn a_header_clause_is_refused() {
-        let filter = SearchEmailsFilterQuery::Header("Message-ID".into(), "id".into());
         assert!(filter_to_kql(&filter).is_err());
     }
 }

@@ -22,7 +22,6 @@ const COPIED: &str = "From: alice@example.org\r\n\
     Cc: Carol <carol@example.org>\r\n\
     Subject: Copied\r\n\
     Message-ID: <copied-123@example.org>\r\n\
-    X-Custom-Tag: urgent\r\n\
     Date: Mon, 02 Mar 2026 10:00:00 +0000\r\n\
     \r\n\
     hello\r\n";
@@ -120,15 +119,20 @@ fn new_clauses_select_their_messages() {
     assert_eq!(subjects(&config, home, &["attachment"]), ["Attached"]);
     assert_eq!(subjects(&config, home, &["not", "attachment"]), ["Copied"]);
     assert_eq!(
-        subjects(&config, home, &["header", "Message-ID", "copied-123"]),
+        subjects(&config, home, &["message-id", "copied-123@example.org"]),
         ["Copied"]
     );
     assert_eq!(
-        subjects(&config, home, &["header", "X-Custom-Tag", "urgent"]),
-        ["Copied"]
+        subjects(&config, home, &["message-id", "<attached-456@example.org>"]),
+        ["Attached"]
     );
+    assert!(subjects(&config, home, &["message-id", "copied-123"]).is_empty());
     assert_eq!(
-        subjects(&config, home, &["header", "Message-ID", "attached-456"]),
+        subjects(
+            &config,
+            home,
+            &["not", "message-id", "copied-123@example.org"]
+        ),
         ["Attached"]
     );
 }
