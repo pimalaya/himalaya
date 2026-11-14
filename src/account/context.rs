@@ -404,7 +404,7 @@ mod tests {
             layout: Default::default(),
         });
 
-        let mut mailboxes = client.list_mailboxes(false).unwrap();
+        let mut mailboxes = client.list_mailboxes(false).unwrap().value;
         let account = account_with_aliases(&[("trash", "Trash/"), ("sent", "./Sent/")]);
         account.apply_role_aliases(&mut mailboxes, |alias| {
             client.resolve_mailbox_id(alias).ok()

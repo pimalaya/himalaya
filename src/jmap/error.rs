@@ -44,12 +44,12 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
 
 /// The item error of the email `id` a set refused, coded by its type
 /// (RFC 8620 §5.3, RFC 8621 §4.6), the type kept in `sources`.
-pub fn set_item_error<E: JmapSetError>(id: &str, err: &E) -> ItemError {
-    let code = match err.type_name() {
-        "notFound" => Some(ErrorCode::MessageNotFound),
-        "forbidden" => Some(ErrorCode::PermissionDenied),
-        "overQuota" => Some(ErrorCode::QuotaExceeded),
-        "rateLimit" => Some(ErrorCode::RateLimited),
+pub fn set_item_error(id: &str, err: &JmapEmailSetItemError) -> ItemError {
+    let code = match err {
+        JmapEmailSetItemError::NotFound { .. } => Some(ErrorCode::MessageNotFound),
+        JmapEmailSetItemError::Forbidden { .. } => Some(ErrorCode::PermissionDenied),
+        JmapEmailSetItemError::OverQuota { .. } => Some(ErrorCode::QuotaExceeded),
+        JmapEmailSetItemError::RateLimit { .. } => Some(ErrorCode::RateLimited),
         _ => None,
     };
 
@@ -70,7 +70,11 @@ impl JmapSetError for JmapMailboxSetItemError {
             | Self::InvalidPatch { description }
             | Self::WillDestroy { description }
             | Self::InvalidProperties { description, .. }
-            | Self::Singleton { description } => description.as_deref(),
+            | Self::Singleton { description }
+            | Self::Forbidden { description }
+            | Self::OverQuota { description }
+            | Self::TooLarge { description }
+            | Self::RateLimit { description } => description.as_deref(),
             Self::Other { description, .. } => description.as_deref(),
         }
     }
@@ -91,6 +95,10 @@ impl JmapSetError for JmapMailboxSetItemError {
             Self::WillDestroy { .. } => "willDestroy",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Singleton { .. } => "singleton",
+            Self::Forbidden { .. } => "forbidden",
+            Self::OverQuota { .. } => "overQuota",
+            Self::TooLarge { .. } => "tooLarge",
+            Self::RateLimit { .. } => "rateLimit",
             Self::Other { type_name, .. } => type_name,
         }
     }
@@ -106,7 +114,11 @@ impl JmapSetError for JmapEmailSetItemError {
             | Self::InvalidPatch { description }
             | Self::WillDestroy { description }
             | Self::InvalidProperties { description, .. }
-            | Self::Singleton { description } => description.as_deref(),
+            | Self::Singleton { description }
+            | Self::Forbidden { description }
+            | Self::OverQuota { description }
+            | Self::TooLarge { description }
+            | Self::RateLimit { description } => description.as_deref(),
             Self::Other { description, .. } => description.as_deref(),
         }
     }
@@ -128,6 +140,10 @@ impl JmapSetError for JmapEmailSetItemError {
             Self::WillDestroy { .. } => "willDestroy",
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Singleton { .. } => "singleton",
+            Self::Forbidden { .. } => "forbidden",
+            Self::OverQuota { .. } => "overQuota",
+            Self::TooLarge { .. } => "tooLarge",
+            Self::RateLimit { .. } => "rateLimit",
             Self::Other { type_name, .. } => type_name,
         }
     }
@@ -139,7 +155,11 @@ impl JmapSetError for JmapEmailImportItemError {
             Self::AlreadyExists { description, .. }
             | Self::InvalidEmail { description }
             | Self::NotFound { description }
-            | Self::InvalidProperties { description, .. } => description.as_deref(),
+            | Self::InvalidProperties { description, .. }
+            | Self::Forbidden { description }
+            | Self::OverQuota { description }
+            | Self::TooLarge { description }
+            | Self::RateLimit { description } => description.as_deref(),
             Self::Other { description, .. } => description.as_deref(),
         }
     }
@@ -157,6 +177,10 @@ impl JmapSetError for JmapEmailImportItemError {
             Self::InvalidEmail { .. } => "invalidEmail",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
+            Self::Forbidden { .. } => "forbidden",
+            Self::OverQuota { .. } => "overQuota",
+            Self::TooLarge { .. } => "tooLarge",
+            Self::RateLimit { .. } => "rateLimit",
             Self::Other { type_name, .. } => type_name,
         }
     }
@@ -167,7 +191,11 @@ impl JmapSetError for JmapEmailCopyItemError {
         match self {
             Self::AlreadyExists { description, .. }
             | Self::NotFound { description }
-            | Self::InvalidProperties { description, .. } => description.as_deref(),
+            | Self::InvalidProperties { description, .. }
+            | Self::Forbidden { description }
+            | Self::OverQuota { description }
+            | Self::TooLarge { description }
+            | Self::RateLimit { description } => description.as_deref(),
             Self::Other { description, .. } => description.as_deref(),
         }
     }
@@ -184,6 +212,10 @@ impl JmapSetError for JmapEmailCopyItemError {
             Self::AlreadyExists { .. } => "alreadyExists",
             Self::NotFound { .. } => "notFound",
             Self::InvalidProperties { .. } => "invalidProperties",
+            Self::Forbidden { .. } => "forbidden",
+            Self::OverQuota { .. } => "overQuota",
+            Self::TooLarge { .. } => "tooLarge",
+            Self::RateLimit { .. } => "rateLimit",
             Self::Other { type_name, .. } => type_name,
         }
     }
@@ -223,9 +255,9 @@ impl JmapSetError for JmapIdentitySetItemError {
 impl JmapSetError for JmapEmailSubmissionSetItemError {
     fn description(&self) -> Option<&str> {
         match self {
-            Self::TooManyRecipients { description }
+            Self::TooManyRecipients { description, .. }
             | Self::NoRecipients { description }
-            | Self::InvalidRecipients { description }
+            | Self::InvalidRecipients { description, .. }
             | Self::ForbiddenMailFrom { description }
             | Self::ForbiddenFrom { description }
             | Self::ForbiddenToSend { description }

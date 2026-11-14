@@ -575,7 +575,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -952,8 +952,7 @@ dependencies = [
 [[package]]
 name = "io-gmail"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "babcff323c91ac2c9f1a66beb80ecde0f9302f132906cb31649a73267b1a2c63"
+source = "git+https://github.com/pimalaya/io-gmail?rev=3dc66be58f95a136e8c722a745eb8cae1c17e316#3dc66be58f95a136e8c722a745eb8cae1c17e316"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -986,8 +985,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f08d53d879f2a96b5de67712fbe2ae5edcd16df5a415592ab58c86f6be226ba2"
+source = "git+https://github.com/pimalaya/io-imap?rev=da85d95e7155da62e5de9359d50f7caeca5edc50#da85d95e7155da62e5de9359d50f7caeca5edc50"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1006,8 +1004,7 @@ dependencies = [
 [[package]]
 name = "io-jmap"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e56ad963e1b34c4efc06338588c15f2d8a20d9597eea4e7d3a856aa161c5fc8b"
+source = "git+https://github.com/pimalaya/io-jmap?rev=26a77bbba0c3a52d5f681e0fe149385cbf4dc74a#26a77bbba0c3a52d5f681e0fe149385cbf4dc74a"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1024,8 +1021,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41615d0bd3f200cfa97c992cd1f63ea219fcb959f102e4f17941408faeb0c3a6"
+source = "git+https://github.com/pimalaya/io-maildir?rev=babeeb04eb50aa3c8a535d1b1fc1c5e547ba6088#babeeb04eb50aa3c8a535d1b1fc1c5e547ba6088"
 dependencies = [
  "gethostname",
  "log",
@@ -1580,7 +1576,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.4.0"
-source = "git+https://github.com/pimalaya/cli?rev=9ff600345d7dd36a2faaff5183ff9a93df3235df#9ff600345d7dd36a2faaff5183ff9a93df3235df"
+source = "git+https://github.com/pimalaya/cli?rev=0be1b1f08d19ccb9d16ee8e1d4266c27c96e0cdd#0be1b1f08d19ccb9d16ee8e1d4266c27c96e0cdd"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1873,7 +1869,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1931,7 +1927,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2283,7 +2279,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2550,7 +2546,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

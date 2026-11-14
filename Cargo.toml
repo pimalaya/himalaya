@@ -80,5 +80,9 @@ simd-cpu = { version = "0.1", default-features = false, features = ["std"] }
 url = { version = "2.5", default-features = false }
 
 [patch.crates-io]
-pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "9ff600345d7dd36a2faaff5183ff9a93df3235df" }
+pimalaya-cli = { git = "https://github.com/pimalaya/cli", rev = "0be1b1f08d19ccb9d16ee8e1d4266c27c96e0cdd" }
 mime-rs = { git = "https://github.com/pimalaya/mime", rev = "2591e7fec9e3dd8b995d47323c6fa8868c558857" }
+io-imap = { git = "https://github.com/pimalaya/io-imap", rev = "da85d95e7155da62e5de9359d50f7caeca5edc50" }
+io-jmap = { git = "https://github.com/pimalaya/io-jmap", rev = "26a77bbba0c3a52d5f681e0fe149385cbf4dc74a" }
+io-maildir = { git = "https://github.com/pimalaya/io-maildir", rev = "babeeb04eb50aa3c8a535d1b1fc1c5e547ba6088" }
+io-gmail = { git = "https://github.com/pimalaya/io-gmail", rev = "3dc66be58f95a136e8c722a745eb8cae1c17e316" }

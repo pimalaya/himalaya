@@ -1,0 +1,29 @@
+---
+cairn: log
+change: a-result-carries-its-errors
+landed: 2026-11-14
+---
+
+# A result carries its errors
+
+`envelope list`, `envelope search`, `mailbox list`, `flag add|set|remove`, `message copy`, `message move` and `message delete` print an `errors` list beside their result, one pimalaya-cli item error `{id, code, error, sources}` per item they could not list or act on, and exit 3 when it is not empty. The codes `message-unreadable`, `mailbox-unreadable`, `permission-denied`, `quota-exceeded`, `rate-limited` and `recipient-refused` joined the vocabulary. Landed in two passes on 2026-11-14.
+
+Pass 1 (e575f8de) laid the contract (`Outcome<T>` in src/email/outcome.rs, the `ItemError` alias, `missing_message`, `partial_when`, the text `Error:` lines, the schema key `himalaya-item-error`), unknown ids as entries on every backend, the Graph writes through `$batch`, the Gmail listings and lookups through `GmailBatch`, the IMAP `LIST` and `STATUS` entries, SMTP `recipient-refused` and the JMAP SetErrors read by name. Its deviations, recorded in the delta: a failure of the exchange met part-way still fails the command whole, only the server's refusal of an item carrying on; a 2xx batch part whose body does not parse is `message-unreadable`; a page counts as full when its envelopes and its errors reach the page size; the Graph lookups count a 400 as not found only under `ErrorInvalidIdMalformed`.
+
+Pass 2 took the library changes, pinned to git in Cargo.toml (pimalaya-cli 0be1b1f, io-imap da85d95, io-jmap 26a77bb, io-maildir babeeb0, io-gmail 3dc66be), one copy of each crate in the graph:
+
+- IMAP: a FETCH line io-imap recovers in part (`ImapOutput::partial`) lists its message with what decoded, `hasAttachment` `null` when `BODYSTRUCTURE` failed, beside a `message-unreadable` entry naming its UID and the failed items; a line whose `UID` failed leaves its message out, its entry with a `null` id, as does a line skipped whole. `message read` whose body item failed is `message-unreadable`. The `imap` namespace warns of the lines decoded in part as of the skipped ones.
+- JMAP: the SetErrors are matched by their typed variants; an email or a mailbox that does not deserialize (`unparsed`) is `message-unreadable` or `mailbox-unreadable`, a write's id whose email does not is `message-unreadable`; a chained `notFound` stays out of a listing; `message send` refused with `invalidRecipients` fails coded `recipient-refused`, naming the listed addresses.
+- Maildir: an unreadable file is `message-unreadable` with its id, on the first page of a paged listing, and an unreadable folder `mailbox-unreadable` with its path; `maildir list` warns of the latter.
+- Gmail: listings, lookups and writes go through one batch loop, 50 calls to a batch, a throttled or 5xx part sent again up to three times after the longest `Retry-After` (1 second without one, 10 at most), as Graph's loop does; flags, copies and moves through batched `messages.modify`, deletes through batched `messages.delete`. A trash stays a `messages.modify` adding `TRASH`, so io-gmail's batched `trash` and `untrash` are unused.
+- The json_schema.rs test no longer removes `himalaya-item-error` before `JsonSchemaRegistry::check`, which spares it since pimalaya-cli 0be1b1f.
+
+Found, not changed: a JMAP submission the server refuses leaves the message `message send` imported into the drafts mailbox with `$draft`, `onSuccessUpdateEmail` running on success only (RFC 8621 §7.5). Read from the code, not reproduced live, Fastmail being pull-only for the live suites; the spec now states it.
+
+Tested offline: a scripted IMAP server answering a whole line, a seven-level `BODYSTRUCTURE`, a line whose `UID` does not decode and one that does not scan; the Gmail batch loop over 52 calls with a throttled part, a part throttled past the retries, a 404 write; a JMAP email that does not deserialize and refused recipients; a Maildir file and folder whose mode forbids reading. Each new test fails with its backend's new handling removed; against pass 1 they do not build (the listings returned bare lists). #801 reproduced on a scratch Dovecot 2.4.5 (two messages, one nesting seven multiparts): `himalaya --json envelope list --has-attachment` prints both, the deep one with `hasAttachment: null` and `{"id":"2","code":"message-unreadable","error":"Cannot decode BODYSTRUCTURE of the FETCH response"}`, exit 3, where the pass-1 binary printed the other alone and exited 0. Clippy over every feature set of tests.yml, `cargo test --all-features`, the Maildir-only tests.
+
+Tested live on 2026-11-14: the Google suite (Gmail API and Gmail IMAP, 11 tests), the Microsoft suite (Graph and Exchange IMAP, 11) and the Fastmail anonymous suite (2). The new `gmail_writes` and `graph_writes` add a throwaway message (Gmail `messages.insert` under a throwaway label, a Graph draft), flag it beside the id `bogus`, which prints a `message-not-found` entry and exits 3, move it, trash it and delete it, cleaning up after themselves; Gmail answered `bogus` 400 `Invalid id value`, Graph 400 `ErrorInvalidIdMalformed`.
+
+Spec: commands ("A command acting on several items lists what failed" and "An item that failed prints in the header block" added; "A command given message ids says how many it found", "The exit status tells the outcome", "The JSON contract is described and versioned" and "Listings resume from their cursor" modified), backends ("Each backend names the items it could not serve" and "Gmail batches fifty calls at a time" added; "An IMAP answer missing lines says so", "JMAP writes are scoped to the mailbox given", "A JMAP send files the message as sent", "Graph batches four requests at a time", "Graph folders are named by path" and "Graph writes are scoped to the mailbox given" modified), mcp ("A tool's output is the command's payload" modified).
+
+Left open: the `ItemError` of pimalaya-cli and the four io-* changes are git pins until their releases.

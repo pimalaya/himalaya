@@ -6,12 +6,12 @@
 //! Gmail is label-based, so a label is a mailbox, nested by its name, and
 //! a handful of system labels back the shared flags.
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, thread, time::Duration};
 
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, FixedOffset, Utc};
 use io_gmail::v1::{
-    batch::{GMAIL_BATCH_MAX_REQUESTS, GmailBatch, GmailBatchRequest, GmailBatchResponseError},
+    batch::{GmailBatch, GmailBatchRequest, GmailBatchResponse, GmailBatchResponseError},
     client::GmailClientStdError,
     rest::{
         labels::GmailLabel,
@@ -21,10 +21,11 @@ use io_gmail::v1::{
         },
         settings::{get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate},
     },
-    send::{GmailApiError, GmailSendError},
+    send::GmailApiError,
 };
 use mime::header::marker::IN_REPLY_TO;
 use pimalaya_cli::sanitize;
+use serde::de::{DeserializeOwned, IgnoredAny};
 
 use crate::{
     email::{
@@ -53,6 +54,18 @@ const DRAFT: &str = "DRAFT";
 const SPAM: &str = "SPAM";
 /// Gmail system label every sent message carries.
 const SENT: &str = "SENT";
+
+/// The calls one batch holds, as many as Google advises for Gmail.
+const BATCH_SIZE: usize = 50;
+
+/// How many times a throttled call is sent again.
+const BATCH_RETRIES: usize = 3;
+
+/// The wait before a retry when Gmail names none.
+const BATCH_DEFAULT_WAIT: Duration = Duration::from_secs(1);
+
+/// The longest `Retry-After` honoured between two tries.
+const BATCH_MAX_WAIT: Duration = Duration::from_secs(10);
 
 impl GmailClient {
     /// Lists every Gmail label as a mailbox. With `with_counts`, issues
@@ -219,10 +232,7 @@ impl GmailClient {
             return Ok(found.map(|ids| ids.len()));
         }
 
-        let modified = self.each_message(&found.value, |client, id| {
-            client.message_modify(id, &add, &remove).map(drop)
-        })?;
-
+        let modified = self.modify_each(&found.value, &add, &remove)?;
         Ok(modified.after(found.errors))
     }
 
@@ -235,25 +245,37 @@ impl GmailClient {
         Ok(labelled(mailbox, ids, answers))
     }
 
-    /// Runs `write` on each of `ids`, one request per message, returning
-    /// how many it wrote beside the error of each message Gmail refused.
-    ///
-    /// A refusal carries on to the next message; a failure of the
-    /// exchange itself fails the command.
-    fn each_message(
+    /// Adds and removes labels on each of `ids` through batched
+    /// `messages.modify`.
+    fn modify_each(
         &mut self,
         ids: &[String],
-        write: impl Fn(&mut Self, &str) -> Result<(), GmailClientStdError>,
+        add: &[String],
+        remove: &[String],
     ) -> Result<Outcome<usize>> {
+        let requests = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| GmailBatchRequest::message_modify(i, &self.user_id, id, add, remove))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.write_each(ids, &requests)
+    }
+
+    /// Sends `requests`, one write per message of `ids`, returning how
+    /// many Gmail wrote beside the error of each message it did not.
+    fn write_each(
+        &mut self,
+        ids: &[String],
+        requests: &[GmailBatchRequest],
+    ) -> Result<Outcome<usize>> {
+        let answers = self.batch_each::<IgnoredAny>(requests)?;
         let mut outcome = Outcome::from(0);
 
-        for id in ids {
-            match write(self, id) {
-                Ok(()) => outcome.value += 1,
-                Err(GmailClientStdError::Send(GmailSendError::Api(err))) => {
-                    outcome.errors.push(api_item_error(id, &err));
-                }
-                Err(err) => return Err(err.into()),
+        for (id, answer) in ids.iter().zip(answers) {
+            match answer {
+                Ok(_) => outcome.value += 1,
+                Err(err) => outcome.errors.push(batch_item_error(id, &err)),
             }
         }
 
@@ -261,43 +283,33 @@ impl GmailClient {
     }
 
     /// Reads the messages of `ids` in `format` through batched
-    /// `messages.get`, [`GMAIL_BATCH_MAX_REQUESTS`] per request, one
-    /// answer per id in the order given.
+    /// `messages.get`, one answer per id in the order given.
     fn messages_get_batch(
         &mut self,
         ids: &[&str],
         format: GmailMessageFormat,
     ) -> Result<Vec<Result<GmailMessage, GmailBatchResponseError>>> {
-        let mut answers = Vec::with_capacity(ids.len());
+        // NOTE: a part is named by its index, an id given on the command
+        // line being no safe `Content-ID`.
+        let requests = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| GmailBatchRequest::message_get(i, &self.user_id, id, format, &[]))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        for chunk in ids.chunks(GMAIL_BATCH_MAX_REQUESTS) {
-            // NOTE: a part is named by its index, an id given on the
-            // command line being no safe `Content-ID`.
-            let requests = chunk
-                .iter()
-                .enumerate()
-                .map(|(i, id)| GmailBatchRequest::message_get(i, &self.user_id, id, format, &[]))
-                .collect::<Result<Vec<_>, _>>()?;
+        self.batch_each(&requests)
+    }
 
-            let coroutine = GmailBatch::<GmailMessage>::new(&self.auth, &requests)?;
-            let mut parts: Vec<_> = chunk.iter().map(|_| None).collect();
-
-            for response in self.run(coroutine)?.response {
-                if let Some(part) = response
-                    .id
-                    .parse()
-                    .ok()
-                    .and_then(|i: usize| parts.get_mut(i))
-                {
-                    *part = Some(response.result);
-                }
-            }
-
-            let missing = || Err(GmailBatchResponseError::Missing);
-            answers.extend(parts.into_iter().map(|part| part.unwrap_or_else(missing)));
-        }
-
-        Ok(answers)
+    /// Sends `requests` through [`GmailBatch`], as [`batch_all`] splits
+    /// and retries them.
+    fn batch_each<T: DeserializeOwned>(
+        &mut self,
+        requests: &[GmailBatchRequest],
+    ) -> Result<Vec<Result<T, GmailBatchResponseError>>> {
+        batch_all(requests, |batch| {
+            let coroutine = GmailBatch::<T>::new(&self.auth, batch)?;
+            Ok(self.run(coroutine)?.response)
+        })
     }
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
@@ -356,9 +368,7 @@ impl GmailClient {
         let found = self.ids_in(from, ids)?;
         let add = vec![to.to_string()];
 
-        let copied = self.each_message(&found.value, |client, id| {
-            client.message_modify(id, &add, &[]).map(drop)
-        })?;
+        let copied = self.modify_each(&found.value, &add, &[])?;
 
         Ok(copied.after(found.errors))
     }
@@ -376,9 +386,7 @@ impl GmailClient {
         let add = vec![to.to_string()];
         let remove = vec![from.to_string()];
 
-        let moved = self.each_message(&found.value, |client, id| {
-            client.message_modify(id, &add, &remove).map(drop)
-        })?;
+        let moved = self.modify_each(&found.value, &add, &remove)?;
 
         Ok(moved.after(found.errors))
     }
@@ -389,9 +397,14 @@ impl GmailClient {
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in(mailbox, ids)?;
 
-        let deleted = self.each_message(&found.value, |client, id| {
-            client.message_delete(id).map(drop)
-        })?;
+        let requests = found
+            .value
+            .iter()
+            .enumerate()
+            .map(|(i, id)| GmailBatchRequest::message_delete(i, &self.user_id, id))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let deleted = self.write_each(&found.value, &requests)?;
 
         Ok(deleted.after(found.errors))
     }
@@ -600,6 +613,65 @@ fn sublabel_renames(labels: &[GmailLabel], old: &str, new: &str) -> Vec<(String,
 /// right shape, `400 Invalid id value` for one it cannot parse.
 fn is_unknown_id(err: &GmailApiError) -> bool {
     err.status == 404 || (err.status == 400 && err.message == "Invalid id value")
+}
+
+/// Sends `requests` through `send`, at most [`BATCH_SIZE`] to a batch,
+/// sending a part Gmail throttled or failed transiently again after the
+/// longest `Retry-After` its round asked for, up to [`BATCH_RETRIES`]
+/// times.
+///
+/// Returns one answer per request, in order, a part still failing keeping
+/// its last error and one left unanswered read as missing.
+fn batch_all<T>(
+    requests: &[GmailBatchRequest],
+    mut send: impl FnMut(&[GmailBatchRequest]) -> Result<Vec<GmailBatchResponse<T>>>,
+) -> Result<Vec<Result<T, GmailBatchResponseError>>> {
+    let mut answers: Vec<Option<Result<T, GmailBatchResponseError>>> =
+        requests.iter().map(|_| None).collect();
+    let mut pending: Vec<usize> = (0..requests.len()).collect();
+
+    for attempt in 0..=BATCH_RETRIES {
+        let mut retry = Vec::new();
+        let mut wait = Duration::ZERO;
+
+        for chunk in pending.chunks(BATCH_SIZE) {
+            let batch: Vec<GmailBatchRequest> =
+                chunk.iter().map(|i| requests[*i].clone()).collect();
+
+            for response in send(&batch)? {
+                let Some(index) = response.id.parse().ok().filter(|i| chunk.contains(i)) else {
+                    continue;
+                };
+
+                match response.result {
+                    Err(err) if attempt < BATCH_RETRIES && is_retryable(&err) => {
+                        wait = wait.max(err.retry_after().unwrap_or(BATCH_DEFAULT_WAIT));
+                        retry.push(index);
+                    }
+                    result => answers[index] = Some(result),
+                }
+            }
+        }
+
+        if retry.is_empty() {
+            break;
+        }
+
+        thread::sleep(wait.min(BATCH_MAX_WAIT));
+        pending = retry;
+    }
+
+    let missing = || Err(GmailBatchResponseError::Missing);
+    Ok(answers
+        .into_iter()
+        .map(|answer| answer.unwrap_or_else(missing))
+        .collect())
+}
+
+/// Whether a batched call is worth sending again: throttled, or a
+/// transient server failure. A part left unanswered is not.
+fn is_retryable(err: &GmailBatchResponseError) -> bool {
+    err.api().is_some_and(GmailApiError::is_retryable)
 }
 
 /// The envelopes of the `answers` to batched `messages.get` of `ids`,
@@ -919,8 +991,10 @@ fn parse_rfc2822(raw: &str) -> Option<DateTime<FixedOffset>> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use io_gmail::v1::{
-        batch::GmailBatchResponseError,
+        batch::{GmailBatchRequest, GmailBatchResponse, GmailBatchResponseError},
         rest::{labels::GmailLabel, messages::GmailMessage},
         send::GmailApiError,
     };
@@ -929,9 +1003,90 @@ mod tests {
         email::flag::{Flag, FlagOp, IanaFlag},
         error::{ErrorCode, ItemError},
         gmail::backend::{
-            is_unknown_id, label_patch, labelled, listed, reply_parents, sublabel_renames,
+            batch_all, batch_item_error, is_unknown_id, label_patch, labelled, listed,
+            reply_parents, sublabel_renames,
         },
     };
+
+    /// A batch answering each call with what `answer` says for its index
+    /// and round, recording the indexes each round sent.
+    fn batch(
+        count: usize,
+        answer: impl Fn(usize, usize) -> Result<u32, GmailBatchResponseError>,
+    ) -> (Vec<Result<u32, GmailBatchResponseError>>, Vec<Vec<usize>>) {
+        let requests: Vec<_> = (0..count)
+            .map(|i| GmailBatchRequest {
+                id: i.to_string(),
+                ..Default::default()
+            })
+            .collect();
+        let mut sent: Vec<Vec<usize>> = Vec::new();
+
+        let answers = batch_all(&requests, |batch| {
+            let round = sent.len();
+            let indexes: Vec<usize> = batch.iter().map(|r| r.id.parse().unwrap()).collect();
+            sent.push(indexes.clone());
+
+            Ok(indexes
+                .into_iter()
+                .map(|i| GmailBatchResponse {
+                    id: i.to_string(),
+                    status: None,
+                    result: answer(i, round),
+                })
+                .collect())
+        })
+        .unwrap();
+
+        (answers, sent)
+    }
+
+    fn throttled() -> GmailBatchResponseError {
+        let mut err = api_error(429, "Too many requests");
+        err.retry_after = Some(Duration::ZERO);
+        GmailBatchResponseError::Api(err)
+    }
+
+    /// A batch holds 50 calls at most; a throttled part is sent again
+    /// alone, a refused or unanswered one is not.
+    #[test]
+    fn a_batch_retries_only_the_throttled_parts() {
+        let (answers, sent) = batch(52, |i, round| match (i, round) {
+            (1, 0) => Err(throttled()),
+            (2, _) => Err(refused(403, "insufficientPermissions")),
+            (3, _) => Err(GmailBatchResponseError::Missing),
+            (i, _) => Ok(i as u32),
+        });
+
+        let lens: Vec<usize> = sent.iter().map(Vec::len).collect();
+        assert_eq!(lens, [50, 2, 1]);
+        assert_eq!(sent[2], [1]);
+
+        assert_eq!(answers.len(), 52);
+        assert_eq!(*answers[1].as_ref().unwrap(), 1);
+        assert_eq!(answers[2].as_ref().unwrap_err().status(), Some(403));
+        assert!(matches!(answers[3], Err(GmailBatchResponseError::Missing)));
+        assert_eq!(*answers[51].as_ref().unwrap(), 51);
+    }
+
+    /// A part still throttled after the retries keeps its last error,
+    /// reported `rate-limited`.
+    #[test]
+    fn a_part_throttled_after_the_retries_is_rate_limited() {
+        let (answers, sent) = batch(1, |_, _| Err(throttled()));
+
+        assert_eq!(sent.len(), 4);
+        let err = answers[0].as_ref().unwrap_err();
+        let error = batch_item_error("a", err);
+        assert_eq!(error.code, Some(ErrorCode::RateLimited));
+    }
+
+    /// A write Gmail answers 404 is not found.
+    #[test]
+    fn a_write_answered_404_is_not_found() {
+        let error = batch_item_error("a", &refused(404, "notFound"));
+        assert_eq!(error.code, Some(ErrorCode::MessageNotFound));
+    }
 
     fn label(id: &str, name: &str) -> GmailLabel {
         GmailLabel {

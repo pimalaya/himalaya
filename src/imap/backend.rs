@@ -157,32 +157,39 @@ impl ImapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
         let exists = output_data("SELECT", select).exists.unwrap_or(0);
 
         let Some(window) = compute_window(exists, page, page_size) else {
-            return Ok(Vec::new());
+            return Ok(Outcome::from(Vec::new()));
         };
         let sequence_set: SequenceSet = window
             .as_str()
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP sequence-set window `{window}`"))?;
 
-        let data = self.fetch(
+        let output = self.fetch(
             sequence_set,
             build_item_names(with_attachment),
             ImapMessageFetchOptions::default(),
         )?;
 
-        let envelopes = output_data("FETCH", data)
+        let Outcome { value, errors } = fetched_messages(output);
+        let envelopes: Vec<Envelope> = value
             .into_iter()
             .rev()
             .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
             .collect();
 
-        Ok(envelopes)
+        let ids: Vec<&str> = envelopes.iter().map(|e| e.id.as_str()).collect();
+        let errors = Outcome { value: (), errors }.sorted_by(&ids).errors;
+
+        Ok(Outcome {
+            value: envelopes,
+            errors,
+        })
     }
 
     /// Searches a mailbox with the shared query.
@@ -197,11 +204,11 @@ impl ImapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
         if output_data("SELECT", select).exists.unwrap_or(0) == 0 {
-            return Ok(Vec::new());
+            return Ok(Outcome::from(Vec::new()));
         }
 
         let search_criteria = search_keys(query.and_then(|q| q.filter.as_ref()))?;
@@ -218,12 +225,12 @@ impl ImapClient {
         )?;
         let uids = output_data("SORT", uids);
         if uids.is_empty() {
-            return Ok(Vec::new());
+            return Ok(Outcome::from(Vec::new()));
         }
 
         let page_uids = paginate_uids(&uids, page, page_size);
         if page_uids.is_empty() {
-            return Ok(Vec::new());
+            return Ok(Outcome::from(Vec::new()));
         }
         let uid_str = page_uids
             .iter()
@@ -235,7 +242,7 @@ impl ImapClient {
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP UID set `{uid_str}`"))?;
 
-        let data = self.fetch(
+        let output = self.fetch(
             sequence_set,
             build_item_names(with_attachment),
             ImapMessageFetchOptions {
@@ -244,7 +251,8 @@ impl ImapClient {
             },
         )?;
 
-        let mut envelopes = reorder_envelopes(output_data("FETCH", data), &page_uids);
+        let Outcome { value, errors } = fetched_messages(output);
+        let mut envelopes = reorder_envelopes(value, &page_uids);
 
         // NOTE: HEADER matches a substring, so a `message-id` clause on the
         // chain of `and` from the root is checked whole once fetched.
@@ -254,7 +262,14 @@ impl ImapClient {
             ids.iter().all(|wanted| id == Some(*wanted))
         });
 
-        Ok(envelopes)
+        let order: Vec<String> = page_uids.iter().map(u32::to_string).collect();
+        let order: Vec<&str> = order.iter().map(String::as_str).collect();
+        let errors = Outcome { value: (), errors }.sorted_by(&order).errors;
+
+        Ok(Outcome {
+            value: envelopes,
+            errors,
+        })
     }
 
     /// Adds, sets or removes flags on a UID set, returning how many of
@@ -326,29 +341,31 @@ impl ImapClient {
                 ..Default::default()
             },
         )?;
-        let unreadable = !output.skipped.is_empty();
+        let unreadable = !output.skipped.is_empty() || !output.partial.is_empty();
         let data = output_data("FETCH", output);
+        let found = !data.is_empty();
 
-        if data.is_empty() && unreadable {
-            let message = format!(
-                "Cannot read message `{id}` of mailbox `{mailbox}`: its FETCH response does not decode"
-            );
-            return Err(CodedError::new(ErrorCode::MessageUnreadable, message).into());
-        }
-
-        if data.is_empty() {
-            return Err(message_not_found(format!(
-                "Message `{id}` not found in mailbox `{mailbox}`"
-            )));
-        }
-
-        data.into_values()
+        let body = data
+            .into_values()
             .flat_map(|items| items.into_inner().into_iter())
             .find_map(|item| match item {
                 MessageDataItem::BodyExt { data, .. } => data.0.map(|d| d.as_ref().to_vec()),
                 _ => None,
-            })
-            .ok_or_else(|| anyhow!("FETCH returned no body for the requested message"))
+            });
+
+        match body {
+            Some(body) => Ok(body),
+            None if unreadable => {
+                let message = format!(
+                    "Cannot read message `{id}` of mailbox `{mailbox}`: its FETCH response does not decode"
+                );
+                Err(CodedError::new(ErrorCode::MessageUnreadable, message).into())
+            }
+            None if !found => Err(message_not_found(format!(
+                "Message `{id}` not found in mailbox `{mailbox}`"
+            ))),
+            None => Err(anyhow!("FETCH returned no body for the requested message")),
+        }
     }
 
     /// Appends a message and returns its UID, from the UIDPLUS
@@ -1126,6 +1143,58 @@ fn unreadable_mailbox(id: Option<&str>, error: &str) -> ItemError {
     }
 }
 
+/// The messages a `FETCH` answered, beside an item error for each line
+/// that did not decode whole.
+///
+/// A line decoded in part keeps its message with the items that did,
+/// unless its UID is among the failed ones; a line skipped whole names
+/// no message.
+fn fetched_messages(output: ImapOutput<FetchData>) -> Outcome<FetchData> {
+    let partial = output.partial.clone();
+    let skipped = output.skipped.len();
+    let mut data = output_data("FETCH", output);
+    let mut errors = Vec::new();
+
+    for line in partial {
+        let uid = line.uid.map(NonZeroU32::get).or_else(|| {
+            let items = data.get(&line.seq)?;
+            items.as_ref().iter().find_map(|item| match item {
+                MessageDataItem::Uid(uid) => Some(uid.get()),
+                _ => None,
+            })
+        });
+
+        if uid.is_none() {
+            data.remove(&line.seq);
+        }
+
+        let names: Vec<&str> = line.failed.iter().map(|item| item.name.as_str()).collect();
+        errors.push(ItemError {
+            id: uid.map(|uid| uid.to_string()),
+            code: Some(ErrorCode::MessageUnreadable),
+            error: format!("Cannot decode {} of the FETCH response", names.join(", ")),
+            sources: Vec::new(),
+        });
+    }
+
+    for _ in 0..skipped {
+        errors.push(ItemError {
+            id: None,
+            code: Some(ErrorCode::MessageUnreadable),
+            error: String::from("Cannot decode a line of the FETCH response"),
+            sources: Vec::new(),
+        });
+    }
+
+    Outcome {
+        value: data,
+        errors,
+    }
+}
+
+/// The messages of a `FETCH` answer, by sequence number.
+type FetchData = BTreeMap<NonZeroU32, Vec1<MessageDataItem<'static>>>;
+
 /// Parses stringified UIDs into an IMAP [`SequenceSet`].
 fn parse_uids(ids: &[&str]) -> Result<SequenceSet> {
     let uids = ids
@@ -1867,6 +1936,25 @@ mod tests {
             )
         }
 
+        /// A `FETCH` answer holding a whole line, one whose
+        /// `BODYSTRUCTURE` nests seven multiparts ([#801]), one whose
+        /// `UID` does not decode and one that does not scan.
+        ///
+        /// [#801]: https://github.com/pimalaya/himalaya/issues/801
+        fn fetch_lines() -> String {
+            let text = r#"("text" "plain" ("charset" "utf-8") NIL NIL "7bit" 2 1)"#;
+            let nested = (0..7).fold(String::from(text), |inner, _| {
+                format!("({inner} \"mixed\")")
+            });
+
+            format!(
+                "* 1 FETCH (UID 1 FLAGS (\\Seen) RFC822.SIZE 10 BODYSTRUCTURE {text})\r\n\
+                 * 2 FETCH (UID 2 FLAGS () RFC822.SIZE 20 BODYSTRUCTURE {nested})\r\n\
+                 * 3 FETCH (UID 3 INTERNALDATE oops)\r\n\
+                 * 4 FETCH (UID 0 FLAGS ())\r\n"
+            )
+        }
+
         fn parse_set(set: &str) -> Vec<u32> {
             set.split(',')
                 .flat_map(|part| match part.split_once(':') {
@@ -1932,6 +2020,7 @@ mod tests {
                             "* LIST () \"/\" INBOX\r\n* LIST () \"/\" Locked\r\n\
                              {tag} OK done\r\n"
                         ),
+                        ["FETCH", "1:*", ..] => format!("{}{tag} OK done\r\n", fetch_lines()),
                         ["STATUS", "Locked", ..] => format!("{tag} NO denied\r\n"),
                         ["STATUS", ..] => {
                             format!("* STATUS INBOX (MESSAGES 1 UNSEEN 0)\r\n{tag} OK done\r\n")
@@ -2146,6 +2235,48 @@ mod tests {
             };
             assert_eq!(error.id.as_deref(), Some("Locked"));
             assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
+        }
+
+        /// A listing keeps the message of a line decoded in part, beside
+        /// an item error naming the items that did not decode; a line
+        /// whose UID failed, or that does not scan, names no message.
+        #[test]
+        fn a_line_decoded_in_part_lists_its_message_beside_its_error() {
+            let (server, handle) = serve(PLAIN, vec![1, 2, 3, 4], none);
+            let mut client = client(&server);
+            let outcome = client.list_envelopes("INBOX", None, None, true).unwrap();
+            drop(client);
+            handle.join().unwrap();
+
+            let envelopes: Vec<_> = outcome
+                .value
+                .iter()
+                .map(|envelope| (envelope.id.as_str(), envelope.has_attachment))
+                .collect();
+            assert_eq!(envelopes, [("2", None), ("1", Some(false))]);
+
+            let errors: Vec<_> = outcome
+                .errors
+                .iter()
+                .map(|error| (error.id.as_deref(), error.code, error.error.as_str()))
+                .collect();
+            let unreadable = Some(ErrorCode::MessageUnreadable);
+            assert_eq!(
+                errors,
+                [
+                    (
+                        Some("2"),
+                        unreadable,
+                        "Cannot decode BODYSTRUCTURE of the FETCH response"
+                    ),
+                    (None, unreadable, "Cannot decode UID of the FETCH response"),
+                    (
+                        None,
+                        unreadable,
+                        "Cannot decode a line of the FETCH response"
+                    ),
+                ]
+            );
         }
 
         /// A read whose `FETCH` answer holds a line that does not decode

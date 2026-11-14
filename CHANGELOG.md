@@ -73,15 +73,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Changed `flag add|set|remove`, `message copy`, `message move` and `message delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on; given none it holds, they print `count: 0` where they printed the failure object and exited 1.
 - Changed `mailbox list --counts` to list a mailbox whose counts could not be fetched without them, beside a `mailbox-unreadable` entry: an IMAP `STATUS` refused or not decoding, a Gmail `labels.get` refused, an mbox index that does not sync. An IMAP `LIST` line that does not decode is a `mailbox-unreadable` entry with a `null` id.
-- Changed the Gmail listings to read the envelopes' metadata through batched `messages.get`, 100 per request, where they sent one request per message.
+- Changed the Gmail listings to read the envelopes' metadata through batched `messages.get`, 50 per request, where they sent one request per message.
 
-  A message deleted since the list was read is left out; one Gmail throttles is a `rate-limited` entry, one it otherwise refuses with 403 `permission-denied`, one the batch leaves unanswered an entry coded `null`.
-- Changed the Gmail writes to look their ids up through batched `messages.get` and to carry on past a message Gmail refuses, each refusal an entry coded by its status.
+  A part Gmail throttles (429, 403 `rateLimitExceeded` or `userRateLimitExceeded`) or fails with 500, 502, 503 or 504 is sent again up to three times, after the longest `Retry-After` asked (1 second without one, 10 at most). A message deleted since the list was read is left out; one still throttled is a `rate-limited` entry, one it otherwise refuses with 403 `permission-denied`, one the batch leaves unanswered an entry coded `null`.
+- Changed the Gmail writes to look their ids up through batched `messages.get`, then to flag, copy and move through batched `messages.modify` and delete through batched `messages.delete`, 50 per request with the retries of the listings, where they sent one request per message and stopped at the first failure.
+
+  Each message Gmail refuses is an entry coded by its status, the others written.
 - Changed the Microsoft Graph writes to patch, copy, move and delete through `$batch`, four requests at a time with the retries of the lookups, where they sent one request per message and stopped at the first failure.
 
   A part answered 404, or 400 `ErrorInvalidIdMalformed`, is `message-not-found`, 403 `permission-denied`, 429 after the retries `rate-limited`, `ErrorQuotaExceeded` `quota-exceeded`, any other an entry coded `null` with Graph's `error.code` in `sources`, and a part the answer left out an entry.
-- Changed `message send` over SMTP to fail coded `recipient-refused` when the server refuses a recipient, naming it, the message sent to nobody.
+- Changed `message send` to fail coded `recipient-refused` when the server refuses a recipient, the message sent to nobody: over SMTP naming the first refused address, over JMAP (`invalidRecipients`) every address the server lists.
 - Changed an IMAP `message read` whose `FETCH` answer does not decode to fail coded `message-unreadable`.
+- Changed the JMAP listings to report an email or a mailbox that does not deserialize as a `message-unreadable` or `mailbox-unreadable` entry, its id when known, where the whole command failed; a write's id whose email does not deserialize is `message-unreadable`.
 - Changed `attachment list` and `attachment download` to print `No attachments` under the header when the message has no part to list, where the header stood alone.
 - Changed `himalaya message --help` to list the subcommands by purpose, `read` and `parse`, the builders `compose`, `reply` and `forward`, the raw `send` and `add`, then `copy`, `move` and `delete`, and their help to say what each does: a builder prints the message unless `--save` or `--send`, `send` and `add` take a raw message as it is, `parse` reads a file or its contents on stdin.
 - **BREAKING**: Changed `mailbox list` on Microsoft Graph to leave `total` and `unread` `null` without `--counts`, as every other backend does, where it filled them whatever the flag.
@@ -220,6 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed an IMAP listing dropping a message whose `FETCH` line does not decode, with a warning only ([#801]): the message is listed with the items that decoded, `hasAttachment` `null` when `BODYSTRUCTURE` failed, beside a `message-unreadable` entry naming its UID and the failed items; a line that does not decode at all is an entry with a `null` id.
+- Fixed a Maildir listing skipping an unreadable message file or folder with a warning only: each is a `message-unreadable` or `mailbox-unreadable` entry with its id, a file's on the first page of a paged listing.
 - Fixed the Microsoft Graph lookups counting every 400 as an id or a folder not found: only one Graph codes `ErrorInvalidIdMalformed` is, another 400 being an entry coded `null` for a message id and a failure for a folder.
 - Fixed a send over SMTP running again the credential command the IMAP block already ran, which `message send` with `save-copy` asked for twice ([#813]).
 - Fixed a message sent over SMTP, or queued on a pimdir account, taking from its headers an envelope address holding a control character, and `message send` over SMTP an address the transaction cannot carry (a space, a line break): the send fails naming the address before anything is written (io-smtp).
@@ -307,7 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `imap fetch --structure` printing the server's uppercase MIME types (it lowercases them) and a bad sequence set failing without naming it, on `fetch`, `store`, `copy` and `move`.
 - Fixed `imap copy` and `imap move` saying the messages were copied or moved when no `COPYUID` said so: the text names the UIDs, or says none came back.
 - Fixed `imap thread` on a server without the algorithm's `THREAD=` capability failing with the server's parse error: it is refused with `capability-missing` before anything is sent.
-- Fixed a JMAP write failing whole on an id gone beside known ones: each id the server refuses is an `errors` entry coded by its SetError type, read by name, the others written.
+- Fixed a JMAP write failing whole on an id gone beside known ones: each id the server refuses is an `errors` entry coded by its SetError type (`notFound`, `forbidden`, `overQuota`, `rateLimit`), the others written.
 - Fixed `message add`, a save and a send on a JMAP server forbidding duplicates (Fastmail) failing on bytes the account holds: the existing email is filed into the mailbox with the flags and its id reported, or submitted.
 - Fixed the JMAP set and method errors dropping the type, description and arguments a server sent (`invalidArguments [filter/inMailbox]`), and a stray backtick in their message.
 - Fixed `vacation set` on Fastmail failing after the update was applied, its `newState` being `null` and its answer echoing only the properties sent (io-jmap).
@@ -1733,6 +1738,7 @@ Few major concepts changed:
 [#781]: https://github.com/pimalaya/himalaya/issues/781
 [#786]: https://github.com/pimalaya/himalaya/issues/786
 [#790]: https://github.com/pimalaya/himalaya/issues/790
+[#801]: https://github.com/pimalaya/himalaya/issues/801
 [#802]: https://github.com/pimalaya/himalaya/issues/802
 [#805]: https://github.com/pimalaya/himalaya/issues/805
 [#806]: https://github.com/pimalaya/himalaya/issues/806

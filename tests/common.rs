@@ -10,7 +10,8 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::{Command, Output, Stdio},
+    process::{self, Command, Output, Stdio},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde_json::Value;
@@ -210,5 +211,77 @@ pub fn env_content(name: &str) -> Option<String> {
     match env_var(&format!("{name}_FILE")) {
         Some(path) => Some(fs::read_to_string(path).unwrap()),
         None => env_var(name),
+    }
+}
+
+/// A message id no mailbox holds, given to a write beside a real one.
+pub const BOGUS_ID: &str = "bogus";
+
+/// A name no earlier run left behind, for the mailboxes and the message
+/// a write test makes.
+pub fn throwaway_tag() -> String {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    format!("himalaya-live-{}-{}", now.as_secs(), process::id())
+}
+
+/// A message from and to `address`, its subject `tag`.
+pub fn throwaway_message(tag: &str, address: &str) -> String {
+    format!(
+        "From: {address}\r\nTo: {address}\r\nSubject: {tag}\r\n\
+         Date: Sat, 14 Nov 2026 12:00:00 +0000\r\n\
+         Message-ID: <{tag}@himalaya.test>\r\n\r\nA throwaway message.\r\n"
+    )
+}
+
+/// Fails unless `write` acted on `count` messages and names [`BOGUS_ID`]
+/// alone in its `errors`, under `message-not-found`.
+pub fn assert_bogus_id(write: &Value, count: u64) {
+    assert_eq!(write["count"], count, "{write}");
+
+    let errors = write["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1, "{write}");
+    assert_eq!(errors[0]["id"], BOGUS_ID, "{write}");
+    assert_eq!(errors[0]["code"], "message-not-found", "{write}");
+}
+
+/// The commands undoing what a write test made, run when it ends,
+/// whether it passed or not, their failures ignored.
+pub struct Cleanup<'a> {
+    run: &'a dyn Fn(&[&str]) -> Output,
+    first: Vec<Vec<String>>,
+    later: Vec<Vec<String>>,
+}
+
+impl<'a> Cleanup<'a> {
+    /// A cleanup running its commands through `run`.
+    pub fn new(run: &'a dyn Fn(&[&str]) -> Output) -> Self {
+        Self {
+            run,
+            first: Vec::new(),
+            later: Vec::new(),
+        }
+    }
+
+    /// Runs `args` before the commands given to [`Self::later`].
+    pub fn first(&mut self, args: &[&str]) {
+        self.first
+            .push(args.iter().map(ToString::to_string).collect());
+    }
+
+    /// Runs `args` last, the latest given first.
+    pub fn later(&mut self, args: &[&str]) {
+        self.later
+            .push(args.iter().map(ToString::to_string).collect());
+    }
+}
+
+impl Drop for Cleanup<'_> {
+    fn drop(&mut self) {
+        let later = self.later.iter().rev();
+
+        for args in self.first.iter().chain(later) {
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            (self.run)(&args);
+        }
     }
 }

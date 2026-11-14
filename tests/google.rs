@@ -5,8 +5,8 @@
 //! test Workspace's mailbox with a token the suite mints for a service
 //! account acting as `HIMALAYA_GOOGLE_SERVICE_ACCOUNT_SUBJECT` (RFC 7523
 //! section 2.1), its key read from `HIMALAYA_GOOGLE_SERVICE_ACCOUNT_KEY`
-//! or the file `HIMALAYA_GOOGLE_SERVICE_ACCOUNT_KEY_FILE` names. It only
-//! reads.
+//! or the file `HIMALAYA_GOOGLE_SERVICE_ACCOUNT_KEY_FILE` names. It reads,
+//! save `gmail_writes`, which removes the labels and the message it makes.
 //!
 //! The Gmail API account is the Gmail section of config.sample.toml. The
 //! sample has no Gmail IMAP section, so that account is written here.
@@ -227,6 +227,48 @@ mod credentialed {
         let args = ["--json", "envelope", "list", "-s", "5"];
         let out = himalaya(&config, token(), &args);
         assert_envelopes(&json(&out, 0), 5);
+    }
+
+    /// A throwaway message added under a throwaway label is flagged beside
+    /// an unknown id, moved to a second label, trashed, then deleted, each
+    /// write through a batch; the labels and the message go either way.
+    #[test]
+    #[ignore = "requires Google credentials and --ignored"]
+    fn gmail_writes() {
+        let dir = TempDir::new().unwrap();
+        let config = write_gmail_account(dir.path());
+        let run = |args: &[&str]| himalaya(&config, token(), args);
+        let mut cleanup = Cleanup::new(&run);
+
+        let tag = throwaway_tag();
+        let from = format!("{tag}-a");
+        let to = format!("{tag}-b");
+
+        for name in [&from, &to] {
+            let created = json(&run(&["--json", "mailbox", "create", name]), 0);
+            let id = created["id"].as_str().unwrap().to_owned();
+            cleanup.later(&["mailbox", "delete", &id]);
+        }
+
+        let raw = throwaway_message(&tag, &subject());
+        let added = json(&run(&["--json", "message", "add", "-m", &from, &raw]), 0);
+        let id = added["id"].as_str().unwrap().to_owned();
+        cleanup.first(&["gmail", "messages", "delete", &id]);
+
+        let args = ["--json", "flag", "add", "-m", &from, "--flag", "flagged"];
+        let flagged = json(&run(&[&args[..], &[&id, BOGUS_ID]].concat()), 3);
+        assert_bogus_id(&flagged, 1);
+
+        let args = ["--json", "message", "move", "-f", &from, "-t", &to, &id];
+        let moved = json(&run(&args), 0);
+        assert_eq!(moved["count"], 1, "{moved}");
+
+        let trashed = json(&run(&["--json", "message", "delete", "-m", &to, &id]), 0);
+        assert_eq!(trashed["count"], 1, "{trashed}");
+
+        let args = ["--json", "message", "delete", "-m", "trash", &id];
+        let deleted = json(&run(&args), 0);
+        assert_eq!(deleted["count"], 1, "{deleted}");
     }
 
     #[test]

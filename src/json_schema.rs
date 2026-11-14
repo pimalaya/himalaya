@@ -781,12 +781,7 @@ mod tests {
 
     #[test]
     fn every_command_is_described() {
-        let mut registry = registry();
-
-        // NOTE: the item error names no command, as the failure object.
-        registry.schemas.remove("himalaya-item-error");
-
-        let problems = registry.check(&Cli::command(), SILENT);
+        let problems = registry().check(&Cli::command(), SILENT);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 

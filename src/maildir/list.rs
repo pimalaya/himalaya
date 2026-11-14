@@ -7,6 +7,7 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
+use log::warn;
 use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -31,11 +32,17 @@ impl MaildirMailboxListCommand {
         client: &mut MaildirClient,
     ) -> Result<()> {
         client.ensure_root()?;
-        let maildirs = client.list_maildirs()?;
+        let listing = client.list_maildirs()?;
+
+        for folder in &listing.unreadable {
+            let error = folder.error.to_string();
+            warn!("skipped unreadable folder: {}", sanitize::text(&error));
+        }
 
         let table = MaildirListOutput {
             account: account.name().to_string(),
-            rows: maildirs
+            rows: listing
+                .maildirs
                 .into_iter()
                 .map(|maildir| MaildirRow {
                     name: client.mailbox_name(&maildir),

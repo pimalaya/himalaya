@@ -445,6 +445,7 @@ mod tests {
         let mut names: Vec<String> = client
             .list_maildirs()
             .unwrap()
+            .maildirs
             .iter()
             .map(|maildir| client.mailbox_name(maildir))
             .collect();

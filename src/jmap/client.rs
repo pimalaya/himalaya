@@ -87,7 +87,7 @@ impl JmapClient {
 
     fn mailbox_index(&mut self) -> Result<&MailboxIndex> {
         if self.mailbox_index.is_none() {
-            let mailboxes = self.list_mailboxes(false)?;
+            let mailboxes = self.list_mailboxes(false)?.value;
             self.mailbox_index = Some(MailboxIndex(mailboxes));
         }
 

@@ -16,12 +16,12 @@ use crate::{
         outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ItemError, message_not_found, missing_message},
+    error::{ErrorCode, ItemError, message_not_found, missing_message},
     maildir::client::{MaildirClient, validate_maildir_name},
 };
 use anyhow::{Result, bail};
 use io_maildir::{
-    client::MaildirClientError,
+    client::{MaildirClientError, MaildirUnreadableEntry},
     entry::{MaildirFullEntry, locate::MaildirEntryLocateError},
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
@@ -30,13 +30,15 @@ use io_maildir::{
 impl MaildirClient {
     /// Lists every Maildir under the configured root, sorted by name,
     /// the store's inbox marked with its role. `with_counts` is ignored
-    /// (Maildir does not surface counts cheaply).
-    pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// (Maildir does not surface counts cheaply). A folder the walk could
+    /// not read is an item error.
+    pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         self.ensure_root()?;
 
         let inbox = self.inbox().map(|inbox| inbox.path().to_string());
-        let mut mailboxes: Vec<Mailbox> = self
-            .list_maildirs()?
+        let listing = self.list_maildirs()?;
+        let mut mailboxes: Vec<Mailbox> = listing
+            .maildirs
             .into_iter()
             .map(|maildir| mailbox_from(self, maildir))
             .map(|mut mailbox| {
@@ -47,27 +49,46 @@ impl MaildirClient {
             })
             .collect();
         mailboxes.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(mailboxes)
+
+        let errors = listing
+            .unreadable
+            .into_iter()
+            .map(|folder| ItemError {
+                id: Some(folder.path.to_string()),
+                code: Some(ErrorCode::MailboxUnreadable),
+                error: String::from("Cannot read the Maildir folder"),
+                sources: vec![folder.error.to_string()],
+            })
+            .collect();
+
+        Ok(Outcome {
+            value: mailboxes,
+            errors,
+        })
     }
 
     /// Lists envelopes from `mailbox`, sorted by `Date:` descending
     /// then paginated. `with_attachment` is always honoured (the body
-    /// is parsed regardless).
+    /// is parsed regardless). A file that cannot be read is an item error
+    /// of the first page.
     pub fn list_envelopes(
         &self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let fulls = self.read_readable_entries(&maildir, &entries);
+        let read = self.read_readable_entries(&maildir, &entries);
 
-        let mut envelopes: Vec<Envelope> = fulls.iter().map(envelope_from_entry).collect();
+        let mut envelopes: Vec<Envelope> = read.entries.iter().map(envelope_from_entry).collect();
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
 
-        Ok(paginate(envelopes, page, page_size))
+        Ok(Outcome {
+            value: paginate(envelopes, page, page_size),
+            errors: unreadable_entries(read.unreadable, page),
+        })
     }
 
     /// Searches envelopes in `mailbox`: lists them, then applies the
@@ -80,14 +101,14 @@ impl MaildirClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let fulls = self.read_readable_entries(&maildir, &entries);
+        let read = self.read_readable_entries(&maildir, &entries);
 
         let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = Vec::new();
-        for full in &fulls {
+        for full in &read.entries {
             let envelope = envelope_from_entry(full);
             let keep = match filter {
                 Some(filter) => eval::matches_filter(&envelope, None, full.contents(), filter),
@@ -99,7 +120,11 @@ impl MaildirClient {
         }
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
-        Ok(paginate(hits, page, page_size))
+
+        Ok(Outcome {
+            value: paginate(hits, page, page_size),
+            errors: unreadable_entries(read.unreadable, page),
+        })
     }
 
     /// Adds, sets, or removes `flags` on the messages of `ids` the Maildir
@@ -268,6 +293,7 @@ impl MaildirClient {
 
         let mut children: Vec<String> = self
             .list_maildirs()?
+            .maildirs
             .iter()
             .map(|maildir| self.relative_name(maildir))
             .filter(|child| child.starts_with(&prefix))
@@ -439,6 +465,24 @@ fn flag_from_maildir(flag: &MaildirFlag) -> Flag {
 
 /// 1-indexed in-memory pagination; `page_size = None` returns the full
 /// slice; size 0 or a page past the end returns empty.
+/// The item error of each entry a listing could not read, on its first
+/// page only, so a later page does not repeat them.
+fn unreadable_entries(entries: Vec<MaildirUnreadableEntry>, page: Option<u32>) -> Vec<ItemError> {
+    if page.unwrap_or(1) > 1 {
+        return Vec::new();
+    }
+
+    entries
+        .into_iter()
+        .map(|unreadable| ItemError {
+            id: unreadable.entry.id().map(String::from),
+            code: Some(ErrorCode::MessageUnreadable),
+            error: String::from("Cannot read the message file"),
+            sources: vec![unreadable.error.to_string()],
+        })
+        .collect()
+}
+
 fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<T> {
     let Some(size) = page_size else {
         return items;
@@ -512,6 +556,7 @@ mod tests {
             client
                 .list_envelopes("B", None, None, false)
                 .unwrap()
+                .value
                 .is_empty()
         );
 
@@ -533,6 +578,7 @@ mod tests {
         let names: Vec<_> = client
             .list_mailboxes(false)
             .unwrap()
+            .value
             .into_iter()
             .map(|mailbox| mailbox.name)
             .collect();
@@ -621,7 +667,7 @@ mod tests {
             1
         );
 
-        let envelopes = client.list_envelopes("A", None, None, false).unwrap();
+        let envelopes = client.list_envelopes("A", None, None, false).unwrap().value;
         assert_eq!(envelopes.len(), 1);
         assert_eq!(envelopes[0].id, id);
     }
@@ -641,7 +687,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn an_unreadable_message_is_skipped_by_the_listing() {
+    fn an_unreadable_message_is_an_item_error_of_the_first_page() {
         use std::os::unix::fs::PermissionsExt;
 
         let (dir, client, _) = fixture();
@@ -661,9 +707,53 @@ mod tests {
             return;
         }
 
-        let envelopes = client.list_envelopes("A", None, None, false);
+        let listed = client.list_envelopes("A", None, None, false);
+        let searched = client.search_envelopes("A", None, None, None, false);
+        let second = client.list_envelopes("A", Some(2), Some(1), false);
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert_eq!(envelopes.unwrap().len(), 1);
+
+        for outcome in [listed.unwrap(), searched.unwrap()] {
+            assert_eq!(outcome.value.len(), 1);
+            let [error] = outcome.errors.as_slice() else {
+                panic!("{:?}", outcome.errors);
+            };
+            assert_eq!(error.id.as_deref(), Some(locked.as_str()));
+            assert_eq!(error.code, Some(ErrorCode::MessageUnreadable));
+        }
+
+        assert!(second.unwrap().errors.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_folder_is_an_item_error() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, client, _) = fixture();
+        let locked = dir.path().join("Locked");
+        for subdir in ["cur", "new", "tmp"] {
+            fs::create_dir_all(locked.join(subdir)).unwrap();
+        }
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
+        // NOTE: root reads through any mode.
+        if fs::read_dir(&locked).is_ok() {
+            fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+            return;
+        }
+
+        let outcome = client.list_mailboxes(false);
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+        let outcome = outcome.unwrap();
+
+        let names: Vec<_> = outcome.value.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(names, ["A"]);
+        let [error] = outcome.errors.as_slice() else {
+            panic!("{:?}", outcome.errors);
+        };
+        let id = error.id.as_deref().unwrap();
+        assert!(id.ends_with("Locked"), "{id}");
+        assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
     }
 
     #[test]

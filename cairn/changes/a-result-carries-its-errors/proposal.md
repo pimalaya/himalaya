@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: a-result-carries-its-errors
-status: active
+status: landed
 created: 2026-11-14
 ---
 
@@ -115,6 +115,12 @@ A result with errors exits 3, a partial outcome, which `himalaya mcp` already re
 - **None found still prints the result.** A write whose ids are all unknown prints `count: 0` and one `message-not-found` entry per id, exit 3, where today it prints the failure object, exit 1. The rule stays one: an item's failure is an entry, even when every item fails.
 - **A listing reports what it could not read, never what is gone.** A message the server stopped listing between two requests is the mailbox changing, not a failure.
 - **v3.** v3 is unreleased and its exit 3 landed on 2026-11-13, so `errors` and its exit 3 ship in v3, not in a later major.
+- **Only refusals carry on.** A failure of the exchange met part-way (the connection, a batch answer that does not parse) still fails the command whole; only the server's refusal of one item becomes an entry. A 2xx batch part whose body does not parse is `message-unreadable` (pass 1).
+- **A page is full when its items and its errors reach the page size**, so a page one item short for an error still gives the next cursor (pass 1). A listing that reads the whole mailbox before cutting its page (Maildir, a JMAP search rechecked client-side) prints its errors on the first page only, or every page would repeat them and look full forever (pass 2).
+- **An IMAP line whose `UID` failed leaves its message out**, its entry naming no id: a listed envelope carries the id later commands take, and a sequence number is none (pass 2).
+- **A JMAP mailbox that does not deserialize is `mailbox-unreadable`**, as an email is `message-unreadable` (pass 2).
+- **A Gmail trash is still a label change.** `message delete` outside the trash moves the message with batched `messages.modify` adding `TRASH`, as before; io-gmail's batched `trash` and `untrash` stay unused (pass 2).
+- **A refused JMAP submission leaves a draft.** `message send` imports the message into the drafts mailbox with `$draft` before `EmailSubmission/set`; `onSuccessUpdateEmail` only runs on success (RFC 8621 §7.5), so a refused submission, `invalidRecipients` included, leaves that email in the drafts mailbox. Found reading the code on 2026-11-14, not reproduced live (no writable JMAP test account); the send is not redesigned here.
 
 ## Order
 

@@ -159,13 +159,13 @@ impl EmailClient {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.list_mailboxes(with_counts).map(Outcome::from),
+            BackendClient::Jmap(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(client) => client.list_mailboxes(with_counts).map(Outcome::from),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.list_mailboxes(with_counts).map(Outcome::from),
+            BackendClient::Maildir(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "pimdir")]
@@ -323,13 +323,13 @@ impl EmailClient {
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client
-                .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Imap(client) => {
+                client.list_envelopes(mailbox, page, page_size, with_attachment)
+            }
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client
-                .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Jmap(client) => {
+                client.list_envelopes(mailbox, page, page_size, with_attachment)
+            }
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => {
                 client.list_envelopes(mailbox, page, page_size, with_attachment)
@@ -339,9 +339,9 @@ impl EmailClient {
                 .list_envelopes(mailbox, page, page_size, with_attachment)
                 .map(Outcome::from),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client
-                .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Maildir(client) => {
+                client.list_envelopes(mailbox, page, page_size, with_attachment)
+            }
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client
                 .list_envelopes(mailbox, page, page_size, with_attachment)
@@ -368,17 +368,17 @@ impl EmailClient {
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client
-                .search_envelopes(mailbox, query, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Imap(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
+            }
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client
-                .search_envelopes(mailbox, query, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Jmap(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
+            }
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client
-                .search_envelopes(mailbox, query, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Maildir(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
+            }
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client
                 .search_envelopes(mailbox, query, page, page_size, with_attachment)

@@ -7,7 +7,8 @@
 //! through the client credentials grant of a confidential registration,
 //! read from `HIMALAYA_MICROSOFT_TENANT_ID`, `HIMALAYA_MICROSOFT_CLIENT_ID`
 //! and `HIMALAYA_MICROSOFT_CLIENT_SECRET`; `HIMALAYA_MICROSOFT_USER` names
-//! the mailbox. It only reads.
+//! the mailbox. It reads, save `graph_writes`, which removes the draft it
+//! makes.
 //!
 //! Run with `cargo test --test microsoft -- --ignored`. A failure never
 //! shows a token: the binary reads it from its environment only.
@@ -130,6 +131,7 @@ mod anonymous {
 mod credentialed {
     use std::{
         path::{Path, PathBuf},
+        process::Output,
         sync::OnceLock,
     };
 
@@ -190,10 +192,14 @@ mod credentialed {
         TOKEN.get_or_init(|| mint(IMAP_SCOPE))
     }
 
+    /// The mailbox the suite reads.
+    fn address() -> String {
+        env_var("HIMALAYA_MICROSOFT_USER").unwrap_or_else(|| USER.to_owned())
+    }
+
     /// The mailbox the suite reads, as a TOML string.
     fn user() -> String {
-        let user = env_var("HIMALAYA_MICROSOFT_USER").unwrap_or_else(|| USER.to_owned());
-        format!("\"{user}\"")
+        format!("\"{}\"", address())
     }
 
     /// Writes the sample's Graph account on the test mailbox, its token
@@ -248,6 +254,64 @@ mod credentialed {
         let args = ["--json", "envelope", "list", "-s", "5"];
         let out = himalaya(&config, graph_token(), &args);
         assert_envelopes(&json(&out, 0), 5);
+    }
+
+    /// A throwaway draft is flagged beside an unknown id, moved to the
+    /// archive, trashed, then deleted, each write through `$batch`; the
+    /// message goes either way.
+    #[test]
+    #[ignore = "requires Microsoft credentials and --ignored"]
+    fn graph_writes() {
+        let dir = TempDir::new().unwrap();
+        let config = write_graph_account(dir.path());
+        let run = |args: &[&str]| himalaya(&config, graph_token(), args);
+        let mut cleanup = Cleanup::new(&run);
+
+        let tag = throwaway_tag();
+        let raw = throwaway_message(&tag, &address());
+        let args = [
+            "--json", "msgraph", "messages", "create", "-f", "drafts", &raw,
+        ];
+        let created = json(&run(&args), 0);
+        let id = created["id"].as_str().unwrap().to_owned();
+        cleanup.later(&["msgraph", "messages", "delete", &id]);
+
+        let args = ["--json", "flag", "add", "-m", "drafts", "--flag", "flagged"];
+        let flagged = json(&run(&[&args[..], &[&id, BOGUS_ID]].concat()), 3);
+        assert_bogus_id(&flagged, 1);
+
+        let args = [
+            "--json", "message", "move", "-f", "drafts", "-t", "archive", &id,
+        ];
+        let moved = json(&run(&args), 0);
+        assert_eq!(moved["count"], 1, "{moved}");
+
+        // NOTE: a move gives the message a new id.
+        let id = find_by_subject(&run, "archive", &tag);
+        cleanup.later(&["msgraph", "messages", "delete", &id]);
+
+        let args = ["--json", "message", "delete", "-m", "archive", &id];
+        let trashed = json(&run(&args), 0);
+        assert_eq!(trashed["count"], 1, "{trashed}");
+
+        let id = find_by_subject(&run, "trash", &tag);
+        cleanup.later(&["msgraph", "messages", "delete", &id]);
+
+        let args = ["--json", "message", "delete", "-m", "trash", &id];
+        let deleted = json(&run(&args), 0);
+        assert_eq!(deleted["count"], 1, "{deleted}");
+    }
+
+    /// The id of the message of `mailbox` whose subject is `subject`,
+    /// among its most recent ones.
+    fn find_by_subject(run: &dyn Fn(&[&str]) -> Output, mailbox: &str, subject: &str) -> String {
+        let args = ["--json", "envelope", "list", "-m", mailbox, "-s", "50"];
+        let list = json(&run(&args), 0);
+
+        let envelopes = list["envelopes"].as_array().unwrap();
+        let envelope = envelopes.iter().find(|e| e["subject"] == subject);
+        let envelope = envelope.unwrap_or_else(|| panic!("no `{subject}` in {list}"));
+        envelope["id"].as_str().unwrap().to_owned()
     }
 
     #[test]

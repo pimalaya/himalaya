@@ -15,7 +15,7 @@ use pimalaya_cli::sanitize;
 use crate::shared::message::header;
 
 /// Takes the result out of the output of `command`, warning of the
-/// server's alerts and of the response lines skipped for not decoding.
+/// server's alerts and of the response lines that did not decode whole.
 pub fn output_data<T>(command: &str, output: ImapOutput<T>) -> T {
     for alert in &output.alerts {
         warn!("server sent an alert: {}", sanitize::text(alert));
@@ -25,6 +25,13 @@ pub fn output_data<T>(command: &str, output: ImapOutput<T>) -> T {
         let count = output.skipped.len();
         warn!(
             "skipped {count} unreadable line(s) of the {command} response, the result may be incomplete"
+        );
+    }
+
+    if !output.partial.is_empty() {
+        let count = output.partial.len();
+        warn!(
+            "decoded {count} line(s) of the {command} response in part, the result may be incomplete"
         );
     }
 

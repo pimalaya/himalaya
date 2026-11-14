@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate};
 use io_jmap::{
-    rfc8620::filter::JmapFilter,
+    rfc8620::{filter::JmapFilter, get::JmapUnparsed},
     rfc8621::{
         JMAP_MAIL_CAPABILITY,
         email::{
@@ -25,7 +25,7 @@ use io_jmap::{
             set::{JmapEmailPatch, JmapEmailSetArgs, JmapEmailSetOutput},
         },
         email_submission::{
-            JMAP_SUBMISSION_CAPABILITY,
+            JMAP_SUBMISSION_CAPABILITY, JmapEmailSubmissionSetItemError,
             set::{JmapEmailSubmissionCreate, JmapEmailSubmissionSetArgs},
         },
         identity::get::JmapIdentityGetOptions,
@@ -38,7 +38,7 @@ use io_jmap::{
     },
 };
 use log::warn;
-use pimalaya_cli::sanitize;
+use pimalaya_cli::{error::CodedError, sanitize};
 use url::Url;
 
 use crate::{
@@ -56,7 +56,7 @@ use crate::{
         },
         vacation::{Vacation, VacationPatch, format_date, normalize_date},
     },
-    error::{ItemError, missing_message},
+    error::{ErrorCode, ItemError, missing_message},
     jmap::{
         client::JmapClient,
         error::{format_set_error, set_item_error},
@@ -66,17 +66,24 @@ use crate::{
 impl JmapClient {
     /// Lists every mailbox in the primary mail account. JMAP returns
     /// counts inline, surfaced only when `with_counts` is set.
-    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    ///
+    /// A mailbox that does not deserialize is an item error.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let output = self.mailbox_get(JmapMailboxGetOptions {
             ids: None,
             properties: None,
         })?;
 
-        Ok(output
+        let mailboxes = output
             .mailboxes
             .into_iter()
             .map(|mailbox| mailbox_from(mailbox, with_counts))
-            .collect())
+            .collect();
+
+        Ok(Outcome {
+            value: mailboxes,
+            errors: unparsed(output.unparsed, ErrorCode::MailboxUnreadable),
+        })
     }
 
     /// Lists envelopes from `mailbox` (a JMAP mailbox id), batching
@@ -87,7 +94,7 @@ impl JmapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let (position, limit) = compute_position_limit(page, page_size);
         let filter = JmapEmailFilter {
             in_mailbox: Some(mailbox.to_string()),
@@ -102,7 +109,10 @@ impl JmapClient {
             ..Default::default()
         })?;
 
-        Ok(output.emails.into_iter().map(envelope_from).collect())
+        Ok(Outcome {
+            value: output.emails.into_iter().map(envelope_from).collect(),
+            errors: unparsed(output.unparsed, ErrorCode::MessageUnreadable),
+        })
     }
 
     /// Searches a mailbox with an `Email/query` chained into an
@@ -118,7 +128,7 @@ impl JmapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let Converted {
             filter,
             sort,
@@ -142,12 +152,21 @@ impl JmapClient {
         })?;
 
         let mut envelopes: Vec<Envelope> = output.emails.into_iter().map(envelope_from).collect();
+        let mut errors = unparsed(output.unparsed, ErrorCode::MessageUnreadable);
         if paginate_client_side {
             envelopes.retain(|envelope| post_match(envelope, &post_filters));
             envelopes = paginate(envelopes, page, page_size);
+
+            // NOTE: the whole query was read, so its errors go on page 1.
+            if page.unwrap_or(1) > 1 {
+                errors.clear();
+            }
         }
 
-        Ok(envelopes)
+        Ok(Outcome {
+            value: envelopes,
+            errors,
+        })
     }
 
     /// Adds, sets, or removes `flags` (JMAP keywords) on the ids of `ids`
@@ -160,8 +179,10 @@ impl JmapClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<Outcome<usize>> {
-        let found = self.emails_in(mailbox, ids)?;
-        let errors = missing_from(ids, &found);
+        let Outcome {
+            value: found,
+            errors,
+        } = self.emails_in(mailbox, ids)?;
 
         let ids: Vec<&str> = found.keys().map(String::as_str).collect();
         Ok(self.store_keywords(&ids, flags, op)?.after(errors))
@@ -206,11 +227,12 @@ impl JmapClient {
     }
 
     /// The emails of `ids` that `mailbox` holds, each with the mailboxes
-    /// holding it (`Email/get` of `mailboxIds`). A JMAP id names an email
-    /// account-wide, so this is what scopes a write to the mailbox given.
-    fn emails_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<EmailMailboxes> {
+    /// holding it (`Email/get` of `mailboxIds`), beside the error of each
+    /// other id. A JMAP id names an email account-wide, so this is what
+    /// scopes a write to the mailbox given.
+    fn emails_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<EmailMailboxes>> {
         if ids.is_empty() {
-            return Ok(EmailMailboxes::new());
+            return Ok(Outcome::from(EmailMailboxes::new()));
         }
 
         let output = self.email_get(
@@ -221,7 +243,13 @@ impl JmapClient {
             },
         )?;
 
-        Ok(held_by(output.emails, mailbox))
+        let found = held_by(output.emails, mailbox);
+        let errors = missing_from(ids, &found, output.unparsed);
+
+        Ok(Outcome {
+            value: found,
+            errors,
+        })
     }
 
     /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the
@@ -337,8 +365,10 @@ impl JmapClient {
     /// to their mailboxes, and returns how many were copied beside the
     /// error of each id not copied.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
-        let found = self.emails_in(from, ids)?;
-        let errors = missing_from(ids, &found);
+        let Outcome {
+            value: found,
+            errors,
+        } = self.emails_in(from, ids)?;
         if found.is_empty() {
             return Ok(Outcome { value: 0, errors });
         }
@@ -355,8 +385,10 @@ impl JmapClient {
     /// `Email/set`, and returns how many were moved beside the error of
     /// each id not moved.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
-        let found = self.emails_in(from, ids)?;
-        let errors = missing_from(ids, &found);
+        let Outcome {
+            value: found,
+            errors,
+        } = self.emails_in(from, ids)?;
 
         // NOTE: the patch removing `from` would win over the one adding
         // `to`, taking the emails out of the very mailbox they stay in.
@@ -379,8 +411,10 @@ impl JmapClient {
     /// another mailbox holds too only leaves `mailbox`. An id not removed
     /// is an item error.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
-        let found = self.emails_in(mailbox, ids)?;
-        let errors = missing_from(ids, &found);
+        let Outcome {
+            value: found,
+            errors,
+        } = self.emails_in(mailbox, ids)?;
         if found.is_empty() {
             return Ok(Outcome { value: 0, errors });
         }
@@ -608,7 +642,7 @@ impl JmapClient {
             on_success_destroy_email: None,
         })?;
         if let Some(err) = output.not_created.values().next() {
-            bail!("Submit JMAP message error{}", format_set_error(err));
+            return Err(submission_error(err));
         }
 
         // NOTE: the message went out whatever the Email/set answers.
@@ -729,6 +763,26 @@ fn imported(mut output: JmapEmailImportOutput, key: &str) -> Result<Imported> {
     }
 }
 
+/// The failure of a refused submission, coded `recipient-refused` naming
+/// the addresses the server listed when it refused recipients.
+fn submission_error(err: &JmapEmailSubmissionSetItemError) -> anyhow::Error {
+    let JmapEmailSubmissionSetItemError::InvalidRecipients {
+        invalid_recipients, ..
+    } = err
+    else {
+        return anyhow!("Submit JMAP message error{}", format_set_error(err));
+    };
+
+    let mut message = String::from("JMAP server refused the recipients");
+    if !invalid_recipients.is_empty() {
+        message.push(' ');
+        message.push_str(&sanitize::text(&invalid_recipients.join(", ")));
+    }
+    message.push_str(&format_set_error(err));
+
+    CodedError::new(ErrorCode::RecipientRefused, message).into()
+}
+
 /// The mailboxes holding each email, keyed by email id.
 type EmailMailboxes = BTreeMap<String, BTreeMap<String, bool>>;
 
@@ -782,11 +836,35 @@ fn written(output: JmapEmailSetOutput) -> Outcome<usize> {
     }
 }
 
-/// The error of each id of `ids` the mailbox does not hold.
-fn missing_from(ids: &[&str], found: &EmailMailboxes) -> Vec<ItemError> {
+/// The error of each id of `ids` the mailbox does not hold, unreadable
+/// when its email is among the `objects` that did not deserialize.
+fn missing_from(
+    ids: &[&str],
+    found: &EmailMailboxes,
+    objects: Vec<JmapUnparsed>,
+) -> Vec<ItemError> {
+    let unreadable = unparsed(objects, ErrorCode::MessageUnreadable);
+
     ids.iter()
         .filter(|id| !found.contains_key(**id))
-        .map(|id| missing_message(id))
+        .map(|id| {
+            let error = unreadable.iter().find(|err| err.id.as_deref() == Some(id));
+            error.cloned().unwrap_or_else(|| missing_message(id))
+        })
+        .collect()
+}
+
+/// The item error of each object a get could not deserialize, coded
+/// `code`.
+fn unparsed(objects: Vec<JmapUnparsed>, code: ErrorCode) -> Vec<ItemError> {
+    objects
+        .into_iter()
+        .map(|object| ItemError {
+            id: object.id,
+            code: Some(code),
+            error: String::from("Cannot read the object the JMAP server answered"),
+            sources: vec![sanitize::text(&object.error).into_owned()],
+        })
         .collect()
 }
 
@@ -1322,10 +1400,60 @@ mod tests {
     fn an_id_the_mailbox_does_not_hold_is_not_found() {
         let found = held_by(vec![email("E1", &["A"]), email("E2", &["B"])], "A");
 
-        let errors = missing_from(&["E1", "E2", "E9"], &found);
+        let errors = missing_from(&["E1", "E2", "E9"], &found, Vec::new());
 
         let ids: Vec<_> = errors.iter().map(|error| error.id.as_deref()).collect();
         assert_eq!(ids, [Some("E2"), Some("E9")]);
+    }
+
+    /// An email the get could not deserialize is unreadable, not missing.
+    #[test]
+    fn an_email_that_does_not_deserialize_is_unreadable() {
+        let found = held_by(vec![email("E1", &["A"])], "A");
+        let unparsed = vec![JmapUnparsed {
+            id: Some(String::from("E2")),
+            error: String::from("invalid type: string \"x\", expected a map"),
+        }];
+
+        let errors = missing_from(&["E1", "E2", "E9"], &found, unparsed);
+
+        let codes: Vec<_> = errors
+            .iter()
+            .map(|error| (error.id.as_deref(), error.code))
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                (Some("E2"), Some(ErrorCode::MessageUnreadable)),
+                (Some("E9"), Some(ErrorCode::MessageNotFound)),
+            ]
+        );
+    }
+
+    /// A submission refusing recipients fails coded `recipient-refused`,
+    /// naming the addresses the server listed.
+    #[test]
+    fn refused_recipients_are_coded_and_named() {
+        let err: JmapEmailSubmissionSetItemError = serde_json::from_value(serde_json::json!({
+            "type": "invalidRecipients",
+            "invalidRecipients": ["a@example.org", "b@example.org"],
+        }))
+        .unwrap();
+
+        let err = submission_error(&err);
+
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::RecipientRefused));
+        let message = err.to_string();
+        assert!(
+            message.contains("a@example.org, b@example.org"),
+            "{message}"
+        );
+
+        let err: JmapEmailSubmissionSetItemError =
+            serde_json::from_value(serde_json::json!({ "type": "forbiddenToSend" })).unwrap();
+        let err = submission_error(&err);
+        assert_eq!(pimalaya_cli::error::code_of::<ErrorCode>(&err), None);
     }
 
     #[test]
