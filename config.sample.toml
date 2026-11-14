@@ -62,6 +62,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##imap.tls.rustls.crypto = "ring"			# rustls on ring, the build's first otherwise
 ##imap.tls.rustls.crypto = "aws"			# rustls on aws-lc-rs
 ##imap.tls.cert = "/path/to/cert.pem"			# a PEM certificate to trust, such as Proton Bridge's
+##imap.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# a client certificate and its key, when the server asks for one
 ##imap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for IMAP alone
 #
 #smtp.server = "smtp.example.org"		# implicit TLS, on port 465 unless given
@@ -77,6 +78,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##smtp.tls.provider = "native-tls"		# as imap.tls
 ##smtp.tls.rustls.crypto = "aws"		# as imap.tls.rustls
 ##smtp.tls.cert = "/path/to/cert.pem"		# as imap.tls
+##smtp.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
 ##smtp.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for SMTP alone
 #message.send.save-copy = "Sent"		# SMTP files no copy of what it sends
 
@@ -95,6 +97,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##sieve.tls.provider = "native-tls"			# as imap.tls
 ##sieve.tls.rustls.crypto = "aws"			# as imap.tls.rustls
 ##sieve.tls.cert = "/path/to/cert.pem"			# as imap.tls
+##sieve.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
 ##sieve.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for ManageSieve alone
 
 # JMAP
@@ -112,6 +115,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##jmap.tls.provider = "native-tls"			# as imap.tls
 ##jmap.tls.rustls.crypto = "aws"			# as imap.tls.rustls
 ##jmap.tls.cert = "/path/to/cert.pem"			# as imap.tls
+##jmap.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
 ##jmap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for JMAP alone
 
 # Gmail
@@ -126,6 +130,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##gmail.tls.provider = "native-tls"		# as imap.tls
 ##gmail.tls.rustls.crypto = "aws"		# as imap.tls.rustls
 ##gmail.tls.cert = "/path/to/cert.pem"		# as imap.tls
+##gmail.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
 ##gmail.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for Gmail alone
 
 # Microsoft Graph
@@ -140,6 +145,7 @@ envelope.list.datetime-local-tz = true		# show a date in the local timezone
 ##msgraph.tls.provider = "native-tls"			# as imap.tls
 ##msgraph.tls.rustls.crypto = "aws"			# as imap.tls.rustls
 ##msgraph.tls.cert = "/path/to/cert.pem"		# as imap.tls
+##msgraph.tls.client = { cert = "/path/to/client.pem", key = "/path/to/client.key.pem" }	# as imap.tls.client
 ##msgraph.proxy.url = "socks5h://localhost:1080"	# the proxy keys, for Graph alone
 
 # Microsoft IMAP and SMTP

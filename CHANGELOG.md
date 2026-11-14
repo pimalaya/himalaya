@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `tls.client.cert` and `tls.client.key` to every network backend, a client certificate presented when the server asks for one (mutual TLS). native-tls reads a PKCS#8 key only.
 - Added `--no-from`, `--no-to`, `--no-subject`, `--no-text` and `--no-html` to `vacation set`, clearing a field of the auto-reply (JMAP sends `null`, Gmail unsets it), so an auto-reply can go back to having nothing set.
 - Added the capabilities an argument reaches to the `Backends:` footer of `--help` (`submit (with --send, --no-save)`, `message.add (with --save)` on `message compose`, `reply` and `forward`, `compose` getting its footer), and left out of an MCP tool the argument the account cannot serve (`send` on an account with no transport), the tool kept.
 - Added the first-run welcome: run at a terminal without a configuration, bare `himalaya` and every command reading one print on stderr the missing path, the command creating it from config.sample.toml (copied from share/doc/himalaya/ when one ships beside the binary, downloaded with `curl` otherwise) and the first command to run, `himalaya envelope list`, then exit 1. Under `--json` or with stderr piped, the error names the path and the sample instead. A bare `himalaya` prints the help when a configuration exists.

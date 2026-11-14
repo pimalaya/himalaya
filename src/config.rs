@@ -54,7 +54,7 @@ use pimalaya_config::{
 ))]
 use pimalaya_stream::{
     proxy::{Proxy, ProxyAuth},
-    tls::{Rustls, RustlsCrypto, Tls, TlsProvider, TlsServer},
+    tls::{Rustls, RustlsCrypto, Tls, TlsClient, TlsProvider, TlsServer},
 };
 #[cfg(any(
     feature = "imap",
@@ -888,6 +888,31 @@ pub struct TlsConfig {
     /// A custom certificate to trust, in PEM format.
     #[serde(default, deserialize_with = "opt_shell_expanded_path")]
     pub cert: Option<PathBuf>,
+    /// A client certificate, presented when the server asks for one.
+    pub client: Option<TlsClientConfig>,
+}
+
+/// Client certificate configuration, both in PEM format.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "sieve"
+    )),
+    allow(dead_code)
+)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct TlsClientConfig {
+    /// The certificate, optionally followed by its intermediates.
+    #[serde(deserialize_with = "shell_expanded_path")]
+    pub cert: PathBuf,
+    /// The private key, PKCS#8 under native-tls.
+    #[serde(deserialize_with = "shell_expanded_path")]
+    pub key: PathBuf,
 }
 
 /// SSL/TLS provider configuration.
@@ -958,7 +983,10 @@ impl TlsConfig {
                 alpn,
             },
             server: self.cert.map(|cert| TlsServer { cert }),
-            client: None,
+            client: self.client.map(|c| TlsClient {
+                cert: c.cert,
+                key: c.key,
+            }),
         }
     }
 }
@@ -1617,6 +1645,16 @@ inbox = "~/spool""#,
 
         let tls: TlsConfig = toml::from_str("").unwrap();
         assert_eq!(tls.cert, None);
+        assert!(tls.client.is_none());
+
+        let tls: TlsConfig =
+            toml::from_str(r#"client = { cert = "~/me.pem", key = "~/me.key.pem" }"#).unwrap();
+        let client = tls.client.unwrap();
+        assert_eq!(client.cert, home.join("me.pem"));
+        assert_eq!(client.key, home.join("me.key.pem"));
+
+        // NOTE: a certificate without its key cannot be presented
+        assert!(toml::from_str::<TlsConfig>(r#"client.cert = "~/me.pem""#).is_err());
     }
 
     #[cfg(any(
