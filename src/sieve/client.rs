@@ -19,7 +19,8 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ProxyConfig, SieveConfig, parse_server},
+    config::{AccountConfig, Config, ProxyConfig, SieveConfig},
+    server::parse_server,
 };
 
 /// ManageSieve client wrapping the inner stream for script management.

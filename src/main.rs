@@ -131,13 +131,40 @@ mod mcp;
 mod msgraph;
 #[cfg(feature = "pimdir")]
 mod pimdir;
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
+mod proxy;
 mod repl;
+#[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
+mod sasl;
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "sieve"
+))]
+mod server;
 mod session;
 mod shared;
 #[cfg(feature = "sieve")]
 mod sieve;
 #[cfg(feature = "smtp")]
 mod smtp;
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "sieve"
+))]
+mod tls;
 
 use std::process;
 

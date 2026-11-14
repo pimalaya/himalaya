@@ -6,75 +6,35 @@
 //! Backend defaults are duplicated here rather than read from the io-*
 //! crates, so the schema compiles under any feature subset, none included.
 //!
-//! Every build parses the whole schema, the blocks of the backends it
-//! leaves out included. A type only some backends read is therefore
-//! allowed to go unread in the builds without them
-//! (`cfg_attr(not(..), allow(dead_code))`) rather than gated, which would
-//! change what a build accepts.
+//! The configuration is a plain model every build parses whole, the
+//! blocks of the backends it leaves out included, so every build accepts
+//! and refuses the same file. The features turn it into runtime values
+//! (TLS, proxy, SASL, server URL), so a build missing a backend leaves
+//! part of the model unread.
+
+#![cfg_attr(
+    not(all(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "mbox",
+        feature = "sieve",
+        feature = "pimdir"
+    )),
+    allow(dead_code)
+)]
 
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Error, anyhow};
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve"
-))]
-use anyhow::{Result, bail};
 use clap::ValueEnum;
-#[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
-use io_sasl::{
-    login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
-    rfc4616::plain::SaslPlainCreds, rfc5801::SaslGs2ChannelBinding, rfc5802::SaslScramCreds,
-    rfc7628::oauthbearer::SaslOauthbearerCreds, xoauth2::SaslXoauth2Creds,
-};
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve"
-))]
-use pimalaya_config::secret::SecretResolver;
 use pimalaya_config::{
     secret::Secret,
     toml::{TomlConfig, opt_shell_expanded_path, shell_expanded_path, shell_expanded_string},
 };
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve"
-))]
-use pimalaya_stream::{
-    proxy::{Proxy, ProxyAuth},
-    tls::{Rustls, RustlsCrypto, Tls, TlsClient, TlsProvider, TlsServer},
-};
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "sieve"
-))]
-use secrecy::SecretString;
 use serde::{Deserialize, de::IgnoredAny};
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "sieve"
-))]
-use url::Url;
-
-use crate::{backend::Backend, capability};
 
 // NOTE: these mirror the io-* crates' own `default_alpn()`, kept local so
 // the schema depends on no backend crate.
@@ -98,10 +58,6 @@ pub(crate) fn default_jmap_alpn() -> Vec<String> {
 ///
 /// `deny_unknown_fields` is omitted so one file can be shared with
 /// himalaya-tui, whose own top-level fields are ignored here.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -172,47 +128,6 @@ impl AccountConfig {
             slot.get_or_insert_with(|| proxy.clone());
         }
     }
-
-    /// The error of account `name` where nothing matches `backend`, the
-    /// caller being able to use `supported` alone.
-    ///
-    /// Names the v1 `backend` table or the removed `m2dir` block when
-    /// present, it being the likely cause. A `--backend` naming a block the account lacks is refused
-    /// under `capability-missing`, as the resolver refuses a verb the
-    /// filter leaves unserved.
-    pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
-        let (reason, missing) = match backend {
-            Backend::Auto => {
-                let supported: Vec<String> = supported.iter().map(|b| format!("`{b}`")).collect();
-                let supported = supported.join(", ");
-                let reason =
-                    format!("Account `{name}` configures no supported backend ({supported})");
-                (reason, false)
-            }
-            backend if !supported.contains(&backend) => {
-                let reason =
-                    format!("Backend `{backend}` is not supported by this command or build");
-                (reason, false)
-            }
-            backend => (format!("Account `{name}` has no `{backend}` block"), true),
-        };
-
-        let reason = if self.backend.is_some() {
-            format!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
-        } else if self.m2dir.is_some() {
-            format!(
-                "{reason}: its `m2dir` block is ignored since v3 removed m2dir, see MIGRATION.md"
-            )
-        } else {
-            reason
-        };
-
-        if missing {
-            capability::missing(reason)
-        } else {
-            anyhow!(reason)
-        }
-    }
 }
 
 /// One `[accounts.<name>]` block.
@@ -220,10 +135,6 @@ impl AccountConfig {
 /// `deny_unknown_fields` is omitted so a block written for one binary
 /// loads in the other: the CLI-only sub-blocks have to be tolerated by
 /// himalaya-tui, which models the rest.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
@@ -274,31 +185,22 @@ pub struct AccountConfig {
     #[serde(default)]
     pub proxy: Option<ProxyConfig>,
     /// The IMAP backend of this account.
-    #[allow(unused)]
     pub imap: Option<ImapConfig>,
     /// The JMAP backend of this account.
-    #[allow(unused)]
     pub jmap: Option<JmapConfig>,
     /// The Gmail backend of this account.
-    #[allow(unused)]
     pub gmail: Option<GmailConfig>,
     /// The Microsoft Graph backend of this account.
-    #[allow(unused)]
     pub msgraph: Option<MsgraphConfig>,
     /// The Maildir backend of this account.
-    #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
     /// The mbox backend of this account.
-    #[allow(unused)]
     pub mbox: Option<MboxConfig>,
     /// The pimdir backend of this account.
-    #[allow(unused)]
     pub pimdir: Option<PimdirConfig>,
     /// The SMTP transport of this account.
-    #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
     /// The ManageSieve endpoint of this account.
-    #[allow(unused)]
     pub sieve: Option<SieveConfig>,
     /// The v1 `backend` table, kept only to point at MIGRATION.md.
     #[serde(default)]
@@ -310,10 +212,6 @@ pub struct AccountConfig {
 }
 
 /// Envelope-level rendering options.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeConfig {
@@ -323,10 +221,6 @@ pub struct EnvelopeConfig {
 }
 
 /// Mailbox aliases.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxConfig {
@@ -344,10 +238,6 @@ pub struct MailboxConfig {
 ///
 /// Unknown keys are accepted rather than denied, so the rest of a v1
 /// `[message]` table (`read`, `write`, `delete`...) keeps loading.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageConfig {
@@ -363,10 +253,6 @@ pub struct MessageConfig {
 }
 
 /// Quoting options under `message.reply.*` and `message.forward.*`.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageQuoteConfig {
@@ -390,10 +276,6 @@ pub enum PostingStyle {
 }
 
 /// Sending options under `message.send.*`.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MessageSendConfig {
@@ -405,7 +287,6 @@ pub struct MessageSendConfig {
 }
 
 /// The `message.send.save-copy` value.
-#[cfg_attr(not(any(backend, feature = "smtp")), allow(dead_code))]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum SaveCopyConfig {
@@ -416,10 +297,6 @@ pub enum SaveCopyConfig {
 }
 
 /// `envelope list` rendering options under `envelope.list.*`.
-#[cfg_attr(
-    not(any(backend, feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListConfig {
@@ -440,35 +317,7 @@ pub struct EnvelopeListConfig {
     _table: Option<IgnoredAny>,
 }
 
-/// Parses a backend `server` string into a [`Url`].
-///
-/// A full URL, a bare authority or a bare host, the two bare forms taking
-/// the default scheme. Absence of `://` is what detects them, the parser
-/// otherwise reading `mail.example.com:993` as a scheme.
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "jmap",
-    feature = "sieve"
-))]
-pub fn parse_server(server: &str, default_scheme: &str, allowed: &[&str]) -> Result<Url> {
-    let url = if server.contains("://") {
-        Url::parse(server)?
-    } else {
-        Url::parse(&format!("{default_scheme}://{server}"))?
-    };
-
-    let scheme = url.scheme();
-
-    if !allowed.contains(&scheme) {
-        bail!("Invalid server scheme `{scheme}`: expected one of {allowed:?}");
-    }
-
-    Ok(url)
-}
-
 /// IMAP configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapConfig {
@@ -520,7 +369,6 @@ pub struct ImapConfig {
 }
 
 /// Per-account `imap.sort.*` options.
-#[cfg_attr(not(feature = "imap"), allow(dead_code))]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapSortConfig {
@@ -533,7 +381,6 @@ pub struct ImapSortConfig {
 }
 
 /// Per-account `imap.id.*` quirks.
-#[cfg_attr(not(feature = "imap"), allow(dead_code))]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapIdConfig {
@@ -580,7 +427,6 @@ pub struct MaildirKeywordsConfig {
 }
 
 /// Maildir configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
@@ -613,7 +459,6 @@ pub enum MaildirLayoutConfig {
 }
 
 /// mbox configuration: a directory of mbox files, plus the spool.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MboxConfig {
@@ -691,7 +536,6 @@ fn default_true() -> bool {
 ///
 /// The store is a SQLite index beside content-addressed blobs, populated
 /// by the Neverest sync engine.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PimdirConfig {
@@ -709,7 +553,6 @@ pub struct PimdirConfig {
 }
 
 /// SMTP configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SmtpConfig {
@@ -742,7 +585,6 @@ pub struct SmtpConfig {
 }
 
 /// ManageSieve configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SieveConfig {
@@ -789,17 +631,6 @@ pub struct SieveConfig {
 /// `url` is a `socks5://`, `socks5h://` or `http://` proxy URL. Its user
 /// info authenticates too, but `username` and `password` keep the secret
 /// out of the URL.
-#[cfg_attr(
-    not(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    )),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ProxyConfig {
@@ -811,72 +642,7 @@ pub struct ProxyConfig {
     pub password: Option<Secret>,
 }
 
-impl ProxyConfig {
-    /// Resolves an optional configuration, an absent one reading the
-    /// environment at connect time.
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    ))]
-    pub fn resolve(config: Option<Self>, resolver: &mut SecretResolver) -> Result<Proxy> {
-        match config {
-            Some(config) => config.try_into_proxy(resolver),
-            None => Ok(Proxy::System),
-        }
-    }
-
-    /// Resolves the configuration into a runtime [`Proxy`], the password
-    /// going through `resolver`.
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    ))]
-    pub fn try_into_proxy(self, resolver: &mut SecretResolver) -> Result<Proxy> {
-        let mut proxy = Proxy::from_url(&self.url)?;
-
-        let auth = match (self.username, self.password) {
-            (None, None) => return Ok(proxy),
-            (None, Some(_)) => bail!("Proxy password requires a username"),
-            (Some(user), pass) => ProxyAuth {
-                user,
-                pass: match pass {
-                    Some(pass) => resolver.resolve(pass)?,
-                    None => SecretString::default(),
-                },
-            },
-        };
-
-        match &mut proxy {
-            Proxy::Socks5 { auth: slot, .. } | Proxy::Http { auth: slot, .. } => {
-                *slot = Some(auth);
-            }
-            Proxy::None | Proxy::System => {}
-        }
-
-        Ok(proxy)
-    }
-}
-
 /// SSL/TLS configuration.
-#[cfg_attr(
-    not(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    )),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TlsConfig {
@@ -893,17 +659,6 @@ pub struct TlsConfig {
 }
 
 /// Client certificate configuration, both in PEM format.
-#[cfg_attr(
-    not(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    )),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TlsClientConfig {
@@ -926,17 +681,6 @@ pub enum TlsProviderConfig {
 }
 
 /// Rustls configuration.
-#[cfg_attr(
-    not(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    )),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RustlsConfig {
@@ -954,51 +698,10 @@ pub enum RustlsCryptoConfig {
     Ring,
 }
 
-impl TlsConfig {
-    /// Builds the runtime [`Tls`] handle the connect helpers expect,
-    /// folding in the protocol-level `alpn` list.
-    ///
-    /// The TOML schema never exposes `tls.rustls.alpn` directly, the
-    /// per-protocol `*.alpn` field standing for it. An empty list skips
-    /// ALPN.
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "sieve"
-    ))]
-    pub fn into_tls(self, alpn: Vec<String>) -> Tls {
-        Tls {
-            provider: self.provider.map(|p| match p {
-                TlsProviderConfig::Rustls => TlsProvider::Rustls,
-                TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
-            }),
-            rustls: Rustls {
-                crypto: self.rustls.crypto.map(|c| match c {
-                    RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
-                    RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
-                }),
-                alpn,
-            },
-            server: self.cert.map(|cert| TlsServer { cert }),
-            client: self.client.map(|c| TlsClient {
-                cert: c.cert,
-                key: c.key,
-            }),
-        }
-    }
-}
-
 /// SASL configuration, exactly one mechanism per `[*.sasl]` block.
 ///
 /// Each variant carries only what its mechanism transmits, and serde picks
 /// it from the field name.
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum SaslConfig {
@@ -1020,10 +723,6 @@ pub enum SaslConfig {
 /// SASL ANONYMOUS configuration <sup>[rfc4505]</sup>.
 ///
 /// [rfc4505]: https://www.iana.org/go/rfc4505
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslAnonymousConfig {
@@ -1034,10 +733,6 @@ pub struct SaslAnonymousConfig {
 /// SASL LOGIN configuration <sup>[draft]</sup>.
 ///
 /// [draft]: https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslLoginConfig {
@@ -1051,10 +746,6 @@ pub struct SaslLoginConfig {
 /// SASL PLAIN configuration <sup>[rfc4616]</sup>.
 ///
 /// [rfc4616]: https://www.iana.org/go/rfc4616
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslPlainConfig {
@@ -1075,10 +766,6 @@ pub struct SaslPlainConfig {
 /// URL at connect time, so neither is configured here.
 ///
 /// [rfc7628]: https://www.iana.org/go/rfc7628
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslOauthbearerConfig {
@@ -1092,10 +779,6 @@ pub struct SaslOauthbearerConfig {
 /// SASL XOAUTH2 configuration, [Google's pre-standard scheme][xoauth2].
 ///
 /// [xoauth2]: https://developers.google.com/gmail/imap/xoauth2-protocol
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslXoauth2Config {
@@ -1109,10 +792,6 @@ pub struct SaslXoauth2Config {
 /// SASL SCRAM-SHA-256 configuration <sup>[rfc7677]</sup>.
 ///
 /// [rfc7677]: https://www.iana.org/go/rfc7677
-#[cfg_attr(
-    not(any(feature = "imap", feature = "smtp", feature = "sieve")),
-    allow(dead_code)
-)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslScramSha256Config {
@@ -1123,56 +802,7 @@ pub struct SaslScramSha256Config {
     pub password: Secret,
 }
 
-impl SaslConfig {
-    /// Resolves the configuration into a runtime [`Sasl`].
-    ///
-    /// The host and port come from the live server URL. OAUTHBEARER alone
-    /// reads them, echoing them in its GS2 header.
-    ///
-    /// The credential goes through `resolver`, so an account whose IMAP,
-    /// SMTP and ManageSieve blocks name one command spawns it once.
-    #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
-    pub fn try_into_sasl(
-        self,
-        host: impl ToString,
-        port: u16,
-        resolver: &mut SecretResolver,
-    ) -> Result<Sasl> {
-        Ok(match self {
-            SaslConfig::Anonymous(c) => Sasl::Anonymous(SaslAnonymousCreds { message: c.message }),
-            SaslConfig::Login(c) => Sasl::Login(SaslLoginCreds {
-                username: c.username,
-                password: resolver.resolve(c.password)?,
-            }),
-            SaslConfig::Plain(c) => Sasl::Plain(SaslPlainCreds {
-                authzid: c.authzid,
-                authcid: c.authcid,
-                passwd: resolver.resolve(c.passwd)?,
-            }),
-            SaslConfig::Oauthbearer(c) => Sasl::Oauthbearer(SaslOauthbearerCreds {
-                username: c.username,
-                host: host.to_string(),
-                port,
-                token: resolver.resolve(c.token)?,
-            }),
-            SaslConfig::Xoauth2(c) => Sasl::Xoauth2(SaslXoauth2Creds {
-                username: c.username,
-                token: resolver.resolve(c.token)?,
-            }),
-            // NOTE: an empty nonce means draw one for me: the client fills
-            // it in, an I/O-free coroutine having no randomness of its own.
-            SaslConfig::ScramSha256(c) => Sasl::ScramSha256(SaslScramCreds {
-                username: c.username,
-                password: resolver.resolve(c.password)?,
-                nonce: Vec::new(),
-                channel_binding: SaslGs2ChannelBinding::Unsupported,
-            }),
-        })
-    }
-}
-
 /// JMAP configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct JmapConfig {
@@ -1215,7 +845,6 @@ pub struct JmapConfig {
 }
 
 /// JMAP authentication configuration.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum JmapAuthConfig {
@@ -1241,7 +870,6 @@ pub enum JmapAuthConfig {
 /// Gmail has no per-account server address, the client always talking to
 /// gmail.googleapis.com, so only the mailbox owner, TLS and the OAuth 2.0
 /// credential are configured.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GmailConfig {
@@ -1279,7 +907,6 @@ fn default_gmail_alpn() -> Vec<String> {
 /// Gmail accepts OAuth 2.0 bearer tokens alone, so this is a short-lived
 /// access token an external helper such as ortie mints. Refreshing it is
 /// the caller's business.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GmailAuthConfig {
@@ -1292,7 +919,6 @@ pub struct GmailAuthConfig {
 /// Graph has no per-account server address, the client always talking to
 /// graph.microsoft.com, so only the mailbox owner, TLS and the OAuth 2.0
 /// credential are configured.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MsgraphConfig {
@@ -1332,7 +958,6 @@ fn default_msgraph_alpn() -> Vec<String> {
 /// Graph accepts OAuth 2.0 bearer tokens alone, so this is a short-lived
 /// access token an external helper such as ortie mints. Refreshing it is
 /// the caller's business.
-#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MsgraphAuthConfig {
@@ -1347,15 +972,7 @@ mod tests {
     use pimalaya_config::sample::{Variant, variants};
     use tempfile::NamedTempFile;
 
-    use crate::config::*;
-
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    const IMAP: &[&str] = &["imap", "imaps"];
+    use crate::{backend::Backend, config::*};
 
     /// Run after run the map order changes, so the error has to come
     /// whichever default the iteration would have met first.
@@ -1509,62 +1126,6 @@ mod tests {
         assert!(config.sasl.is_none());
     }
 
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    #[test]
-    fn bare_host_defaults_to_secure_scheme() {
-        let url = parse_server("mail.example.com", "imaps", IMAP).unwrap();
-        assert_eq!(url.scheme(), "imaps");
-        assert_eq!(url.host_str(), Some("mail.example.com"));
-        // NOTE: with no explicit port, the backend client applies the
-        // protocol default rather than this parser.
-        assert_eq!(url.port(), None);
-    }
-
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    #[test]
-    fn bare_host_port_keeps_port_and_secure_scheme() {
-        let url = parse_server("mail.example.com:1993", "imaps", IMAP).unwrap();
-        assert_eq!(url.scheme(), "imaps");
-        assert_eq!(url.host_str(), Some("mail.example.com"));
-        assert_eq!(url.port(), Some(1993));
-    }
-
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    #[test]
-    fn full_url_scheme_host_port_is_kept_verbatim() {
-        let url = parse_server("imap://mail.example.com:143", "imaps", IMAP).unwrap();
-        assert_eq!(url.scheme(), "imap");
-        assert_eq!(url.host_str(), Some("mail.example.com"));
-        assert_eq!(url.port(), Some(143));
-    }
-
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    #[test]
-    fn unknown_scheme_is_rejected() {
-        let err = parse_server("ftp://mail.example.com", "imaps", IMAP).unwrap_err();
-        assert!(err.to_string().contains("Invalid server scheme `ftp`"));
-    }
-
     /// himalaya-tui spells the identity `from` and `from-name`, and one
     /// file backs both binaries, so a config it wrote must reach the same
     /// fields the composers read.
@@ -1655,19 +1216,6 @@ inbox = "~/spool""#,
 
         // NOTE: a certificate without its key cannot be presented
         assert!(toml::from_str::<TlsConfig>(r#"client.cert = "~/me.pem""#).is_err());
-    }
-
-    #[cfg(any(
-        feature = "imap",
-        feature = "smtp",
-        feature = "jmap",
-        feature = "sieve"
-    ))]
-    #[test]
-    fn path_is_preserved_for_full_url() {
-        let url = parse_server("https://example.com/jmap/session", "https", &["https"]).unwrap();
-        assert_eq!(url.scheme(), "https");
-        assert_eq!(url.path(), "/jmap/session");
     }
 
     /// The sections of config.sample.toml, one of which a user

@@ -17,8 +17,9 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, ProxyConfig, parse_server},
+    config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, ProxyConfig},
     email::mailbox::{MailboxIndex, MailboxRole},
+    server::parse_server,
     shared::base64,
 };
 

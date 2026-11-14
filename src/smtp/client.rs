@@ -25,7 +25,8 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ProxyConfig, SmtpConfig, parse_server},
+    config::{AccountConfig, Config, ProxyConfig, SmtpConfig},
+    server::parse_server,
 };
 
 /// SMTP client wrapping the inner stream for sending messages.

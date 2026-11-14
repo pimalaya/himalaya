@@ -22,8 +22,9 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ImapConfig, ProxyConfig, parse_server},
+    config::{AccountConfig, Config, ImapConfig, ProxyConfig},
     imap::id::resolve_auto_id_params,
+    server::parse_server,
 };
 
 /// A live IMAP session, its capabilities and the sort fallback policy.
