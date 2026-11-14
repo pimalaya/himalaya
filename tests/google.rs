@@ -52,6 +52,22 @@ mod anonymous {
     /// The user the made-up token claims to be.
     const USER: &str = "alice@example.org";
 
+    /// The accounts the suite writes load, offline: a sample change
+    /// breaking them fails here rather than against Google.
+    #[test]
+    fn the_accounts_load() {
+        let dir = TempDir::new().unwrap();
+        let list = ["--json", "account", "list"];
+
+        // NOTE: each account overwrites the one before, so each loads
+        // before the next is written.
+        let config = write_gmail_account(dir.path());
+        json(&himalaya(&config, MADE_UP, &list), 0);
+
+        let config = write_imap_account(dir.path(), USER);
+        json(&himalaya(&config, MADE_UP, &list), 0);
+    }
+
     #[test]
     #[ignore = "requires network and --ignored"]
     fn gmail_account_check_refused() {

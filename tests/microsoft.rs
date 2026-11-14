@@ -1,8 +1,8 @@
 //! # Microsoft live suite
 //!
 //! The binary against Microsoft Graph and Exchange Online. `anonymous`
-//! runs the Microsoft sections of config.sample.toml with a made-up token,
-//! touching no account. `credentialed` reads the test tenant's mailbox
+//! runs the Microsoft Graph section of config.sample.toml and an Exchange
+//! IMAP and SMTP account with a made-up token, touching no account. `credentialed` reads the test tenant's mailbox
 //! through Graph and Exchange IMAP, with app-only tokens the suite mints
 //! through the client credentials grant of a confidential registration,
 //! read from `HIMALAYA_MICROSOFT_TENANT_ID`, `HIMALAYA_MICROSOFT_CLIENT_ID`
@@ -16,12 +16,31 @@
 
 mod common;
 
+use crate::common::TOKEN_COMMAND;
+
+/// The lines of an Exchange Online IMAP and SMTP account authenticating
+/// `user`, a TOML string, with XOAUTH2, both tokens read through
+/// [`TOKEN_COMMAND`].
+fn exchange_account(user: &str) -> String {
+    let token = TOKEN_COMMAND;
+
+    format!(
+        "imap.server = \"outlook.office365.com\"\n\
+         imap.sasl.xoauth2.username = {user}\n\
+         imap.sasl.xoauth2.token.command = {token}\n\
+         smtp.server = \"smtp://smtp.office365.com:587\"\n\
+         smtp.starttls = true\n\
+         smtp.sasl.xoauth2.username = {user}\n\
+         smtp.sasl.xoauth2.token.command = {token}"
+    )
+}
+
 mod anonymous {
     use std::path::{Path, PathBuf};
 
     use tempfile::TempDir;
 
-    use crate::common::*;
+    use crate::{common::*, exchange_account};
 
     /// What Himalaya says of a request Graph refuses.
     const GRAPH_REFUSED: &str = "HTTP 401";
@@ -38,15 +57,27 @@ mod anonymous {
         write_config(dir, "microsoft", &section)
     }
 
-    /// Writes the sample's Exchange IMAP and SMTP account, both tokens
-    /// read through [`TOKEN_COMMAND`].
+    /// Writes an Exchange IMAP and SMTP account, both tokens read through
+    /// [`TOKEN_COMMAND`].
     fn write_imap_account(dir: &Path) -> PathBuf {
-        let tokens = [
-            ("imap.sasl.xoauth2.token.command", TOKEN_COMMAND),
-            ("smtp.sasl.xoauth2.token.command", TOKEN_COMMAND),
-        ];
-        let section = sample_section("Microsoft IMAP and SMTP", &tokens);
-        write_config(dir, "microsoft", &section)
+        let account = exchange_account("\"alice@example.org\"");
+        write_config(dir, "microsoft", &account)
+    }
+
+    /// The accounts the suite writes load, offline: a sample change
+    /// breaking them fails here rather than against Microsoft.
+    #[test]
+    fn the_accounts_load() {
+        let dir = TempDir::new().unwrap();
+        let list = ["--json", "account", "list"];
+
+        // NOTE: each account overwrites the one before, so each loads
+        // before the next is written.
+        let config = write_graph_account(dir.path());
+        json(&himalaya(&config, MADE_UP, &list), 0);
+
+        let config = write_imap_account(dir.path());
+        json(&himalaya(&config, MADE_UP, &list), 0);
     }
 
     #[test]
@@ -110,7 +141,7 @@ mod credentialed {
     use secrecy::{ExposeSecret, SecretString};
     use tempfile::TempDir;
 
-    use crate::common::*;
+    use crate::{common::*, exchange_account};
 
     /// The mailbox read when `HIMALAYA_MICROSOFT_USER` is unset.
     const USER: &str = "microsoft@pimalaya.onmicrosoft.com";
@@ -178,20 +209,11 @@ mod credentialed {
         write_config(dir, "microsoft", &section)
     }
 
-    /// Writes the sample's Exchange IMAP and SMTP account on the test
-    /// mailbox, both tokens read through [`TOKEN_COMMAND`]. The suite never
-    /// reaches SMTP.
+    /// Writes an Exchange IMAP and SMTP account on the test mailbox, both
+    /// tokens read through [`TOKEN_COMMAND`]. The suite never reaches SMTP.
     fn write_imap_account(dir: &Path) -> PathBuf {
-        let user = user();
-        let overrides = [
-            ("imap.sasl.xoauth2.username", user.as_str()),
-            ("imap.sasl.xoauth2.token.command", TOKEN_COMMAND),
-            ("smtp.sasl.xoauth2.username", user.as_str()),
-            ("smtp.sasl.xoauth2.token.command", TOKEN_COMMAND),
-        ];
-
-        let section = sample_section("Microsoft IMAP and SMTP", &overrides);
-        write_config(dir, "microsoft", &section)
+        let account = exchange_account(&user());
+        write_config(dir, "microsoft", &account)
     }
 
     #[test]

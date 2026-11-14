@@ -1,9 +1,8 @@
 //! # Fastmail live suite
 //!
-//! The binary against Fastmail's JMAP server, on the Fastmail section of
-//! config.sample.toml with a made-up bearer token. Only a browser consent
-//! issues a Fastmail token, so the suite is `anonymous` only and touches
-//! no account.
+//! The binary against Fastmail's JMAP server, on its session URL with a
+//! made-up bearer token. Only a browser consent issues a Fastmail token, so
+//! the suite is `anonymous` only and touches no account.
 //!
 //! Run with `cargo test --test fastmail -- --ignored`.
 
@@ -21,11 +20,25 @@ mod anonymous {
     /// What Himalaya says of a session the server refuses.
     const REFUSED: &str = "HTTP 401";
 
-    /// Writes the sample's Fastmail account, its token read through
+    /// Writes a Fastmail account, its token read through
     /// [`TOKEN_COMMAND`].
     fn write_account(dir: &Path) -> PathBuf {
-        let token = [("jmap.auth.bearer.token.command", TOKEN_COMMAND)];
-        write_config(dir, "fastmail", &sample_section("Fastmail", &token))
+        let lines = format!(
+            "jmap.server = \"https://api.fastmail.com/jmap/session\"\njmap.auth.bearer.token.command = {TOKEN_COMMAND}"
+        );
+        write_config(dir, "fastmail", &lines)
+    }
+
+    /// The account the suite writes loads, offline.
+    #[test]
+    fn the_account_loads() {
+        let dir = TempDir::new().unwrap();
+        let config = write_account(dir.path());
+
+        json(
+            &himalaya(&config, MADE_UP, &["--json", "account", "list"]),
+            0,
+        );
     }
 
     #[test]

@@ -136,23 +136,39 @@ pub fn assert_envelopes(list: &Value, size: usize) {
     }
 }
 
-/// The commented section `name` of config.sample.toml, uncommented,
-/// each line setting a key of `overrides` set to its value instead.
+/// The section `name` of config.sample.toml, the paragraph its `# name`
+/// heading opens, uncommented: the first line setting each field, a
+/// later alternative of it left out (a secret's `raw` after its
+/// `command`), each key of `overrides` set to its value instead.
 pub fn sample_section(name: &str, overrides: &[(&str, &str)]) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("config.sample.toml");
     let sample = fs::read_to_string(path).unwrap();
     let heading = format!("# {name}");
 
-    let mut lines = sample.lines().skip_while(|line| *line != heading).skip(2);
+    let lines = sample.lines().skip_while(|line| *line != heading).skip(1);
+    let mut fields = Vec::new();
     let mut section = String::new();
 
-    for line in lines.by_ref().take_while(|line| !line.is_empty()) {
-        let line = line.strip_prefix('#').unwrap_or(line);
-        let key = line.split(" = ").next().unwrap_or_default();
+    for line in lines.take_while(|line| !line.is_empty()) {
+        let code = line.split('\t').next().unwrap_or_default();
+        let code = code.strip_prefix('#').unwrap_or(code);
+
+        let Some((key, _)) = code.split_once(" = ") else {
+            continue;
+        };
+
+        let secret = key.strip_suffix(".raw").or(key.strip_suffix(".command"));
+        let field = secret.unwrap_or(key);
+
+        if fields.contains(&field) {
+            continue;
+        }
+
+        fields.push(field);
 
         match overrides.iter().find(|(k, _)| *k == key) {
             Some((key, value)) => section.push_str(&format!("{key} = {value}\n")),
-            None => section.push_str(&format!("{line}\n")),
+            None => section.push_str(&format!("{code}\n")),
         }
     }
 
