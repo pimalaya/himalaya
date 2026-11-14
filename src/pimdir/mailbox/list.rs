@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_pimdir::{client::reader::PimdirRoundState, collection::PimdirCoverage};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use crate::{
     account::context::Account,
     backend::Backend,
     email::mailbox::{Mailbox, MailboxRole},
-    listing::{self, Listing},
+    listing,
     pimdir::{backend::PimdirCoveredMailbox, client::PimdirClient},
 };
 
@@ -154,7 +154,7 @@ pub struct PimdirMailboxListOutput {
 
 impl fmt::Display for PimdirMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
 
         for mailbox in &self.mailboxes {
             let role = mailbox.role.as_ref().map(ToString::to_string);

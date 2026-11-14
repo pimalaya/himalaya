@@ -3,13 +3,14 @@
 //! The `account capability` command, listing what the account serves of
 //! the unified API, which backend serves each capability and how well.
 
-use std::{fmt, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, sanitize};
-use schemars::JsonSchema;
-use serde::Serialize;
+use pimalaya_cli::{
+    capability::{AccountCapability, AccountCapabilityOutput},
+    printer::Printer,
+};
 
 #[cfg(feature = "pimdir")]
 use crate::pimdir::client::PimdirClient;
@@ -17,7 +18,6 @@ use crate::{
     backend::Backend,
     capability::{self, Resolution, StoreSupport},
     cli::resolve_account,
-    listing::Listing,
 };
 
 /// List what the account serves of the unified API.
@@ -69,7 +69,7 @@ impl AccountCapabilityCommand {
             capabilities.push(AccountCapability {
                 name: capability.name(),
                 backend: backend.map(|backend| backend.to_string()),
-                level: support.level.to_string(),
+                level: support.level,
                 detail: support.detail,
             });
         }
@@ -78,49 +78,5 @@ impl AccountCapabilityCommand {
             account: name,
             capabilities,
         })
-    }
-}
-
-/// The `account capability` output.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountCapabilityOutput {
-    /// The account the capabilities are resolved for.
-    pub account: String,
-    /// One row per unified capability, in the order the commands reach
-    /// them.
-    pub capabilities: Vec<AccountCapability>,
-}
-
-/// How the account serves one unified capability.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountCapability {
-    /// The capability, pimdir's grammar without the domain word
-    /// (`message.move`, `envelope.search.body`).
-    pub name: String,
-    /// The backend it resolves to, `null` when the account configures none
-    /// that `--backend` allows.
-    pub backend: Option<String>,
-    /// `full`, `partial`, `server` or `none`.
-    pub level: String,
-    /// What the level leaves out, `null` for a full one.
-    pub detail: Option<String>,
-}
-
-impl fmt::Display for AccountCapabilityOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, None);
-
-        for capability in &self.capabilities {
-            listing.items.push([
-                capability.name.as_str(),
-                capability.backend.as_deref().unwrap_or_default(),
-                capability.level.as_str(),
-                &*sanitize::text(capability.detail.as_deref().unwrap_or_default()),
-            ]);
-        }
-
-        write!(f, "{listing}")
     }
 }

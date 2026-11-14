@@ -8,14 +8,17 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::{Listing, ListingPage},
     pimdir::{
         client::PimdirClient,
         index::{
@@ -265,8 +268,8 @@ pub struct PimdirSearchPlace {
 
 impl PimdirSearchPlace {
     /// A listing headed by the account and the query.
-    fn listing(&self) -> Listing {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+    fn listing(&self) -> Listing<'static> {
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
         listing.head("Query", &self.query);
         listing
     }
@@ -295,8 +298,8 @@ mod tests {
     };
 
     /// A hit prints on one line, its mailboxes and what matched before the
-    /// sender, under the account and the query; the page and what the
-    /// answer could not see print under the hits.
+    /// sender, under the account, the query, the page and what the answer
+    /// could not see, `Incomplete:` widening the label column.
     #[test]
     fn a_hit_prints_on_one_line() {
         let envelope = Envelope {
@@ -340,10 +343,10 @@ mod tests {
         };
 
         let expected = "\
-Account:    work (pimdir)
-Query:      report
-Page:       1, message 1, the last
-Incomplete: 1 message(s) have no local body and matched on their headers alone
+Account:     work (pimdir)
+Query:       report
+Page:        1, message 1, the last
+Incomplete:  1 message(s) have no local body and matched on their headers alone
 
 7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
 ";

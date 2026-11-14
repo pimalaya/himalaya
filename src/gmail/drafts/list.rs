@@ -10,16 +10,15 @@ use io_gmail::v1::rest::drafts::{
     GmailDraft,
     list::{GmailDraftsList, GmailDraftsListParams},
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    gmail::client::GmailClient,
-    listing::{Listing, ListingPage},
-};
+use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
 
 /// List Gmail drafts (users.drafts.list).
 #[derive(Debug, Parser)]
@@ -88,7 +87,7 @@ pub struct GmailDraftListOutput {
 
 impl fmt::Display for GmailDraftListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         if let Some(query) = &self.query {
             listing.head("Query", query);

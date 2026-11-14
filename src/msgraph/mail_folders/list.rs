@@ -10,14 +10,19 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
-use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer, sanitize};
+use pimalaya_cli::{
+    clap::args::PageTokenArg,
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::{self, Listing, ListingPage},
+    listing,
     msgraph::{
         client::MsgraphClient,
         messages::list::{next_page_token, page_skip},
@@ -108,7 +113,7 @@ impl MsgraphMailFolderListOutput {
 
 impl fmt::Display for MsgraphMailFolderListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph.as_str()));
 
         for folder in &self.folders {
             listing.items.push([

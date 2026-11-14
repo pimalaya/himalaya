@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use crate::{
     backend::Backend,
     email::{mailbox::Mailbox, outcome::Outcome},
     error::{ItemError, partial_when},
-    listing::{self, Listing},
+    listing,
     shared::client::EmailClient,
 };
 
@@ -84,7 +84,7 @@ pub struct MailboxListOutput {
 
 impl fmt::Display for MailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, self.backend);
+        let mut listing = Listing::new(&self.account, self.backend.map(Backend::as_str));
 
         for mailbox in &self.mailboxes {
             let mut row = vec![
@@ -103,7 +103,7 @@ impl fmt::Display for MailboxListOutput {
         }
 
         for error in &self.errors {
-            listing.head("Error", &error.to_string());
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")
@@ -119,7 +119,8 @@ mod tests {
     };
 
     /// The counts print as one `unread/total` cell, and only with
-    /// `--counts`; a mailbox whose counts failed prints an `Error:` field.
+    /// `--counts`; a mailbox whose counts failed prints an `Error:` line
+    /// after the items.
     #[test]
     fn counts_print_as_unread_over_total() {
         let mailbox = |id: &str, role, counts: Option<(u64, u64)>| Mailbox {
@@ -166,10 +167,11 @@ Lists  -      Lists
 
         let expected = "\
 Account:    work
-Error:      Lists  mailbox-unreadable  Cannot count the messages
 
 INBOX  inbox  3/120  INBOX
 Lists  -      -      Lists
+
+Error:  Lists  mailbox-unreadable  Cannot count the messages
 ";
         assert_eq!(unread.to_string(), expected);
     }

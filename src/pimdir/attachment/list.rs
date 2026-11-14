@@ -11,14 +11,17 @@ use chrono::{DateTime, Local};
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use io_pimdir::client::reader::PimdirAccountAttachment;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::{Listing, ListingPage},
     pimdir::{
         attachment::{AttachmentQuery, PimdirAttachmentPage, page_token, parse_page_token},
         client::PimdirClient,
@@ -201,7 +204,7 @@ impl PimdirAttachmentListOutput {
 
 impl fmt::Display for PimdirAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
 
         if let Some(query) = &self.query {
             listing.head("Query", query);

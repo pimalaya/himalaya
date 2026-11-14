@@ -7,13 +7,11 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, backend::Backend, listing::Listing, sieve::client::SieveClient,
-};
+use crate::{account::context::Account, backend::Backend, sieve::client::SieveClient};
 
 /// List all server-side Sieve scripts and mark the active script.
 #[derive(Debug, Parser)]
@@ -66,7 +64,7 @@ pub struct SieveListOutput {
 
 impl fmt::Display for SieveListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Sieve));
+        let mut listing = Listing::new(&self.account, Some(Backend::Sieve.as_str()));
 
         for script in &self.scripts {
             let active = if script.active { "active" } else { "" };

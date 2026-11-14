@@ -7,12 +7,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use log::warn;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, backend::Backend, listing::Listing, pimdir::client::PimdirClient,
+    account::context::Account, backend::Backend, pimdir::client::PimdirClient,
     shared::mailbox::arg::MailboxArg,
 };
 
@@ -76,7 +76,7 @@ pub struct PimdirFlagListOutput {
 
 impl fmt::Display for PimdirFlagListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
         listing.head("Mailbox", &self.mailbox);
         listing.head("Message", &self.message);
 

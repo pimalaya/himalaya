@@ -9,13 +9,11 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, backend::Backend, listing::Listing, msgraph::client::MsgraphClient,
-};
+use crate::{account::context::Account, backend::Backend, msgraph::client::MsgraphClient};
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
 #[derive(Debug, Parser)]
@@ -56,7 +54,7 @@ pub struct MsgraphAttachmentListOutput {
 
 impl fmt::Display for MsgraphAttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph.as_str()));
         listing.head("Message", &self.message);
 
         for attachment in &self.attachments {

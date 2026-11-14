@@ -15,7 +15,7 @@ use crate::{
     account::context::Account,
     capability::{self, Capability},
     email::mailbox::MailboxRole,
-    error::{ItemError, partial_when},
+    error::{ItemError, partial_when, write_item_errors},
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
@@ -154,11 +154,7 @@ impl fmt::Display for MessageDeleteOutput {
             ),
         }?;
 
-        for error in &self.errors {
-            writeln!(f, "Error:  {error}")?;
-        }
-
-        Ok(())
+        write_item_errors(f, &self.errors)
     }
 }
 
@@ -198,7 +194,7 @@ mod tests {
     }
 
     /// Each message not acted on prints one `Error:` line after the
-    /// sentence, and one item error under `errors`.
+    /// sentence and a blank line, and one item error under `errors`.
     #[test]
     fn an_unknown_id_prints_after_the_sentence() {
         let mut output = moved(false);
@@ -207,7 +203,7 @@ mod tests {
 
         assert_eq!(
             output.to_string(),
-            "Successfully moved 0 message(s) to the trash\n\
+            "Successfully moved 0 message(s) to the trash\n\n\
              Error:  99  message-not-found  Message not found in the mailbox\n"
         );
         assert_eq!(

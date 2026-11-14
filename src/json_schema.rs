@@ -173,7 +173,7 @@ pub fn registry() -> JsonSchemaRegistry {
     );
     insert!(
         "himalaya-account-capability",
-        crate::account::capability::AccountCapabilityOutput
+        pimalaya_cli::capability::AccountCapabilityOutput
     );
     #[cfg(feature = "imap")]
     {

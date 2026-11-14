@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::flag::{Flag, FlagOp},
-    error::{ItemError, partial_when},
+    error::{ItemError, partial_when, write_item_errors},
     shared::{
         client::EmailClient,
         flag::arg::{FlagsArg, MessageIdsArg},
@@ -84,11 +84,7 @@ impl fmt::Display for FlagSetOutput {
             writeln!(f, "Successfully set flags on {count} message(s): {flags}")?;
         }
 
-        for error in &self.errors {
-            writeln!(f, "Error:  {error}")?;
-        }
-
-        Ok(())
+        write_item_errors(f, &self.errors)
     }
 }
 

@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    error::{ItemError, partial_when},
+    error::{ItemError, partial_when, write_item_errors},
     shared::{
         client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::resolve_mailbox_or_default,
     },
@@ -82,10 +82,6 @@ impl fmt::Display for MessageCopyOutput {
             writeln!(f, "{count} message(s) successfully copied")?;
         }
 
-        for error in &self.errors {
-            writeln!(f, "Error:  {error}")?;
-        }
-
-        Ok(())
+        write_item_errors(f, &self.errors)
     }
 }

@@ -12,7 +12,7 @@ use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     types::flag::{Flag, FlagPerm},
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
@@ -20,7 +20,6 @@ use crate::{
     account::context::Account,
     backend::Backend,
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome, utils::output_data},
-    listing::Listing,
 };
 
 /// List the flags a mailbox allows (SELECT response, RFC 3501).
@@ -103,7 +102,7 @@ impl ImapFlagListOutput<'_> {
 
 impl fmt::Display for ImapFlagListOutput<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap.as_str()));
         listing.head("Mailbox", &self.mailbox);
 
         for (flag, perm) in self.build_entries() {

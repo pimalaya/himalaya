@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, list::GmailSendAsList};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +16,6 @@ use crate::{
     account::context::Account,
     backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
-    listing::Listing,
 };
 
 /// List all Gmail send-as aliases (settings.sendAs.list).
@@ -55,7 +54,7 @@ pub struct GmailSettingsSendAsListOutput {
 impl fmt::Display for GmailSettingsSendAsListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // NOTE: a display name is free text, so it reads last.
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for send_as in &self.send_as {
             let default = if send_as.is_default == Some(true) {

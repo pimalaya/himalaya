@@ -11,16 +11,15 @@ use io_jmap::rfc8621::email_submission::{
     JmapEmailSubmission, JmapUndoStatus,
     query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    jmap::client::JmapClient,
-    listing::{Listing, ListingPage},
-};
+use crate::{account::context::Account, backend::Backend, jmap::client::JmapClient};
 
 /// How far along a submission is, and whether it can still be canceled.
 #[derive(Clone, Debug, ValueEnum)]
@@ -115,7 +114,7 @@ pub struct JmapSubmissionQueryOutput {
 
 impl fmt::Display for JmapSubmissionQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for submission in &self.submissions {
             let text = |value: &Option<String>| {

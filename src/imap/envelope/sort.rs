@@ -15,7 +15,7 @@ use io_imap::{
         extensions::sort::{SortCriterion, SortKey},
     },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{listing::Listing, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -29,7 +29,6 @@ use crate::{
         outcome,
         utils::output_data,
     },
-    listing::Listing,
 };
 
 /// Sort messages (SORT, RFC 5256).
@@ -151,7 +150,7 @@ pub struct ImapSortOutput {
 
 impl fmt::Display for ImapSortOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap.as_str()));
 
         if let Some(mailbox) = &self.mailbox {
             listing.head("Mailbox", mailbox);

@@ -22,7 +22,7 @@ use io_imap::{
         sequence::SequenceSet,
     },
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
@@ -39,7 +39,6 @@ use crate::{
         outcome,
         utils::output_data,
     },
-    listing::Listing,
     shared::envelope::list::{format_date, format_flags, format_names},
 };
 
@@ -299,7 +298,7 @@ impl ImapThreadOutput {
 
 impl fmt::Display for ImapThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap.as_str()));
 
         if let Some(mailbox) = &self.mailbox {
             listing.head("Mailbox", mailbox);

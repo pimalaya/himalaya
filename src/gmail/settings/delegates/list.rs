@@ -10,7 +10,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::list::{
     GmailDelegatesList, GmailDelegatesListResponse,
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -18,7 +18,6 @@ use crate::{
     account::context::Account,
     backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
-    listing::Listing,
 };
 
 /// List all Gmail delegates (users.settings.delegates.list).
@@ -58,7 +57,7 @@ pub struct GmailSettingsDelegateListOutput {
 
 impl fmt::Display for GmailSettingsDelegateListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for delegate in &self.response.delegates {
             let status = delegate

@@ -16,7 +16,10 @@ use io_jmap::{
         },
     },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -27,7 +30,6 @@ use crate::{
         backend::{envelope_from, parse_rfc3339},
         client::JmapClient,
     },
-    listing::{Listing, ListingPage},
     shared::envelope::list::envelope_cells,
 };
 
@@ -205,7 +207,7 @@ impl JmapEmailQueryOutput {
 
 impl fmt::Display for JmapEmailQueryOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         if let Some(mailbox) = &self.mailbox {
             listing.head("Mailbox", mailbox);

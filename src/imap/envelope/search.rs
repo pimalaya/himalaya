@@ -15,7 +15,7 @@ use io_imap::{
         search::SearchKey,
     },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{listing::Listing, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -28,7 +28,6 @@ use crate::{
         outcome,
         utils::output_data,
     },
-    listing::Listing,
 };
 
 /// Search messages (SEARCH, RFC 3501).
@@ -292,7 +291,7 @@ pub struct ImapSearchOutput {
 
 impl fmt::Display for ImapSearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Imap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Imap.as_str()));
 
         if let Some(mailbox) = &self.mailbox {
             listing.head("Mailbox", mailbox);

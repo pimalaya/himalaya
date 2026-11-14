@@ -7,14 +7,13 @@ use std::{collections::HashMap, fmt};
 
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::Listing,
     pimdir::{
         client::PimdirClient,
         index::{PimdirListStyle, PimdirMailThread},
@@ -70,7 +69,7 @@ pub struct PimdirThreadOutput {
 
 impl fmt::Display for PimdirThreadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
 
         if let Some(thread) = &self.thread.thread {
             listing.head("Thread", thread);

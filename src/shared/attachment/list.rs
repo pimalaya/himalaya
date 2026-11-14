@@ -9,14 +9,13 @@ use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::Listing,
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -145,7 +144,7 @@ pub struct AttachmentListOutput {
 
 impl fmt::Display for AttachmentListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, self.backend);
+        let mut listing = Listing::new(&self.account, self.backend.map(Backend::as_str));
         listing.head("Mailbox", &self.mailbox);
         listing.head("Message", &self.message);
         listing.empty = Some("No attachments");

@@ -8,13 +8,11 @@ use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::thread::JmapThread;
 use log::warn;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, backend::Backend, jmap::client::JmapClient, listing::Listing,
-};
+use crate::{account::context::Account, backend::Backend, jmap::client::JmapClient};
 
 /// Get JMAP threads by ID (Thread/get).
 ///
@@ -62,7 +60,7 @@ impl fmt::Display for JmapThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // NOTE: one row per email, in thread order, so each line is one
         // pair a script can read, and an empty thread one row of its own.
-        let mut listing = Listing::new(&self.account, Some(Backend::Jmap));
+        let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for thread in &self.threads {
             let id = sanitize::text(&thread.id);

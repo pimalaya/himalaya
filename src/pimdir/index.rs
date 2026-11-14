@@ -33,7 +33,7 @@ use io_pimdir::{
 };
 use jiff::tz::TimeZone;
 use log::warn;
-use pimalaya_cli::error::CodedError;
+use pimalaya_cli::{error::CodedError, listing::Listing};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -41,7 +41,6 @@ use crate::{
     account::context::Account,
     email::envelope::Envelope,
     error::{ErrorCode, pimdir_error},
-    listing::Listing,
     pimdir::{
         backend::{envelope, envelope_from_item},
         client::PimdirClient,

@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::flag::{Flag, FlagOp},
-    error::{ItemError, partial_when},
+    error::{ItemError, partial_when, write_item_errors},
     shared::{
         client::EmailClient,
         flag::arg::{FlagsArg, MessageIdsArg},
@@ -84,11 +84,7 @@ impl fmt::Display for FlagAddOutput {
             writeln!(f, "Successfully added flags to {count} message(s): {flags}")?;
         }
 
-        for error in &self.errors {
-            writeln!(f, "Error:  {error}")?;
-        }
-
-        Ok(())
+        write_item_errors(f, &self.errors)
     }
 }
 
@@ -101,7 +97,7 @@ mod tests {
     };
 
     /// One id of two found: the sentence counts it, then the unknown one
-    /// prints on its `Error:` line.
+    /// prints on its `Error:` line after a blank line.
     #[test]
     fn an_unknown_id_prints_after_the_sentence() {
         let output = FlagAddOutput {
@@ -113,7 +109,7 @@ mod tests {
 
         assert_eq!(
             output.to_string(),
-            "Successfully added flags to 1 message(s): \\Flagged\n\
+            "Successfully added flags to 1 message(s): \\Flagged\n\n\
              Error:  99999999  message-not-found  Message not found in the mailbox\n"
         );
         assert_eq!(

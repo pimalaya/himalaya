@@ -8,7 +8,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::settings::filters::list::{GmailFiltersList, GmailFiltersListResponse};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -19,7 +19,6 @@ use crate::{
         client::GmailClient,
         settings::filters::summary::{action_summary, criteria_summary},
     },
-    listing::Listing,
 };
 
 /// List all Gmail filters (users.settings.filters.list).
@@ -59,7 +58,7 @@ pub struct GmailSettingsFilterListOutput {
 
 impl fmt::Display for GmailSettingsFilterListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for filter in &self.response.filter {
             let criteria = filter.criteria.as_ref().map(criteria_summary);

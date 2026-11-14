@@ -7,13 +7,11 @@ use std::{fmt, path::PathBuf};
 use anyhow::Result;
 use clap::Parser;
 use io_mbox::mbox::Mbox;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, backend::Backend, listing::Listing, mbox::client::MboxClient,
-};
+use crate::{account::context::Account, backend::Backend, mbox::client::MboxClient};
 
 /// List mbox files.
 ///
@@ -54,7 +52,7 @@ pub struct MboxListOutput {
 
 impl fmt::Display for MboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Mbox));
+        let mut listing = Listing::new(&self.account, Some(Backend::Mbox.as_str()));
 
         for mbox in &self.rows {
             let path = mbox.path.display().to_string();

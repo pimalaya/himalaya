@@ -1,7 +1,8 @@
 //! # MCP command
 //!
 //! The `mcp` subcommand, a Model Context Protocol server over stdin and
-//! stdout exposing the unified API as tools, one per leaf command.
+//! stdout exposing the unified API as tools, one per leaf command, and
+//! `account capability`.
 //!
 //! pimalaya-cli's [`mcp`] module answers the protocol and checks each call
 //! against its tool's input schema; this one lists the tools and runs the
@@ -61,14 +62,18 @@ given `save` or `send`, and attach files given inline as `attach-data`, \
 never by path. The tools and arguments that change the store are listed \
 only when the server runs with --allow-write, those that send mail only \
 with --allow-send. A failed call answers isError with a himalaya-error \
-object, its `code` naming the failure when it has one.";
+object, its `code` naming the failure when it has one. \
+account_capability says which backend serves each capability of the \
+account, and how well.";
 
-/// The unified API leaves exposed as tools, with what each may do.
+/// The unified API leaves exposed as tools, with what each may do, and
+/// `account capability`, which says what the account serves of them.
 ///
 /// A leaf missing here is not exposed, so a new command is listed only
 /// once it is classified; `message parse` (reads a local file the caller
 /// names) is left out.
 const TOOLS: &[McpTool] = &[
+    McpTool::read("account", "capability"),
     McpTool::read("mailbox", "list"),
     McpTool::write("mailbox", "create", false),
     McpTool::write("mailbox", "rename", true),

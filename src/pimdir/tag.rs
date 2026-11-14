@@ -7,7 +7,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,7 +15,6 @@ use crate::{
     account::context::Account,
     backend::Backend,
     email::flag::Flag,
-    listing::Listing,
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
@@ -108,7 +107,7 @@ pub struct PimdirTagOutput {
 
 impl fmt::Display for PimdirTagOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir));
+        let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
         listing.head("Query", &self.query);
 
         for tagged in &self.tagged {

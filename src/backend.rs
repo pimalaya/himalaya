@@ -78,6 +78,22 @@ impl Backend {
         Self::Sieve,
     ];
 
+    /// The backend's name, as `--backend` and the lists spell it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Imap => "imap",
+            Self::Jmap => "jmap",
+            Self::Gmail => "gmail",
+            Self::Msgraph => "msgraph",
+            Self::Maildir => "maildir",
+            Self::Mbox => "mbox",
+            Self::Pimdir => "pimdir",
+            Self::Smtp => "smtp",
+            Self::Sieve => "sieve",
+        }
+    }
+
     /// Whether the IMAP arm of a unified command may run.
     pub fn allows_imap(self) -> bool {
         matches!(self, Self::Auto | Self::Imap)
@@ -126,18 +142,7 @@ impl Backend {
 
 impl fmt::Display for Backend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Auto => write!(f, "auto"),
-            Self::Imap => write!(f, "imap"),
-            Self::Jmap => write!(f, "jmap"),
-            Self::Gmail => write!(f, "gmail"),
-            Self::Msgraph => write!(f, "msgraph"),
-            Self::Maildir => write!(f, "maildir"),
-            Self::Mbox => write!(f, "mbox"),
-            Self::Pimdir => write!(f, "pimdir"),
-            Self::Smtp => write!(f, "smtp"),
-            Self::Sieve => write!(f, "sieve"),
-        }
+        f.write_str(self.as_str())
     }
 }
 

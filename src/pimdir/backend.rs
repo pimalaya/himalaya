@@ -43,7 +43,7 @@ use io_pimdir::{
     },
 };
 use log::{info, warn};
-use pimalaya_cli::error::CodedError;
+use pimalaya_cli::{capability::CapabilityLevel, error::CodedError};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -216,12 +216,12 @@ impl PimdirClient {
             let (candidates, _) = self.performers(name)?;
             let support = if candidates.is_empty() {
                 StoreSupport {
-                    level: "none",
+                    level: CapabilityLevel::None,
                     detail: Some(format!("no source of the store performs `{name}`")),
                 }
             } else {
                 StoreSupport {
-                    level: "full",
+                    level: CapabilityLevel::Full,
                     detail: None,
                 }
             };
@@ -230,11 +230,11 @@ impl PimdirClient {
 
         let support = match refusals.first() {
             Some(refusal) if refusals.len() == collections.len() => StoreSupport {
-                level: "none",
+                level: CapabilityLevel::None,
                 detail: Some(refusal.clone()),
             },
             Some(refusal) => StoreSupport {
-                level: "partial",
+                level: CapabilityLevel::Partial,
                 detail: Some(format!(
                     "refused in {} of {} mailboxes: {refusal}",
                     refusals.len(),
@@ -242,11 +242,11 @@ impl PimdirClient {
                 )),
             },
             None if !partials.is_empty() => StoreSupport {
-                level: "partial",
+                level: CapabilityLevel::Partial,
                 detail: Some(partials.into_iter().collect::<Vec<_>>().join("; ")),
             },
             None => StoreSupport {
-                level: "full",
+                level: CapabilityLevel::Full,
                 detail: None,
             },
         };
@@ -2925,10 +2925,10 @@ mod tests {
         );
 
         let full = |capability| client.store_support(capability).unwrap().unwrap().level;
-        assert_eq!(full(Capability::FlagsSeen), "full");
-        assert_eq!(full(Capability::MailboxRename), "full");
-        assert_eq!(full(Capability::FlagsAnswered), "none");
-        assert_eq!(full(Capability::MailboxDelete), "none");
+        assert_eq!(full(Capability::FlagsSeen), CapabilityLevel::Full);
+        assert_eq!(full(Capability::MailboxRename), CapabilityLevel::Full);
+        assert_eq!(full(Capability::FlagsAnswered), CapabilityLevel::None);
+        assert_eq!(full(Capability::MailboxDelete), CapabilityLevel::None);
 
         // NOTE: a read is the store's own, whatever its sources declare.
         assert_eq!(client.store_support(Capability::MessageRead).unwrap(), None);

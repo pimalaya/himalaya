@@ -10,14 +10,17 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::messages::{
     MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
-use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer};
+use pimalaya_cli::{
+    clap::args::PageTokenArg,
+    listing::{Listing, ListingPage},
+    printer::Printer,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    listing::{Listing, ListingPage},
     msgraph::{backend::envelope_from, client::MsgraphClient},
     shared::envelope::list::envelope_cells,
 };
@@ -151,7 +154,7 @@ pub struct MsgraphMessageListOutput {
 
 impl fmt::Display for MsgraphMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph));
+        let mut listing = Listing::new(&self.account, Some(Backend::Msgraph.as_str()));
 
         let heads = [
             ("Folder", &self.folder),

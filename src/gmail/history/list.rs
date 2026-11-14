@@ -10,16 +10,15 @@ use io_gmail::v1::rest::history::{
     GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    gmail::client::GmailClient,
-    listing::{Listing, ListingPage},
-};
+use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
 
 /// List the changes applied to the mailbox since a given history id.
 ///
@@ -131,7 +130,7 @@ pub(crate) struct GmailHistoryListOutput {
 
 impl fmt::Display for GmailHistoryListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
         listing.head("Since", &self.since);
 
         if let Some(label) = &self.label {

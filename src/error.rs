@@ -208,6 +208,22 @@ pub fn partial_when(errors: &[ItemError]) -> anyhow::Result<()> {
     }
 }
 
+/// Writes the item errors after a command's output, one blank line and one
+/// aligned `Error:` line each, nothing when there are none.
+#[cfg(any(backend, feature = "smtp"))]
+pub fn write_item_errors(
+    f: &mut std::fmt::Formatter<'_>,
+    errors: &[ItemError],
+) -> std::fmt::Result {
+    let mut lines = pimalaya_cli::error::ItemErrors::default();
+
+    for error in errors {
+        lines.push(error);
+    }
+
+    lines.write_after(f)
+}
+
 /// The pimdir codes Himalaya relays, by io-pimdir's spelling, which
 /// serialises each.
 #[cfg(feature = "pimdir")]

@@ -10,7 +10,11 @@ use io_gmail::v1::rest::threads::{
     GmailThreadSummary,
     list::{GmailThreadsList, GmailThreadsListParams},
 };
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -18,7 +22,6 @@ use crate::{
     account::context::Account,
     backend::Backend,
     gmail::{client::GmailClient, format::snippet_text},
-    listing::{Listing, ListingPage},
 };
 
 /// List Gmail threads matching the given query and labels
@@ -98,7 +101,7 @@ pub struct GmailThreadListOutput {
 
 impl fmt::Display for GmailThreadListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         if !self.labels.is_empty() {
             listing.head("Labels", &self.labels.join(", "));

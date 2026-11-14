@@ -131,7 +131,7 @@ fn a_write_with_an_unknown_id_prints_its_errors_and_exits_3() {
     assert_eq!(output.status.code(), Some(3), "{stdout}");
     assert_eq!(
         stdout,
-        "Successfully added flags to 0 message(s): \\Flagged\n\
+        "Successfully added flags to 0 message(s): \\Flagged\n\n\
          Error:  98  message-not-found  Message not found in the mailbox\n\
          Error:  99  message-not-found  Message not found in the mailbox\n"
     );

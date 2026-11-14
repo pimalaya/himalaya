@@ -7,16 +7,15 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessageId, list::GmailMessagesListParams};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    gmail::client::GmailClient,
-    listing::{Listing, ListingPage},
-};
+use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
 
 /// List Gmail message ids matching the given query and labels
 /// (users.messages.list).
@@ -91,7 +90,7 @@ pub struct GmailMessageListOutput {
 
 impl fmt::Display for GmailMessageListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         if !self.labels.is_empty() {
             listing.head("Labels", &self.labels.join(", "));

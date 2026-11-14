@@ -102,11 +102,12 @@
 //! carries the logs, the welcome, the REPL's prompt and its help in a
 //! JSON session, and the failures of the MCP server, whose stdout is the
 //! protocol's. Text output is plain text, with no border, no colour and
-//! nothing sized to the terminal: a list prints one item per line as
-//! aligned columns between the fields placing it (the account above, the
-//! page under), and a record as aligned `Label: value` lines. Each
-//! command's doc comment is its `--help`, so `himalaya <command> --help`
-//! is the canonical usage reference.
+//! nothing sized to the terminal: a list prints in pimalaya-cli's listing
+//! frame (the fields placing it, one item per line as aligned columns,
+//! then the errors of the items it could not serve), and a record as
+//! aligned `Label: value` lines. Each command's doc comment is its
+//! `--help`, so `himalaya <command> --help` is the canonical usage
+//! reference.
 
 pub mod account;
 pub mod backend;

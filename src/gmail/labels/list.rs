@@ -7,16 +7,11 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_gmail::v1::rest::labels::{GmailLabel, GmailLabelType};
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    gmail::client::GmailClient,
-    listing::{self, Listing},
-};
+use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient, listing};
 
 /// List all Gmail labels (users.labels.list).
 #[derive(Debug, Parser)]
@@ -58,7 +53,7 @@ impl GmailLabelListOutput {
 
 impl fmt::Display for GmailLabelListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, Some(Backend::Gmail));
+        let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for label in &self.labels {
             let label_type = label.label_type.map(label_type_wire).unwrap_or_default();

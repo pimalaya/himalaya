@@ -170,6 +170,42 @@ fn reading_tools_only_without_flags() {
     }
 }
 
+/// `account capability` is a reading tool, listed without flags, which
+/// answers the rows the command prints.
+#[test]
+fn account_capability_says_what_the_account_serves() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let responses = serve(
+        &config,
+        &[],
+        &[list(1), call(2, "account_capability", json!({}))],
+    );
+
+    let tool = tool(&responses[0], "account_capability").unwrap();
+    let annotations = json!({
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false,
+    });
+    assert_eq!(tool["annotations"], annotations);
+    assert_eq!(tool["outputSchema"]["type"], "object");
+
+    let result = &responses[1]["result"];
+    assert_ne!(result["isError"], true, "{result}");
+
+    let output = &result["structuredContent"];
+    assert_eq!(output["account"], "a", "{output}");
+
+    let rows = output["capabilities"].as_array().unwrap();
+    let row = |name: &str| rows.iter().find(|row| row["name"] == name).unwrap();
+    assert_eq!(row("mailbox.list")["backend"], "maildir");
+    assert_eq!(row("mailbox.list")["level"], "full");
+
+    #[cfg(feature = "smtp")]
+    assert_eq!(row("submit")["backend"], "smtp");
+}
+
 #[test]
 fn initialize_tells_the_agent_how_to_use_the_tools() {
     let dir = TempDir::new().unwrap();
@@ -193,6 +229,7 @@ fn initialize_tells_the_agent_how_to_use_the_tools() {
         "envelope_list",
         "envelope_search",
         "attachment_download",
+        "account_capability",
         "--allow-write",
         "--allow-send",
     ] {

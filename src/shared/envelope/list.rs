@@ -7,7 +7,12 @@ use std::{collections::BTreeSet, fmt};
 use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
-use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer, sanitize};
+use pimalaya_cli::{
+    clap::args::PageTokenArg,
+    listing::{Listing, ListingPage},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +21,6 @@ use crate::{
     backend::Backend,
     email::{address::Address, envelope::Envelope, flag::Flag, outcome::Outcome},
     error::{ItemError, partial_when},
-    listing::{Listing, ListingPage},
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
 
@@ -162,7 +166,7 @@ pub struct EnvelopeListOutput {
 
 impl fmt::Display for EnvelopeListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut listing = Listing::new(&self.account, self.backend);
+        let mut listing = Listing::new(&self.account, self.backend.map(Backend::as_str));
         listing.head("Mailbox", &self.mailbox);
 
         if let Some(query) = &self.query {
@@ -201,7 +205,7 @@ impl fmt::Display for EnvelopeListOutput {
         );
 
         for error in &self.errors {
-            listing.head("Error", &error.to_string());
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")
@@ -415,32 +419,42 @@ Page:       4, empty
         assert_eq!(envelopes.to_string(), expected);
     }
 
-    /// Each envelope the page could not list prints as one `Error:` field
-    /// after the paging fields, `-` for an absent id or code, and none
-    /// under the items.
+    /// Each envelope the page could not list prints as one `Error:` line
+    /// after the items and a blank line, aligned among themselves, `-` for
+    /// an absent id or code.
     #[test]
-    fn an_item_error_prints_in_the_header_block() {
+    fn an_item_error_prints_after_the_items() {
         let mut envelopes = envelopes();
         envelopes.page_size = Some(2);
         envelopes.next_page = Some(String::from("2"));
 
         let alice = address(Some("Alice"), "alice@example.org");
         envelopes.envelopes = vec![envelope("4", &[IanaFlag::Seen], alice, "Hi")];
-        envelopes.errors = vec![ItemError {
-            id: None,
-            code: Some(ErrorCode::MessageUnreadable),
-            error: String::from("Cannot decode a line of the FETCH response"),
-            sources: Vec::new(),
-        }];
+        envelopes.errors = vec![
+            ItemError {
+                id: None,
+                code: Some(ErrorCode::MessageUnreadable),
+                error: String::from("Cannot decode a line of the FETCH response"),
+                sources: Vec::new(),
+            },
+            ItemError {
+                id: Some(String::from("3")),
+                code: None,
+                error: String::from("Gone"),
+                sources: Vec::new(),
+            },
+        ];
 
         let expected = "\
 Account:    work (imap)
 Mailbox:    INBOX
 Page:       1, envelope 1
 Next page:  --page 2
-Error:      -  message-unreadable  Cannot decode a line of the FETCH response
 
 4        2026-11-11 10:00  Alice  Hi
+
+Error:  -  message-unreadable  Cannot decode a line of the FETCH response
+Error:  3  -                   Gone
 ";
         assert_eq!(envelopes.to_string(), expected);
 
