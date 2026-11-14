@@ -36,7 +36,8 @@ use crate::shared::receipt::IdsReceipt;
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
 /// Each value describes the type the command hands to the printer, and
-/// `himalaya-error` the failure object every command prints instead. A
+/// `himalaya-error` the failure object every command prints instead,
+/// `himalaya-item-error` the error of one item in a result's `errors`. A
 /// command printing one of two types is described by both, through
 /// `OneOf`.
 pub fn registry() -> JsonSchemaRegistry {
@@ -746,6 +747,8 @@ pub fn registry() -> JsonSchemaRegistry {
     }
 
     insert!("himalaya-error", ErrorReport<ErrorCode>);
+    #[cfg(any(backend, feature = "smtp"))]
+    insert!("himalaya-item-error", crate::error::ItemError);
 
     registry
 }
@@ -778,7 +781,41 @@ mod tests {
 
     #[test]
     fn every_command_is_described() {
-        let problems = registry().check(&Cli::command(), SILENT);
+        let mut registry = registry();
+
+        // NOTE: the item error names no command, as the failure object.
+        registry.schemas.remove("himalaya-item-error");
+
+        let problems = registry.check(&Cli::command(), SILENT);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_result_carrying_errors_requires_them() {
+        let registry = registry();
+
+        for key in [
+            "himalaya-envelope-list",
+            "himalaya-envelope-search",
+            "himalaya-mailbox-list",
+            "himalaya-flag-add",
+            "himalaya-flag-set",
+            "himalaya-flag-remove",
+            "himalaya-message-copy",
+            "himalaya-message-move",
+            "himalaya-message-delete",
+        ] {
+            let schema = &registry.schemas[key];
+            let required = schema["required"].as_array().unwrap();
+            assert!(required.iter().any(|k| k == "errors"), "{key}: {schema}");
+        }
+
+        let item = &registry.schemas["himalaya-item-error"];
+        for key in ["id", "code", "error", "sources"] {
+            let required = item["required"].as_array().unwrap();
+            assert!(required.iter().any(|k| k == key), "{key}: {item}");
+        }
+        assert!(item.to_string().contains("message-unreadable"), "{item}");
     }
 }

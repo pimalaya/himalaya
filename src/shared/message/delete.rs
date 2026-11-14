@@ -15,7 +15,7 @@ use crate::{
     account::context::Account,
     capability::{self, Capability},
     email::mailbox::MailboxRole,
-    error::message_not_found,
+    error::{ItemError, partial_when},
     shared::{client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
@@ -60,30 +60,32 @@ impl MessageDeleteCommand {
         let trash_id = client.resolve_mailbox_id(&trash)?;
 
         let queued = client.queues_writes();
-        let report = if current_id == trash_id {
-            let (count, removed) = client.delete_messages(&current_id, &ids)?;
-            if count == 0 {
-                return Err(message_not_found(
-                    "No message deleted: no id matched in the mailbox",
-                ));
-            }
+        let output = if current_id == trash_id {
+            let outcome = client.delete_messages(&current_id, &ids)?;
+            let (count, removed) = outcome.value;
             let action = if removed {
                 DeleteAction::Deleted
             } else {
                 DeleteAction::Flagged
             };
-            MessageDeleteOutput::new(action, count, queued)
-        } else {
-            let moved = client.move_messages(&current_id, &trash_id, &ids)?;
-            if moved == 0 {
-                return Err(message_not_found(
-                    "No message deleted: no id matched in the mailbox",
-                ));
+            MessageDeleteOutput {
+                action,
+                count,
+                queued,
+                errors: outcome.errors,
             }
-            MessageDeleteOutput::new(DeleteAction::MovedToTrash, moved, queued)
+        } else {
+            let outcome = client.move_messages(&current_id, &trash_id, &ids)?;
+            MessageDeleteOutput {
+                action: DeleteAction::MovedToTrash,
+                count: outcome.value,
+                queued,
+                errors: outcome.errors,
+            }
         };
 
-        printer.out(report)
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -110,17 +112,8 @@ pub(crate) struct MessageDeleteOutput {
     count: usize,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
-}
-
-impl MessageDeleteOutput {
-    /// Reports one action over a message count, queued or done.
-    fn new(action: DeleteAction, count: usize, queued: bool) -> Self {
-        Self {
-            action,
-            count,
-            queued,
-        }
-    }
+    /// The error of each message not acted on, in the order given.
+    errors: Vec<ItemError>,
 }
 
 /// What `message delete` did to the messages it was given.
@@ -159,18 +152,36 @@ impl fmt::Display for MessageDeleteOutput {
                 f,
                 "Flagged {count} message(s) as deleted; run an expunge on the trash to remove them",
             ),
+        }?;
+
+        for error in &self.errors {
+            writeln!(f, "Error:  {error}")?;
         }
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::shared::message::delete::{DeleteAction, MessageDeleteOutput};
+    use crate::{
+        error::missing_message,
+        shared::message::delete::{DeleteAction, MessageDeleteOutput},
+    };
+
+    fn moved(queued: bool) -> MessageDeleteOutput {
+        MessageDeleteOutput {
+            action: DeleteAction::MovedToTrash,
+            count: 2,
+            queued,
+            errors: Vec::new(),
+        }
+    }
 
     #[test]
     fn a_queued_delete_says_it_is_queued() {
-        let queued = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, true);
-        let done = MessageDeleteOutput::new(DeleteAction::MovedToTrash, 2, false);
+        let queued = moved(true);
+        let done = moved(false);
 
         assert_eq!(
             queued.to_string(),
@@ -182,7 +193,31 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&queued).unwrap(),
-            r#"{"action":"moved-to-trash","count":2,"queued":true}"#
+            r#"{"action":"moved-to-trash","count":2,"queued":true,"errors":[]}"#
+        );
+    }
+
+    /// Each message not acted on prints one `Error:` line after the
+    /// sentence, and one item error under `errors`.
+    #[test]
+    fn an_unknown_id_prints_after_the_sentence() {
+        let mut output = moved(false);
+        output.count = 0;
+        output.errors = vec![missing_message("99")];
+
+        assert_eq!(
+            output.to_string(),
+            "Successfully moved 0 message(s) to the trash\n\
+             Error:  99  message-not-found  Message not found in the mailbox\n"
+        );
+        assert_eq!(
+            serde_json::to_value(&output).unwrap()["errors"],
+            serde_json::json!([{
+                "id": "99",
+                "code": "message-not-found",
+                "error": "Message not found in the mailbox",
+                "sources": [],
+            }])
         );
     }
 }

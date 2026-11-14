@@ -14,7 +14,8 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    email::mailbox::Mailbox,
+    email::{mailbox::Mailbox, outcome::Outcome},
+    error::{ItemError, partial_when},
     listing::{self, Listing},
     shared::client::EmailClient,
 };
@@ -40,17 +41,24 @@ impl MailboxListCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mut mailboxes = client.list_mailboxes(self.counts)?;
+        let Outcome {
+            value: mut mailboxes,
+            errors,
+        } = client.list_mailboxes(self.counts)?;
         account.apply_role_aliases(&mut mailboxes, |alias| client.alias_mailbox_id(alias));
 
         let resolution = client.resolution();
 
-        printer.out(MailboxListOutput {
+        let output = MailboxListOutput {
             account: resolution.account.clone(),
             backend: resolution.storage,
             with_counts: self.counts,
             mailboxes,
-        })
+            errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -69,6 +77,9 @@ pub struct MailboxListOutput {
     pub with_counts: bool,
     /// The mailboxes, in the order the backend returned them.
     pub mailboxes: Vec<Mailbox>,
+    /// The error of each mailbox the account could not read, in the
+    /// order met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for MailboxListOutput {
@@ -91,6 +102,10 @@ impl fmt::Display for MailboxListOutput {
             listing.items.push(row);
         }
 
+        for error in &self.errors {
+            listing.head("Error", &error.to_string());
+        }
+
         write!(f, "{listing}")
     }
 }
@@ -99,11 +114,12 @@ impl fmt::Display for MailboxListOutput {
 mod tests {
     use crate::{
         email::mailbox::{Mailbox, MailboxRole},
+        error::{ErrorCode, ItemError},
         shared::mailbox::list::MailboxListOutput,
     };
 
     /// The counts print as one `unread/total` cell, and only with
-    /// `--counts`.
+    /// `--counts`; a mailbox whose counts failed prints an `Error:` field.
     #[test]
     fn counts_print_as_unread_over_total() {
         let mailbox = |id: &str, role, counts: Option<(u64, u64)>| Mailbox {
@@ -121,6 +137,7 @@ mod tests {
                 mailbox("INBOX", Some(MailboxRole::Inbox), Some((3, 120))),
                 mailbox("Lists", None, None),
             ],
+            errors: Vec::new(),
         };
 
         let expected = "\
@@ -138,5 +155,22 @@ INBOX  inbox  INBOX
 Lists  -      Lists
 ";
         assert_eq!(output(false).to_string(), expected);
+
+        let mut unread = output(true);
+        unread.errors = vec![ItemError {
+            id: Some(String::from("Lists")),
+            code: Some(ErrorCode::MailboxUnreadable),
+            error: String::from("Cannot count the messages"),
+            sources: Vec::new(),
+        }];
+
+        let expected = "\
+Account:    work
+Error:      Lists  mailbox-unreadable  Cannot count the messages
+
+INBOX  inbox  3/120  INBOX
+Lists  -      -      Lists
+";
+        assert_eq!(unread.to_string(), expected);
     }
 }

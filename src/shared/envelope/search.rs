@@ -14,8 +14,11 @@ use pimalaya_cli::{clap::args::PageTokenArg, error::CodedError, printer::Printer
 use crate::{
     account::context::Account,
     capability::Capability,
-    email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
-    error::ErrorCode,
+    email::{
+        outcome::Outcome,
+        search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
+    },
+    error::{ErrorCode, partial_when},
     shared::{client::EmailClient, envelope::list::EnvelopeListOutput, mailbox::arg::MailboxArg},
 };
 
@@ -131,7 +134,10 @@ impl EnvelopeSearchCommand {
         let text = query_text(self.query.as_deref());
         let query = parse_query(text.as_deref())?;
 
-        let envelopes = client.search_envelopes(
+        let Outcome {
+            value: envelopes,
+            errors,
+        } = client.search_envelopes(
             &mailbox,
             query.as_ref(),
             page,
@@ -142,7 +148,7 @@ impl EnvelopeSearchCommand {
         // NOTE: the token is the next page number, given while a page comes
         // back full; the page after a full last one comes back empty.
         let next_page = match (page, page_size) {
-            (Some(page), Some(size)) if envelopes.len() >= size as usize => {
+            (Some(page), Some(size)) if envelopes.len() + errors.len() >= size as usize => {
                 Some((page + 1).to_string())
             }
             _ => None,
@@ -150,7 +156,7 @@ impl EnvelopeSearchCommand {
 
         let resolution = client.resolution();
 
-        printer.out(EnvelopeListOutput {
+        let output = EnvelopeListOutput {
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
             account: resolution.account.clone(),
@@ -162,7 +168,11 @@ impl EnvelopeSearchCommand {
             recipient: self.recipient,
             envelopes,
             next_page,
-        })
+            errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 

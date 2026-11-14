@@ -80,7 +80,7 @@ impl GmailClient {
 
     fn label_index(&mut self) -> Result<&MailboxIndex> {
         if self.label_index.is_none() {
-            let labels = self.list_mailboxes(false)?;
+            let labels = self.list_mailboxes(false)?.value;
             self.label_index = Some(MailboxIndex(labels));
         }
 

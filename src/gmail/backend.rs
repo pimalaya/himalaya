@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, FixedOffset, Utc};
 use io_gmail::v1::{
+    batch::{GMAIL_BATCH_MAX_REQUESTS, GmailBatch, GmailBatchRequest, GmailBatchResponseError},
     client::GmailClientStdError,
     rest::{
         labels::GmailLabel,
@@ -20,9 +21,10 @@ use io_gmail::v1::{
         },
         settings::{get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate},
     },
-    send::GmailSendError,
+    send::{GmailApiError, GmailSendError},
 };
 use mime::header::marker::IN_REPLY_TO;
+use pimalaya_cli::sanitize;
 
 use crate::{
     email::{
@@ -30,9 +32,11 @@ use crate::{
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
+        outcome::Outcome,
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
         vacation::{Vacation, VacationPatch, date_from_millis},
     },
+    error::{ErrorCode, ItemError, missing_message},
     gmail::{client::GmailClient, search},
     shared::message::header::parse_headers,
 };
@@ -52,32 +56,48 @@ const SENT: &str = "SENT";
 
 impl GmailClient {
     /// Lists every Gmail label as a mailbox. With `with_counts`, issues
-    /// one `labels.get` per label to fill totals/unread.
-    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// one `labels.get` per label to fill totals/unread, a label Gmail
+    /// refuses it for listed without counts, beside its error.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let labels = self.labels_list()?.response.labels;
 
         if !with_counts {
-            return Ok(labels.into_iter().map(mailbox_from).collect());
+            let mailboxes: Vec<Mailbox> = labels.into_iter().map(mailbox_from).collect();
+            return Ok(Outcome::from(mailboxes));
         }
 
         let mut mailboxes = Vec::with_capacity(labels.len());
-        for label in &labels {
-            let full = self.label_get(&label.id)?.response;
-            mailboxes.push(mailbox_from(full));
+        let mut errors = Vec::new();
+        for label in labels {
+            match self.label_get(&label.id) {
+                Ok(full) => mailboxes.push(mailbox_from(full.response)),
+                Err(GmailClientStdError::Send(err)) if err.api().is_some() => {
+                    let err = anyhow!(err).context("Cannot count the messages of the label");
+                    let mut error = ItemError::new(Some(&label.id), &err);
+                    error.code = Some(ErrorCode::MailboxUnreadable);
+                    errors.push(error);
+                    mailboxes.push(mailbox_from(label));
+                }
+                Err(err) => return Err(err.into()),
+            }
         }
-        Ok(mailboxes)
+
+        Ok(Outcome {
+            value: mailboxes,
+            errors,
+        })
     }
 
     /// Lists envelopes from the `mailbox` label: `messages.list` (walking
-    /// the opaque page token to the requested 1-indexed page) then one
-    /// `messages.get` (metadata) per id.
+    /// the opaque page token to the requested 1-indexed page) then the
+    /// metadata of the ids, through batched `messages.get`.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let label_ids = vec![mailbox.to_string()];
         let spam_trash = include_spam_trash(mailbox);
         let skip = page.unwrap_or(1).max(1) - 1;
@@ -93,7 +113,7 @@ impl GmailClient {
             };
             match self.messages_list(&params)?.response.next_page_token {
                 Some(token) => page_token = Some(token),
-                None => return Ok(Vec::new()),
+                None => return Ok(Outcome::from(Vec::new())),
             }
         }
 
@@ -112,14 +132,9 @@ impl GmailClient {
             .map(|message| message.id)
             .collect();
 
-        let mut envelopes = Vec::with_capacity(ids.len());
-        for id in &ids {
-            let message = self
-                .message_get(id, GmailMessageFormat::Metadata, &[])?
-                .response;
-            envelopes.push(envelope_from(message));
-        }
-        Ok(envelopes)
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let answers = self.messages_get_batch(&ids, GmailMessageFormat::Metadata)?;
+        Ok(listed(&ids, answers))
     }
 
     /// Searches the `mailbox` label with the shared query: the filter
@@ -133,7 +148,7 @@ impl GmailClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let q = match query.and_then(|query| query.filter.as_ref()) {
             Some(filter) => Some(search::filter_to_q(filter)?),
             None => None,
@@ -154,7 +169,7 @@ impl GmailClient {
             };
             match self.messages_list(&params)?.response.next_page_token {
                 Some(token) => page_token = Some(token),
-                None => return Ok(Vec::new()),
+                None => return Ok(Outcome::from(Vec::new())),
             }
         }
 
@@ -173,69 +188,116 @@ impl GmailClient {
             .map(|message| message.id)
             .collect();
 
-        let mut envelopes = Vec::with_capacity(ids.len());
-        for id in &ids {
-            let message = self
-                .message_get(id, GmailMessageFormat::Metadata, &[])?
-                .response;
-            envelopes.push(envelope_from(message));
-        }
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let answers = self.messages_get_batch(&ids, GmailMessageFormat::Metadata)?;
+        let mut outcome = listed(&ids, answers);
 
         if let Some(sort) = query.and_then(|query| query.sort.as_deref()) {
-            sort_envelopes(&mut envelopes, Some(sort));
+            sort_envelopes(&mut outcome.value, Some(sort));
         }
 
-        Ok(envelopes)
+        Ok(outcome)
     }
 
     /// Adds, sets, or removes `flags` via `messages.modify` on the ids
-    /// carrying the `mailbox` label, returning how many do.
+    /// carrying the `mailbox` label, returning how many it modified beside
+    /// the error of each id it did not.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let (add, remove) = label_patch(flags, op);
-        let ids = self.ids_in(mailbox, ids)?;
+        let found = self.ids_in(mailbox, ids)?;
 
         // NOTE: an IANA flag without a label (`$Forwarded`) leaves nothing
         // to patch, and an empty `messages.modify` is a wasted request that
         // could still fail.
         if add.is_empty() && remove.is_empty() {
-            return Ok(ids.len());
+            return Ok(found.map(|ids| ids.len()));
         }
 
-        for id in &ids {
-            self.message_modify(id, &add, &remove)?;
-        }
-        Ok(ids.len())
+        let modified = self.each_message(&found.value, |client, id| {
+            client.message_modify(id, &add, &remove).map(drop)
+        })?;
+
+        Ok(modified.after(found.errors))
     }
 
-    /// The ids of `ids` whose message carries the `mailbox` label, one
-    /// `messages.get` (minimal) each, Gmail ids being account-wide. An id
-    /// Gmail does not know is left out, as is a repeated one.
-    fn ids_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Vec<String>> {
-        let mut found: Vec<String> = Vec::with_capacity(ids.len());
+    /// The ids of `ids` whose message carries the `mailbox` label, through
+    /// batched `messages.get` (minimal), Gmail ids being account-wide. An
+    /// id Gmail does not know, or whose message lacks the label, is an
+    /// item error, as is one Gmail could not answer for.
+    fn ids_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<Vec<String>>> {
+        let answers = self.messages_get_batch(ids, GmailMessageFormat::Minimal)?;
+        Ok(labelled(mailbox, ids, answers))
+    }
+
+    /// Runs `write` on each of `ids`, one request per message, returning
+    /// how many it wrote beside the error of each message Gmail refused.
+    ///
+    /// A refusal carries on to the next message; a failure of the
+    /// exchange itself fails the command.
+    fn each_message(
+        &mut self,
+        ids: &[String],
+        write: impl Fn(&mut Self, &str) -> Result<(), GmailClientStdError>,
+    ) -> Result<Outcome<usize>> {
+        let mut outcome = Outcome::from(0);
 
         for id in ids {
-            if found.iter().any(|known| known == id) {
-                continue;
-            }
-
-            let message = match self.message_get(id, GmailMessageFormat::Minimal, &[]) {
-                Ok(output) => output.response,
-                Err(GmailClientStdError::Send(err)) if is_unknown_id(&err) => continue,
+            match write(self, id) {
+                Ok(()) => outcome.value += 1,
+                Err(GmailClientStdError::Send(GmailSendError::Api(err))) => {
+                    outcome.errors.push(api_item_error(id, &err));
+                }
                 Err(err) => return Err(err.into()),
-            };
-
-            if message.label_ids.iter().any(|label| label == mailbox) {
-                found.push(id.to_string());
             }
         }
 
-        Ok(found)
+        Ok(outcome)
+    }
+
+    /// Reads the messages of `ids` in `format` through batched
+    /// `messages.get`, [`GMAIL_BATCH_MAX_REQUESTS`] per request, one
+    /// answer per id in the order given.
+    fn messages_get_batch(
+        &mut self,
+        ids: &[&str],
+        format: GmailMessageFormat,
+    ) -> Result<Vec<Result<GmailMessage, GmailBatchResponseError>>> {
+        let mut answers = Vec::with_capacity(ids.len());
+
+        for chunk in ids.chunks(GMAIL_BATCH_MAX_REQUESTS) {
+            // NOTE: a part is named by its index, an id given on the
+            // command line being no safe `Content-ID`.
+            let requests = chunk
+                .iter()
+                .enumerate()
+                .map(|(i, id)| GmailBatchRequest::message_get(i, &self.user_id, id, format, &[]))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let coroutine = GmailBatch::<GmailMessage>::new(&self.auth, &requests)?;
+            let mut parts: Vec<_> = chunk.iter().map(|_| None).collect();
+
+            for response in self.run(coroutine)?.response {
+                if let Some(part) = response
+                    .id
+                    .parse()
+                    .ok()
+                    .and_then(|i: usize| parts.get_mut(i))
+                {
+                    *part = Some(response.result);
+                }
+            }
+
+            let missing = || Err(GmailBatchResponseError::Missing);
+            answers.extend(parts.into_iter().map(|part| part.unwrap_or_else(missing)));
+        }
+
+        Ok(answers)
     }
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
@@ -288,41 +350,50 @@ impl GmailClient {
     }
 
     /// Copies the ids carrying the `from` label into `to` by adding `to`'s
-    /// label, returning how many do.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in(from, ids)?;
+    /// label, returning how many it copied beside the error of each id it
+    /// did not.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in(from, ids)?;
         let add = vec![to.to_string()];
-        for id in &ids {
-            self.message_modify(id, &add, &[])?;
-        }
-        Ok(ids.len())
+
+        let copied = self.each_message(&found.value, |client, id| {
+            client.message_modify(id, &add, &[]).map(drop)
+        })?;
+
+        Ok(copied.after(found.errors))
     }
 
     /// Moves the ids carrying the `from` label to `to` by adding `to`'s
-    /// label and removing `from`'s, returning how many do. A move onto
-    /// the same label changes nothing.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in(from, ids)?;
+    /// label and removing `from`'s, returning how many it moved beside the
+    /// error of each id it did not. A move onto the same label changes
+    /// nothing.
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in(from, ids)?;
         if from == to {
-            return Ok(ids.len());
+            return Ok(found.map(|ids| ids.len()));
         }
 
         let add = vec![to.to_string()];
         let remove = vec![from.to_string()];
-        for id in &ids {
-            self.message_modify(id, &add, &remove)?;
-        }
-        Ok(ids.len())
+
+        let moved = self.each_message(&found.value, |client, id| {
+            client.message_modify(id, &add, &remove).map(drop)
+        })?;
+
+        Ok(moved.after(found.errors))
     }
 
     /// Permanently deletes the ids carrying the `mailbox` label
-    /// (`users.messages.delete`), returning how many do.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in(mailbox, ids)?;
-        for id in &ids {
-            self.message_delete(id)?;
-        }
-        Ok(ids.len())
+    /// (`users.messages.delete`), returning how many it deleted beside the
+    /// error of each id it did not.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in(mailbox, ids)?;
+
+        let deleted = self.each_message(&found.value, |client, id| {
+            client.message_delete(id).map(drop)
+        })?;
+
+        Ok(deleted.after(found.errors))
     }
 
     /// Creates the label `name` at the top, or under `parent` as
@@ -527,10 +598,107 @@ fn sublabel_renames(labels: &[GmailLabel], old: &str, new: &str) -> Vec<(String,
 
 /// Whether Gmail refused a message id as unknown: `404` for an id of the
 /// right shape, `400 Invalid id value` for one it cannot parse.
-fn is_unknown_id(err: &GmailSendError) -> bool {
-    err.api().is_some_and(|err| {
-        err.status == 404 || (err.status == 400 && err.message == "Invalid id value")
-    })
+fn is_unknown_id(err: &GmailApiError) -> bool {
+    err.status == 404 || (err.status == 400 && err.message == "Invalid id value")
+}
+
+/// The envelopes of the `answers` to batched `messages.get` of `ids`,
+/// beside the error of each one Gmail could not answer for.
+///
+/// A message answered 404 was deleted since the list was read, so it is
+/// left out rather than reported.
+fn listed(
+    ids: &[&str],
+    answers: Vec<Result<GmailMessage, GmailBatchResponseError>>,
+) -> Outcome<Vec<Envelope>> {
+    let mut outcome = Outcome::from(Vec::with_capacity(ids.len()));
+
+    for (id, answer) in ids.iter().zip(answers) {
+        match answer {
+            Ok(message) => outcome.value.push(envelope_from(message)),
+            Err(err) if err.is_not_found() => continue,
+            Err(err) => outcome.errors.push(batch_item_error(id, &err)),
+        }
+    }
+
+    outcome
+}
+
+/// The ids of `ids` whose message, in the `answers` to batched
+/// `messages.get`, carries the `mailbox` label, beside the error of each
+/// other one.
+fn labelled(
+    mailbox: &str,
+    ids: &[&str],
+    answers: Vec<Result<GmailMessage, GmailBatchResponseError>>,
+) -> Outcome<Vec<String>> {
+    let mut outcome = Outcome::from(Vec::with_capacity(ids.len()));
+
+    for (id, answer) in ids.iter().zip(answers) {
+        match answer {
+            Ok(message) if message.label_ids.iter().any(|label| label == mailbox) => {
+                outcome.value.push(id.to_string());
+            }
+            Ok(_) => outcome.errors.push(missing_message(id)),
+            Err(GmailBatchResponseError::Api(err)) if is_unknown_id(&err) => {
+                outcome.errors.push(missing_message(id));
+            }
+            Err(err) => outcome.errors.push(batch_item_error(id, &err)),
+        }
+    }
+
+    outcome
+}
+
+/// The item error of the message `id` a batched call failed on: Gmail's
+/// refusal, an answer that does not parse, or no answer at all.
+fn batch_item_error(id: &str, err: &GmailBatchResponseError) -> ItemError {
+    match err {
+        GmailBatchResponseError::Api(err) => api_item_error(id, err),
+        GmailBatchResponseError::ParseResponse(_) => ItemError {
+            id: Some(id.to_owned()),
+            code: Some(ErrorCode::MessageUnreadable),
+            error: String::from("Cannot parse the Gmail message"),
+            sources: vec![err.to_string()],
+        },
+        GmailBatchResponseError::Missing => ItemError {
+            id: Some(id.to_owned()),
+            code: None,
+            error: err.to_string(),
+            sources: Vec::new(),
+        },
+    }
+}
+
+/// The item error of the message `id` Gmail refused, coded by its status
+/// and reasons, which `sources` keeps.
+fn api_item_error(id: &str, err: &GmailApiError) -> ItemError {
+    let code = if err.is_rate_limited() {
+        Some(ErrorCode::RateLimited)
+    } else if err.status == 403 {
+        Some(ErrorCode::PermissionDenied)
+    } else if is_unknown_id(err) {
+        Some(ErrorCode::MessageNotFound)
+    } else {
+        None
+    };
+
+    let mut sources = vec![format!("HTTP {}", err.status)];
+    sources.extend(
+        err.reasons
+            .iter()
+            .map(|reason| sanitize::text(reason).into_owned()),
+    );
+
+    ItemError {
+        id: Some(id.to_owned()),
+        code,
+        error: format!(
+            "Gmail refused the message: {}",
+            sanitize::text(&err.message)
+        ),
+        sources,
+    }
 }
 
 /// Converts one Gmail label into the shared [`Mailbox`] shape.
@@ -752,13 +920,17 @@ fn parse_rfc2822(raw: &str) -> Option<DateTime<FixedOffset>> {
 #[cfg(test)]
 mod tests {
     use io_gmail::v1::{
-        rest::labels::GmailLabel,
-        send::{GmailApiError, GmailSendError},
+        batch::GmailBatchResponseError,
+        rest::{labels::GmailLabel, messages::GmailMessage},
+        send::GmailApiError,
     };
 
     use crate::{
         email::flag::{Flag, FlagOp, IanaFlag},
-        gmail::backend::{is_unknown_id, label_patch, reply_parents, sublabel_renames},
+        error::{ErrorCode, ItemError},
+        gmail::backend::{
+            is_unknown_id, label_patch, labelled, listed, reply_parents, sublabel_renames,
+        },
     };
 
     fn label(id: &str, name: &str) -> GmailLabel {
@@ -769,12 +941,94 @@ mod tests {
         }
     }
 
-    fn api_error(status: u16, message: &str) -> GmailSendError {
-        GmailSendError::Api(GmailApiError {
+    fn api_error(status: u16, message: &str) -> GmailApiError {
+        GmailApiError {
             status,
             message: message.into(),
             ..Default::default()
-        })
+        }
+    }
+
+    fn refused(status: u16, reason: &str) -> GmailBatchResponseError {
+        let mut err = api_error(status, "Refused");
+        err.reasons = vec![reason.into()];
+        GmailBatchResponseError::Api(err)
+    }
+
+    fn message(id: &str, labels: &[&str]) -> GmailMessage {
+        GmailMessage {
+            id: id.into(),
+            label_ids: labels.iter().map(|label| label.to_string()).collect(),
+            ..Default::default()
+        }
+    }
+
+    fn codes(errors: &[ItemError]) -> Vec<(Option<&str>, Option<ErrorCode>)> {
+        errors
+            .iter()
+            .map(|error| (error.id.as_deref(), error.code))
+            .collect()
+    }
+
+    /// A part answered 404 is left out of a listing, the others coded by
+    /// what Gmail answered, an unanswered one coded `null`.
+    #[test]
+    fn a_listing_reports_the_parts_gmail_could_not_answer() {
+        let ids = ["a", "gone", "slow", "denied", "lost"];
+        let answers = vec![
+            Ok(message("a", &["INBOX"])),
+            Err(refused(404, "notFound")),
+            Err(refused(429, "rateLimitExceeded")),
+            Err(refused(403, "insufficientPermissions")),
+            Err(GmailBatchResponseError::Missing),
+        ];
+
+        let outcome = listed(&ids, answers);
+
+        let listed: Vec<&str> = outcome.value.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(listed, ["a"]);
+        assert_eq!(
+            codes(&outcome.errors),
+            [
+                (Some("slow"), Some(ErrorCode::RateLimited)),
+                (Some("denied"), Some(ErrorCode::PermissionDenied)),
+                (Some("lost"), None),
+            ]
+        );
+    }
+
+    /// An id Gmail does not know, or whose message lacks the label, is not
+    /// found; a 403 throttle is a rate limit, not a refusal.
+    #[test]
+    fn a_lookup_keeps_the_ids_carrying_the_label() {
+        let ids = ["in", "elsewhere", "unknown", "malformed", "throttled"];
+        let answers = vec![
+            Ok(message("in", &["Label_1"])),
+            Ok(message("elsewhere", &["INBOX"])),
+            Err(refused(404, "notFound")),
+            Err(GmailBatchResponseError::Api(api_error(
+                400,
+                "Invalid id value",
+            ))),
+            Err(refused(403, "userRateLimitExceeded")),
+        ];
+
+        let outcome = labelled("Label_1", &ids, answers);
+
+        assert_eq!(outcome.value, ["in"]);
+        assert_eq!(
+            codes(&outcome.errors),
+            [
+                (Some("elsewhere"), Some(ErrorCode::MessageNotFound)),
+                (Some("unknown"), Some(ErrorCode::MessageNotFound)),
+                (Some("malformed"), Some(ErrorCode::MessageNotFound)),
+                (Some("throttled"), Some(ErrorCode::RateLimited)),
+            ]
+        );
+        assert_eq!(
+            outcome.errors[3].sources,
+            ["HTTP 403", "userRateLimitExceeded"]
+        );
     }
 
     #[test]

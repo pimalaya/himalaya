@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    error::message_not_found,
+    error::{ItemError, partial_when},
     shared::{
         client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::resolve_mailbox_or_default,
     },
@@ -47,17 +47,16 @@ impl MessageMoveCommand {
         let from = resolve_mailbox_or_default(account, self.from.as_deref());
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids = self.ids.ids();
-        let count = client.move_messages(&from, &to, &ids)?;
-        if count == 0 {
-            return Err(message_not_found(
-                "No message moved: no id matched in the source mailbox",
-            ));
-        }
+        let outcome = client.move_messages(&from, &to, &ids)?;
 
-        printer.out(MessageMoveOutput {
-            count,
+        let output = MessageMoveOutput {
+            count: outcome.value,
             queued: client.queues_writes(),
-        })
+            errors: outcome.errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -65,10 +64,12 @@ impl MessageMoveCommand {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MessageMoveOutput {
-    /// How many of the given messages were found and moved.
+    /// How many of the given messages were moved.
     count: usize,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
+    /// The error of each message not acted on, in the order given.
+    errors: Vec<ItemError>,
 }
 
 impl fmt::Display for MessageMoveOutput {
@@ -76,9 +77,15 @@ impl fmt::Display for MessageMoveOutput {
         let count = self.count;
 
         if self.queued {
-            return writeln!(f, "{count} message(s) queued for moving");
+            writeln!(f, "{count} message(s) queued for moving")?;
+        } else {
+            writeln!(f, "{count} message(s) successfully moved")?;
         }
 
-        writeln!(f, "{count} message(s) successfully moved")
+        for error in &self.errors {
+            writeln!(f, "Error:  {error}")?;
+        }
+
+        Ok(())
     }
 }

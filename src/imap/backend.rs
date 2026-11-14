@@ -26,6 +26,7 @@ use io_imap::{
     },
     rfc5256::sort::ImapMessageSortOptions,
     rfc6851::r#move::ImapMessageMoveOptions,
+    send::ImapOutput,
     types::{
         body::{BodyStructure, SpecificFields},
         core::{AString, Atom, Vec1},
@@ -42,6 +43,7 @@ use io_imap::{
 };
 use log::debug;
 use mime::header::marker::MESSAGE_ID;
+use pimalaya_cli::error::CodedError;
 
 use crate::{
     capability,
@@ -50,6 +52,7 @@ use crate::{
         envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level},
+        outcome::Outcome,
         search::{
             error::unsupported,
             filter::query::SearchEmailsFilterQuery,
@@ -57,7 +60,7 @@ use crate::{
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
         },
     },
-    error::{mailbox_not_found, message_not_found},
+    error::{ErrorCode, ItemError, mailbox_not_found, message_not_found, missing_message},
     imap::{client::ImapClient, utils::output_data},
     shared::message::{header, part},
 };
@@ -65,7 +68,11 @@ use crate::{
 impl ImapClient {
     /// Lists every selectable mailbox, following each with a `STATUS`
     /// when counts were asked for.
-    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    ///
+    /// A `LIST` line that does not decode is an item error naming no
+    /// mailbox, and a mailbox whose `STATUS` the server refuses or that
+    /// does not decode is listed without counts, beside its error.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let reference: ImapMailbox<'static> = ""
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP list reference"))?;
@@ -73,7 +80,13 @@ impl ImapClient {
             .try_into()
             .map_err(|_| anyhow!("Invalid IMAP list pattern"))?;
 
-        let rows = output_data("LIST", self.list(reference, pattern)?);
+        let output = self.list(reference, pattern)?;
+        let mut errors: Vec<ItemError> = output
+            .skipped
+            .iter()
+            .map(|_| unreadable_mailbox(None, "Cannot decode a line of the LIST response"))
+            .collect();
+        let rows = output_data("LIST", output);
 
         let mut mailboxes: Vec<Mailbox> = rows
             .into_iter()
@@ -84,15 +97,36 @@ impl ImapClient {
         if with_counts {
             for mailbox in &mut mailboxes {
                 let mbox = parse_mailbox(&mailbox.id)?;
-                let items = self.status(
-                    mbox,
-                    vec![StatusDataItemName::Messages, StatusDataItemName::Unseen].into(),
-                )?;
-                apply_status(mailbox, output_data("STATUS", items));
+                let names = vec![StatusDataItemName::Messages, StatusDataItemName::Unseen];
+                let output = match self.status(mbox, names.into()) {
+                    Ok(output) => output,
+                    Err(err) if err.status().is_some() => {
+                        let id = Some(mailbox.id.as_str());
+                        let err = anyhow!(err).context("Cannot count the messages");
+                        let mut error = ItemError::new(id, &err);
+                        error.code = Some(ErrorCode::MailboxUnreadable);
+                        errors.push(error);
+                        continue;
+                    }
+                    Err(err) => return Err(err.into()),
+                };
+
+                let undecoded = !output.skipped.is_empty();
+                let items = output_data("STATUS", output);
+                if items.is_empty() && undecoded {
+                    let error = "Cannot decode the STATUS response";
+                    errors.push(unreadable_mailbox(Some(&mailbox.id), error));
+                    continue;
+                }
+
+                apply_status(mailbox, items);
             }
         }
 
-        Ok(mailboxes)
+        Ok(Outcome {
+            value: mailboxes,
+            errors,
+        })
     }
 
     /// Maps a role (`sent`, `trash`...) onto the mailbox whose special-use
@@ -101,7 +135,7 @@ impl ImapClient {
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match MailboxRole::known(mailbox) {
             None | Some(MailboxRole::Inbox) => Ok(mailbox.to_string()),
-            Some(_) => MailboxIndex(self.list_mailboxes(false)?).resolve(mailbox),
+            Some(_) => MailboxIndex(self.list_mailboxes(false)?.value).resolve(mailbox),
         }
     }
 
@@ -112,7 +146,7 @@ impl ImapClient {
             return Ok(Some(String::from("INBOX")));
         }
 
-        MailboxIndex(self.list_mailboxes(false)?).with_role(role)
+        MailboxIndex(self.list_mailboxes(false)?.value).with_role(role)
     }
 
     /// Lists envelopes most recent first, the whole mailbox when neither
@@ -230,14 +264,15 @@ impl ImapClient {
     /// section 6.4.8), so the untagged `FETCH` echoes are the first
     /// count. A server is free to skip the echo of a message whose flags
     /// did not change, so fewer echoes than UIDs is settled by a
-    /// `UID SEARCH` on the same set.
+    /// `UID SEARCH` on the same set. A UID found by neither is an item
+    /// error.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(ids)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
@@ -263,11 +298,8 @@ impl ImapClient {
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        if output_data("STORE", echoes).len() >= ids.len() {
-            return Ok(ids.len());
-        }
-
-        Ok(self.present_uids(sequence_set)?.len())
+        let present = self.stored_uids(echoes, sequence_set, ids.len())?;
+        Ok(found_uids(ids, &present))
     }
 
     /// Fetches one message's raw RFC 5322 bytes, marking it seen only
@@ -298,9 +330,10 @@ impl ImapClient {
         let data = output_data("FETCH", output);
 
         if data.is_empty() && unreadable {
-            bail!(
+            let message = format!(
                 "Cannot read message `{id}` of mailbox `{mailbox}`: its FETCH response does not decode"
             );
+            return Err(CodedError::new(ErrorCode::MessageUnreadable, message).into());
         }
 
         if data.is_empty() {
@@ -377,8 +410,9 @@ impl ImapClient {
         Ok(uid)
     }
 
-    /// Copies a UID set between two mailboxes.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// Copies a UID set between two mailboxes, a UID not copied being an
+    /// item error.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
@@ -390,7 +424,8 @@ impl ImapClient {
             ImapMessageCopyOptions { uid: true },
         )?;
 
-        Ok(self.copied_uids(copy_uid, sequence_set, ids.len())?.len())
+        let copied = self.copied_uids(copy_uid, sequence_set, ids.len())?;
+        Ok(found_uids(ids, &copied))
     }
 
     /// Moves a UID set between two mailboxes.
@@ -402,7 +437,7 @@ impl ImapClient {
     /// [`Self::copied_uids`]). Without UIDPLUS the messages stay flagged
     /// in the source, as `delete_messages` already does in the trash. A
     /// plain `EXPUNGE` would also remove every other `\Deleted` message.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
@@ -416,7 +451,7 @@ impl ImapClient {
             // present are searched beforehand, and only they are moved.
             let present = self.present_uids(sequence_set)?;
             if present.is_empty() {
-                return Ok(0);
+                return Ok(found_uids(ids, &present));
             }
             let copy_uid = self.r#move(
                 uid_sequence_set(present.clone())?,
@@ -425,12 +460,13 @@ impl ImapClient {
             )?;
             // NOTE: a COPYUID counting more messages than were sent is
             // not believed.
-            return Ok(match copy_uid {
-                Some(copy_uid) if copy_uid.count() <= present.len() as u64 => {
-                    copy_uid.count() as usize
-                }
-                _ => present.len(),
-            });
+            let mut outcome = found_uids(ids, &present);
+            if let Some(copy_uid) = copy_uid
+                && copy_uid.count() < present.len() as u64
+            {
+                outcome.value = copy_uid.count() as usize;
+            }
+            return Ok(outcome);
         }
 
         let copy_uid = self.copy(
@@ -439,11 +475,11 @@ impl ImapClient {
             ImapMessageCopyOptions { uid: true },
         )?;
         let copied = self.copied_uids(copy_uid, sequence_set, ids.len())?;
+        let outcome = found_uids(ids, &copied);
         if copied.is_empty() {
-            return Ok(0);
+            return Ok(outcome);
         }
 
-        let moved = copied.len();
         let to_remove = uid_sequence_set(copied)?;
 
         self.store(
@@ -462,7 +498,7 @@ impl ImapClient {
             );
         }
 
-        Ok(moved)
+        Ok(outcome)
     }
 
     /// Creates `name` at the top, or under `parent` joined by the
@@ -633,7 +669,11 @@ impl ImapClient {
     /// `\Deleted` message alone. Without it they are only flagged. The
     /// count comes from the STORE echoes, else from a `UID SEARCH UID`
     /// run before the expunge.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<(usize, bool)> {
+    pub fn delete_messages(
+        &mut self,
+        mailbox: &str,
+        ids: &[&str],
+    ) -> Result<Outcome<(usize, bool)>> {
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(ids)?;
 
@@ -645,18 +685,44 @@ impl ImapClient {
             ImapMessageStoreOptions { uid: true },
         )?;
 
-        let count = if output_data("STORE", echoes).len() >= ids.len() {
-            ids.len()
-        } else {
-            self.present_uids(sequence_set.clone())?.len()
-        };
+        let present = self.stored_uids(echoes, sequence_set.clone(), ids.len())?;
+        let outcome = found_uids(ids, &present);
 
-        if count > 0 && self.supports_uidplus() {
+        if outcome.value > 0 && self.supports_uidplus() {
             self.uid_expunge(sequence_set)?;
-            return Ok((count, true));
+            return Ok(outcome.map(|count| (count, true)));
         }
 
-        Ok((count, false))
+        Ok(outcome.map(|count| (count, false)))
+    }
+
+    /// The UIDs of `requested` a `UID STORE` found, from its `echoes` when
+    /// they number `asked`, else from a `UID SEARCH` of the set, a server
+    /// being free to skip the echo of a message whose flags did not change.
+    fn stored_uids(
+        &mut self,
+        echoes: ImapOutput<BTreeMap<NonZeroU32, Vec1<MessageDataItem<'static>>>>,
+        requested: SequenceSet,
+        asked: usize,
+    ) -> Result<Vec<u32>> {
+        let echoes = output_data("STORE", echoes);
+
+        let mut uids: Vec<u32> = echoes
+            .into_values()
+            .flat_map(|items| items.into_inner())
+            .filter_map(|item| match item {
+                MessageDataItem::Uid(uid) => Some(uid.get()),
+                _ => None,
+            })
+            .collect();
+
+        if uids.len() < asked {
+            uids.extend(self.present_uids(requested)?);
+        }
+
+        uids.sort_unstable();
+        uids.dedup();
+        Ok(uids)
     }
 
     /// The source UIDs a `UID COPY` of `requested` really copied, the
@@ -1028,6 +1094,36 @@ fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
 /// case-insensitive (RFC 3501 section 5.1).
 fn same_name(left: &str, right: &str) -> bool {
     left == right || (left.eq_ignore_ascii_case("INBOX") && right.eq_ignore_ascii_case("INBOX"))
+}
+
+/// How many of `ids` the server found among the `found` UIDs, beside the
+/// error of each one it did not.
+fn found_uids(ids: &[&str], found: &[u32]) -> Outcome<usize> {
+    let mut count = 0;
+    let mut errors = Vec::new();
+
+    for id in ids {
+        match id.parse() {
+            Ok(uid) if found.contains(&uid) => count += 1,
+            _ => errors.push(missing_message(id)),
+        }
+    }
+
+    Outcome {
+        value: count,
+        errors,
+    }
+}
+
+/// The item error of a mailbox the client could not read, `None` for one
+/// whose `LIST` line did not decode.
+fn unreadable_mailbox(id: Option<&str>, error: &str) -> ItemError {
+    ItemError {
+        id: id.map(String::from),
+        code: Some(ErrorCode::MailboxUnreadable),
+        error: error.to_owned(),
+        sources: Vec::new(),
+    }
 }
 
 /// Parses stringified UIDs into an IMAP [`SequenceSet`].
@@ -1710,7 +1806,7 @@ mod tests {
         assert!(parse_rfc2822_date("not a date").is_none());
     }
 
-    /// Copy and move counts against a scripted IMAP server.
+    /// Write counts and item errors against a scripted IMAP server.
     mod copy_and_move {
         use std::{
             io::{BufRead, BufReader, Write},
@@ -1718,7 +1814,15 @@ mod tests {
             thread::{self, JoinHandle},
         };
 
-        use crate::{config::imap::ImapConfig, imap::client::ImapClient};
+        use crate::{
+            config::imap::ImapConfig,
+            email::{
+                flag::{Flag, FlagOp, IanaFlag},
+                outcome::Outcome,
+            },
+            error::ErrorCode,
+            imap::client::ImapClient,
+        };
 
         /// The `COPYUID` code a scripted server answers for the source
         /// UIDs that matched, if any.
@@ -1824,6 +1928,17 @@ mod tests {
                                 None => format!("{tag} OK done\r\n"),
                             }
                         }
+                        ["LIST", ..] => format!(
+                            "* LIST () \"/\" INBOX\r\n* LIST () \"/\" Locked\r\n\
+                             {tag} OK done\r\n"
+                        ),
+                        ["STATUS", "Locked", ..] => format!("{tag} NO denied\r\n"),
+                        ["STATUS", ..] => {
+                            format!("* STATUS INBOX (MESSAGES 1 UNSEEN 0)\r\n{tag} OK done\r\n")
+                        }
+                        ["UID", "FETCH", "7", ..] => {
+                            format!("* 1 FETCH (UID 7 BODY[] \"x)\r\n{tag} OK done\r\n")
+                        }
                         ["UID", "EXPUNGE", set] => {
                             let set = parse_set(set);
                             existing.retain(|uid| !set.contains(uid));
@@ -1849,19 +1964,39 @@ mod tests {
             ImapClient::new(config, &mut pimalaya_config::secret::SecretResolver::new()).unwrap()
         }
 
-        /// Runs `op` against a scripted server, returning its count and
-        /// the commands the server received.
+        /// Runs `op` against a scripted server, returning its count, the
+        /// ids of its item errors and the commands the server received.
         fn run(
             capabilities: &'static str,
             existing: &[u32],
             copy_uid: CopyUid,
-            op: impl FnOnce(&mut ImapClient) -> anyhow::Result<usize>,
+            op: impl FnOnce(&mut ImapClient) -> anyhow::Result<Outcome<usize>>,
         ) -> (usize, Vec<String>) {
+            let (count, _, commands) = run_outcome(capabilities, existing, copy_uid, op);
+            (count, commands)
+        }
+
+        /// Runs `op` as [`run`] does, returning the ids its item errors
+        /// name beside its count.
+        fn run_outcome(
+            capabilities: &'static str,
+            existing: &[u32],
+            copy_uid: CopyUid,
+            op: impl FnOnce(&mut ImapClient) -> anyhow::Result<Outcome<usize>>,
+        ) -> (usize, Vec<String>, Vec<String>) {
             let (server, handle) = serve(capabilities, existing.to_vec(), copy_uid);
             let mut client = client(&server);
-            let count = op(&mut client).unwrap();
+            let outcome = op(&mut client).unwrap();
             drop(client);
-            (count, handle.join().unwrap())
+
+            let missing = outcome
+                .errors
+                .into_iter()
+                .inspect(|error| assert_eq!(error.code, Some(ErrorCode::MessageNotFound)))
+                .filter_map(|error| error.id)
+                .collect();
+
+            (outcome.value, missing, handle.join().unwrap())
         }
 
         fn has(commands: &[String], prefix: &str) -> bool {
@@ -1874,14 +2009,15 @@ mod tests {
 
         fn mv(
             ids: &'static [&'static str],
-        ) -> impl FnOnce(&mut ImapClient) -> anyhow::Result<usize> {
+        ) -> impl FnOnce(&mut ImapClient) -> anyhow::Result<Outcome<usize>> {
             move |client| client.move_messages("INBOX", "Archive", ids)
         }
 
         #[test]
         fn a_valid_copyuid_answers_the_copy_fallback_move() {
-            let (count, commands) = run(UIDPLUS, &[1], valid, mv(&["1", "999"]));
+            let (count, missing, commands) = run_outcome(UIDPLUS, &[1], valid, mv(&["1", "999"]));
             assert_eq!(count, 1);
+            assert_eq!(missing, ["999"]);
             assert!(!has(&commands, "UID SEARCH"), "{commands:?}");
             assert!(has(&commands, "UID STORE 1 +FLAGS"), "{commands:?}");
             assert!(has(&commands, "UID EXPUNGE 1"), "{commands:?}");
@@ -1927,8 +2063,9 @@ mod tests {
 
         #[test]
         fn a_move_without_copyuid_counts_the_messages_present() {
-            let (count, commands) = run(MOVE, &[1], none, mv(&["1", "999"]));
+            let (count, missing, commands) = run_outcome(MOVE, &[1], none, mv(&["1", "999"]));
             assert_eq!(count, 1);
+            assert_eq!(missing, ["999"]);
             assert!(has(&commands, "UID MOVE 1 "), "{commands:?}");
 
             let (count, commands) = run(MOVE, &[1], valid, mv(&["999"]));
@@ -1956,8 +2093,8 @@ mod tests {
         fn a_trash_delete_counts_the_messages_present() {
             let delete = |ids: &'static [&'static str]| {
                 move |client: &mut ImapClient| {
-                    let (count, _) = client.delete_messages("INBOX", ids)?;
-                    Ok(count)
+                    let outcome = client.delete_messages("INBOX", ids)?;
+                    Ok(outcome.map(|(count, _)| count))
                 }
             };
 
@@ -1970,7 +2107,59 @@ mod tests {
             assert_eq!(count, 0);
             assert!(!has(&commands, "UID EXPUNGE"), "{commands:?}");
 
+            let (_, missing, _) = run_outcome(UIDPLUS, &[1], none, delete(&["1", "999"]));
+            assert_eq!(missing, ["999"]);
+
             assert_eq!(run(PLAIN, &[1], none, delete(&["999"])).0, 0);
+        }
+
+        /// A UID neither echoed by the `UID STORE` nor found by the
+        /// `UID SEARCH` after it is an item error, the others counted.
+        #[test]
+        fn a_flag_on_an_unknown_uid_is_an_item_error() {
+            let flagged = [Flag::from_iana(IanaFlag::Flagged)];
+            let store = move |client: &mut ImapClient| {
+                client.store_flags("INBOX", &["1", "999"], &flagged, FlagOp::Add)
+            };
+
+            let (count, missing, commands) = run_outcome(UIDPLUS, &[1], none, store);
+            assert_eq!(count, 1);
+            assert_eq!(missing, ["999"]);
+            assert!(has(&commands, "UID SEARCH UID 1,999"), "{commands:?}");
+        }
+
+        /// A mailbox whose `STATUS` the server refuses is listed without
+        /// counts, beside its error.
+        #[test]
+        fn a_refused_status_is_an_unreadable_mailbox() {
+            let (server, handle) = serve(PLAIN, vec![1], none);
+            let mut client = client(&server);
+            let outcome = client.list_mailboxes(true).unwrap();
+            drop(client);
+            handle.join().unwrap();
+
+            let counts: Vec<_> = outcome.value.iter().map(|m| (m.unread, m.total)).collect();
+            assert_eq!(counts, [(Some(0), Some(1)), (None, None)]);
+
+            let [error] = outcome.errors.as_slice() else {
+                panic!("{:?}", outcome.errors);
+            };
+            assert_eq!(error.id.as_deref(), Some("Locked"));
+            assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
+        }
+
+        /// A read whose `FETCH` answer holds a line that does not decode
+        /// and no message is unreadable, not missing.
+        #[test]
+        fn reading_an_undecodable_answer_is_unreadable() {
+            let (server, handle) = serve(PLAIN, vec![1], none);
+            let mut client = client(&server);
+            let err = client.get_message("INBOX", "7", false).unwrap_err();
+            drop(client);
+            handle.join().unwrap();
+
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MessageUnreadable), "{err:#}");
         }
 
         #[test]

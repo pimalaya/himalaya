@@ -11,6 +11,9 @@
 //! A pimdir store failure takes the code io-pimdir gives it
 //! (`PimdirError::code`), spelled the same, so a caller reading every
 //! pimdir app reads one vocabulary.
+//!
+//! The same codes type an `ItemError`, the failure of one item a command
+//! listing or acting on several could not serve, printed in its `errors`.
 
 #[cfg(feature = "pimdir")]
 use io_pimdir::client::PimdirError;
@@ -23,7 +26,7 @@ use serde::Serialize;
 /// Declared in every build, the pimdir ones included, so the
 /// `himalaya-error` schema a caller reads does not change with the
 /// backends compiled in.
-#[cfg_attr(not(feature = "pimdir"), allow(dead_code))]
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ErrorCode {
@@ -56,8 +59,22 @@ pub enum ErrorCode {
     CapabilityMissing,
     /// The mailbox named does not exist: nothing was done.
     MailboxNotFound,
-    /// None of the message ids given is in the mailbox: nothing was done.
+    /// A message id given is not in the mailbox: an item error beside what
+    /// was done, or the failure of a command reading that one message.
     MessageNotFound,
+    /// The backend answered for a message the client could not read: an
+    /// item error, or the failure of a command reading that one message.
+    MessageUnreadable,
+    /// A mailbox was listed but could not be read, its counts included.
+    MailboxUnreadable,
+    /// The server refused the item, or the command, to the account.
+    PermissionDenied,
+    /// The write would exceed the account's quota.
+    QuotaExceeded,
+    /// The server still throttled the item after the retries.
+    RateLimited,
+    /// The server refused a recipient, so the message reached nobody.
+    RecipientRefused,
     /// The pimdir store is of another draft of the format than Himalaya's:
     /// upgrade Himalaya, or reinstall the store as its sync engine says.
     StoreVersion,
@@ -151,11 +168,44 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
 }
 
-/// A refusal under `message-not-found`: no id given matched a message
-/// of the mailbox.
-#[cfg_attr(not(backend), allow(dead_code))]
+/// A refusal under `message-not-found`: the message asked for is not in
+/// the mailbox.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "maildir",
+        feature = "mbox",
+        feature = "pimdir"
+    )),
+    allow(dead_code)
+)]
 pub fn message_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MessageNotFound, message.into()).into()
+}
+
+/// The error of one item a command could not list or act on.
+#[cfg(any(backend, feature = "smtp"))]
+pub type ItemError = pimalaya_cli::error::ItemError<ErrorCode>;
+
+/// The item error of the message `id` the mailbox does not hold.
+#[cfg(any(backend, feature = "smtp"))]
+#[cfg_attr(not(backend), allow(dead_code))]
+pub fn missing_message(id: &str) -> ItemError {
+    ItemError {
+        id: Some(id.to_owned()),
+        code: Some(ErrorCode::MessageNotFound),
+        error: String::from("Message not found in the mailbox"),
+        sources: Vec::new(),
+    }
+}
+
+/// Ends a command that printed its result: exit 3 when an item failed.
+#[cfg(any(backend, feature = "smtp"))]
+pub fn partial_when(errors: &[ItemError]) -> anyhow::Result<()> {
+    match errors.is_empty() {
+        true => Ok(()),
+        false => Err(pimalaya_cli::error::PartialOutcome::default().into()),
+    }
 }
 
 /// The pimdir codes Himalaya relays, by io-pimdir's spelling, which

@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::flag::{Flag, FlagOp},
-    error::message_not_found,
+    error::{ItemError, partial_when},
     shared::{
         client::EmailClient,
         flag::arg::{FlagsArg, MessageIdsArg},
@@ -45,19 +45,17 @@ impl FlagRemoveCommand {
         let ids = self.message_ids.ids();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        let count = client.store_flags(&mailbox, &ids, &flags, FlagOp::Remove)?;
-        if count == 0 {
-            return Err(message_not_found(
-                "No flag removed: no id matched in the mailbox",
-            ));
-        }
+        let outcome = client.store_flags(&mailbox, &ids, &flags, FlagOp::Remove)?;
 
-        let queued = client.queues_writes();
-        printer.out(FlagRemoveOutput {
+        let output = FlagRemoveOutput {
             flags: client.written_flags(flags),
-            count,
-            queued,
-        })
+            count: outcome.value,
+            queued: client.queues_writes(),
+            errors: outcome.errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -67,10 +65,12 @@ impl FlagRemoveCommand {
 pub(crate) struct FlagRemoveOutput {
     /// The flags written.
     flags: Vec<Flag>,
-    /// How many of the given messages were found.
+    /// How many of the given messages were acted on.
     count: usize,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
+    /// The error of each message not acted on, in the order given.
+    errors: Vec<ItemError>,
 }
 
 impl fmt::Display for FlagRemoveOutput {
@@ -79,15 +79,22 @@ impl fmt::Display for FlagRemoveOutput {
         let flags: Vec<&str> = self.flags.iter().map(Flag::raw).collect();
         let flags = flags.join(", ");
         if self.queued {
-            return writeln!(
+            writeln!(
                 f,
                 "Flags queued for removal from {count} message(s): {flags}"
-            );
+            )?;
+        } else {
+            writeln!(
+                f,
+                "Successfully removed flags from {count} message(s): {flags}"
+            )?;
         }
-        writeln!(
-            f,
-            "Successfully removed flags from {count} message(s): {flags}"
-        )
+
+        for error in &self.errors {
+            writeln!(f, "Error:  {error}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -107,6 +114,7 @@ mod tests {
             ],
             count: 2,
             queued: false,
+            errors: Vec::new(),
         };
 
         assert_eq!(
@@ -115,7 +123,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"flags":[{"raw":"\\Seen","iana":"seen"},{"raw":"\\Flagged","iana":"flagged"}],"count":2,"queued":false}"#
+            r#"{"flags":[{"raw":"\\Seen","iana":"seen"},{"raw":"\\Flagged","iana":"flagged"}],"count":2,"queued":false,"errors":[]}"#
         );
     }
 }

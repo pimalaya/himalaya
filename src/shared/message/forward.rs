@@ -188,8 +188,19 @@ impl MessageForwardCommand {
             let forwarded = Flag::from_iana(IanaFlag::Forwarded);
             let stored =
                 client.store_flags(&mailbox, &[self.id.as_str()], &[forwarded], FlagOp::Add);
-            if let Err(err) = stored {
-                log::warn!("message sent, but flagging the source as forwarded failed: {err:#}");
+            match stored {
+                Ok(outcome) => {
+                    for error in outcome.errors {
+                        log::warn!(
+                            "message sent, but flagging the source as forwarded failed: {error}"
+                        );
+                    }
+                }
+                Err(err) => {
+                    log::warn!(
+                        "message sent, but flagging the source as forwarded failed: {err:#}"
+                    );
+                }
             }
         }
 

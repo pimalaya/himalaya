@@ -188,7 +188,7 @@ impl MessageReplyCommand {
         // done never failing for want of the flag.
         let answered = client.resolution().support(Capability::FlagsAnswered);
         if self.send && answered.is_served() {
-            client
+            let outcome = client
                 .store_flags(
                     &mailbox,
                     &[self.id.as_str()],
@@ -196,6 +196,10 @@ impl MessageReplyCommand {
                     FlagOp::Add,
                 )
                 .context("Message sent, but flagging the source as answered failed")?;
+
+            for error in outcome.errors {
+                log::warn!("message sent, but flagging the source as answered failed: {error}");
+            }
         }
 
         Ok(())

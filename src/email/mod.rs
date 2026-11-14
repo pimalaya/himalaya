@@ -11,6 +11,7 @@ pub mod address;
 pub mod envelope;
 pub mod flag;
 pub mod mailbox;
+pub mod outcome;
 pub mod search;
 #[cfg(any(feature = "smtp", feature = "pimdir"))]
 pub mod submission;

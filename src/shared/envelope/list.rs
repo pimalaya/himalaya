@@ -14,7 +14,8 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    email::{address::Address, envelope::Envelope, flag::Flag},
+    email::{address::Address, envelope::Envelope, flag::Flag, outcome::Outcome},
+    error::{ItemError, partial_when},
     listing::{Listing, ListingPage},
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
@@ -74,12 +75,15 @@ impl EnvelopeListCommand {
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account);
 
-        let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
+        let Outcome {
+            value: envelopes,
+            errors,
+        } = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
 
         // NOTE: the token is the next page number, given while a page comes
         // back full; the page after a full last one comes back empty.
         let next_page = match (page, page_size) {
-            (Some(page), Some(size)) if envelopes.len() >= size as usize => {
+            (Some(page), Some(size)) if envelopes.len() + errors.len() >= size as usize => {
                 Some((page + 1).to_string())
             }
             _ => None,
@@ -87,7 +91,7 @@ impl EnvelopeListCommand {
 
         let resolution = client.resolution();
 
-        printer.out(EnvelopeListOutput {
+        let output = EnvelopeListOutput {
             datetime_fmt: account.datetime_fmt().to_string(),
             datetime_local_tz: account.datetime_local_tz(),
             account: resolution.account.clone(),
@@ -99,7 +103,11 @@ impl EnvelopeListCommand {
             recipient: self.recipient,
             envelopes,
             next_page,
-        })
+            errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -140,6 +148,9 @@ pub struct EnvelopeListOutput {
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     pub next_page: Option<String>,
+    /// The error of each envelope the page could not list, in the order
+    /// met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for EnvelopeListOutput {
@@ -181,6 +192,10 @@ impl fmt::Display for EnvelopeListOutput {
             ["envelope", "envelopes"],
             self.next_page.as_deref(),
         );
+
+        for error in &self.errors {
+            listing.head("Error", &error.to_string());
+        }
 
         write!(f, "{listing}")
     }
@@ -265,6 +280,7 @@ mod tests {
             envelope::Envelope,
             flag::{Flag, IanaFlag},
         },
+        error::{ErrorCode, ItemError},
         shared::envelope::list::EnvelopeListOutput,
     };
 
@@ -281,6 +297,7 @@ mod tests {
             recipient: false,
             envelopes: Vec::new(),
             next_page: None,
+            errors: Vec::new(),
         }
     }
 
@@ -388,6 +405,40 @@ Mailbox:    INBOX
 Page:       4, empty
 ";
         assert_eq!(envelopes.to_string(), expected);
+    }
+
+    /// Each envelope the page could not list prints as one `Error:` field
+    /// after the paging fields, `-` for an absent id or code, and none
+    /// under the items.
+    #[test]
+    fn an_item_error_prints_in_the_header_block() {
+        let mut envelopes = envelopes();
+        envelopes.page_size = Some(2);
+        envelopes.next_page = Some(String::from("2"));
+
+        let alice = address(Some("Alice"), "alice@example.org");
+        envelopes.envelopes = vec![envelope("4", &[IanaFlag::Seen], alice, "Hi")];
+        envelopes.errors = vec![ItemError {
+            id: None,
+            code: Some(ErrorCode::MessageUnreadable),
+            error: String::from("Cannot decode a line of the FETCH response"),
+            sources: Vec::new(),
+        }];
+
+        let expected = "\
+Account:    work (imap)
+Mailbox:    INBOX
+Page:       1, envelope 1
+Next page:  --page 2
+Error:      -  message-unreadable  Cannot decode a line of the FETCH response
+
+4        2026-11-11 10:00  Alice  Hi
+";
+        assert_eq!(envelopes.to_string(), expected);
+
+        let json = serde_json::to_value(&envelopes).unwrap();
+        assert_eq!(json["errors"][0]["id"], serde_json::Value::Null);
+        assert_eq!(json["errors"][0]["code"], "message-unreadable");
     }
 
     /// A search names its query under the mailbox.

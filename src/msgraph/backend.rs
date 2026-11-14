@@ -7,7 +7,11 @@
 //! the message, `isRead` or the follow-up flag, or onto its categories.
 //! There is no `add_message`: a MIME message Graph creates stays a draft.
 
-use std::{collections::BTreeSet, thread, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    thread,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset};
@@ -27,8 +31,10 @@ use io_msgraph::v1::{
             },
         },
     },
-    send::{MsgraphSend, path_segment, user_path},
+    send::{MsgraphSend, MsgraphSendError, path_segment, user_path},
 };
+use pimalaya_cli::sanitize;
+use serde_json::{Value, json};
 use url::Url;
 
 use crate::{
@@ -37,8 +43,10 @@ use crate::{
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
+        outcome::Outcome,
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
+    error::{ErrorCode, ItemError, missing_message},
     msgraph::{client::MsgraphClient, search},
 };
 
@@ -202,15 +210,20 @@ impl MsgraphClient {
     }
 
     /// Keeps the ids of `ids` naming a message of the folder `mailbox`,
-    /// each once, in the given order.
+    /// each once, in the given order, beside the error of each other one.
     ///
     /// Graph message ids are account-wide and its message endpoints take
     /// no folder, so without this a command would act on a message of
     /// another folder.
-    fn ids_in_folder<'a>(&mut self, mailbox: &str, ids: &[&'a str]) -> Result<Vec<&'a str>> {
+    fn ids_in_folder<'a>(
+        &mut self,
+        mailbox: &str,
+        ids: &[&'a str],
+    ) -> Result<Outcome<Vec<&'a str>>> {
         let user = user_path(&self.user_id)?;
         let mut unique: Vec<&str> = Vec::with_capacity(ids.len());
         let mut requests = Vec::with_capacity(ids.len());
+        let mut errors = Vec::new();
 
         for id in ids {
             if unique.contains(id) {
@@ -219,6 +232,7 @@ impl MsgraphClient {
 
             // NOTE: an id that cannot be a path segment names nothing.
             let Ok(segment) = path_segment(id) else {
+                errors.push(missing_message(id));
                 continue;
             };
 
@@ -232,11 +246,39 @@ impl MsgraphClient {
         }
 
         if requests.is_empty() {
-            return Ok(Vec::new());
+            return Ok(Outcome {
+                value: Vec::new(),
+                errors,
+            });
         }
 
         let responses = self.batch_all(requests)?;
-        ids_found(&unique, responses, mailbox)
+        Ok(ids_found(&unique, responses, mailbox).after(errors))
+    }
+
+    /// Sends one `$batch` request per id of `ids`, `request` building each
+    /// from the id's path segment, returning how many Graph answered with a
+    /// success beside the error of each other one.
+    fn write_each(
+        &mut self,
+        ids: &[&str],
+        request: impl Fn(String) -> MsgraphBatchRequest,
+    ) -> Result<Outcome<usize>> {
+        let user = user_path(&self.user_id)?;
+        let mut requests = Vec::with_capacity(ids.len());
+
+        for (index, id) in ids.iter().enumerate() {
+            let mut sub = request(format!("/{user}/messages/{}", path_segment(id)?));
+            sub.id = index.to_string();
+            requests.push(sub);
+        }
+
+        if requests.is_empty() {
+            return Ok(Outcome::from(0));
+        }
+
+        let responses = self.batch_all(requests)?;
+        Ok(written(ids, responses))
     }
 
     /// Lists envelopes from the `mailbox` folder (id or well-known name
@@ -355,29 +397,30 @@ impl MsgraphClient {
     }
 
     /// Adds, sets, or removes `flags` on the messages of `ids` the folder
-    /// `mailbox` holds, one `PATCH /messages/{id}` each, returning how
-    /// many it holds.
+    /// `mailbox` holds, one `PATCH /messages/{id}` each through `$batch`,
+    /// returning how many it patched beside the error of each other id.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
-        let ids = self.ids_in_folder(mailbox, ids)?;
+    ) -> Result<Outcome<usize>> {
+        let found = self.ids_in_folder(mailbox, ids)?;
         let patch = flag_patch(flags, op);
 
         // NOTE: `$Forwarded` has no Graph field, so adding or removing it
         // alone leaves an empty PATCH, a wasted request that could still
         // fail. `\Answered` and `\Draft` never get here: the unified API
         // refuses them up front (`flags.answered`, `flags.draft`).
-        if patch != MsgraphMessage::default() {
-            for id in &ids {
-                self.message_update(id, &patch)?;
-            }
+        if patch == MsgraphMessage::default() {
+            return Ok(found.map(|ids| ids.len()));
         }
 
-        Ok(ids.len())
+        let body = serde_json::to_value(&patch).context("Cannot serialize the message patch")?;
+        let patched = self.write_each(&found.value, |url| json_request("PATCH", url, &body))?;
+
+        Ok(patched.after(found.errors))
     }
 
     /// Fetches one message's raw RFC 5322 bytes via
@@ -395,44 +438,51 @@ impl MsgraphClient {
         Ok(raw)
     }
 
-    /// Copies the messages of `ids` the folder `from` holds into `to`,
-    /// returning how many it holds.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in_folder(from, ids)?;
+    /// Copies the messages of `ids` the folder `from` holds into `to`
+    /// through `$batch`, returning how many it copied beside the error of
+    /// each other id.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in_folder(from, ids)?;
+        let body = json!({ "destinationId": to });
 
-        for id in &ids {
-            self.message_copy(id, to)?;
-        }
+        let copied = self.write_each(&found.value, |url| {
+            json_request("POST", format!("{url}/copy"), &body)
+        })?;
 
-        Ok(ids.len())
+        Ok(copied.after(found.errors))
     }
 
-    /// Moves the messages of `ids` the folder `from` holds into `to`,
-    /// returning how many it holds. Moving into `from` itself leaves them
-    /// as they are.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in_folder(from, ids)?;
-
-        if from != to {
-            for id in &ids {
-                self.message_move(id, to)?;
-            }
+    /// Moves the messages of `ids` the folder `from` holds into `to`
+    /// through `$batch`, returning how many it moved beside the error of
+    /// each other id. Moving into `from` itself leaves them as they are.
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in_folder(from, ids)?;
+        if from == to {
+            return Ok(found.map(|ids| ids.len()));
         }
 
-        Ok(ids.len())
+        let body = json!({ "destinationId": to });
+        let moved = self.write_each(&found.value, |url| {
+            json_request("POST", format!("{url}/move"), &body)
+        })?;
+
+        Ok(moved.after(found.errors))
     }
 
     /// Permanently deletes the messages of `ids` the folder `mailbox`
-    /// holds (`DELETE /messages/{id}`; from Deleted Items this is a hard
-    /// delete), returning how many it holds.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
-        let ids = self.ids_in_folder(mailbox, ids)?;
+    /// holds (`DELETE /messages/{id}` through `$batch`; from Deleted Items
+    /// this is a hard delete), returning how many it deleted beside the
+    /// error of each other id.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let found = self.ids_in_folder(mailbox, ids)?;
 
-        for id in &ids {
-            self.message_delete(id)?;
-        }
+        let deleted = self.write_each(&found.value, |url| MsgraphBatchRequest {
+            method: "DELETE".into(),
+            url,
+            ..Default::default()
+        })?;
 
-        Ok(ids.len())
+        Ok(deleted.after(found.errors))
     }
 
     /// Creates the folder `name` at the top, or under `parent`, returning
@@ -544,38 +594,139 @@ fn roles_from(responses: Vec<MsgraphBatchResponse>) -> Result<Vec<(String, Mailb
 }
 
 /// Keeps the ids of `ids` whose `$batch` response, answered under the id's
-/// index, names a message of the folder `mailbox`.
-///
-/// A 400 (malformed id) or 404 (no such message) counts as not found, as
-/// does a message of another folder; any other failure is an error.
+/// index, names a message of the folder `mailbox`, beside the error of
+/// each other id: one of another folder is not found, as is one Graph
+/// answers so ([`part_error`]).
 fn ids_found<'a>(
     ids: &[&'a str],
     responses: Vec<MsgraphBatchResponse>,
     mailbox: &str,
-) -> Result<Vec<&'a str>> {
-    let mut found = vec![false; ids.len()];
+) -> Outcome<Vec<&'a str>> {
+    let mut outcome = Outcome::from(Vec::with_capacity(ids.len()));
 
-    for response in responses {
-        let Some(index) = response.id.parse::<usize>().ok().filter(|i| *i < ids.len()) else {
+    for (id, response) in ids.iter().zip(answered(ids, responses)) {
+        let Some(response) = response else {
+            outcome.errors.push(unanswered(id));
             continue;
         };
 
-        if matches!(response.status, 400 | 404) {
+        if !(200..300).contains(&response.status) {
+            outcome.errors.push(part_error(id, response));
             continue;
         }
 
-        let id = ids[index];
-        let message = response
-            .parse::<MsgraphMessage>()
-            .with_context(|| format!("Cannot check the folder of message `{id}`"))?;
-        found[index] = message.parent_folder_id.as_deref() == Some(mailbox);
+        match response.parse::<MsgraphMessage>() {
+            Ok(message) if message.parent_folder_id.as_deref() == Some(mailbox) => {
+                outcome.value.push(*id);
+            }
+            Ok(_) => outcome.errors.push(missing_message(id)),
+            Err(err) => outcome.errors.push(ItemError {
+                id: Some(id.to_string()),
+                code: Some(ErrorCode::MessageUnreadable),
+                error: String::from("Cannot parse the Graph message"),
+                sources: vec![err.to_string()],
+            }),
+        }
     }
 
-    Ok(ids
-        .iter()
-        .zip(found)
-        .filter_map(|(id, found)| found.then_some(*id))
-        .collect())
+    outcome
+}
+
+/// Counts the ids of `ids` whose `$batch` response, answered under the
+/// id's index, is a success, beside the error of each other id.
+fn written(ids: &[&str], responses: Vec<MsgraphBatchResponse>) -> Outcome<usize> {
+    let mut outcome = Outcome::from(0);
+
+    for (id, response) in ids.iter().zip(answered(ids, responses)) {
+        match response {
+            None => outcome.errors.push(unanswered(id)),
+            Some(response) if (200..300).contains(&response.status) => outcome.value += 1,
+            Some(response) => outcome.errors.push(part_error(id, response)),
+        }
+    }
+
+    outcome
+}
+
+/// The `$batch` responses in the order of `ids`, each answered under its
+/// id's index, `None` for one the answer left out.
+fn answered(
+    ids: &[&str],
+    responses: Vec<MsgraphBatchResponse>,
+) -> Vec<Option<MsgraphBatchResponse>> {
+    let mut answered: Vec<_> = ids.iter().map(|_| None).collect();
+
+    for response in responses {
+        if let Some(slot) = response
+            .id
+            .parse::<usize>()
+            .ok()
+            .and_then(|i| answered.get_mut(i))
+        {
+            *slot = Some(response);
+        }
+    }
+
+    answered
+}
+
+/// The item error of the message `id` a `$batch` answer left out.
+fn unanswered(id: &str) -> ItemError {
+    ItemError {
+        id: Some(id.to_owned()),
+        code: None,
+        error: String::from("Graph batch answer holds no response for this message"),
+        sources: Vec::new(),
+    }
+}
+
+/// The item error of the message `id` a `$batch` part failed on, coded by
+/// its status and Graph's `error.code`, both kept in `sources`.
+///
+/// A 404, or a 400 Graph codes `ErrorInvalidIdMalformed`, is a message not
+/// found; any other 400 is a request Graph refused, no missing message.
+fn part_error(id: &str, response: MsgraphBatchResponse) -> ItemError {
+    let status = response.status;
+    let (code, message) = match response.parse::<Value>() {
+        Err(MsgraphSendError::Api(err)) => (err.code, err.message),
+        _ => (String::new(), String::new()),
+    };
+
+    let item_code = match (status, code.as_str()) {
+        (404, _) | (400, "ErrorInvalidIdMalformed") => Some(ErrorCode::MessageNotFound),
+        (403, _) => Some(ErrorCode::PermissionDenied),
+        (429, _) => Some(ErrorCode::RateLimited),
+        (_, "ErrorQuotaExceeded") => Some(ErrorCode::QuotaExceeded),
+        _ => None,
+    };
+
+    let mut sources = vec![format!("HTTP {status}")];
+    if !code.is_empty() {
+        sources.push(sanitize::text(&code).into_owned());
+    }
+
+    let error = match message.is_empty() {
+        true => format!("Graph refused the message with status {status}"),
+        false => format!("Graph refused the message: {}", sanitize::text(&message)),
+    };
+
+    ItemError {
+        id: Some(id.to_owned()),
+        code: item_code,
+        error,
+        sources,
+    }
+}
+
+/// A `$batch` request with a JSON body.
+fn json_request(method: &str, url: String, body: &Value) -> MsgraphBatchRequest {
+    MsgraphBatchRequest {
+        method: method.into(),
+        url,
+        headers: BTreeMap::from([("Content-Type".into(), "application/json".into())]),
+        body: Some(body.clone()),
+        ..Default::default()
+    }
 }
 
 /// Whether a `$batch` sub-response is worth sending again: throttled, or
@@ -752,7 +903,8 @@ mod tests {
     use crate::{
         email::flag::{Flag, FlagOp, IanaFlag},
         email::mailbox::MailboxRole,
-        msgraph::backend::{flag_patch, ids_found, roles_from, well_known_role},
+        error::{ErrorCode, ItemError},
+        msgraph::backend::{flag_patch, ids_found, roles_from, well_known_role, written},
     };
 
     fn response(id: &str, status: u16, body: serde_json::Value) -> MsgraphBatchResponse {
@@ -808,9 +960,19 @@ mod tests {
         assert_eq!(well_known_role("outbox"), None);
     }
 
+    fn codes(errors: &[ItemError]) -> Vec<(Option<&str>, Option<ErrorCode>)> {
+        errors
+            .iter()
+            .map(|error| (error.id.as_deref(), error.code))
+            .collect()
+    }
+
+    /// A message of another folder, one Graph answers 404 for or 400
+    /// `ErrorInvalidIdMalformed`, is not found; another 400 is a refused
+    /// request, and a part the answer left out an error coded `null`.
     #[test]
-    fn a_message_of_another_folder_is_not_found() {
-        let ids = ["in", "elsewhere", "gone", "malformed"];
+    fn a_lookup_keeps_the_messages_of_the_folder() {
+        let ids = ["in", "elsewhere", "gone", "malformed", "refused", "lost"];
         let responses = vec![
             response("0", 200, json!({"id": "in", "parentFolderId": "trash"})),
             response(
@@ -824,18 +986,48 @@ mod tests {
                 400,
                 json!({"error": {"code": "ErrorInvalidIdMalformed"}}),
             ),
+            response("4", 400, json!({"error": {"code": "BadRequest"}})),
         ];
 
-        assert_eq!(ids_found(&ids, responses, "trash").unwrap(), vec!["in"]);
+        let outcome = ids_found(&ids, responses, "trash");
+
+        assert_eq!(outcome.value, ["in"]);
+        assert_eq!(
+            codes(&outcome.errors),
+            [
+                (Some("elsewhere"), Some(ErrorCode::MessageNotFound)),
+                (Some("gone"), Some(ErrorCode::MessageNotFound)),
+                (Some("malformed"), Some(ErrorCode::MessageNotFound)),
+                (Some("refused"), None),
+                (Some("lost"), None),
+            ]
+        );
+        assert_eq!(outcome.errors[3].sources, ["HTTP 400", "BadRequest"]);
     }
 
+    /// Each part of a write is counted or coded on its own, the write
+    /// carrying on past a refused one.
     #[test]
-    fn a_failed_message_lookup_is_an_error() {
-        let responses = vec![response(
-            "0",
-            503,
-            json!({"error": {"code": "Unavailable"}}),
-        )];
-        assert!(ids_found(&["id"], responses, "trash").is_err());
+    fn a_write_counts_each_part_on_its_own() {
+        let ids = ["a", "b", "c", "d", "e"];
+        let responses = vec![
+            response("0", 200, json!({"id": "a"})),
+            response("1", 403, json!({"error": {"code": "ErrorAccessDenied"}})),
+            response("2", 429, json!({"error": {"code": "ApplicationThrottled"}})),
+            response("3", 507, json!({"error": {"code": "ErrorQuotaExceeded"}})),
+        ];
+
+        let outcome = written(&ids, responses);
+
+        assert_eq!(outcome.value, 1);
+        assert_eq!(
+            codes(&outcome.errors),
+            [
+                (Some("b"), Some(ErrorCode::PermissionDenied)),
+                (Some("c"), Some(ErrorCode::RateLimited)),
+                (Some("d"), Some(ErrorCode::QuotaExceeded)),
+                (Some("e"), None),
+            ]
+        );
     }
 }

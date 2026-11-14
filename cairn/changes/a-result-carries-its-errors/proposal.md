@@ -77,12 +77,12 @@ What each backend can say depends on its protocol. Each was checked on 2026-11-1
   - An id the chained `Email/get` reports in `notFound` is left out of a listing, the email being gone since the query.
   - This rests on pimalaya/io-jmap, cairn/changes/a-get-keeps-what-it-misses.
 - **Gmail** reports each call of a batch on its own (developers.google.com/workspace/gmail/api/guides/batch).
-  - A listing reads its metadata through `GmailBatch`, 100 per request, where it sends one `messages.get` each today. A part answered 404 is left out, since its message was deleted after the list was read. A part still throttled after the retries is `rate-limited`, another 403 `permission-denied`, and an unanswered part an entry coded `null`.
+  - A listing reads its metadata through `GmailBatch`, 50 per request (Google advises no more), where it sends one `messages.get` each today. A part answered 429, a 403 `rateLimitExceeded` or `userRateLimitExceeded`, 500, 502, 503 or 504 is sent again, up to three times, as Graph's are: a `messages.get` costs 5 of the 250 quota units a user spends per second, so a full batch is throttled in part. A part answered 404 is left out, since its message was deleted after the list was read. A part still throttled after the retries is `rate-limited`, another 403 `permission-denied`, and an unanswered part an entry coded `null`.
   - A write looks its ids up through batched `messages.get` (minimal). An id Gmail does not know, or whose message does not carry the mailbox's label, is `message-not-found`.
   - A write then goes through batched `messages.modify`, `trash` and `delete` (pimalaya/io-gmail, cairn/changes/a-batch-carries-writes). Until that change, it sends one request per message, carrying on past a failed one.
 - **Microsoft Graph** reports each request of a `$batch` (learn.microsoft.com/graph/json-batching).
   - A listing is one request, so it fails whole.
-  - A write looks its ids up through `$batch` as today, then patches, copies, moves and deletes through `$batch` too, 20 requests at a time, with the existing retries.
+  - A write looks its ids up through `$batch` as today, then patches, copies, moves and deletes through `$batch` too, four sub-requests to a batch with the existing retries, Graph serving four concurrent requests per mailbox (cairn/spec/backends.md, "Graph batches four requests at a time").
   - A part answered 404, or 400 with Graph's `error.code` `ErrorInvalidIdMalformed`, is `message-not-found`; 403 is `permission-denied`, 429 after the retries `rate-limited`, and `ErrorQuotaExceeded` `quota-exceeded`. Any other, another 400 included (a request body Graph refused is no missing message), is `null`, with Graph's `error.code` in `sources`. The id lookup, which counts every 400 as not found today, follows the same rule.
   - A part the answer left out is an entry, no longer an id not found.
 - **Maildir** reads and writes one file per message.
@@ -104,7 +104,7 @@ A result with errors exits 3, a partial outcome, which `himalaya mcp` already re
 ## Scope / non-goals
 
 - `account check` keeps its rows `{backend, ok, code, error}`, the shared noun, and its exit 3.
-- No retry beyond the existing ones (Graph's `BATCH_RETRIES`).
+- No retry beyond Graph's existing ones (`BATCH_RETRIES`) and the same rule given to Gmail's batches, which batching makes necessary.
 - The protocol namespaces keep their outputs.
 - So do the keywords io-maildir drops when it cannot store them. A later change can report them the same way.
 - imap-codec cannot tell which item of a FETCH line failed, nor be told a deeper body nesting. io-imap opens an upstream issue (its change); until then, io-imap's own scanner is what recovers the items.

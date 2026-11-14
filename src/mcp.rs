@@ -940,6 +940,7 @@ mod tests {
     use clap::CommandFactory;
     #[cfg(any(backend, feature = "smtp"))]
     use pimalaya_cli::{
+        error::PartialOutcome,
         mcp::{Incoming, read},
         printer::Printer,
     };
@@ -1145,6 +1146,27 @@ mod tests {
 
         let result = tool_result(&tool, "a", &Map::new(), printer, Ok(()));
         serde_json::to_value(result).unwrap()
+    }
+
+    /// A result whose `errors` is not empty ends with a partial outcome:
+    /// it stays the structured content, flagged as an error.
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn a_result_with_errors_is_structured_and_flagged() {
+        let tool = spec("flag_add");
+        let mut printer = CapturePrinter::default();
+        let value = json!({
+            "count": 1,
+            "errors": [{"id": "99", "code": "message-not-found"}],
+        });
+        printer.out(&value).unwrap();
+
+        let outcome = Err(PartialOutcome::default().into());
+        let result = tool_result(&tool, "a", &Map::new(), printer, outcome);
+        let result = serde_json::to_value(result).unwrap();
+
+        assert_eq!(result["isError"], true, "{result}");
+        assert_eq!(result["structuredContent"], value, "{result}");
     }
 
     #[cfg(any(backend, feature = "smtp"))]

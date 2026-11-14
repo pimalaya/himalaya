@@ -22,7 +22,7 @@ use io_jmap::{
             query::{
                 JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
             },
-            set::{JmapEmailPatch, JmapEmailSetArgs, JmapEmailSetItemError, JmapEmailSetOutput},
+            set::{JmapEmailPatch, JmapEmailSetArgs, JmapEmailSetOutput},
         },
         email_submission::{
             JMAP_SUBMISSION_CAPABILITY,
@@ -48,6 +48,7 @@ use crate::{
         envelope::{Envelope, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
+        outcome::Outcome,
         search::{
             filter::query::SearchEmailsFilterQuery,
             query::SearchEmailsQuery,
@@ -55,7 +56,11 @@ use crate::{
         },
         vacation::{Vacation, VacationPatch, format_date, normalize_date},
     },
-    jmap::{client::JmapClient, error::format_set_error},
+    error::{ItemError, missing_message},
+    jmap::{
+        client::JmapClient,
+        error::{format_set_error, set_item_error},
+    },
 };
 
 impl JmapClient {
@@ -146,23 +151,31 @@ impl JmapClient {
     }
 
     /// Adds, sets, or removes `flags` (JMAP keywords) on the ids of `ids`
-    /// that `mailbox` holds, returning how many were updated.
+    /// that `mailbox` holds, returning how many were updated beside the
+    /// error of each id not updated.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let found = self.emails_in(mailbox, ids)?;
+        let errors = missing_from(ids, &found);
+
         let ids: Vec<&str> = found.keys().map(String::as_str).collect();
-        self.store_keywords(&ids, flags, op)
+        Ok(self.store_keywords(&ids, flags, op)?.after(errors))
     }
 
     /// Writes `flags` as keywords on `ids`, wherever the emails are.
-    fn store_keywords(&mut self, ids: &[&str], flags: &[Flag], op: FlagOp) -> Result<usize> {
+    fn store_keywords(
+        &mut self,
+        ids: &[&str],
+        flags: &[Flag],
+        op: FlagOp,
+    ) -> Result<Outcome<usize>> {
         if ids.is_empty() {
-            return Ok(0);
+            return Ok(Outcome::from(0));
         }
 
         let mut args = JmapEmailSetArgs::default();
@@ -189,7 +202,7 @@ impl JmapClient {
             }
         }
 
-        count_written(self.email_set(args)?)
+        Ok(written(self.email_set(args)?))
     }
 
     /// The emails of `ids` that `mailbox` holds, each with the mailboxes
@@ -306,7 +319,14 @@ impl JmapClient {
             args.set_keyword(existing_id.clone(), keyword_from(flag));
         }
 
-        if count_written(self.email_set(args)?)? == 0 {
+        let filed = written(self.email_set(args)?);
+        if let Some(error) = filed.errors.first() {
+            bail!(
+                "JMAP server holds the message as `{existing_id}` but could not file it: {}",
+                error.error
+            );
+        }
+        if filed.value == 0 {
             bail!("JMAP server holds the message as `{existing_id}` but could not file it");
         }
 
@@ -314,11 +334,13 @@ impl JmapClient {
     }
 
     /// Copies the ids of `ids` that `from` holds into `to`, adding `to`
-    /// to their mailboxes, and returns how many were copied.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// to their mailboxes, and returns how many were copied beside the
+    /// error of each id not copied.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.emails_in(from, ids)?;
+        let errors = missing_from(ids, &found);
         if found.is_empty() {
-            return Ok(0);
+            return Ok(Outcome { value: 0, errors });
         }
 
         let mut args = JmapEmailSetArgs::default();
@@ -326,18 +348,21 @@ impl JmapClient {
             args.add_to_mailbox(id.clone(), to.to_string());
         }
 
-        count_written(self.email_set(args)?)
+        Ok(written(self.email_set(args)?).after(errors))
     }
 
     /// Moves the ids of `ids` that `from` holds to `to` in one
-    /// `Email/set`, and returns how many were moved.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// `Email/set`, and returns how many were moved beside the error of
+    /// each id not moved.
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.emails_in(from, ids)?;
+        let errors = missing_from(ids, &found);
 
         // NOTE: the patch removing `from` would win over the one adding
         // `to`, taking the emails out of the very mailbox they stay in.
         if found.is_empty() || from == to {
-            return Ok(found.len());
+            let value = found.len();
+            return Ok(Outcome { value, errors });
         }
 
         let mut args = JmapEmailSetArgs::default();
@@ -346,19 +371,21 @@ impl JmapClient {
             args.remove_from_mailbox(id.clone(), from.to_string());
         }
 
-        count_written(self.email_set(args)?)
+        Ok(written(self.email_set(args)?).after(errors))
     }
 
     /// Removes the ids of `ids` that `mailbox` holds from it, and returns
     /// how many were removed: an email held there alone is destroyed, one
-    /// another mailbox holds too only leaves `mailbox`.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+    /// another mailbox holds too only leaves `mailbox`. An id not removed
+    /// is an item error.
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.emails_in(mailbox, ids)?;
+        let errors = missing_from(ids, &found);
         if found.is_empty() {
-            return Ok(0);
+            return Ok(Outcome { value: 0, errors });
         }
 
-        count_written(self.email_set(removal(mailbox, found))?)
+        Ok(written(self.email_set(removal(mailbox, found))?).after(errors))
     }
 
     /// Creates `name` at the top or under `parent` (`Mailbox/set`
@@ -739,28 +766,28 @@ fn removal(mailbox: &str, found: EmailMailboxes) -> JmapEmailSetArgs {
     args
 }
 
-/// Counts the emails an `Email/set` updated or destroyed. One gone since
-/// it was looked up (`notFound`) counts as not found; any other refusal
-/// fails, saying how many landed beside it.
-fn count_written(output: JmapEmailSetOutput) -> Result<usize> {
-    let count = output.updated.len() + output.destroyed.len();
-
-    let refused: Vec<String> = output
+/// Counts the emails an `Email/set` updated or destroyed, beside the item
+/// error of each one it refused.
+fn written(output: JmapEmailSetOutput) -> Outcome<usize> {
+    let errors = output
         .not_updated
         .iter()
         .chain(&output.not_destroyed)
-        .filter(|(_, err)| !matches!(err, JmapEmailSetItemError::NotFound { .. }))
-        .map(|(id, err)| format!("`{id}`{}", format_set_error(err)))
+        .map(|(id, err)| set_item_error(id, err))
         .collect();
 
-    if !refused.is_empty() {
-        bail!(
-            "Write JMAP messages error ({count} written): {}",
-            refused.join("; ")
-        );
+    Outcome {
+        value: output.updated.len() + output.destroyed.len(),
+        errors,
     }
+}
 
-    Ok(count)
+/// The error of each id of `ids` the mailbox does not hold.
+fn missing_from(ids: &[&str], found: &EmailMailboxes) -> Vec<ItemError> {
+    ids.iter()
+        .filter(|id| !found.contains_key(**id))
+        .map(|id| missing_message(id))
+        .collect()
 }
 
 /// Primary mail account id; empty when the session has none.
@@ -1156,6 +1183,7 @@ mod tests {
 
     use crate::{
         email::{envelope::Envelope, search::query::SearchEmailsQuery},
+        error::ErrorCode,
         jmap::backend::*,
     };
 
@@ -1250,23 +1278,54 @@ mod tests {
         );
     }
 
+    /// Each id a set refused is an item error coded by its type, read by
+    /// name, an unknown type kept in `sources`, beside what was written.
     #[test]
-    fn an_id_gone_beside_an_updated_one_counts_as_not_found() {
-        let output = set_output(&["E1"], &[("99999999", "notFound")]);
+    fn a_refused_id_is_an_item_error_coded_by_its_type() {
+        let refused = [
+            ("E2", "notFound"),
+            ("E3", "forbidden"),
+            ("E4", "overQuota"),
+            ("E5", "rateLimit"),
+            ("E6", "tooManyKeywords"),
+        ];
+        let output = set_output(&["E1"], &refused);
 
-        assert_eq!(count_written(output).unwrap(), 1);
+        let outcome = written(output);
+
+        assert_eq!(outcome.value, 1);
+        let codes: Vec<_> = outcome
+            .errors
+            .iter()
+            .map(|error| (error.id.as_deref(), error.code))
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                (Some("E2"), Some(ErrorCode::MessageNotFound)),
+                (Some("E3"), Some(ErrorCode::PermissionDenied)),
+                (Some("E4"), Some(ErrorCode::QuotaExceeded)),
+                (Some("E5"), Some(ErrorCode::RateLimited)),
+                (Some("E6"), None),
+            ]
+        );
+        assert_eq!(outcome.errors[4].sources, ["tooManyKeywords"]);
+        assert_eq!(
+            outcome.errors[4].error,
+            "JMAP server refused the write: tooManyKeywords"
+        );
     }
 
+    /// An id the mailbox does not hold is an item error, the ids it holds
+    /// left alone.
     #[test]
-    fn a_refusal_beside_an_update_fails_saying_what_landed() {
-        let output = set_output(&["E1"], &[("E2", "tooManyKeywords")]);
+    fn an_id_the_mailbox_does_not_hold_is_not_found() {
+        let found = held_by(vec![email("E1", &["A"]), email("E2", &["B"])], "A");
 
-        let err = count_written(output).unwrap_err().to_string();
+        let errors = missing_from(&["E1", "E2", "E9"], &found);
 
-        assert_eq!(
-            err,
-            "Write JMAP messages error (1 written): `E2`: tooManyKeywords"
-        );
+        let ids: Vec<_> = errors.iter().map(|error| error.id.as_deref()).collect();
+        assert_eq!(ids, [Some("E2"), Some("E9")]);
     }
 
     #[test]

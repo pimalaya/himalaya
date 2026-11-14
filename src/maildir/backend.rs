@@ -8,24 +8,23 @@
 
 use std::{collections::HashSet, fs, path::Path};
 
+use crate::{
+    email::{
+        envelope::{self, Envelope},
+        flag::{Flag, FlagOp, IanaFlag},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
+        outcome::Outcome,
+        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
+    },
+    error::{ItemError, message_not_found, missing_message},
+    maildir::client::{MaildirClient, validate_maildir_name},
+};
 use anyhow::{Result, bail};
 use io_maildir::{
     client::MaildirClientError,
     entry::{MaildirFullEntry, locate::MaildirEntryLocateError},
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
-};
-use log::warn;
-
-use crate::{
-    email::{
-        envelope::{self, Envelope},
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
-        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
-    },
-    error::message_not_found,
-    maildir::client::{MaildirClient, validate_maildir_name},
 };
 
 impl MaildirClient {
@@ -104,17 +103,17 @@ impl MaildirClient {
     }
 
     /// Adds, sets, or removes `flags` on the messages of `ids` the Maildir
-    /// holds, returning how many it found.
+    /// holds, returning how many it found beside the unknown ids.
     pub fn store_flags(
         &self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let maildir_flags = flags_to_maildir(flags);
-        let found = self.found(&maildir, ids)?;
+        let (found, errors) = self.found(&maildir, ids)?;
 
         for id in &found {
             match op {
@@ -124,7 +123,10 @@ impl MaildirClient {
             }
         }
 
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
@@ -153,38 +155,42 @@ impl MaildirClient {
     }
 
     /// Copies the messages of `ids` `from` holds to `to`, returning how
-    /// many it found.
-    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// many it found beside the unknown ids.
+    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
-        let found = self.found(&source, ids)?;
+        let (found, errors) = self.found(&source, ids)?;
 
         for id in &found {
             self.copy(*id, source.clone(), target.clone(), None)?;
         }
 
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// Moves the messages of `ids` `from` holds to `to`, returning how
-    /// many it found.
+    /// many it found beside the unknown ids.
     ///
     /// A move within one Maildir changes nothing, the ids kept, rather
     /// than re-delivering each message under a new id.
-    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
-        let found = self.found(&source, ids)?;
+        let (found, errors) = self.found(&source, ids)?;
 
-        if source.path() == target.path() {
-            return Ok(found.len());
+        if source.path() != target.path() {
+            for id in &found {
+                self.r#move(*id, source.clone(), target.clone(), None)?;
+            }
         }
 
-        for id in &found {
-            self.r#move(*id, source.clone(), target.clone(), None)?;
-        }
-
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// Creates the Maildir `name` at the top of the store, or under
@@ -300,28 +306,32 @@ impl MaildirClient {
     }
 
     /// Permanently deletes the messages of `ids` `mailbox` holds by
-    /// unlinking their files, returning how many it found.
-    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+    /// unlinking their files, returning how many it found beside the
+    /// unknown ids.
+    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
-        let found = self.found(&maildir, ids)?;
+        let (found, errors) = self.found(&maildir, ids)?;
 
         for id in &found {
             self.delete_entry(maildir.clone(), *id)?;
         }
 
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// The ids of `ids` `maildir` holds, each entry once, every id checked
-    /// before the first write. An unknown one is skipped with a warning.
-    fn found<'a>(&self, maildir: &Maildir, ids: &[&'a str]) -> Result<Vec<&'a str>> {
+    /// before the first write, beside the error of each unknown one.
+    fn found<'a>(
+        &self,
+        maildir: &Maildir,
+        ids: &[&'a str],
+    ) -> Result<(Vec<&'a str>, Vec<ItemError>)> {
         let (found, missing) = self.locate_all(maildir, ids)?;
-
-        for id in missing {
-            warn!("skip message `{id}`: not found in {}", maildir.path());
-        }
-
-        Ok(found)
+        let errors = missing.into_iter().map(missing_message).collect();
+        Ok((found, errors))
     }
 
     /// The ids of `ids` `maildir` holds, each entry once, every id checked
@@ -452,7 +462,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-    use crate::config::maildir::MaildirConfig;
+    use crate::{config::maildir::MaildirConfig, error::ErrorCode};
 
     fn entry(name: &str, contents: &[u8]) -> MaildirFullEntry {
         let entry = MaildirEntry::from_path(MaildirFsPath::new(name));
@@ -476,25 +486,42 @@ mod tests {
     }
 
     #[test]
-    fn unknown_ids_are_skipped_before_any_write_and_repeats_count_once() {
+    fn unknown_ids_are_item_errors_before_any_write_and_repeats_count_once() {
         let (_dir, client, id) = fixture();
         client.create_mailbox("B", None).unwrap();
         let flagged = [Flag::from_iana(IanaFlag::Flagged)];
+        let missing = |outcome: &Outcome<usize>| -> Vec<Option<String>> {
+            outcome
+                .errors
+                .iter()
+                .map(|error| error.id.clone())
+                .collect()
+        };
 
-        let count = client
+        let stored = client
             .store_flags("A", &[&id, "nope", &id], &flagged, FlagOp::Add)
             .unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(stored.value, 1);
+        assert_eq!(missing(&stored), [Some(String::from("nope"))]);
+        assert_eq!(stored.errors[0].code, Some(ErrorCode::MessageNotFound));
 
-        assert_eq!(client.copy_messages("A", "B", &["nope"]).unwrap(), 0);
+        let copied = client.copy_messages("A", "B", &["nope"]).unwrap();
+        assert_eq!(copied.value, 0);
+        assert_eq!(missing(&copied), [Some(String::from("nope"))]);
         assert!(
             client
                 .list_envelopes("B", None, None, false)
                 .unwrap()
                 .is_empty()
         );
-        assert_eq!(client.copy_messages("A", "B", &[&id, "nope"]).unwrap(), 1);
-        assert_eq!(client.delete_messages("B", &["nope"]).unwrap(), 0);
+
+        let copied = client.copy_messages("A", "B", &[&id, "nope"]).unwrap();
+        assert_eq!(copied.value, 1);
+        assert_eq!(missing(&copied), [Some(String::from("nope"))]);
+
+        let deleted = client.delete_messages("B", &["nope"]).unwrap();
+        assert_eq!(deleted.value, 0);
+        assert_eq!(missing(&deleted), [Some(String::from("nope"))]);
     }
 
     #[test]
@@ -561,7 +588,10 @@ mod tests {
 
         assert!(dir.path().join(".Sent/cur").is_dir());
         assert_eq!(
-            client.store_flags("A", &[&id], &[], FlagOp::Add).unwrap(),
+            client
+                .store_flags("A", &[&id], &[], FlagOp::Add)
+                .unwrap()
+                .value,
             1
         );
     }
@@ -582,8 +612,14 @@ mod tests {
         let (dir, client, id) = fixture();
         let path = dir.path().join("A").to_string_lossy().into_owned();
 
-        assert_eq!(client.move_messages("A", &path, &[&id]).unwrap(), 1);
-        assert_eq!(client.move_messages("A/", "A", &[&id, "nope"]).unwrap(), 1);
+        assert_eq!(client.move_messages("A", &path, &[&id]).unwrap().value, 1);
+        assert_eq!(
+            client
+                .move_messages("A/", "A", &[&id, "nope"])
+                .unwrap()
+                .value,
+            1
+        );
 
         let envelopes = client.list_envelopes("A", None, None, false).unwrap();
         assert_eq!(envelopes.len(), 1);

@@ -44,6 +44,7 @@ use crate::{
         envelope::Envelope,
         flag::{Flag, FlagOp},
         mailbox::{self, Mailbox, MailboxRole},
+        outcome::Outcome,
         search::query::SearchEmailsQuery,
     },
 };
@@ -151,23 +152,24 @@ impl EmailClient {
         ))
     }
 
-    /// Lists every mailbox available to the active account.
-    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// Lists every mailbox available to the active account, beside the
+    /// mailboxes it could not read.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.list_mailboxes(with_counts),
+            BackendClient::Jmap(client) => client.list_mailboxes(with_counts).map(Outcome::from),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.list_mailboxes(with_counts),
+            BackendClient::Msgraph(client) => client.list_mailboxes(with_counts).map(Outcome::from),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.list_mailboxes(with_counts),
+            BackendClient::Maildir(client) => client.list_mailboxes(with_counts).map(Outcome::from),
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => client.list_mailboxes(with_counts),
+            BackendClient::Pimdir(client) => client.list_mailboxes(with_counts).map(Outcome::from),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -316,38 +318,38 @@ impl EmailClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Imap(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Jmap(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => {
                 client.list_envelopes(mailbox, page, page_size, with_attachment)
             }
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Msgraph(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Maildir(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Mbox(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Pimdir(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -361,58 +363,58 @@ impl EmailClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<Outcome<Vec<Envelope>>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Imap(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Jmap(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Maildir(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Mbox(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "pimdir")]
-            BackendClient::Pimdir(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Pimdir(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => {
                 client.search_envelopes(mailbox, query, page, page_size, with_attachment)
             }
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => {
-                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
-            }
+            BackendClient::Msgraph(client) => client
+                .search_envelopes(mailbox, query, page, page_size, with_attachment)
+                .map(Outcome::from),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
     }
 
     /// Adds, sets or removes flags on a set of messages, returning how
-    /// many of them were found.
+    /// many of them were found beside the error of each one not acted on.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let capabilities: Vec<Capability> = flags.iter().filter_map(Flag::capability).collect();
         self.require(&capabilities)?;
 
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
-        match self.storage_mut()? {
+        let outcome: Outcome<_> = match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.store_flags(mailbox, ids, flags, op),
             #[cfg(feature = "jmap")]
@@ -428,8 +430,10 @@ impl EmailClient {
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.store_flags(mailbox, ids, flags, op),
             #[cfg(not(backend))]
-            _ => bail!("No storage backend is configured for this account"),
-        }
+            _ => Err(anyhow!("No storage backend is configured for this account")),
+        }?;
+
+        Ok(outcome.sorted_by(ids))
     }
 
     /// Fetches one message's raw RFC 5322 bytes, marking it seen when
@@ -508,12 +512,13 @@ impl EmailClient {
         }
     }
 
-    /// Copies messages between two mailboxes, returning how many landed.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// Copies messages between two mailboxes, returning how many landed,
+    /// beside the error of each message not acted on.
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
         let (from, to) = (from.as_str(), to.as_str());
-        match self.storage_mut()? {
+        let outcome: Outcome<_> = match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.copy_messages(from, to, ids),
             #[cfg(feature = "jmap")]
@@ -529,16 +534,19 @@ impl EmailClient {
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.copy_messages(from, to, ids),
             #[cfg(not(backend))]
-            _ => bail!("No storage backend is configured for this account"),
-        }
+            _ => Err(anyhow!("No storage backend is configured for this account")),
+        }?;
+
+        Ok(outcome.sorted_by(ids))
     }
 
-    /// Moves messages between two mailboxes, returning how many landed.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    /// Moves messages between two mailboxes, returning how many landed,
+    /// beside the error of each message not acted on.
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
         let (from, to) = (from.as_str(), to.as_str());
-        match self.storage_mut()? {
+        let outcome: Outcome<_> = match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.move_messages(from, to, ids),
             #[cfg(feature = "jmap")]
@@ -554,8 +562,10 @@ impl EmailClient {
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client.move_messages(from, to, ids),
             #[cfg(not(backend))]
-            _ => bail!("No storage backend is configured for this account"),
-        }
+            _ => Err(anyhow!("No storage backend is configured for this account")),
+        }?;
+
+        Ok(outcome.sorted_by(ids))
     }
 
     /// The id of the mailbox the backend marks with `role`, `None` when it
@@ -614,31 +624,43 @@ impl EmailClient {
         )),
         allow(unused_variables)
     )]
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<(usize, bool)> {
-        match self.storage_mut()? {
+    pub fn delete_messages(
+        &mut self,
+        mailbox: &str,
+        ids: &[&str],
+    ) -> Result<Outcome<(usize, bool)>> {
+        let outcome: Outcome<_> = match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.delete_messages(mailbox, ids),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
+            BackendClient::Jmap(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
+            BackendClient::Gmail(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => {
-                client.delete_messages(mailbox, ids).map(|n| (n, true))
-            }
+            BackendClient::Msgraph(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(feature = "maildir")]
             BackendClient::Maildir(client) => client
                 .delete_messages(mailbox, ids)
-                .map(|found| (found, true)),
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client.delete_messages(mailbox, ids).map(|n| (n, true)),
+            BackendClient::Mbox(client) => client
+                .delete_messages(mailbox, ids)
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client
                 .delete_messages(mailbox, ids)
-                .map(|count| (count, true)),
+                .map(|outcome| outcome.map(|n| (n, true))),
             #[cfg(not(backend))]
-            _ => bail!("No storage backend is configured for this account"),
-        }
+            _ => Err(anyhow!("No storage backend is configured for this account")),
+        }?;
+
+        Ok(outcome.sorted_by(ids))
     }
 
     /// Refuses the first of `capabilities` the account does not serve,

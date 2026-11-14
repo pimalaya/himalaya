@@ -13,6 +13,8 @@ use io_jmap::rfc8621::{
 };
 use pimalaya_cli::sanitize;
 
+use crate::error::{ErrorCode, ItemError};
+
 /// Returns the optional human-readable description carried by a JMAP set error.
 pub trait JmapSetError {
     fn description(&self) -> Option<&str>;
@@ -38,6 +40,25 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
 
     // The type, properties and description come from the server.
     sanitize::text(&msg).into_owned()
+}
+
+/// The item error of the email `id` a set refused, coded by its type
+/// (RFC 8620 §5.3, RFC 8621 §4.6), the type kept in `sources`.
+pub fn set_item_error<E: JmapSetError>(id: &str, err: &E) -> ItemError {
+    let code = match err.type_name() {
+        "notFound" => Some(ErrorCode::MessageNotFound),
+        "forbidden" => Some(ErrorCode::PermissionDenied),
+        "overQuota" => Some(ErrorCode::QuotaExceeded),
+        "rateLimit" => Some(ErrorCode::RateLimited),
+        _ => None,
+    };
+
+    ItemError {
+        id: Some(id.to_owned()),
+        code,
+        error: format!("JMAP server refused the write{}", format_set_error(err)),
+        sources: vec![sanitize::text(err.type_name()).into_owned()],
+    }
 }
 
 impl JmapSetError for JmapMailboxSetItemError {

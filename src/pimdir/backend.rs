@@ -54,6 +54,7 @@ use crate::{
         envelope::Envelope,
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole},
+        outcome::Outcome,
         search::{
             eval::{self, EnvelopeCopies},
             filter::query::SearchEmailsFilterQuery,
@@ -65,7 +66,7 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{ErrorCode, pimdir_error},
+    error::{ErrorCode, missing_message, pimdir_error},
     pimdir::client::PimdirClient,
 };
 
@@ -598,20 +599,14 @@ impl PimdirClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
-        Ok(self.stage_flags(mailbox, ids, flags, op)?.len())
+    ) -> Result<Outcome<usize>> {
+        Ok(self
+            .stage_flag_op(mailbox, ids, flags, op)?
+            .map(|staged| staged.len()))
     }
 
-    /// Stages a flag op on the messages of `ids` the mailbox holds,
-    /// returning the queue row each message's `SetFlags` waits in, `None`
-    /// for one the op leaves as it shows, for which nothing is staged.
-    ///
-    /// An id the mailbox does not hold is skipped, so the caller reports
-    /// how many messages it found. The rows are appended as one batch
-    /// (pimdir STORAGE §15.1), each passing the gate of the sources'
-    /// declarations (§15.6) once: a change the gate refuses on any
-    /// message, or the store failing, leaves nothing staged. A partial
-    /// support passes, its warning logged once the batch is queued.
+    /// Stages a flag op as [`Self::stage_flag_op`] does, an id the mailbox
+    /// does not hold skipped with a warning.
     pub fn stage_flags(
         &mut self,
         mailbox: &str,
@@ -619,14 +614,42 @@ impl PimdirClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<Vec<PimdirFlagged>> {
+        let staged = self.stage_flag_op(mailbox, ids, flags, op)?;
+
+        for error in staged.errors {
+            let id = error.id.unwrap_or_default();
+            warn!("Message `{id}` not found in `{mailbox}`, skipped");
+        }
+
+        Ok(staged.value)
+    }
+
+    /// Stages a flag op on the messages of `ids` the mailbox holds,
+    /// returning the queue row each message's `SetFlags` waits in, `None`
+    /// for one the op leaves as it shows, for which nothing is staged.
+    ///
+    /// An id the mailbox does not hold is an item error, so the caller
+    /// reports how many messages it found. The rows are appended as one batch
+    /// (pimdir STORAGE §15.1), each passing the gate of the sources'
+    /// declarations (§15.6) once: a change the gate refuses on any
+    /// message, or the store failing, leaves nothing staged. A partial
+    /// support passes, its warning logged once the batch is queued.
+    fn stage_flag_op(
+        &mut self,
+        mailbox: &str,
+        ids: &[&str],
+        flags: &[Flag],
+        op: FlagOp,
+    ) -> Result<Outcome<Vec<PimdirFlagged>>> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
 
         let mut staged = Vec::with_capacity(ids.len());
         let mut changes = Vec::with_capacity(ids.len());
+        let mut errors = Vec::new();
         for id in ids {
             let Some(item) = self.get(&collection, id)? else {
-                warn!("Message `{id}` not found in `{collection}`, skipped");
+                errors.push(missing_message(id));
                 continue;
             };
             let replacement = apply_flag_op(&item.flags, flags, op)
@@ -676,7 +699,7 @@ impl PimdirClient {
         };
         let mut rows = rows.into_iter();
 
-        Ok(staged
+        let staged = staged
             .into_iter()
             .map(|(id, changed)| {
                 let row = changed.then(|| rows.next()).flatten();
@@ -688,7 +711,12 @@ impl PimdirClient {
                     queue_id: row.map(|row| row.handle.id),
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(Outcome {
+            value: staged,
+            errors,
+        })
     }
 
     /// The flags a message carries as the store shows it, staged changes
@@ -862,7 +890,7 @@ impl PimdirClient {
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
     /// on the next sync, no body re-upload).
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         self.refile(from, to, ids, |seq, target| PimdirAction::Copy {
             seq,
             to: target,
@@ -875,7 +903,7 @@ impl PimdirClient {
     /// A move states no resolution (pimdir SYNC §7): the owner parks it
     /// over a message a sync left in conflict, as it does a remove, and
     /// the message stays listed where it was (STORAGE §15.4).
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         self.refile(from, to, ids, |seq, target| PimdirAction::Move {
             seq,
             to: target,
@@ -1000,9 +1028,12 @@ impl PimdirClient {
     /// STORAGE §15.3): it deletes whatever the message holds, and the
     /// owner parks it over a message a sync left in conflict, Himalaya
     /// deciding none.
-    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let collection = self.hub_id(mailbox)?;
-        let found = self.found(&collection, ids)?;
+        let Outcome {
+            value: found,
+            errors,
+        } = self.found(&collection, ids)?;
         let mut producer = self.producer()?;
 
         for (id, seq) in &found {
@@ -1019,24 +1050,30 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .with_context(|| format!("Stage delete of `{id}` in `{mailbox}`"))?;
         }
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// Stages one refiling action per id `from` holds, `build` deciding
     /// whether the source copy stays, returning how many it found.
     ///
     /// Every id is checked before the first row is staged, an unknown one
-    /// skipped, so the caller reports how many messages it found.
+    /// an item error, so the caller reports how many messages it found.
     fn refile(
         &mut self,
         from: &str,
         to: &str,
         ids: &[&str],
         build: fn(i64, PimdirCollectionId) -> PimdirAction,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let source = self.hub_id(from)?;
         let target = PimdirCollectionId(self.hub_id(to)?);
-        let found = self.found(&source, ids)?;
+        let Outcome {
+            value: found,
+            errors,
+        } = self.found(&source, ids)?;
         let mut producer = self.producer()?;
 
         for (id, seq) in &found {
@@ -1044,7 +1081,10 @@ impl PimdirClient {
                 .map_err(pimdir_error)
                 .with_context(|| format!("Stage refile of `{id}` from `{from}` to `{to}`"))?;
         }
-        Ok(found.len())
+        Ok(Outcome {
+            value: found.len(),
+            errors,
+        })
     }
 
     /// The item behind a public id, or `None` when the collection holds none.
@@ -1056,14 +1096,14 @@ impl PimdirClient {
     }
 
     /// The public ids of `ids` the collection holds, checked here so a stale
-    /// id is skipped rather than parked by the owner much later; a malformed
-    /// one fails.
-    fn found<'a>(&self, collection: &str, ids: &[&'a str]) -> Result<Vec<(&'a str, i64)>> {
-        let mut found = Vec::with_capacity(ids.len());
+    /// id is an item error rather than parked by the owner much later; a
+    /// malformed one fails.
+    fn found<'a>(&self, collection: &str, ids: &[&'a str]) -> Result<Outcome<Vec<(&'a str, i64)>>> {
+        let mut found = Outcome::from(Vec::with_capacity(ids.len()));
         for id in ids {
             match self.get(collection, id)? {
-                Some(item) => found.push((*id, item.seq)),
-                None => warn!("Message `{id}` not found in `{collection}`, skipped"),
+                Some(item) => found.value.push((*id, item.seq)),
+                None => found.errors.push(missing_message(id)),
             }
         }
         Ok(found)
@@ -4029,18 +4069,20 @@ mod tests {
         }
     }
 
-    /// An id the mailbox does not hold is skipped and counted out, as the
-    /// unified commands report how many of the given ids they found.
+    /// An id the mailbox does not hold is an item error and counted out, as
+    /// the unified commands report how many of the given ids they found.
     #[test]
-    fn an_unknown_id_is_skipped_and_counted_out() {
+    fn an_unknown_id_is_an_item_error_and_counted_out() {
         let (_dir, mut client) = flag_store(None);
         let id = id_of(&mut client, 0);
         let seen = [Flag::from_iana(IanaFlag::Seen)];
 
-        let count = client
+        let stored = client
             .store_flags("imap/INBOX", &[id.as_str(), "999"], &seen, FlagOp::Add)
             .unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(stored.value, 1);
+        assert_eq!(stored.errors[0].id.as_deref(), Some("999"));
+        assert_eq!(stored.errors[0].code, Some(ErrorCode::MessageNotFound));
         assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
 
         let staged = client
@@ -4051,7 +4093,7 @@ mod tests {
     }
 
     /// A refile or a delete stages the ids the mailbox holds and counts them,
-    /// an unknown one skipped; none known stages nothing.
+    /// an unknown one an item error; none known stages nothing.
     #[test]
     fn a_refile_or_delete_stages_the_ids_it_found() {
         let (dir, mut client) = flag_store(None);
@@ -4060,17 +4102,21 @@ mod tests {
         let queued = |client: &PimdirClient| client.store.list_pending_actions().unwrap().len();
 
         let copied = client.copy_messages("imap/INBOX", "imap/Archive", &[&ids[0], "999"]);
-        assert_eq!(copied.unwrap(), 1);
+        let copied = copied.unwrap();
+        assert_eq!(copied.value, 1);
+        assert_eq!(copied.errors[0].id.as_deref(), Some("999"));
         assert_eq!(queued(&client), 1);
         let moved = client.move_messages("imap/INBOX", "imap/Archive", &[&ids[1], "999"]);
-        assert_eq!(moved.unwrap(), 1);
+        assert_eq!(moved.unwrap().value, 1);
         assert_eq!(queued(&client), 2);
         let deleted = client.delete_messages("imap/INBOX", &[&ids[2], "999"]);
-        assert_eq!(deleted.unwrap(), 1);
+        assert_eq!(deleted.unwrap().value, 1);
         assert_eq!(queued(&client), 3);
 
         let none = client.copy_messages("imap/INBOX", "imap/Archive", &["998", "999"]);
-        assert_eq!(none.unwrap(), 0);
+        let none = none.unwrap();
+        assert_eq!(none.value, 0);
+        assert_eq!(none.errors.len(), 2);
         assert!(
             client
                 .delete_messages("imap/INBOX", &[&ids[0], "x"])
@@ -4122,7 +4168,7 @@ mod tests {
             .store_flags("imap/INBOX", &ids, &seen, FlagOp::Add)
             .unwrap();
 
-        assert_eq!(count, 2);
+        assert_eq!(count.value, 2);
         assert!(
             client
                 .store
@@ -4259,7 +4305,7 @@ mod tests {
         let moved = client
             .move_messages("imap/Drafts", "imap/Trash", &[drafts[0].as_str()])
             .unwrap();
-        assert_eq!(moved, 1, "the move is queued");
+        assert_eq!(moved.value, 1, "the move is queued");
         let row = client.store.pending_actions("imap/Drafts").unwrap()[0].id;
         assert_eq!(listed(&mut client, "imap/Drafts"), drafts, "taken out");
         assert!(listed(&mut client, "imap/Trash").is_empty(), "brought in");

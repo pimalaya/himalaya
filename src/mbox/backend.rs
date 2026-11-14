@@ -41,9 +41,10 @@ use crate::{
         envelope::{self, Envelope},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
+        outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::message_not_found,
+    error::{ErrorCode, ItemError, message_not_found, missing_message},
     mbox::{
         cache::MboxCache,
         client::{MboxClient, validate_mbox_name},
@@ -62,29 +63,44 @@ const STORE_FIELDS: [&str; 6] = [
     "X-Mozilla-Keys",
 ];
 
+/// The edits a write makes, by entry id, beside the error of each id it
+/// leaves out.
+type UpdatePlan = (BTreeMap<String, MboxEntryUpdateEdit>, Vec<ItemError>);
+
 impl MboxClient {
     /// Lists the mbox files of the store, the spool as `INBOX`.
     ///
     /// `with_counts` syncs the index of every file, which scans a file the
-    /// cache does not know yet.
-    pub fn list_mailboxes(&self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// cache does not know yet; a file whose index cannot be synced is
+    /// listed without counts, beside its error.
+    pub fn list_mailboxes(&self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         self.check_root()?;
         let mut mailboxes = Vec::new();
+        let mut errors = Vec::new();
 
         for mbox in self.list_mboxes()? {
             let name = mbox.name.to_string();
             let role = (self.store.inbox.is_some() && name == INBOX).then_some(MailboxRole::Inbox);
 
-            let (total, unread) = if with_counts {
-                let index = self.index(&mbox.path, false)?.0;
-                let total = index.messages().count() as u64;
-                let unread = index
-                    .messages()
-                    .filter(|entry| !entry.flags.contains(&MboxFlag::Seen))
-                    .count() as u64;
-                (Some(total), Some(unread))
-            } else {
-                (None, None)
+            let (total, unread) = match with_counts {
+                false => (None, None),
+                true => match self.index(&mbox.path, false) {
+                    Ok((index, _)) => {
+                        let total = index.messages().count() as u64;
+                        let unread = index
+                            .messages()
+                            .filter(|entry| !entry.flags.contains(&MboxFlag::Seen))
+                            .count() as u64;
+                        (Some(total), Some(unread))
+                    }
+                    Err(err) => {
+                        let err = err.context("Cannot count the messages of the mailbox");
+                        let mut error = ItemError::new(Some(&name), &err);
+                        error.code = Some(ErrorCode::MailboxUnreadable);
+                        errors.push(error);
+                        (None, None)
+                    }
+                },
             };
 
             mailboxes.push(Mailbox {
@@ -96,7 +112,10 @@ impl MboxClient {
             });
         }
 
-        Ok(mailboxes)
+        Ok(Outcome {
+            value: mailboxes,
+            errors,
+        })
     }
 
     /// Lists envelopes from `mailbox`, sorted by `Date:` descending then
@@ -151,7 +170,7 @@ impl MboxClient {
 
     /// Adds, sets or removes `flags` on the messages of `mailbox` among
     /// `ids`, rewriting the file once for the whole set, and returns how
-    /// many it found. An unknown id is skipped, and none found writes
+    /// many it found, beside the error of each unknown id. None found writes
     /// nothing.
     ///
     /// A set keeps the `O` (old) status, which no shared flag names, so
@@ -163,7 +182,7 @@ impl MboxClient {
         ids: &[&str],
         flags: &[Flag],
         op: FlagOp,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let path = self.open_mbox(mailbox)?;
         let flags = flags_to_mbox(flags)?;
 
@@ -188,14 +207,15 @@ impl MboxClient {
         };
 
         self.update(&path, |index| {
-            let edits = found(index, ids, &path)
+            let (entries, errors) = found(index, ids);
+            let edits = entries
                 .into_iter()
                 .map(|entry| {
                     let flags = MboxEntryUpdateEdit::Flags(edit(&entry.flags));
                     (entry.id.clone(), flags)
                 })
                 .collect();
-            Ok(edits)
+            Ok((edits, errors))
         })
     }
 
@@ -218,7 +238,7 @@ impl MboxClient {
                     (entry.id.clone(), flags)
                 })
                 .collect();
-            Ok(edits)
+            Ok((edits, Vec::new()))
         })?;
         Ok(())
     }
@@ -298,21 +318,30 @@ impl MboxClient {
     }
 
     /// Copies the messages of `from` among `ids` to the end of `to`,
-    /// returning how many it found. An unknown id is skipped, and none
-    /// found writes nothing.
-    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        Ok(self.copy_message_ids(from, to, ids)?.len())
+    /// returning how many it found beside the error of each unknown id.
+    /// None found writes nothing.
+    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        Ok(self.copy_message_ids(from, to, ids)?.map(|ids| ids.len()))
     }
 
     /// Copies like [`Self::copy_messages`], returning the ids of the
     /// copies in `to`, each message found once.
-    pub fn copy_message_ids(&self, from: &str, to: &str, ids: &[&str]) -> Result<Vec<String>> {
+    pub fn copy_message_ids(
+        &self,
+        from: &str,
+        to: &str,
+        ids: &[&str],
+    ) -> Result<Outcome<Vec<String>>> {
         let source = self.open_mbox(from)?;
         let target = self.open_mbox(to)?;
         let (index, _) = self.index(&source, false)?;
-        let entries: Vec<MboxEntry> = found(&index, ids, &source).into_iter().cloned().collect();
+        let (entries, errors) = found(&index, ids);
+        let entries: Vec<MboxEntry> = entries.into_iter().cloned().collect();
         if entries.is_empty() {
-            return Ok(Vec::new());
+            return Ok(Outcome {
+                value: Vec::new(),
+                errors,
+            });
         }
 
         let opts = MboxEntryCopyOptions {
@@ -322,25 +351,37 @@ impl MboxClient {
             chunk_size: self.chunk_size,
         };
         let copied = self.exec(MboxEntryCopy::new(source, target.clone(), entries, opts))?;
-        self.appended_ids(&target, &copied)
+        Ok(Outcome {
+            value: self.appended_ids(&target, &copied)?,
+            errors,
+        })
     }
 
     /// Moves the messages of `from` among `ids` to the end of `to`: a
-    /// copy, then a removal from the source. Returns how many it found,
-    /// an unknown id being skipped and none found writing nothing.
-    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        Ok(self.move_message_ids(from, to, ids)?.len())
+    /// copy, then a removal from the source. Returns how many it found
+    /// beside the error of each unknown id, none found writing nothing.
+    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        Ok(self.move_message_ids(from, to, ids)?.map(|ids| ids.len()))
     }
 
     /// Moves like [`Self::move_messages`], returning the ids of the
     /// messages in `to`, each message found once.
-    pub fn move_message_ids(&self, from: &str, to: &str, ids: &[&str]) -> Result<Vec<String>> {
+    pub fn move_message_ids(
+        &self,
+        from: &str,
+        to: &str,
+        ids: &[&str],
+    ) -> Result<Outcome<Vec<String>>> {
         let source = self.open_mbox(from)?;
         let target = self.open_mbox(to)?;
         let (index, mut cache) = self.index(&source, false)?;
-        let entries: Vec<MboxEntry> = found(&index, ids, &source).into_iter().cloned().collect();
+        let (entries, errors) = found(&index, ids);
+        let entries: Vec<MboxEntry> = entries.into_iter().cloned().collect();
         if entries.is_empty() {
-            return Ok(Vec::new());
+            return Ok(Outcome {
+                value: Vec::new(),
+                errors,
+            });
         }
 
         let opts = MboxEntryMoveOptions {
@@ -359,7 +400,10 @@ impl MboxClient {
 
         cache.index = Some(output.index);
         cache.save(self.cache_dir.as_deref(), &source);
-        self.appended_ids(&target, &output.entries)
+        Ok(Outcome {
+            value: self.appended_ids(&target, &output.entries)?,
+            errors,
+        })
     }
 
     /// Fails unless the mbox at `path` holds every id of `ids`, for the raw
@@ -370,17 +414,18 @@ impl MboxClient {
     }
 
     /// Permanently removes the messages of `mailbox` among `ids`,
-    /// returning how many it found. An unknown id is skipped, and none
-    /// found writes nothing.
-    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<usize> {
+    /// returning how many it found beside the error of each unknown id.
+    /// None found writes nothing.
+    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let path = self.open_mbox(mailbox)?;
 
         self.update(&path, |index| {
-            let edits = found(index, ids, &path)
+            let (entries, errors) = found(index, ids);
+            let edits = entries
                 .into_iter()
                 .map(|entry| (entry.id.clone(), MboxEntryUpdateEdit::Remove))
                 .collect();
-            Ok(edits)
+            Ok((edits, errors))
         })
     }
 
@@ -559,8 +604,8 @@ impl MboxClient {
     fn update(
         &self,
         path: &MboxFsPath,
-        plan: impl Fn(&MboxIndex) -> Result<BTreeMap<String, MboxEntryUpdateEdit>>,
-    ) -> Result<usize> {
+        plan: impl Fn(&MboxIndex) -> Result<UpdatePlan>,
+    ) -> Result<Outcome<usize>> {
         match self.update_once(path, &plan, false) {
             Err(err) if err.downcast_ref().is_some_and(is_stale) => {
                 self.update_once(path, &plan, true)
@@ -574,14 +619,14 @@ impl MboxClient {
     fn update_once(
         &self,
         path: &MboxFsPath,
-        plan: &impl Fn(&MboxIndex) -> Result<BTreeMap<String, MboxEntryUpdateEdit>>,
+        plan: &impl Fn(&MboxIndex) -> Result<UpdatePlan>,
         rebuild: bool,
-    ) -> Result<usize> {
+    ) -> Result<Outcome<usize>> {
         let (index, mut cache) = self.index(path, rebuild)?;
-        let edits = plan(&index)?;
+        let (edits, errors) = plan(&index)?;
         let count = edits.len();
         if count == 0 {
-            return Ok(0);
+            return Ok(Outcome { value: 0, errors });
         }
 
         let opts = MboxEntryUpdateOptions {
@@ -594,7 +639,10 @@ impl MboxClient {
 
         cache.index = Some(output.index);
         cache.save(self.cache_dir.as_deref(), path);
-        Ok(count)
+        Ok(Outcome {
+            value: count,
+            errors,
+        })
     }
 
     /// The envelope of every message of `path`, pseudo message aside, in
@@ -707,11 +755,12 @@ fn require_all(index: &MboxIndex, ids: &[&str], path: &MboxFsPath) -> Result<()>
     Ok(())
 }
 
-/// The entries of `index` among `ids`, each once, in the order given. An
-/// unknown id is skipped with a warning.
-fn found<'a>(index: &'a MboxIndex, ids: &[&str], path: &MboxFsPath) -> Vec<&'a MboxEntry> {
+/// The entries of `index` among `ids`, each once, in the order given,
+/// beside the error of each unknown id.
+fn found<'a>(index: &'a MboxIndex, ids: &[&str]) -> (Vec<&'a MboxEntry>, Vec<ItemError>) {
     let mut seen = BTreeSet::new();
     let mut found = Vec::with_capacity(ids.len());
+    let mut errors = Vec::new();
 
     for id in ids {
         match index.get(id) {
@@ -720,11 +769,11 @@ fn found<'a>(index: &'a MboxIndex, ids: &[&str], path: &MboxFsPath) -> Vec<&'a M
                     found.push(entry);
                 }
             }
-            _ => warn!("message `{id}` not found in mbox {path}, skipping it"),
+            _ => errors.push(missing_message(id)),
         }
     }
 
-    found
+    (found, errors)
 }
 
 /// Leaves out of a stored message the header fields the store owns: the
@@ -857,7 +906,7 @@ mod tests {
 
     /// The names of the mailboxes of `client`.
     fn names(client: &MboxClient) -> Vec<String> {
-        let mailboxes = client.list_mailboxes(false).unwrap();
+        let mailboxes = client.list_mailboxes(false).unwrap().value;
         mailboxes.into_iter().map(|mailbox| mailbox.name).collect()
     }
 
@@ -870,25 +919,34 @@ mod tests {
         let flagged = [Flag::from_iana(IanaFlag::Flagged)];
 
         let count = client.store_flags("A", &["nope"], &flagged, FlagOp::Add);
-        assert_eq!(count.unwrap(), 0);
+        assert_eq!(count.unwrap().value, 0);
         let count = client.store_flags("A", &[&id, "nope", &id], &flagged, FlagOp::Add);
-        assert_eq!(count.unwrap(), 1);
+        assert_eq!(count.unwrap().value, 1);
 
-        assert_eq!(client.copy_messages("A", "B", &["nope"]).unwrap(), 0);
-        assert_eq!(client.copy_messages("A", "B", &[&id, &id]).unwrap(), 1);
+        assert_eq!(client.copy_messages("A", "B", &["nope"]).unwrap().value, 0);
+        assert_eq!(
+            client.copy_messages("A", "B", &[&id, &id]).unwrap().value,
+            1
+        );
         assert_eq!(
             client.list_envelopes("B", None, None, false).unwrap().len(),
             1
         );
 
-        assert_eq!(client.move_messages("A", "B", &["nope"]).unwrap(), 0);
-        assert_eq!(client.delete_messages("A", &["nope"]).unwrap(), 0);
+        assert_eq!(client.move_messages("A", "B", &["nope"]).unwrap().value, 0);
+        assert_eq!(client.delete_messages("A", &["nope"]).unwrap().value, 0);
         assert_eq!(
             client.list_envelopes("A", None, None, false).unwrap().len(),
             1
         );
 
-        assert_eq!(client.delete_messages("B", &[&id, "nope", &id]).unwrap(), 1);
+        assert_eq!(
+            client
+                .delete_messages("B", &[&id, "nope", &id])
+                .unwrap()
+                .value,
+            1
+        );
         assert!(
             client
                 .list_envelopes("B", None, None, false)
@@ -1133,13 +1191,13 @@ mod tests {
         move_an_entry();
         let flagged = [Flag::from_iana(IanaFlag::Flagged)];
         let count = client.store_flags("A", &[&first, &second], &flagged, FlagOp::Add);
-        assert_eq!(count.unwrap(), 2);
+        assert_eq!(count.unwrap().value, 2);
 
         let envelopes = client.list_envelopes("A", None, None, false).unwrap();
         assert!(envelopes.iter().all(|envelope| envelope.flags.len() == 1));
 
         move_an_entry();
-        assert_eq!(client.delete_messages("A", &[&second]).unwrap(), 1);
+        assert_eq!(client.delete_messages("A", &[&second]).unwrap().value, 1);
 
         let envelopes = client.list_envelopes("A", None, None, false).unwrap();
         assert_eq!(envelopes.len(), 1);
@@ -1154,9 +1212,15 @@ mod tests {
         let id = client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
         client.add_message("B", &[], MESSAGE.to_vec()).unwrap();
 
-        let ids = client.copy_message_ids("A", "B", &[&id, &id]).unwrap();
+        let ids = client
+            .copy_message_ids("A", "B", &[&id, &id])
+            .unwrap()
+            .value;
         assert_eq!(ids, [format!("{id}-2")]);
-        let ids = client.move_message_ids("A", "B", &[&id, &id]).unwrap();
+        let ids = client
+            .move_message_ids("A", "B", &[&id, &id])
+            .unwrap()
+            .value;
         assert_eq!(ids, [format!("{id}-3")]);
     }
 

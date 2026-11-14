@@ -178,11 +178,15 @@ fn may_name_folder(value: &str) -> bool {
     id_like || WELL_KNOWN_NAMES.contains(&value.to_ascii_lowercase().as_str())
 }
 
-/// Whether Graph's answer to a folder lookup means no such folder: a
-/// malformed id (400), an unknown one (404), or a value no path segment
-/// can carry.
+/// Whether Graph's answer to a folder lookup means no such folder: an
+/// unknown id (404), a malformed one (400 `ErrorInvalidIdMalformed`), or a
+/// value no path segment can carry.
 fn names_no_folder(err: &MsgraphSendError) -> bool {
-    matches!(err.status(), Some(400 | 404)) || matches!(err, MsgraphSendError::InvalidRequest(_))
+    let malformed = err
+        .api()
+        .is_some_and(|err| err.status == 400 && err.code == "ErrorInvalidIdMalformed");
+
+    malformed || err.status() == Some(404) || matches!(err, MsgraphSendError::InvalidRequest(_))
 }
 
 /// Resolves a [`MsgraphAuthConfig`] into the bare OAuth 2.0 bearer token;
@@ -199,7 +203,27 @@ pub fn msgraph_token(
 
 #[cfg(test)]
 mod tests {
-    use crate::msgraph::client::may_name_folder;
+    use io_msgraph::v1::send::{MsgraphApiError, MsgraphSendError};
+
+    use crate::msgraph::client::{may_name_folder, names_no_folder};
+
+    fn refused(status: u16, code: &str) -> MsgraphSendError {
+        MsgraphApiError {
+            status,
+            code: code.into(),
+            ..Default::default()
+        }
+        .into()
+    }
+
+    /// A 400 names no folder only when Graph codes the id malformed.
+    #[test]
+    fn only_a_malformed_id_or_a_404_names_no_folder() {
+        assert!(names_no_folder(&refused(404, "ErrorItemNotFound")));
+        assert!(names_no_folder(&refused(400, "ErrorInvalidIdMalformed")));
+        assert!(!names_no_folder(&refused(400, "BadRequest")));
+        assert!(!names_no_folder(&refused(403, "ErrorAccessDenied")));
+    }
 
     #[test]
     fn only_a_well_known_name_or_an_id_shape_is_asked_of_graph() {
