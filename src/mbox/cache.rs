@@ -32,7 +32,7 @@ const VERSION: u32 = 3;
 /// The cached state of one mbox file.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct MboxCache {
-    /// The [`VERSION`] the cache was saved under, 0 before there was one.
+    /// The `VERSION` the cache was saved under, 0 before there was one.
     #[serde(default)]
     pub version: u32,
     /// The scan index, `None` until the file was scanned once.

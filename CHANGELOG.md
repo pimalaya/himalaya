@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `total` to the `envelope list` JSON output: how many messages the mailbox holds, read within the listing itself (IMAP `SELECT` `EXISTS`, JMAP `calculateTotal`, the entries Maildir, mbox and pimdir hold), `null` on Gmail and Microsoft Graph and always for `envelope search`.
+- Added a library target, for himalaya-tui alone, which pins it by git revision and runs Himalaya's commands in-process; it carries no semver promise beyond the CLI grammar and its `--json` output.
 - Added `errors` to `envelope list`, `envelope search`, `mailbox list`, `flag add|set|remove`, `message copy`, `message move` and `message delete`: one item error `{id, code, error, sources}` per item the command could not list or act on, `[]` when there is none, `count` counting what was acted on.
 
   A non-empty `errors` exits 3, printing nothing after the result. In text each entry prints as an `Error:` field of a list's header, after the paging fields, or as an `Error:` line after a write's sentence. `json-schema` describes it under `himalaya-item-error`; `himalaya mcp` returns such a result as `structuredContent` with `isError`.

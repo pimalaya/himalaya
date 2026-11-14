@@ -311,45 +311,48 @@ impl EmailClient {
         }
     }
 
-    /// Lists envelopes from `mailbox`.
+    /// Lists envelopes from `mailbox`, beside how many messages it holds
+    /// when the backend answers it within the listing's own exchanges,
+    /// `None` otherwise (Gmail's count being an estimate, Graph's a
+    /// request of its own).
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
+                client.list_envelopes_counted(mailbox, page, page_size, with_attachment)
             }
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
+                client.list_envelopes_counted(mailbox, page, page_size, with_attachment)
             }
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
-            }
+            BackendClient::Gmail(client) => client
+                .list_envelopes(mailbox, page, page_size, with_attachment)
+                .map(|envelopes| (envelopes, None)),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(client) => client
                 .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+                .map(|envelopes| (Outcome::from(envelopes), None)),
             #[cfg(feature = "maildir")]
             BackendClient::Maildir(client) => {
-                client.list_envelopes(mailbox, page, page_size, with_attachment)
+                client.list_envelopes_counted(mailbox, page, page_size, with_attachment)
             }
             #[cfg(feature = "mbox")]
             BackendClient::Mbox(client) => client
-                .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+                .list_envelopes_counted(mailbox, page, page_size, with_attachment)
+                .map(|(envelopes, total)| (Outcome::from(envelopes), total)),
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client
-                .list_envelopes(mailbox, page, page_size, with_attachment)
-                .map(Outcome::from),
+                .list_envelopes_counted(mailbox, page, page_size, with_attachment)
+                .map(|(envelopes, total)| (Outcome::from(envelopes), total)),
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -813,6 +816,16 @@ impl EmailClient {
                 let _ = alias;
                 None
             }
+        }
+    }
+
+    /// Keeps the storage connection alive: `NOOP` on IMAP, nothing for a
+    /// backend holding no connection between requests.
+    pub fn keep_alive(&mut self) -> Result<()> {
+        match self.storage.as_mut() {
+            #[cfg(feature = "imap")]
+            Some(BackendClient::Imap(client)) => client.keep_alive(),
+            _ => Ok(()),
         }
     }
 

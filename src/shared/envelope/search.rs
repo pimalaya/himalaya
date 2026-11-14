@@ -168,6 +168,7 @@ impl EnvelopeSearchCommand {
             recipient: self.recipient,
             envelopes,
             next_page,
+            total: None,
             errors,
         };
 

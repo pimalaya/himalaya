@@ -24,7 +24,7 @@
 //! order.
 //!
 //! A pattern is a literal: what Gmail would read as an operator inside it
-//! is neutralised (see [`value_q`]).
+//! is neutralised (see `value_q`).
 
 use anyhow::Result;
 use chrono::{Duration, NaiveDate, NaiveTime};

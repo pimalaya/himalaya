@@ -11,9 +11,9 @@
 //! [`Session`] the server keeps and print into a [`CapturePrinter`], whose
 //! one JSON value becomes the call's structured result.
 //!
-//! A tool may also take a [`ServerArg`], an input the CLI says another
+//! A tool may also take a `ServerArg`, an input the CLI says another
 //! way (a path the server keeps closed): declared on the tool in
-//! [`TOOLS`], taken off the call before the argv is rebuilt, validated
+//! `TOOLS`, taken off the call before the argv is rebuilt, validated
 //! here, and handed to the parsed command through a field clap skips.
 //!
 //! [`mcp`]: pimalaya_cli::mcp

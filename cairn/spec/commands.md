@@ -374,6 +374,19 @@ An output type of Himalaya's own SHALL print every key, `null` when the value is
 - WHEN `himalaya --json envelope list -s 1` runs, then `himalaya --json envelope list -s 1 --page-token 2`
 - THEN the first prints one envelope and `"nextPage":"2"`, the second the other envelope
 
+### Requirement: An envelope listing says how many messages the mailbox holds
+`envelope list` SHALL print `total` beside `envelopes`, `nextPage` and `errors`: how many messages the mailbox holds, when the backend answers it within the listing's own exchanges (the `EXISTS` of IMAP's `SELECT`, JMAP's `calculateTotal`, the entries Maildir, mbox and pimdir list), and `null` otherwise, Gmail among them. No backend SHALL send a request for the total alone. `envelope search`, sharing that output, SHALL print `total` as `null`, a search counting its matches rather than the mailbox. The plain text output does not change.
+
+#### Scenario: An IMAP mailbox of 120 messages
+- GIVEN an IMAP mailbox holding 120 messages
+- WHEN `himalaya --json envelope list -s 25` runs
+- THEN it prints 25 envelopes, `nextPage` `"2"` and `total` 120
+
+#### Scenario: Gmail
+- GIVEN a Gmail account
+- WHEN `himalaya --json envelope list` runs
+- THEN `total` is `null`
+
 ### Requirement: An IMAP command prints its completion
 Every `imap` command but `raw` SHALL print the tagged completion of its exchange: `status: "OK"` beside what the command understood of the server's answer, or `{status, text}` when the server answers `NO` or `BAD`, exiting 3 after it. A command getting no completion (a network, TLS or parse failure, a local error) SHALL fail with the failure object. `select` SHALL print the mailbox's state (`flags`, `exists`, `recent`, `firstUnseen`, the number of the first unseen message, `permanentFlags`, `uidNext`, `uidValidity`, `highestModSeq`), `expunge` the expunged message numbers, `store` the FETCH data the server returns, `append` the `APPENDUID` it returns (UIDPLUS), `copy` and `move` the `COPYUID` (`uidValidity`, and `sourceUids` beside `destinationUids`, each source UID at the place of the UID it got), `null` and empty without UIDPLUS or when it counts over a million messages, the mailbox writes `{mailbox}` and `close` and `unselect` the status alone. `fetch` SHALL print envelope addresses as `{name, email}`, and `search` its ids as numbers, as `sort` does. io-imap returns a typed exchange's output whole, so these commands print no events. `thread` SHALL be refused with `capability-missing` before anything is sent when the server does not advertise `THREAD=` the algorithm.
 

@@ -75,10 +75,13 @@ impl EnvelopeListCommand {
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account);
 
-        let Outcome {
-            value: envelopes,
-            errors,
-        } = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
+        let (
+            Outcome {
+                value: envelopes,
+                errors,
+            },
+            total,
+        ) = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
 
         // NOTE: the token is the next page number, given while a page comes
         // back full; the page after a full last one comes back empty.
@@ -103,6 +106,7 @@ impl EnvelopeListCommand {
             recipient: self.recipient,
             envelopes,
             next_page,
+            total,
             errors,
         };
 
@@ -148,6 +152,9 @@ pub struct EnvelopeListOutput {
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     pub next_page: Option<String>,
+    /// How many messages the mailbox holds, `null` when the backend does
+    /// not answer it within the listing, and always for a search.
+    pub total: Option<u64>,
     /// The error of each envelope the page could not list, in the order
     /// met.
     pub errors: Vec<ItemError>,
@@ -297,6 +304,7 @@ mod tests {
             recipient: false,
             envelopes: Vec::new(),
             next_page: None,
+            total: None,
             errors: Vec::new(),
         }
     }

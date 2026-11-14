@@ -158,12 +158,34 @@ impl ImapClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<Outcome<Vec<Envelope>>> {
+        self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
+            .map(|(envelopes, _)| envelopes)
+    }
+
+    /// Sends `NOOP`, keeping an idle connection from the server's
+    /// autologout.
+    pub fn keep_alive(&mut self) -> Result<()> {
+        self.noop()?;
+        Ok(())
+    }
+
+    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
+    /// messages the mailbox holds: the `EXISTS` of the `SELECT` the
+    /// listing sends anyway.
+    pub fn list_envelopes_counted(
+        &mut self,
+        mailbox: &str,
+        page: Option<u32>,
+        page_size: Option<u32>,
+        with_attachment: bool,
+    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
-        let exists = output_data("SELECT", select).exists.unwrap_or(0);
+        let exists = output_data("SELECT", select).exists;
+        let total = exists.map(u64::from);
 
-        let Some(window) = compute_window(exists, page, page_size) else {
-            return Ok(Outcome::from(Vec::new()));
+        let Some(window) = compute_window(exists.unwrap_or(0), page, page_size) else {
+            return Ok((Outcome::from(Vec::new()), total));
         };
         let sequence_set: SequenceSet = window
             .as_str()
@@ -186,10 +208,12 @@ impl ImapClient {
         let ids: Vec<&str> = envelopes.iter().map(|e| e.id.as_str()).collect();
         let errors = Outcome { value: (), errors }.sorted_by(&ids).errors;
 
-        Ok(Outcome {
+        let envelopes = Outcome {
             value: envelopes,
             errors,
-        })
+        };
+
+        Ok((envelopes, total))
     }
 
     /// Searches a mailbox with the shared query.
@@ -451,7 +475,7 @@ impl ImapClient {
     /// the sequence RFC 6851 §1 describes for such servers: `UID COPY`,
     /// then `\Deleted` and, when RFC 4315 UIDPLUS is advertised, a
     /// `UID EXPUNGE` of the source UIDs really copied (see
-    /// [`Self::copied_uids`]). Without UIDPLUS the messages stay flagged
+    /// `Self::copied_uids`). Without UIDPLUS the messages stay flagged
     /// in the source, as `delete_messages` already does in the trash. A
     /// plain `EXPUNGE` would also remove every other `\Deleted` message.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
@@ -2095,6 +2119,44 @@ mod tests {
         const UIDPLUS: &str = "IMAP4rev1 UIDPLUS";
         const PLAIN: &str = "IMAP4rev1";
         const MOVE: &str = "IMAP4rev1 UIDPLUS MOVE";
+
+        #[test]
+        fn a_listing_counts_the_mailbox_from_its_select() {
+            let (server, handle) = serve(PLAIN, vec![1, 2, 3], none);
+            let mut client = client(&server);
+            let (_, total) = client
+                .list_envelopes_counted("INBOX", Some(1), Some(2), false)
+                .unwrap();
+            drop(client);
+            handle.join().unwrap();
+
+            assert_eq!(total, Some(3));
+        }
+
+        #[test]
+        fn a_keepalive_sends_noop() {
+            let (server, handle) = serve(PLAIN, Vec::new(), none);
+            let mut client = client(&server);
+            client.keep_alive().unwrap();
+            drop(client);
+
+            assert!(has(&handle.join().unwrap(), "NOOP"));
+        }
+
+        #[test]
+        fn a_keepalive_on_a_closed_connection_fails() {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            let handle = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                write!(stream, "* PREAUTH [CAPABILITY {PLAIN}] ready\r\n").unwrap();
+            });
+
+            let mut client = client(&format!("imap://{addr}"));
+            handle.join().unwrap();
+
+            assert!(client.keep_alive().is_err());
+        }
 
         fn mv(
             ids: &'static [&'static str],

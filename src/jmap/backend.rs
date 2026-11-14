@@ -93,8 +93,22 @@ impl JmapClient {
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
-        _with_attachment: bool,
+        with_attachment: bool,
     ) -> Result<Outcome<Vec<Envelope>>> {
+        self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
+            .map(|(envelopes, _)| envelopes)
+    }
+
+    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
+    /// messages the mailbox holds: the `total` the same `Email/query`
+    /// computes.
+    pub fn list_envelopes_counted(
+        &mut self,
+        mailbox: &str,
+        page: Option<u32>,
+        page_size: Option<u32>,
+        _with_attachment: bool,
+    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
         let (position, limit) = compute_position_limit(page, page_size);
         let filter = JmapEmailFilter {
             in_mailbox: Some(mailbox.to_string()),
@@ -105,14 +119,17 @@ impl JmapClient {
             filter: Some(JmapFilter::from(filter)),
             position,
             limit,
+            calculate_total: true,
             properties: Some(envelope_properties()),
             ..Default::default()
         })?;
 
-        Ok(Outcome {
+        let envelopes = Outcome {
             value: output.emails.into_iter().map(envelope_from).collect(),
             errors: unparsed(output.unparsed, ErrorCode::MessageUnreadable),
-        })
+        };
+
+        Ok((envelopes, output.total))
     }
 
     /// Searches a mailbox with an `Email/query` chained into an

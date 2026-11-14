@@ -353,12 +353,45 @@ impl PimdirClient {
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
+        with_attachment: bool,
+    ) -> Result<Vec<Envelope>> {
+        self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
+            .map(|(envelopes, _)| envelopes)
+    }
+
+    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
+    /// messages the collection holds: the store's live item count, a local
+    /// query rather than a walk of every item.
+    pub fn list_envelopes_counted(
+        &mut self,
+        mailbox: &str,
+        page: Option<u32>,
+        page_size: Option<u32>,
+        with_attachment: bool,
+    ) -> Result<(Vec<Envelope>, Option<u64>)> {
+        let collection = self.hub_id(mailbox)?;
+        let total = self
+            .store
+            .count_items(&collection)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Count items in `{collection}`"))?;
+        let envelopes =
+            self.list_collection_envelopes(&collection, page, page_size, with_attachment)?;
+        Ok((envelopes, Some(total)))
+    }
+
+    /// The envelopes of `collection`, as [`Self::list_envelopes`] lists
+    /// them.
+    fn list_collection_envelopes(
+        &mut self,
+        collection: &str,
+        page: Option<u32>,
+        page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
-        let collection = self.hub_id(mailbox)?;
         let Some(wanted) = page_end(page, page_size) else {
             let envelopes = self
-                .scan_items(&collection)?
+                .scan_items(collection)?
                 .iter()
                 .map(envelope_from_item)
                 .collect();
@@ -369,7 +402,7 @@ impl PimdirClient {
         }
 
         let mut envelopes: Vec<Envelope> = Vec::new();
-        self.walk(&collection, None, false, wanted.min(SCAN_BATCH), |item| {
+        self.walk(collection, None, false, wanted.min(SCAN_BATCH), |item| {
             envelopes.push(envelope_from_item(&item));
             match wanted - envelopes.len() {
                 0 => ControlFlow::Break(()),
@@ -387,7 +420,7 @@ impl PimdirClient {
     /// The store is read newest first, within the date bounds the query
     /// states and through the unread chip where it applies, and the read
     /// stops at the end of the page when the order is the store's own
-    /// ([`PimdirPushdown`]). Every clause is still matched in memory.
+    /// (`PimdirPushdown`). Every clause is still matched in memory.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -605,7 +638,7 @@ impl PimdirClient {
             .map(|staged| staged.len()))
     }
 
-    /// Stages a flag op as [`Self::stage_flag_op`] does, an id the mailbox
+    /// Stages a flag op as `Self::stage_flag_op` does, an id the mailbox
     /// does not hold skipped with a warning.
     pub fn stage_flags(
         &mut self,

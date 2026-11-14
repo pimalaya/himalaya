@@ -43,3 +43,16 @@ A line clap cannot parse that sets a flag the session fixes when it starts, `-a`
 
 ### Requirement: Help keeps JSON lines whole
 A line asking for help SHALL print clap's text on stdout in a text session, and on stderr when the session's `--json` or a `--json` word of the line before any `--` is set, so stdout keeps one JSON value per line. Its usage line SHALL name the binary before the command, as `Usage: himalaya envelope list [OPTIONS]`. A failing line SHALL hint at restarting the session with `--log-level` for more verbose logs, the flag being fixed for the session.
+
+### Requirement: A session can be kept alive
+`Session::keep_alive` SHALL send `NOOP` on the unified client's IMAP connection when the session holds one, and SHALL do nothing when the slot is empty or the backend keeps no connection. A keepalive that fails SHALL empty the slot, as a failed command does, so the next command builds the client again. No command of the grammar SHALL call it. `Session::is_connected` SHALL say whether the unified client is built, so a caller knows the next command connects first.
+
+#### Scenario: An idle IMAP connection
+- GIVEN a session whose unified client holds an IMAP connection
+- WHEN `Session::keep_alive` runs
+- THEN one `NOOP` is sent on that connection and the client is kept
+
+#### Scenario: A dead connection
+- GIVEN a session whose IMAP connection the server closed
+- WHEN `Session::keep_alive` runs
+- THEN it fails, the slot is emptied, and the next command connects again

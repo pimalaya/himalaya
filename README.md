@@ -419,7 +419,7 @@ Only the tools that read are listed by default. `--allow-write` adds the ones th
 
 Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
-- [pimalaya/himalaya-tui](https://github.com/pimalaya/himalaya-tui): official TUI (in active development)
+- [pimalaya/himalaya-tui](https://github.com/pimalaya/himalaya-tui): official TUI (in active development), which links Himalaya as a library and runs its commands in-process. The library is the TUI's alone, pinned by git revision, and carries no semver promise beyond the CLI grammar and its `--json` output.
 - [pimalaya/himalaya-vim](https://github.com/pimalaya/himalaya-vim): Vim plugin
 - [dantecatalfamo/himalaya-emacs](https://github.com/dantecatalfamo/himalaya-emacs): Emacs plugin
 - [jns/himalaya](https://www.raycast.com/jns/himalaya): Raycast extension

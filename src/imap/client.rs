@@ -80,7 +80,7 @@ impl ImapClient {
     /// issue a server `SORT`.
     ///
     /// `imap.sort.fallback` decides when it is set, and otherwise
-    /// [`default_sort_fallback`] over the advertised capabilities.
+    /// `default_sort_fallback` over the advertised capabilities.
     pub fn sort_fallback(&self) -> bool {
         self.sort_fallback
             .unwrap_or_else(|| default_sort_fallback(&self.capabilities))

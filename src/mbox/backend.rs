@@ -125,8 +125,21 @@ impl MboxClient {
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
-        _with_attachment: bool,
+        with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
+        self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
+            .map(|(envelopes, _)| envelopes)
+    }
+
+    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
+    /// messages the mailbox holds: every one the listing read.
+    pub fn list_envelopes_counted(
+        &self,
+        mailbox: &str,
+        page: Option<u32>,
+        page_size: Option<u32>,
+        _with_attachment: bool,
+    ) -> Result<(Vec<Envelope>, Option<u64>)> {
         let path = self.open_mbox(mailbox)?;
         let mut envelopes: Vec<Envelope> = self
             .envelopes(&path, false)?
@@ -134,8 +147,9 @@ impl MboxClient {
             .map(|(envelope, _)| envelope)
             .collect();
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
+        let total = u64::try_from(envelopes.len()).ok();
 
-        Ok(paginate(envelopes, page, page_size))
+        Ok((paginate(envelopes, page, page_size), total))
     }
 
     /// Searches envelopes in `mailbox`: reads every message, then applies

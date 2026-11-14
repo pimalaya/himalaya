@@ -123,6 +123,37 @@ impl SessionAccount<'_> {
     }
 }
 
+impl Session<'_> {
+    /// Whether the unified client is built, so the next unified command
+    /// runs over it rather than connecting first.
+    pub fn is_connected(&self) -> bool {
+        #[cfg(any(backend, feature = "smtp"))]
+        return self.email.is_some();
+
+        #[cfg(not(any(backend, feature = "smtp")))]
+        false
+    }
+
+    /// Keeps the unified client's connection alive, for a caller idle on
+    /// purpose: `NOOP` on IMAP, nothing for a stateless backend or an
+    /// empty slot. A failure empties the slot, as a failed command does,
+    /// so the next command connects again.
+    pub fn keep_alive(&mut self) -> anyhow::Result<()> {
+        #[cfg(any(backend, feature = "smtp"))]
+        if let Some((_, client)) = self.email.as_mut() {
+            let result = client.keep_alive();
+
+            if result.is_err() {
+                self.email = None;
+            }
+
+            return result;
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(all(test, any(backend, feature = "smtp", feature = "sieve")))]
 mod tests {
     use std::{cell::Cell, fs};
