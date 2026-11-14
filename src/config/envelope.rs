@@ -2,7 +2,9 @@
 //!
 //! The `envelope` block, global or per account.
 
-use serde::{Deserialize, de::IgnoredAny};
+use serde::{Deserialize, Deserializer, de::IgnoredAny};
+
+use crate::config::removed;
 
 /// Envelope-level rendering options.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -27,25 +29,34 @@ pub struct EnvelopeListConfig {
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
-    /// The v2 `table` block, whatever it holds, ignored rather than
-    /// refused: its glyph and colour keys no longer apply, and a file
-    /// shared with himalaya-tui keeps loading.
-    #[serde(rename = "table")]
+    /// The v2 `table` block, refused naming MIGRATION.md.
+    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
     _table: Option<IgnoredAny>,
+}
+
+/// Refuses the v2 `envelope.list.table` block.
+fn refuse_table<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
+    Err(removed("envelope.list.table"))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
 
-    /// The v2 `envelope.list.table` block loads whatever it holds, while
+    /// The v2 `envelope.list.table` block is refused by name, pointing at
+    /// the migration guide, at the root and in an account, while
     /// `envelope.list` still refuses an unknown key of its own, and a
     /// `mailbox` colour key stays refused.
     #[test]
-    fn envelope_table_is_ignored() {
-        let toml = "[envelope.list.table]\nunseen-char = \"N\"\nsubject-color = \"green\"\n\
-                    [accounts.example]\nenvelope.list.table.flagged-char = \"F\"\n";
-        toml::from_str::<Config>(toml).unwrap();
+    fn envelope_table_is_refused_naming_migration() {
+        let root = "[envelope.list.table]\nunseen-char = \"N\"\n[accounts.example]\n";
+        let account = "[accounts.example]\nenvelope.list.table.flagged-char = \"F\"\n";
+
+        for toml in [root, account] {
+            let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+            assert!(err.contains("`envelope.list.table` block"), "{err}");
+            assert!(err.contains("MIGRATION.md"), "{err}");
+        }
 
         let toml = "[accounts.example]\nenvelope.list.datetime-fnt = \"%F\"\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();

@@ -186,7 +186,7 @@ A persistent configuration is loaded from every existing path among the followin
 
 At most one account may be marked `default = true` across them: an rc file moving the default sets `default = false` on the account the other file marks.
 
-These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors.
+These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. The TUI-only keys live under a `[tui]` table, at the top level and in an account (`[accounts.<name>.tui]`), which Himalaya leaves to the TUI; any other key Himalaya does not know fails the configuration.
 
 Override those paths with `-c <PATH>`. Repeat it to merge several files, such as `-c public.toml -c private.toml`: the first one is the base and the next ones are deep-merged on top. Each `-c` takes one path, never split, and no environment variable is read.
 

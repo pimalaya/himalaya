@@ -46,7 +46,10 @@ pub mod tls;
 use std::{collections::HashMap, path::PathBuf};
 
 use pimalaya_config::toml::{TomlConfig, opt_shell_expanded_path};
-use serde::{Deserialize, de::IgnoredAny};
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, IgnoredAny},
+};
 
 use crate::config::{
     envelope::EnvelopeConfig, gmail::GmailConfig, imap::ImapConfig, jmap::JmapConfig,
@@ -55,12 +58,10 @@ use crate::config::{
     smtp::SmtpConfig,
 };
 
-/// The whole TOML configuration file.
-///
-/// `deny_unknown_fields` is omitted so one file can be shared with
-/// himalaya-tui, whose own top-level fields are ignored here.
+/// The whole TOML configuration file, refusing a key it does not know
+/// but the `tui` table.
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     /// Fallback for [`AccountConfig::display_name`].
     #[serde(alias = "from-name")]
@@ -83,6 +84,21 @@ pub struct Config {
     pub message: MessageConfig,
     /// The named `[accounts.<name>]` blocks.
     pub accounts: HashMap<String, AccountConfig>,
+    /// himalaya-tui's own keys, which the file shares with it.
+    #[serde(default)]
+    pub tui: Option<IgnoredAny>,
+    /// The v2 `table` block, always `None`: present, it fails the load
+    /// naming MIGRATION.md.
+    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
+    pub v2_table: Option<IgnoredAny>,
+    /// The v2 `attachment` block, always `None`: present, it fails the load
+    /// naming MIGRATION.md.
+    #[serde(default, rename = "attachment", deserialize_with = "refuse_attachment")]
+    pub v2_attachment: Option<IgnoredAny>,
+    /// The v2 `account` block, always `None`: present, it fails the load
+    /// naming MIGRATION.md.
+    #[serde(default, rename = "account", deserialize_with = "refuse_account")]
+    pub v2_account: Option<IgnoredAny>,
 }
 
 impl TomlConfig for Config {
@@ -131,13 +147,10 @@ impl AccountConfig {
     }
 }
 
-/// One `[accounts.<name>]` block.
-///
-/// `deny_unknown_fields` is omitted so a block written for one binary
-/// loads in the other: the CLI-only sub-blocks have to be tolerated by
-/// himalaya-tui, which models the rest.
+/// One `[accounts.<name>]` block, refusing a key it does not know but
+/// the `tui` table.
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AccountConfig {
     /// Whether a command with no `-a/--account` runs against this one.
     #[serde(default)]
@@ -210,6 +223,39 @@ pub struct AccountConfig {
     /// at MIGRATION.md.
     #[serde(default)]
     pub m2dir: Option<IgnoredAny>,
+    /// himalaya-tui's own keys of this account.
+    #[serde(default)]
+    pub tui: Option<IgnoredAny>,
+    /// The v2 `table` block, always `None`: present, it fails the load
+    /// naming MIGRATION.md.
+    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
+    pub v2_table: Option<IgnoredAny>,
+    /// The v2 `attachment` block, always `None`: present, it fails the load
+    /// naming MIGRATION.md.
+    #[serde(default, rename = "attachment", deserialize_with = "refuse_attachment")]
+    pub v2_attachment: Option<IgnoredAny>,
+}
+
+/// The error of a block v3 removed, naming it and the migration guide.
+pub(crate) fn removed<E: de::Error>(block: &str) -> E {
+    E::custom(format!(
+        "The `{block}` block is removed since v3: delete it, see MIGRATION.md"
+    ))
+}
+
+/// Refuses the v2 `table` block.
+fn refuse_table<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
+    Err(removed("table"))
+}
+
+/// Refuses the v2 `attachment` block.
+fn refuse_attachment<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
+    Err(removed("attachment"))
+}
+
+/// Refuses the v2 `account` block.
+fn refuse_account<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
+    Err(removed("account"))
 }
 
 #[cfg(test)]
@@ -254,6 +300,73 @@ mod tests {
         let err = err.to_string();
         assert!(err.contains("`m2dir` block is ignored"), "{err}");
         assert!(err.contains("MIGRATION.md"), "{err}");
+    }
+
+    #[test]
+    fn an_unknown_root_key_is_refused() {
+        let toml = "downloads-dri = \"~/Downloads\"\n[accounts.example]\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("unknown field `downloads-dri`"), "{err}");
+    }
+
+    #[test]
+    fn an_unknown_account_key_is_refused() {
+        let toml = "[accounts.example]\nemial = \"alice@example.org\"\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("unknown field `emial`"), "{err}");
+    }
+
+    /// The `tui` tables are himalaya-tui's, loaded whatever they hold at
+    /// the root and in an account, and the one exception: a table of
+    /// another name is refused.
+    #[test]
+    fn the_tui_tables_are_left_to_himalaya_tui() {
+        let toml = "[tui]\ncontact-command = \"khard\"\ncontact-complete-key = \"tab\"\n\
+                    [tui.keybinds]\nquit = \"q\"\n[tui.theme.header]\nfg = \"blue\"\n\
+                    [accounts.example]\ntui.contact-command = \"khard\"\n";
+        toml::from_str::<Config>(toml).unwrap();
+
+        let toml = "[accounts.example]\n[accounts.example.tuix]\nkeybinds = 1\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("unknown field `tuix`"), "{err}");
+    }
+
+    /// The v2 blocks Himalaya v3 dropped are refused by name, pointing at
+    /// the migration guide, at the root and in an account.
+    #[test]
+    fn the_v2_blocks_are_refused_naming_migration() {
+        let blocks = [
+            ("table", "table.preset = \"x\"\n"),
+            ("attachment", "attachment.list.table.id-color = \"red\"\n"),
+        ];
+
+        for (block, line) in blocks {
+            let root = format!("{line}[accounts.example]\n");
+            let account = format!("[accounts.example]\n{line}");
+
+            for toml in [root, account] {
+                let err = toml::from_str::<Config>(&toml).unwrap_err().to_string();
+                assert!(err.contains(&format!("`{block}` block")), "{err}");
+                assert!(err.contains("MIGRATION.md"), "{err}");
+            }
+        }
+
+        let toml = "account.list.table.name-color = \"red\"\n[accounts.example]\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("`account` block"), "{err}");
+        assert!(err.contains("MIGRATION.md"), "{err}");
+    }
+
+    /// The rest of a v1 `[message]` table is refused as unknown keys.
+    #[test]
+    fn an_unknown_message_key_is_refused() {
+        let toml = "[accounts.example]\nmessage.send.backend = \"smtp\"\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("unknown field `backend`"), "{err}");
+
+        let toml = "[message.read]\nformat = \"flowed\"\n[accounts.example]\n";
+        let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+        assert!(err.contains("unknown field `read`"), "{err}");
     }
 
     /// himalaya-tui spells the identity `from` and `from-name`, and one

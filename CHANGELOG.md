@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `account_capability` to `himalaya mcp`, a reading tool listed whatever the flags, answering the rows `account capability` prints, as Calendula and Cardamum do.
 - Added `total` to the `envelope list` JSON output: how many messages the mailbox holds, read within the listing itself (IMAP `SELECT` `EXISTS`, JMAP `calculateTotal`, the entries Maildir, mbox and pimdir hold), `null` on Gmail and Microsoft Graph and always for `envelope search`.
 - Added a library target, for himalaya-tui alone, which pins it by git revision and runs Himalaya's commands in-process; it carries no semver promise beyond the CLI grammar and its `--json` output.
 - Added `errors` to `envelope list`, `envelope search`, `mailbox list`, `flag add|set|remove`, `message copy`, `message move` and `message delete`: one item error `{id, code, error, sources}` per item the command could not list or act on, `[]` when there is none, `count` counting what was acted on.
 
-  A non-empty `errors` exits 3, printing nothing after the result. In text each entry prints as an `Error:` field of a list's header, after the paging fields, or as an `Error:` line after a write's sentence. `json-schema` describes it under `himalaya-item-error`; `himalaya mcp` returns such a result as `structuredContent` with `isError`.
+  A non-empty `errors` exits 3, printing nothing after the result. In text the entries print last, after a list's items or a write's sentence and one blank line, one `Error:` line each, aligned among themselves, as pimalaya-cli prints them. `json-schema` describes it under `himalaya-item-error`; `himalaya mcp` returns such a result as `structuredContent` with `isError`.
 - Added the error codes `message-unreadable`, `mailbox-unreadable`, `permission-denied`, `quota-exceeded`, `rate-limited` and `recipient-refused`.
 - Added the `message-id <id>` clause to `envelope search`, finding a message by its whole `Message-ID:`, angle brackets optional: `HEADER Message-ID` re-checked exactly on IMAP, `rfc822msgid:` on Gmail, a `$filter` on `internetMessageId` on Microsoft Graph (the clause alone), the envelope's id on Maildir, mbox and pimdir; JMAP refuses it. Added `imap search --header NAME TEXT`, one `HEADER` key per pair ([#797](https://github.com/pimalaya/himalaya/issues/797), [#811](https://github.com/pimalaya/himalaya/pull/811)).
 - Added `tls.client.cert` and `tls.client.key` to every network backend, a client certificate presented when the server asks for one (mutual TLS). native-tls reads a PKCS#8 key only.
@@ -73,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Changed the top level, the account blocks and the `message` table to refuse a key they do not know, as every other table did, so a typo fails the load naming the key and its line instead of being ignored. The rest of a v1 `[message]` table (`read`, `write`, `send.backend`) is refused with them. himalaya-tui's own keys go under a `[tui]` table at the top level and `[accounts.<name>.tui]` in an account, which Himalaya loads whatever they hold and never reads: `keybinds`, `contact-command`, `contact-complete-key` and `theme` at the top level, `contact-command` in an account.
 - **BREAKING**: Changed `flag add|set|remove`, `message copy`, `message move` and `message delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on; given none it holds, they print `count: 0` where they printed the failure object and exited 1.
 - Changed `mailbox list --counts` to list a mailbox whose counts could not be fetched without them, beside a `mailbox-unreadable` entry: an IMAP `STATUS` refused or not decoding, a Gmail `labels.get` refused, an mbox index that does not sync. An IMAP `LIST` line that does not decode is a `mailbox-unreadable` entry with a `null` id.
 - Changed the Gmail listings to read the envelopes' metadata through batched `messages.get`, 50 per request, where they sent one request per message.
@@ -151,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the default of `envelope.list.datetime-fmt` to `%F %R` and of `envelope.list.datetime-local-tz` to true: a date prints as `2026-11-12 10:15` in the local timezone, where it printed `%F %R%:z` at the offset it was sent with.
 - **BREAKING**: Changed every list to print as plain text, the way `mscan` prints a mailbox: one item per line in columns two spaces apart, with no header row, no border, no colour and no truncation, under the fields placing it.
 
-  Above the items, a blank line apart, one block of fields: `Account:` names the account and the backend answering, followed by what is listed (`Mailbox:`, `Message:`, `Query:`, `Folder:`, `Thread:`); on a paged list, `Page:` names the page and what it holds (`2, envelopes 26 to 50`, `25 messages`, `, the last`, `empty`) and `Next page:` the `--page` or `--page-token` reaching the next one. `pimdir search` and `pimdir tag` print what the answer could not see as `Incomplete:`, `gmail history list` the new history id as `History id:`, `pimdir queue list` the command cancelling a row as `Cancel:`. Nothing prints under the items.
+  Above the items, a blank line apart, one block of fields: `Account:` names the account and the backend answering, followed by what is listed (`Mailbox:`, `Message:`, `Query:`, `Folder:`, `Thread:`); on a paged list, `Page:` names the page and what it holds (`2, envelopes 26 to 50`, `25 messages`, `, the last`, `empty`) and `Next page:` the `--page` or `--page-token` reaching the next one. `pimdir search` and `pimdir tag` print what the answer could not see as `Incomplete:`, `gmail history list` the new history id as `History id:`, `pimdir queue list` the command cancelling a row as `Cancel:`; the values start in one column, past the longest label. Nothing prints under the items but the errors of the items the command could not serve.
 
   A message prints its id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment, a space otherwise), its date, its senders' names (the address of a nameless one) and its subject: `envelope list|search` (or `to ` and the recipients with `--recipient`, the size no longer printing), `jmap email query|get`, `msgraph messages list`, `pimdir search` (its mailboxes and what matched before the senders, the snippet left to `--json`), and the threads `imap thread` and `pimdir thread`, a reply's subject indented two spaces per level. `pimdir tag` and `pimdir queue list` print the same shape with their status, mailbox, queue row or action.
 
@@ -203,11 +205,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Removed the `*.list.table.*-color` options, `table.preset` and `table.arrangement`.
 
-  A colour key under `mailbox` is refused as unknown; `table`, `attachment` and `account` are ignored like any unknown top-level key.
+  A colour key under `mailbox` is refused as unknown; the `table` and `attachment` blocks, at the top level or in an account, and the top-level `account` block are refused naming MIGRATION.md.
 
 - **BREAKING**: Removed the `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` options.
 
-  The envelope lists name the state in words (`unread`, `answered`, `flagged`, `attachment`), and the `envelope.list.table` block is ignored whatever it holds, so a v2 configuration or one shared with himalaya-tui keeps loading.
+  The envelope lists name the state in words (`unread`, `answered`, `flagged`, `attachment`), and the `envelope.list.table` block is refused naming MIGRATION.md, whatever it holds.
 
 - **BREAKING**: Removed `envelope.list.datetime-relative` ([#510]), now refused as an unknown key.
 

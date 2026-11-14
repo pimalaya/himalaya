@@ -6,11 +6,8 @@ use clap::ValueEnum;
 use serde::Deserialize;
 
 /// Message options under `message.*`.
-///
-/// Unknown keys are accepted rather than denied, so the rest of a v1
-/// `[message]` table (`read`, `write`, `delete`...) keeps loading.
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MessageConfig {
     /// Sending options.
     #[serde(default)]
@@ -25,7 +22,7 @@ pub struct MessageConfig {
 
 /// Quoting options under `message.reply.*` and `message.forward.*`.
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MessageQuoteConfig {
     /// Posting style when `--posting-style` is not passed.
     pub posting_style: Option<PostingStyle>,
@@ -48,7 +45,7 @@ pub enum PostingStyle {
 
 /// Sending options under `message.send.*`.
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MessageSendConfig {
     /// Mailbox a sent message is copied to when `--save` is not passed.
     ///

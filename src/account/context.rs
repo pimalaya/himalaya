@@ -522,15 +522,8 @@ mod tests {
     }
 
     #[test]
-    fn save_copy_reads_a_v1_boolean_beside_v1_keys() {
-        let global: AccountConfig = toml::from_str(
-            r#"
-            message.send.save-copy = true
-            message.send.backend = "smtp"
-            message.read.format = "plain"
-            "#,
-        )
-        .unwrap();
+    fn save_copy_reads_a_v1_boolean() {
+        let global: AccountConfig = toml::from_str("message.send.save-copy = true").unwrap();
         let global = Account::from(global);
 
         assert_eq!(global.resolve_save(None, false, true), Some("sent"));

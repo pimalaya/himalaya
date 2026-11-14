@@ -2,7 +2,7 @@
 
 ## From v2 to v3
 
-v3 makes Himalaya a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. Daily mail is a frontend's job: see the interfaces listed in README.md. v3 drops the configuration wizard and the m2dir backend, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a colour key under `mailbox`, sets `envelope.list.datetime-relative` or marks several accounts default.
+v3 makes Himalaya a low-level CLI: plain text for a human to glance at, JSON for scripts and frontends. Daily mail is a frontend's job: see the interfaces listed in README.md. v3 drops the configuration wizard and the m2dir backend, takes one configuration path per `-c` and prints plain text, with no table nor colour. A v2 configuration loads as it is, unless it sets a key v3 does not know (a colour, table or glyph key, `envelope.list.datetime-relative`, a himalaya-tui key outside a `[tui]` table) or marks several accounts default.
 
 What a script or a frontend reads off `--json` and the text output changes, and a few commands that used to report a success they did not achieve now fail. The CHANGELOG lists every change; these are the ones to act on.
 
@@ -13,7 +13,17 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`HIMALAYA_CONFIG` is no longer read.** Pass `-c "$HIMALAYA_CONFIG"` for one path, and one `-c` per path for what was a `:`-separated list.
 - **Every default path is read, as layers.** $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml and $HOME/.himalayarc are each deep-merged on top of the ones before, where v2 read the first one found. An rc file left beside a config.toml now overrides it: delete the one you do not use.
 - **Several `default = true` accounts are refused**, naming them, where v2 picked one at random. Keep it on one account across the merged files: an rc file moving the default sets `default = false` on the account the other file marks.
-- **Colour, table and glyph keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, `table.preset` and `table.arrangement`, and the `envelope.list.table.*-char` glyphs. Under `mailbox` they fail the configuration as unknown keys; elsewhere they are ignored, the whole `envelope.list.table` block included. The envelope lists mark a message's state with fixed characters, `*` unread, `R` answered, `!` flagged and `@` attachment.
+- **Colour, table and glyph keys are gone.** Remove the `*-color` keys of `envelope.list.table`, `mailbox.list.table`, `attachment.list.table` and `account.list.table`, `table.preset` and `table.arrangement`, and the `envelope.list.table.*-char` glyphs. The `table`, `attachment` and top-level `account` blocks and the `envelope.list.table` block fail the configuration naming this guide, whatever they hold; the `mailbox` colour keys fail it as unknown keys. The envelope lists mark a message's state with fixed characters, `*` unread, `R` answered, `!` flagged and `@` attachment.
+- **An unknown key fails the configuration**, at the top level and in an account as in every other table, naming the key and its line: a typo no longer passes silently. Fix or delete it. The rest of a v1 `[message]` table (`read`, `write`, `send.backend`) is refused too.
+- **himalaya-tui's keys go under `[tui]`.** A file shared with himalaya-tui moves its `keybinds`, `contact-command`, `contact-complete-key` and `theme` under a top-level `[tui]` table, and an account's `contact-command` under `[accounts.<name>.tui]`, once himalaya-tui reads them there; Himalaya loads the `tui` tables whatever they hold and reads none of it:
+
+  ```toml
+  [tui]
+  contact-command = "khard email --parsable %s"
+
+  [accounts.work.tui]
+  contact-command = ["abook", "--mutt-query", "%s"]
+  ```
 - **`envelope.list.datetime-relative` is gone**, refused as an unknown key: remove it. Dates print as `envelope.list.datetime-fmt` and `datetime-local-tz` configure them.
 - **Dates default to `%F %R` in the local timezone**, where v2 printed `%F %R%:z` at the offset a message was sent with. Set `envelope.list.datetime-fmt = "%F %R%:z"` and `envelope.list.datetime-local-tz = false` to keep the v2 dates.
 - **`http` and `https` hosts are ASCII.** A JMAP `server` or an HTTP proxy `url` with an internationalised host is refused: write the host in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers are unchanged.
@@ -22,7 +32,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 ### Text output
 
 - **Every list prints one item per line, the way `mscan` prints a mailbox**, in columns two spaces apart with no header row, no border, no colour and no truncation. A message prints its id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment), its date, its senders' names, or `to ` and the recipients' with `--recipient`, then its subject: `envelope list|search`, `jmap email query|get`, `msgraph messages list`, `pimdir search`, and `imap thread` and `pimdir thread`, a reply's subject indented. The size no longer prints. Every other list prints its short cells first and its free text last (`mailbox list` ends with the name), a multi-valued cell joining its values with `,`, a yes-or-no cell its word (`default`, `active`, `permanent`) where v2 printed `yes` or `true`, and a mailbox's unread and total counts one cell (`3/120`) where v2 printed `TOTAL` and `UNREAD` columns. A script cutting the v2 tables or the column labels reads `--json` instead, which is unchanged.
-- **Every list has a header**: `Account:`, what is listed (`Mailbox:`, `Message:`, a search's `Query:`) and, on a paged list, `Page:` and `Next page:` (`--page` or `--page-token`), then a blank line and the items, nothing under them. A script cutting the lines skips everything up to the first blank line (`sed '1,/^$/d'`), or reads `--json` with jq:
+- **Every list has a header**: `Account:`, what is listed (`Mailbox:`, `Message:`, a search's `Query:`) and, on a paged list, `Page:` and `Next page:` (`--page` or `--page-token`), then a blank line and the items. Under them prints nothing but, after another blank line, one `Error:` line per item the command could not serve. A script cutting the lines keeps those between the first two blank lines (`sed '1,/^$/d; /^$/,$d'`), or reads `--json` with jq:
 
   ```sh
   # id, sender and subject, one envelope per line
