@@ -19,7 +19,7 @@ change: a-result-carries-its-errors
 - [ ] IMAP: a skipped line as an entry with a `null` id (`message-unreadable` for FETCH, `mailbox-unreadable` for LIST, STATUS naming its mailbox); a UID neither echoed nor found by `UID SEARCH` as `message-not-found`; `message read` on an undecodable answer coded `message-unreadable`
 - [ ] JMAP: SetError types mapped to codes (`Other { type_name }` read by name until io-jmap types them); `notFound` of a listing left out
 - [ ] Gmail: listing through `GmailBatch`; ids looked up through `GmailBatch`; writes carrying on past a failed message
-- [ ] Graph: writes through `batch_all`; an unanswered part as an entry; statuses mapped
+- [ ] Graph: writes through `batch_all`; an unanswered part as an entry; statuses mapped, a 400 not found only with `ErrorInvalidIdMalformed`, the id lookup too
 - [ ] Maildir, mbox, pimdir: unknown ids as entries instead of warnings
 - [ ] `message send`: `recipient-refused` on a refused `RCPT TO` (SMTP) and `invalidRecipients` (JMAP)
 

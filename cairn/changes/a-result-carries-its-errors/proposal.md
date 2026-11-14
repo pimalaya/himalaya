@@ -51,11 +51,11 @@ The codes stay Himalaya's single vocabulary, for item errors and failure objects
 | `permission-denied` | the server refused the item to the account: a JMAP `forbidden`, an HTTP 403 that is no rate limit (Gmail, Graph), an IMAP `NOPERM` |
 | `quota-exceeded` | the write would exceed the account's quota: a JMAP `overQuota`, an IMAP `OVERQUOTA`, Graph's `ErrorQuotaExceeded` |
 | `rate-limited` | the server still throttled the item after the retries: an HTTP 429, a Gmail 403 `rateLimitExceeded` or `userRateLimitExceeded`, a JMAP `rateLimit` |
-| `recipient-refused` | `message send` reached nobody because the server refused a recipient: an SMTP `RCPT TO` refused (RFC 5321 §3.3), a JMAP `invalidRecipients` (RFC 8621 §7.5), the refused addresses named |
+| `recipient-refused` | `message send` reached nobody because the server refused a recipient: an SMTP `RCPT TO` refused (RFC 5321 §3.3), naming the first refused address, or a JMAP `invalidRecipients` (RFC 8621 §7.5), naming the addresses the server listed |
 
 `message-not-found` widens to an item: an id given that the mailbox does not hold, as an `errors` entry, or the one message a read asked for.
 
-`recipient-refused` codes the failure of a whole send, not an item error. Himalaya keeps sending to nobody when a recipient is refused, with io-smtp's `skip_refused_recipients` left off, since a message reaching some of its recipients surprises its sender.
+`recipient-refused` codes the failure of a whole send, not an item error. Himalaya keeps sending to nobody when a recipient is refused, with io-smtp's `skip_refused_recipients` left off, since a message reaching some of its recipients surprises its sender. io-smtp then stops at the first refused `RCPT TO` (`SmtpMessageSendError::RcptTo`), so an SMTP send names that address alone; the recipients after it were never offered. A JMAP send names every address `invalidRecipients` lists, none when the server lists none.
 
 ### Plain output
 
@@ -83,7 +83,7 @@ What each backend can say depends on its protocol. Each was checked on 2026-11-1
 - **Microsoft Graph** reports each request of a `$batch` (learn.microsoft.com/graph/json-batching).
   - A listing is one request, so it fails whole.
   - A write looks its ids up through `$batch` as today, then patches, copies, moves and deletes through `$batch` too, 20 requests at a time, with the existing retries.
-  - A part answered 400 or 404 is `message-not-found`, 403 `permission-denied`, 429 after the retries `rate-limited`. Any other is `null`, with Graph's `error.code` in `sources`.
+  - A part answered 404, or 400 with Graph's `error.code` `ErrorInvalidIdMalformed`, is `message-not-found`; 403 is `permission-denied`, 429 after the retries `rate-limited`, and `ErrorQuotaExceeded` `quota-exceeded`. Any other, another 400 included (a request body Graph refused is no missing message), is `null`, with Graph's `error.code` in `sources`. The id lookup, which counts every 400 as not found today, follows the same rule.
   - A part the answer left out is an entry, no longer an id not found.
 - **Maildir** reads and writes one file per message.
   - A file that cannot be read is `message-unreadable` with its id, and a folder that cannot be read is `mailbox-unreadable` with its name (pimalaya/io-maildir, cairn/changes/a-listing-returns-what-it-could-not-read).
