@@ -17,7 +17,11 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, GmailAuthConfig, GmailConfig, ProxyConfig},
+    config::{
+        AccountConfig, Config,
+        gmail::{GmailAuthConfig, GmailConfig},
+        proxy::ProxyConfig,
+    },
     email::mailbox::{MailboxIndex, MailboxRole},
 };
 

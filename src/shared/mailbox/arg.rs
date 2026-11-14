@@ -41,7 +41,7 @@ pub fn resolve_mailbox_or_default(account: &Account, name: Option<&str>) -> Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, MailboxConfig};
+    use crate::config::{Config, mailbox::MailboxConfig};
 
     #[test]
     fn omitted_mailbox_is_the_inbox_alias_else_the_inbox_role() {

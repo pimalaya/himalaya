@@ -1656,7 +1656,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::config::PimdirConfig;
+    use crate::config::pimdir::PimdirConfig;
 
     /// A mailbox carries the role its server stated, which the sync engine
     /// recorded in the store (pimdir STORAGE §14), and none otherwise.
@@ -2047,7 +2047,7 @@ mod tests {
         store.ensure_collection("imap/Sent", MAIL_KIND).unwrap();
         drop(store);
 
-        let config = crate::config::PimdirConfig {
+        let config = crate::config::pimdir::PimdirConfig {
             root: dir.path().to_path_buf(),
             account: None,
         };
@@ -4228,7 +4228,7 @@ mod tests {
             .unwrap();
         drop(store);
 
-        let config = crate::config::PimdirConfig {
+        let config = crate::config::pimdir::PimdirConfig {
             root: dir.path().to_path_buf(),
             account: None,
         };

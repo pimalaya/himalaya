@@ -724,7 +724,7 @@ mod tests {
     };
 
     use crate::{
-        config::PimdirConfig,
+        config::pimdir::PimdirConfig,
         email::flag::{Flag, IanaFlag},
     };
 

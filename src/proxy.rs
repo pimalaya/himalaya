@@ -8,7 +8,7 @@ use pimalaya_config::secret::SecretResolver;
 use pimalaya_stream::proxy::{Proxy, ProxyAuth};
 use secrecy::SecretString;
 
-use crate::config::ProxyConfig;
+use crate::config::proxy::ProxyConfig;
 
 impl ProxyConfig {
     /// Resolves an optional configuration, an absent one reading the

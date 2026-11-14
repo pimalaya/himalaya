@@ -21,7 +21,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    config::ImapIdConfig,
+    config::imap::ImapIdConfig,
     imap::{client::ImapClient, outcome},
 };
 

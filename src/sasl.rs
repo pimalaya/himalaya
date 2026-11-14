@@ -11,7 +11,7 @@ use io_sasl::{
 };
 use pimalaya_config::secret::SecretResolver;
 
-use crate::config::SaslConfig;
+use crate::config::sasl::SaslConfig;
 
 impl SaslConfig {
     /// Resolves the configuration into a runtime [`Sasl`].

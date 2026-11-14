@@ -452,7 +452,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-    use crate::config::MaildirConfig;
+    use crate::config::maildir::MaildirConfig;
 
     fn entry(name: &str, contents: &[u8]) -> MaildirFullEntry {
         let entry = MaildirEntry::from_path(MaildirFsPath::new(name));

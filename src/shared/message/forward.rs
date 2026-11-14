@@ -11,7 +11,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    config::PostingStyle,
+    config::message::PostingStyle,
     email::flag::{Flag, FlagOp, IanaFlag},
     shared::{
         client::EmailClient,

@@ -25,7 +25,7 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ProxyConfig, SmtpConfig},
+    config::{AccountConfig, Config, proxy::ProxyConfig, smtp::SmtpConfig},
     server::parse_server,
 };
 

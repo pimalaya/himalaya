@@ -1680,7 +1680,7 @@ mod tests {
             thread::{self, JoinHandle},
         };
 
-        use crate::{config::ImapConfig, imap::client::ImapClient};
+        use crate::{config::imap::ImapConfig, imap::client::ImapClient};
 
         /// The `COPYUID` code a scripted server answers for the source
         /// UIDs that matched, if any.

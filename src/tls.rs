@@ -5,7 +5,7 @@
 
 use pimalaya_stream::tls::{Rustls, RustlsCrypto, Tls, TlsClient, TlsProvider, TlsServer};
 
-use crate::config::{RustlsCryptoConfig, TlsConfig, TlsProviderConfig};
+use crate::config::tls::{RustlsCryptoConfig, TlsConfig, TlsProviderConfig};
 
 impl TlsConfig {
     /// Builds the runtime [`Tls`] handle the connect helpers expect,

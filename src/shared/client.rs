@@ -48,7 +48,7 @@ use crate::{
     },
 };
 #[cfg(feature = "smtp")]
-use crate::{config::SmtpConfig, smtp::client::SmtpClient};
+use crate::{config::smtp::SmtpConfig, smtp::client::SmtpClient};
 
 /// What a send did with the copy it was asked to file.
 #[cfg_attr(not(any(feature = "gmail", feature = "pimdir")), allow(dead_code))]

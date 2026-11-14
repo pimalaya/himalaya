@@ -15,7 +15,10 @@ use std::{env::temp_dir, path::Path};
 #[cfg(any(backend, feature = "smtp"))]
 use dirs::download_dir;
 
-use crate::config::{AccountConfig, Config, PostingStyle, SaveCopyConfig};
+use crate::config::{
+    AccountConfig, Config,
+    message::{PostingStyle, SaveCopyConfig},
+};
 #[cfg(any(backend, feature = "smtp"))]
 use crate::email::mailbox::{Mailbox, MailboxRole};
 
@@ -321,7 +324,7 @@ impl From<AccountConfig> for Account {
 
 #[cfg(all(test, any(backend, feature = "smtp")))]
 mod tests {
-    use crate::{account::context::*, config::MailboxConfig};
+    use crate::{account::context::*, config::mailbox::MailboxConfig};
 
     fn account_with_aliases(pairs: &[(&str, &str)]) -> Account {
         let aliases = pairs
@@ -388,7 +391,7 @@ mod tests {
     #[cfg(feature = "maildir")]
     #[test]
     fn a_maildir_role_alias_spelled_with_a_slash_marks_the_role() {
-        use crate::{config::MaildirConfig, maildir::client::MaildirClient};
+        use crate::{config::maildir::MaildirConfig, maildir::client::MaildirClient};
 
         let dir = tempfile::tempdir().unwrap();
         for subdir in ["cur", "new", "tmp"] {

@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ImapConfig, ProxyConfig},
+    config::{AccountConfig, Config, imap::ImapConfig, proxy::ProxyConfig},
     imap::id::resolve_auto_id_params,
     server::parse_server,
 };

@@ -27,7 +27,7 @@ use pimalaya_cli::error::CodedError;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, PimdirConfig},
+    config::{AccountConfig, Config, pimdir::PimdirConfig},
     error::{ErrorCode, pimdir_error},
 };
 

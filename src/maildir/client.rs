@@ -23,7 +23,8 @@ use io_maildir::{
 use crate::{
     account::context::Account,
     config::{
-        AccountConfig, Config, MaildirConfig, MaildirKeywordHeaderConfig, MaildirLayoutConfig,
+        AccountConfig, Config,
+        maildir::{MaildirConfig, MaildirKeywordHeaderConfig, MaildirLayoutConfig},
     },
     email::mailbox::{validate_level, validate_name},
     error::mailbox_not_found,
@@ -318,7 +319,7 @@ mod tests {
 
     use super::{MaildirClient, validate_maildir_level, validate_maildir_name};
     use crate::{
-        config::{MaildirConfig, MaildirLayoutConfig},
+        config::maildir::{MaildirConfig, MaildirLayoutConfig},
         error::ErrorCode,
     };
 

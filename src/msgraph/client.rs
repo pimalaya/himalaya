@@ -20,7 +20,11 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, MsgraphAuthConfig, MsgraphConfig, ProxyConfig},
+    config::{
+        AccountConfig, Config,
+        msgraph::{MsgraphAuthConfig, MsgraphConfig},
+        proxy::ProxyConfig,
+    },
     email::mailbox::{MailboxIndex, MailboxRole},
     msgraph::backend::well_known_role,
 };

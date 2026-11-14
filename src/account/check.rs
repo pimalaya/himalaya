@@ -18,7 +18,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 #[cfg(feature = "imap")]
-use crate::config::ImapConfig;
+use crate::config::imap::ImapConfig;
 use crate::{backend::Backend, cli::resolve_account, error::ErrorCode};
 
 /// Validate the account configuration.
@@ -199,7 +199,7 @@ fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Resu
     use io_sasl::mechanism::Sasl;
 
     use crate::{
-        config::ProxyConfig,
+        config::proxy::ProxyConfig,
         imap::{client::parse_imap_server, id::resolve_auto_id_params},
     };
 
@@ -233,7 +233,7 @@ fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Resu
 /// Opens a JMAP client and fetches the session object.
 #[cfg(feature = "jmap")]
 fn connect_jmap(
-    jmap_config: &crate::config::JmapConfig,
+    jmap_config: &crate::config::jmap::JmapConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
     use io_jmap::client::JmapClientStd;
@@ -252,13 +252,13 @@ fn connect_jmap(
 /// Opens a Gmail client and fetches the account profile.
 #[cfg(feature = "gmail")]
 fn connect_gmail(
-    gmail_config: &crate::config::GmailConfig,
+    gmail_config: &crate::config::gmail::GmailConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
     use io_gmail::v1::client::{GmailClientStd, GmailClientStdConnectOptions};
     use secrecy::ExposeSecret;
 
-    use crate::{config::ProxyConfig, gmail::client::gmail_token};
+    use crate::{config::proxy::ProxyConfig, gmail::client::gmail_token};
 
     let token = gmail_token(gmail_config.auth.clone(), resolver)?;
     let options = GmailClientStdConnectOptions {
@@ -275,13 +275,13 @@ fn connect_gmail(
 /// Opens a Microsoft Graph client and fetches the signed-in user.
 #[cfg(feature = "msgraph")]
 fn connect_msgraph(
-    msgraph_config: &crate::config::MsgraphConfig,
+    msgraph_config: &crate::config::msgraph::MsgraphConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
     use io_msgraph::v1::client::{MsgraphClientStd, MsgraphClientStdConnectOptions};
     use secrecy::ExposeSecret;
 
-    use crate::{config::ProxyConfig, msgraph::client::msgraph_token};
+    use crate::{config::proxy::ProxyConfig, msgraph::client::msgraph_token};
 
     let token = msgraph_token(msgraph_config.auth.clone(), resolver)?;
     let options = MsgraphClientStdConnectOptions {
@@ -301,7 +301,7 @@ fn connect_msgraph(
 /// Checks that the Maildir root is a directory and lists its Maildirs, so
 /// a store the listing cannot walk fails here rather than on first use.
 #[cfg(feature = "maildir")]
-fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> {
+fn connect_maildir(maildir_config: &crate::config::maildir::MaildirConfig) -> Result<()> {
     let client = crate::maildir::client::MaildirClient::new(maildir_config.clone());
     client.list_mailboxes(false)?;
 
@@ -311,7 +311,7 @@ fn connect_maildir(maildir_config: &crate::config::MaildirConfig) -> Result<()> 
 /// Checks that the mbox root is a directory and the spool, when set, a
 /// readable file, not a directory.
 #[cfg(feature = "mbox")]
-fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
+fn connect_mbox(mbox_config: &crate::config::mbox::MboxConfig) -> Result<()> {
     if !mbox_config.root.is_dir() {
         bail!(
             "Mbox root `{}` does not exist or is not a directory",
@@ -344,7 +344,7 @@ fn connect_mbox(mbox_config: &crate::config::MboxConfig) -> Result<()> {
 /// The probe takes and releases the staging lock without waiting on a
 /// collector, and the database's write lock, writing nothing.
 #[cfg(feature = "pimdir")]
-fn connect_pimdir(pimdir_config: &crate::config::PimdirConfig) -> Result<()> {
+fn connect_pimdir(pimdir_config: &crate::config::pimdir::PimdirConfig) -> Result<()> {
     use anyhow::Context;
 
     let mut client = crate::pimdir::client::PimdirClient::new(pimdir_config.clone())?;
@@ -359,7 +359,7 @@ fn connect_pimdir(pimdir_config: &crate::config::PimdirConfig) -> Result<()> {
 /// Opens an authenticated SMTP session and drops it.
 #[cfg(feature = "smtp")]
 fn connect_smtp(
-    smtp_config: &crate::config::SmtpConfig,
+    smtp_config: &crate::config::smtp::SmtpConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
     use std::net::Ipv4Addr;
@@ -371,7 +371,7 @@ fn connect_smtp(
         session::SmtpSessionOpenOptions,
     };
 
-    use crate::config::ProxyConfig;
+    use crate::config::proxy::ProxyConfig;
 
     let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
     let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
@@ -403,7 +403,7 @@ fn connect_smtp(
 /// Opens an authenticated ManageSieve session and drops it.
 #[cfg(feature = "sieve")]
 fn connect_sieve(
-    sieve_config: &crate::config::SieveConfig,
+    sieve_config: &crate::config::sieve::SieveConfig,
     resolver: &mut SecretResolver,
 ) -> Result<()> {
     let _client = crate::sieve::client::SieveClient::new(sieve_config.clone(), resolver)?;
@@ -501,7 +501,7 @@ mod tests {
     use crate::{
         account::check::{AccountCheckCommand, connect_pimdir},
         backend::Backend,
-        config::PimdirConfig,
+        config::pimdir::PimdirConfig,
         error::ErrorCode,
     };
 
@@ -614,7 +614,7 @@ mod tests {
 mod mbox_tests {
     use crate::{
         account::check::connect_mbox,
-        config::{MboxConfig, MboxFormatConfig},
+        config::mbox::{MboxConfig, MboxFormatConfig},
     };
 
     #[test]

@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: the-config-splits-by-block
-status: active
+status: landed
 created: 2026-11-14
 ---
 

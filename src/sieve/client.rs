@@ -19,7 +19,7 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, ProxyConfig, SieveConfig},
+    config::{AccountConfig, Config, proxy::ProxyConfig, sieve::SieveConfig},
     server::parse_server,
 };
 

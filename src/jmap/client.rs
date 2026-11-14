@@ -17,7 +17,11 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, JmapAuthConfig, JmapConfig, ProxyConfig},
+    config::{
+        AccountConfig, Config,
+        jmap::{JmapAuthConfig, JmapConfig},
+        proxy::ProxyConfig,
+    },
     email::mailbox::{MailboxIndex, MailboxRole},
     server::parse_server,
     shared::base64,
@@ -213,7 +217,7 @@ mod tests {
     use secrecy::{ExposeSecret, SecretString};
 
     use crate::{
-        config::JmapAuthConfig,
+        config::jmap::JmapAuthConfig,
         jmap::client::{jmap_http_auth, parse_server_url},
     };
 

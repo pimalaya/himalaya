@@ -34,7 +34,7 @@ use mime::{
 use pimalaya_cli::session::in_session;
 
 use crate::{
-    config::PostingStyle,
+    config::message::PostingStyle,
     shared::message::{header, part},
 };
 

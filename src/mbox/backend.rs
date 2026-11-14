@@ -833,7 +833,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::config::{MboxConfig, MboxFormatConfig, MboxLockConfig};
+    use crate::config::mbox::{MboxConfig, MboxFormatConfig, MboxLockConfig};
 
     const MESSAGE: &[u8] = b"From: a@x.org\nSubject: hi\nMessage-ID: <1@x>\n\nbody\n";
 

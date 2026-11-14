@@ -29,7 +29,10 @@ use pimalaya_cli::error::CodedError;
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, MboxConfig, MboxFormatConfig},
+    config::{
+        AccountConfig, Config,
+        mbox::{MboxConfig, MboxFormatConfig},
+    },
     error::{ErrorCode, mailbox_not_found},
     mbox::cache::MboxCache,
 };
@@ -293,7 +296,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::config::MboxLockConfig;
+    use crate::config::mbox::MboxLockConfig;
 
     fn config() -> MboxConfig {
         MboxConfig {
