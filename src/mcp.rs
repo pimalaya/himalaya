@@ -54,7 +54,8 @@ its envelopes with envelope_list, or search them with envelope_search, \
 whose `query` takes Himalaya's query language (`from alice and subject \
 report order by date desc`) and whose description says which clauses this \
 account's backend answers. An envelope's `id` names its message, in that \
-mailbox, for message_read, attachment_list and the other message tools. \
+mailbox, passed as `message-id` to message_read, attachment_list and the \
+other message tools. \
 attachment_download reads one part, its bytes coming as an embedded \
 resource rather than as a file. message_compose, message_reply and \
 message_forward print the message they compose, or save or send it when \

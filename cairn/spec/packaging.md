@@ -26,6 +26,9 @@ Himalaya SHALL be dual-licensed MIT OR Apache-2.0, with no per-file headers.
 ### Requirement: The sample ships beside the binary
 The Nix package SHALL install config.sample.toml as share/doc/himalaya/config.sample.toml, the release archives SHALL carry it with the share/ of the build they come from, and install.sh SHALL copy it to the same path under its prefix when the downloaded archive holds it, so the first-run welcome copies it rather than downloading it.
 
+### Requirement: The Nix package lives in the repository
+default.nix SHALL build Himalaya from package.nix, the derivation the repository keeps as a replacement for the nixpkgs one, as cardamum and ortie do: it SHALL link the system SQLite only with the defaults off, `pimdir` asked for by name and `vendored` left out, and install the shell completions, the manual pages, the JSON Schemas and the sample.
+
 ### Requirement: Hosts are ASCII
 Himalaya SHALL build url's IDNA without a Unicode back end, `idna_adapter` being pinned to 1.0.0 in Cargo.toml. A host SHALL be written in ASCII, an internationalised one in its Punycode form (`xn--…`), and an `http` or `https` URL with a non-ASCII host (a JMAP server, an HTTP proxy) SHALL be refused when parsed. IMAP, SMTP and ManageSieve servers are URLs of schemes url keeps opaque, which never reach IDNA: their host is written in ASCII as well.
 

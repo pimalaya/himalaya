@@ -22,7 +22,7 @@ use crate::{
 use anyhow::{Result, bail};
 use io_maildir::{
     client::{MaildirClientError, MaildirUnreadableEntry},
-    entry::{MaildirFullEntry, locate::MaildirEntryLocateError},
+    entry::{MaildirFullEntry, get::MaildirEntryGetError, locate::MaildirEntryLocateError},
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
 };
@@ -179,7 +179,18 @@ impl MaildirClient {
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
     pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
-        let entry = self.get(maildir, id)?;
+        let entry = match self.get(maildir.clone(), id) {
+            Ok(entry) => entry,
+            Err(MaildirClientError::EntryGet(MaildirEntryGetError::Locate(
+                MaildirEntryLocateError::NotFound(_),
+            ))) => {
+                let maildir = self.mailbox_name(&maildir);
+                return Err(message_not_found(format!(
+                    "Message `{id}` not found in Maildir `{maildir}`"
+                )));
+            }
+            Err(err) => return Err(err.into()),
+        };
         let raw = entry.contents().to_vec();
 
         // NOTE: reading the file never renames it, so `--seen` costs the

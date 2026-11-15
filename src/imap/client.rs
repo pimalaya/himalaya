@@ -11,10 +11,13 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_imap::{
-    client::{ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
+    client::{ImapClientError, ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
     has_imap_capability,
     session::ImapSessionOpenOptions,
-    types::{extensions::thread::ThreadingAlgorithm, response::Capability},
+    types::{
+        extensions::thread::ThreadingAlgorithm,
+        response::{Capability, Code},
+    },
 };
 use io_sasl::mechanism::Sasl;
 use pimalaya_config::secret::SecretResolver;
@@ -23,6 +26,7 @@ use url::Url;
 use crate::{
     account::context::Account,
     config::{AccountConfig, Config, imap::ImapConfig, proxy::ProxyConfig},
+    error::ErrorCode,
     imap::id::resolve_auto_id_params,
     server::parse_server,
 };
@@ -169,11 +173,69 @@ pub fn build_imap_client(
     Ok((account, client))
 }
 
+/// The code of an IMAP refusal in an error chain: a completion naming
+/// `NOPERM` is `permission-denied`, one naming `OVERQUOTA`
+/// `quota-exceeded` (RFC 5530 §3).
+pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    let status = cause.downcast_ref::<ImapClientError>()?.status()?;
+
+    match status.code.as_ref()? {
+        Code::OverQuota => Some(ErrorCode::QuotaExceeded),
+        Code::Other(code) if code.inner().eq_ignore_ascii_case(b"NOPERM") => {
+            Some(ErrorCode::PermissionDenied)
+        }
+        Code::Other(code) if code.inner().eq_ignore_ascii_case(b"OVERQUOTA") => {
+            Some(ErrorCode::QuotaExceeded)
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use io_imap::types::response::Capability;
+    use anyhow::Error;
+    use io_imap::{
+        client::ImapClientError,
+        rfc3501::{copy::ImapMessageCopyError, create::ImapMailboxCreateError},
+        send::ImapStatusError,
+        types::response::{Capability, Code, CodeOther, StatusKind},
+    };
 
-    use crate::imap::client::default_sort_fallback;
+    use crate::{
+        error::{self, ErrorCode},
+        imap::client::default_sort_fallback,
+    };
+
+    fn refused(code: Code<'static>) -> ImapStatusError {
+        ImapStatusError {
+            kind: StatusKind::No,
+            code: Some(code),
+            text: String::from("refused"),
+        }
+    }
+
+    /// A refusal the server codes `NOPERM` or `OVERQUOTA` codes the whole
+    /// command, through the context a command adds; any other stays
+    /// uncoded.
+    #[test]
+    fn a_refusal_naming_its_reason_is_coded() {
+        let noperm = Code::Other(CodeOther::unvalidated(b"NOPERM".as_slice()));
+        let err = Error::from(ImapClientError::MailboxCreate(ImapMailboxCreateError::No(
+            refused(noperm),
+        )))
+        .context("Create IMAP mailbox `X`");
+        assert_eq!(error::code(&err), Some(ErrorCode::PermissionDenied));
+
+        let err = Error::from(ImapClientError::MessageCopy(ImapMessageCopyError::No(
+            refused(Code::OverQuota),
+        )));
+        assert_eq!(error::code(&err), Some(ErrorCode::QuotaExceeded));
+
+        let err = Error::from(ImapClientError::MessageCopy(ImapMessageCopyError::No(
+            refused(Code::TryCreate),
+        )));
+        assert_eq!(error::code(&err), None);
+    }
 
     fn capabilities(line: &str) -> Vec<Capability<'static>> {
         line.split(' ')

@@ -58,7 +58,7 @@ pub struct PageArgs {
     #[arg(value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub page_size: Option<u32>,
     /// Start after the page that printed this token as its `nextPage`.
-    #[arg(long = "page-token", short = 't')]
+    #[arg(long = "page-token")]
     #[arg(value_name = "TOKEN")]
     pub page_token: Option<String>,
 }
@@ -239,5 +239,28 @@ impl fmt::Display for PimdirAttachmentListOutput {
         listing.page(ListingPage::Token, count, ["file", "files"], next);
 
         write!(f, "{listing}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::{Parser, error::ErrorKind};
+
+    use crate::cli::Cli;
+
+    /// `-t` is `--to` across Himalaya, so the token of a page has no short
+    /// letter, in the listing and in the search.
+    #[test]
+    fn the_page_token_takes_no_short_letter() {
+        for verb in [&["list"][..], &["search", "facture"]] {
+            let args = [&["himalaya", "pimdir", "attachment"], verb].concat();
+
+            let long = [&args[..], &["--page-token", "x"]].concat();
+            assert!(Cli::try_parse_from(long).is_ok(), "{verb:?}");
+
+            let short = [&args[..], &["-t", "x"]].concat();
+            let err = Cli::try_parse_from(short).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::UnknownArgument, "{verb:?}");
+        }
     }
 }

@@ -6,7 +6,7 @@ Whether you are a human or an AI agent, read these in order before touching the 
 
 1. the [Pimalaya README](https://github.com/pimalaya) for what the project is and how its repositories stack;
 2. the [Pimalaya CONTRIBUTING](https://github.com/pimalaya/.github/blob/master/CONTRIBUTING.md) guide (Nix environment, build and check commands, dependency overrides, commit style), which chains to the shared architecture and guidelines;
-3. the inline header documentation in src/main.rs: it is the architecture document of this binary, covering the backends and plumbing, the three command families, and the shared versus protocol-specific surface;
+3. the inline header documentation in src/lib.rs: it is the architecture document of this crate, covering the backends and plumbing, the three command families, and the shared versus protocol-specific surface;
 4. the cairn/ folder, which follows [Cairn](https://github.com/pimalaya/cairn) (spec/ is current truth, changes/ holds in-flight proposals, log/ is the dated history), activated by AGENTS.md.
 
 Everything below documents only what differs from the Pimalaya standards.
@@ -19,7 +19,7 @@ Himalaya is the CLI front-end of the Pimalaya email stack, a thin shell driving 
 - local storage semantics belong in [io-maildir](https://github.com/pimalaya/io-maildir) and [io-mbox](https://github.com/pimalaya/io-mbox);
 - the commands, rendering, composition and the shared cross-protocol surface live here.
 
-The clap, printer, plain text layout (columns and fields), prompt, first-run welcome, REPL loop and MCP protocol come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader, account resolution and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/main.rs header maps each backend to its crate.
+The clap, printer, plain text layout (columns and fields), prompt, first-run welcome, REPL loop and MCP protocol come from [pimalaya/cli](https://github.com/pimalaya/cli), the TOML loader, account resolution and secret resolution from [pimalaya/config](https://github.com/pimalaya/config), the TCP, TLS and SASL plumbing from [pimalaya/stream](https://github.com/pimalaya/stream), and MIME composition from [pimalaya/mml](https://github.com/pimalaya/mml). The src/lib.rs header maps each backend to its crate.
 
 ## Feature matrix
 

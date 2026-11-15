@@ -192,7 +192,7 @@ mod tests {
             attachment::list::{Attachment, AttachmentListOutput, attachments},
             message::{
                 part::{self, PartRole},
-                read::MessageReadOutput,
+                read::MessageReadView,
             },
         },
     };
@@ -229,7 +229,7 @@ mod tests {
             --m--\r\n";
         let message = part::parse(raw).unwrap();
         let listed: Vec<Attachment> = attachments(&message).collect();
-        let view = serde_json::to_value(MessageReadOutput::new(part::parse(raw).unwrap())).unwrap();
+        let view = serde_json::to_value(MessageReadView::new(part::parse(raw).unwrap())).unwrap();
         let parts = view["parts"].as_array().unwrap();
 
         let ids: Vec<&str> = listed.iter().map(|a| a.id.as_str()).collect();

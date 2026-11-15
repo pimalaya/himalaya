@@ -33,12 +33,12 @@ use crate::{
 /// Once sent, the source is flagged as answered, where the backend keeps
 /// that flag (`flags.answered`).
 ///
-/// Richer composition is `message read --raw <ID>` piped into a standalone
-/// composer, whose output feeds `message send` or `message add`.
+/// Richer composition is `message read --raw <MESSAGE-ID>` piped into a
+/// standalone composer, whose output feeds `message send` or `message add`.
 #[derive(Debug, Parser)]
 pub struct MessageReplyCommand {
     /// Identifier of the source message.
-    #[arg(value_name = "ID")]
+    #[arg(value_name = "MESSAGE-ID")]
     pub id: String,
     #[command(flatten)]
     pub mailbox: MailboxArg,

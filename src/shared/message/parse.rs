@@ -20,7 +20,7 @@ use crate::{
     error::ErrorCode,
     shared::{
         attachment::download::PartBytes,
-        message::{part, read::MessageReadOutput},
+        message::{part, read::MessageReadView},
     },
 };
 
@@ -70,7 +70,7 @@ impl MessageParseCommand {
         let (raw, source) = self.read()?;
 
         if self.part.is_none() && self.section.is_none() {
-            let view = MessageReadOutput::from_raw(&raw)?;
+            let view = MessageReadView::from_raw(&raw)?;
             return printer.out(MessageParseOutput::View(Box::new(view)));
         }
 
@@ -132,7 +132,7 @@ impl MessageParseCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum MessageParseOutput {
-    View(Box<MessageReadOutput>),
+    View(Box<MessageReadView>),
     Part(PartBytes),
 }
 

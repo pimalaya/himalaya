@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeMap, fmt};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::{
     client::JmapClientStd,
@@ -20,7 +20,7 @@ use url::Url;
 use crate::{
     jmap::{
         client::{JmapClient, connect_options, jmap_http_auth},
-        error::format_set_error,
+        error::{format_set_error, set_error},
     },
     shared::message::arg::MessageArg,
 };
@@ -108,7 +108,7 @@ impl JmapEmailImportCommand {
         if let Some(err) = output.not_created.get(&blob_id) {
             let mut msg = format!("Import JMAP email from blob `{blob_id}` error");
             msg.push_str(&format_set_error(err));
-            bail!(msg);
+            return Err(set_error(msg, err));
         }
 
         let id = output

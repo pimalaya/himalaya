@@ -350,3 +350,38 @@ fn a_page_reaching_the_last_message_names_no_next_page() {
     assert!(text.contains("1, envelopes 1 to 2, the last"), "{text}");
     assert!(!text.contains("Next page:"), "{text}");
 }
+
+/// A read carries the id it was given and an `etag`, `null` on a local
+/// store; an id the mailbox does not hold is `message-not-found`, on a
+/// Maildir as on an mbox; a UTC date prints `Z`.
+#[test]
+fn a_read_carries_its_id_and_an_unknown_one_is_not_found() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir.join("A"));
+    let utc = "Date: Mon, 01 Jan 2024 10:00:00 +0000\nSubject: one\n\nbody\n";
+    fs::write(maildir.join("A/cur/one:2,S"), utc).unwrap();
+
+    let mbox = dir.path().join("mbox");
+    fs::create_dir_all(&mbox).unwrap();
+    let utc = format!("From a@b Mon Jan  1 00:00:00 2024\n{utc}");
+    fs::write(mbox.join("A"), utc).unwrap();
+
+    for lines in [maildir_lines(&maildir, ""), mbox_lines(&mbox, "")] {
+        let (ok, out) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
+        assert!(ok, "{out}");
+        let id = out["envelopes"][0]["id"].as_str().unwrap().to_owned();
+
+        let (ok, out) = himalaya(dir.path(), &lines, &["message", "read", "-m", "A", &id]);
+        assert!(ok, "{out}");
+        assert_eq!(out["id"], id.as_str(), "{out}");
+        assert_eq!(out["etag"], Value::Null, "{out}");
+        assert_eq!(out["headers"]["date"], "2024-01-01T10:00:00Z", "{out}");
+
+        let (ok, out) = himalaya(dir.path(), &lines, &["message", "read", "-m", "A", "999"]);
+        assert!(!ok, "{out}");
+        assert_eq!(out["code"], "message-not-found", "{lines}: {out}");
+        let error = out["error"].as_str().unwrap();
+        assert!(error.contains("`999`"), "{error}");
+    }
+}

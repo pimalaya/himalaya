@@ -15,7 +15,9 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     jmap::{
-        client::JmapClient, error::format_set_error, submission::query::JmapSubmissionQueryOutput,
+        client::JmapClient,
+        error::{format_set_error, set_error},
+        submission::query::JmapSubmissionQueryOutput,
     },
 };
 
@@ -86,7 +88,7 @@ impl JmapSubmissionCreateCommand {
         if let Some(err) = output.not_created.get(&self.email_id) {
             let mut msg = format!("Send email `{}` error", self.email_id);
             msg.push_str(&format_set_error(err));
-            bail!(msg);
+            return Err(set_error(msg, err));
         }
 
         printer.out(JmapSubmissionQueryOutput {

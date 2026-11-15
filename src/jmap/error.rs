@@ -1,17 +1,25 @@
 //! # JMAP error
 //!
 //! Renders the `SetError` a JMAP method returns into the message a
-//! command fails with.
+//! command fails with, and codes what the server refused.
 
-use io_jmap::rfc8621::{
-    email::{
-        copy::JmapEmailCopyItemError, import::JmapEmailImportItemError, set::JmapEmailSetItemError,
+use anyhow::Error;
+use io_jmap::{
+    rfc8620::{
+        blob_download::JmapBlobDownloadError, blob_upload::JmapBlobUploadError,
+        error::JmapMethodError, send::JmapSendError, session_get::JmapSessionGetError,
     },
-    email_submission::JmapEmailSubmissionSetItemError,
-    identity::set::JmapIdentitySetItemError,
-    mailbox::set::JmapMailboxSetItemError,
+    rfc8621::{
+        email::{
+            copy::JmapEmailCopyItemError, import::JmapEmailImportItemError,
+            set::JmapEmailSetItemError,
+        },
+        email_submission::JmapEmailSubmissionSetItemError,
+        identity::set::JmapIdentitySetItemError,
+        mailbox::set::JmapMailboxSetItemError,
+    },
 };
-use pimalaya_cli::sanitize;
+use pimalaya_cli::{error::CodedError, sanitize};
 
 use crate::error::{ErrorCode, ItemError};
 
@@ -20,6 +28,56 @@ pub trait JmapSetError {
     fn description(&self) -> Option<&str>;
     fn properties(&self) -> &[String];
     fn type_name(&self) -> &str;
+}
+
+/// The code of a refusal by its SetError type (RFC 8620 §5.3, RFC 8621
+/// §4.6): `forbidden` is `permission-denied`, `overQuota`
+/// `quota-exceeded`, `rateLimit` `rate-limited`.
+fn set_error_code(type_name: &str) -> Option<ErrorCode> {
+    match type_name {
+        "forbidden" => Some(ErrorCode::PermissionDenied),
+        "overQuota" => Some(ErrorCode::QuotaExceeded),
+        "rateLimit" => Some(ErrorCode::RateLimited),
+        _ => None,
+    }
+}
+
+/// The failure of a whole command whose one write the server refused,
+/// worded `message`, coded by the type of `err`.
+pub fn set_error<E: JmapSetError>(message: String, err: &E) -> Error {
+    match set_error_code(err.type_name()) {
+        Some(code) => CodedError::new(code, message).into(),
+        None => Error::msg(message),
+    }
+}
+
+/// The code of a JMAP refusal in an error chain: an HTTP 429 is
+/// `rate-limited` and a 403 `permission-denied`, whichever request it
+/// answered, as is a method error `forbidden` (RFC 8620 §3.6.2).
+pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    let status = if let Some(err) = cause.downcast_ref::<JmapSendError>() {
+        match err {
+            JmapSendError::HttpStatus(status) | JmapSendError::Request { status, .. } => *status,
+            _ => return None,
+        }
+    } else if let Some(err) = cause.downcast_ref::<JmapMethodError>() {
+        return matches!(err, JmapMethodError::Forbidden { .. })
+            .then_some(ErrorCode::PermissionDenied);
+    } else if let Some(JmapSessionGetError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else if let Some(JmapBlobDownloadError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else if let Some(JmapBlobUploadError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else {
+        return None;
+    };
+
+    match status {
+        429 => Some(ErrorCode::RateLimited),
+        403 => Some(ErrorCode::PermissionDenied),
+        _ => None,
+    }
 }
 
 /// Renders the suffix a failed JMAP set is reported with: its error type,
@@ -47,10 +105,7 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
 pub fn set_item_error(id: &str, err: &JmapEmailSetItemError) -> ItemError {
     let code = match err {
         JmapEmailSetItemError::NotFound { .. } => Some(ErrorCode::MessageNotFound),
-        JmapEmailSetItemError::Forbidden { .. } => Some(ErrorCode::PermissionDenied),
-        JmapEmailSetItemError::OverQuota { .. } => Some(ErrorCode::QuotaExceeded),
-        JmapEmailSetItemError::RateLimit { .. } => Some(ErrorCode::RateLimited),
-        _ => None,
+        err => set_error_code(err.type_name()),
     };
 
     ItemError {
@@ -298,5 +353,62 @@ impl JmapSetError for JmapEmailSubmissionSetItemError {
             Self::InvalidProperties { .. } => "invalidProperties",
             Self::Other { type_name, .. } => type_name,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use io_jmap::{
+        rfc8620::{error::JmapMethodError, get::JmapGetError, send::JmapSendError},
+        rfc8621::{email::get::JmapEmailGetError, mailbox::set::JmapMailboxSetItemError},
+    };
+    use serde_json::json;
+
+    use crate::{
+        error::{self, ErrorCode},
+        jmap::error::set_error,
+    };
+
+    /// A whole command the server refused is coded by the HTTP status of
+    /// its answer, or by its method error, through the context a command
+    /// adds.
+    #[test]
+    fn a_whole_refusal_is_coded() {
+        let code = |err: JmapEmailGetError| {
+            error::code(&Error::from(err).context("Cannot read the message"))
+        };
+
+        let throttled = JmapEmailGetError::Send(JmapSendError::HttpStatus(429));
+        assert_eq!(code(throttled), Some(ErrorCode::RateLimited));
+
+        let denied = JmapEmailGetError::Send(JmapSendError::HttpStatus(403));
+        assert_eq!(code(denied), Some(ErrorCode::PermissionDenied));
+
+        let forbidden = JmapMethodError::Forbidden { description: None };
+        let forbidden = JmapEmailGetError::Get(JmapGetError::Method(forbidden));
+        assert_eq!(code(forbidden), Some(ErrorCode::PermissionDenied));
+
+        let failed = JmapEmailGetError::Send(JmapSendError::HttpStatus(500));
+        assert_eq!(code(failed), None);
+    }
+
+    /// A write a whole command makes, refused, is coded by its SetError
+    /// type.
+    #[test]
+    fn a_refused_write_is_coded_by_its_type() {
+        let code = |kind: &str| {
+            let err: JmapMailboxSetItemError =
+                serde_json::from_value(json!({"type": kind})).unwrap();
+            error::code(&set_error(
+                String::from("Create JMAP mailbox `X` error"),
+                &err,
+            ))
+        };
+
+        assert_eq!(code("forbidden"), Some(ErrorCode::PermissionDenied));
+        assert_eq!(code("overQuota"), Some(ErrorCode::QuotaExceeded));
+        assert_eq!(code("rateLimit"), Some(ErrorCode::RateLimited));
+        assert_eq!(code("invalidProperties"), None);
     }
 }

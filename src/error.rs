@@ -4,20 +4,29 @@
 //! to act on, printed as `code` beside the message under `--json`.
 //!
 //! The message stays for humans and may be reworded at any time; the
-//! code is the contract. A failure with no code prints as before, with
-//! no `code` field. The mechanism (`CodedError`, `code_of`, the report)
-//! lives in `pimalaya_cli::error`; only the vocabulary is Himalaya's.
+//! code is the contract. A failure with no code prints `code: null`. The
+//! mechanism (`CodedError`, `code_of`, the report) lives in
+//! `pimalaya_cli::error`; only the vocabulary is Himalaya's.
 //!
 //! A pimdir store failure takes the code io-pimdir gives it
 //! (`PimdirError::code`), spelled the same, so a caller reading every
 //! pimdir app reads one vocabulary.
 //!
+//! A whole command a server refused takes the code of that refusal,
+//! `permission-denied`, `quota-exceeded` or `rate-limited`, read from the
+//! typed error of the protocol that answered it, and an account
+//! pimalaya-config could not take one of the `account-*` codes, read from
+//! its `AccountError`: [`code`] walks the chain through one reader per
+//! protocol, and [`coded`] hands the code to the failure object at every
+//! exit (a one-shot run, a REPL line, an MCP call).
+//!
 //! The same codes type an `ItemError`, the failure of one item a command
 //! listing or acting on several could not serve, printed in its `errors`.
 
+use anyhow::Error;
 #[cfg(feature = "pimdir")]
 use io_pimdir::client::PimdirError;
-use pimalaya_cli::error::{CodedError, with_code};
+use pimalaya_cli::error::{CodedError, code_of, with_code};
 use pimalaya_config::toml::AccountError;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -180,14 +189,47 @@ impl ErrorCode {
     }
 }
 
-/// Gives a failure the code of the account refusal its chain carries,
-/// its messages kept, as the report reads it (see [`with_code`]).
-pub fn coded(err: anyhow::Error) -> anyhow::Error {
-    with_code(err, |err| {
-        err.chain()
-            .find_map(|cause| cause.downcast_ref::<AccountError>())
-            .map(ErrorCode::of_account)
-    })
+/// Gives a failure the code of the account or server refusal its chain
+/// carries, its messages kept, as the report reads it (see
+/// [`with_code`]).
+pub fn coded(err: Error) -> Error {
+    with_code(err, typed_code)
+}
+
+/// The code of `err`: the one a coded error in its chain carries, else
+/// the one a typed error under it names.
+pub fn code(err: &Error) -> Option<ErrorCode> {
+    code_of(err).or_else(|| typed_code(err))
+}
+
+/// A reader of one kind of typed errors, coding those it knows.
+type Reader = fn(&(dyn std::error::Error + 'static)) -> Option<ErrorCode>;
+
+/// The code a typed error of `err`'s chain names, the account taken or
+/// the refusal of the server that answered: the first cause a reader
+/// codes.
+fn typed_code(err: &Error) -> Option<ErrorCode> {
+    let readers: &[Reader] = &[
+        account_code,
+        #[cfg(feature = "imap")]
+        crate::imap::client::refusal_code,
+        #[cfg(feature = "jmap")]
+        crate::jmap::error::refusal_code,
+        #[cfg(feature = "gmail")]
+        crate::gmail::client::refusal_code,
+        #[cfg(feature = "msgraph")]
+        crate::msgraph::client::refusal_code,
+    ];
+
+    err.chain()
+        .find_map(|cause| readers.iter().find_map(|reader| reader(cause)))
+}
+
+/// The code of the account `-a` names, or the default one, not taken.
+fn account_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    cause
+        .downcast_ref::<AccountError>()
+        .map(ErrorCode::of_account)
 }
 
 /// A refusal under `mailbox-not-found`: the mailbox named does not
@@ -205,6 +247,7 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
 #[cfg_attr(
     not(any(
         feature = "imap",
+        feature = "jmap",
         feature = "maildir",
         feature = "mbox",
         feature = "pimdir"
@@ -213,6 +256,15 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
 )]
 pub fn message_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MessageNotFound, message.into()).into()
+}
+
+/// The failure of a command reading the message `id` the server does not
+/// know, under `message-not-found`, `cause` what it answered kept in
+/// `sources`.
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+pub fn unknown_message(id: &str, cause: impl Into<Error>) -> Error {
+    with_code(cause.into(), |_| Some(ErrorCode::MessageNotFound))
+        .context(format!("Message `{id}` not found"))
 }
 
 /// The error of one item a command could not list or act on.

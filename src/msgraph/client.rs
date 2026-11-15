@@ -26,6 +26,7 @@ use crate::{
         proxy::ProxyConfig,
     },
     email::mailbox::{MailboxIndex, MailboxRole},
+    error::ErrorCode,
     msgraph::backend::well_known_role,
 };
 
@@ -189,6 +190,37 @@ fn names_no_folder(err: &MsgraphSendError) -> bool {
     malformed || err.status() == Some(404) || matches!(err, MsgraphSendError::InvalidRequest(_))
 }
 
+/// Whether Graph's answer to a message request means no such message: an
+/// unknown id (404) or a malformed one (400 `ErrorInvalidIdMalformed`).
+pub(crate) fn names_no_message(status: u16, code: &str) -> bool {
+    status == 404 || (status == 400 && code == "ErrorInvalidIdMalformed")
+}
+
+/// The code of a Graph refusal in an error chain, as [`refusal_of`] reads
+/// it.
+pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    let err = match cause.downcast_ref::<MsgraphClientStdError>() {
+        Some(MsgraphClientStdError::Send(err)) => err,
+        Some(_) => return None,
+        None => cause.downcast_ref::<MsgraphSendError>()?,
+    };
+    let err = err.api()?;
+
+    refusal_of(err.status, &err.code)
+}
+
+/// The code of what Graph refused, by its status and its `error.code`:
+/// `ErrorQuotaExceeded` or a 507 is `quota-exceeded` whatever the
+/// status, then 429 `rate-limited` and 403 `permission-denied`.
+pub(crate) fn refusal_of(status: u16, code: &str) -> Option<ErrorCode> {
+    match (status, code) {
+        (_, "ErrorQuotaExceeded") | (507, _) => Some(ErrorCode::QuotaExceeded),
+        (429, _) => Some(ErrorCode::RateLimited),
+        (403, _) => Some(ErrorCode::PermissionDenied),
+        _ => None,
+    }
+}
+
 /// Resolves a [`MsgraphAuthConfig`] into the bare OAuth 2.0 bearer token;
 /// the Microsoft Graph client adds the `Bearer ` prefix itself.
 ///
@@ -203,9 +235,16 @@ pub fn msgraph_token(
 
 #[cfg(test)]
 mod tests {
-    use io_msgraph::v1::send::{MsgraphApiError, MsgraphSendError};
+    use anyhow::Error;
+    use io_msgraph::v1::{
+        client::MsgraphClientStdError,
+        send::{MsgraphApiError, MsgraphSendError},
+    };
 
-    use crate::msgraph::client::{may_name_folder, names_no_folder};
+    use crate::{
+        error::{self, ErrorCode},
+        msgraph::client::{may_name_folder, names_no_folder},
+    };
 
     fn refused(status: u16, code: &str) -> MsgraphSendError {
         MsgraphApiError {
@@ -223,6 +262,35 @@ mod tests {
         assert!(names_no_folder(&refused(400, "ErrorInvalidIdMalformed")));
         assert!(!names_no_folder(&refused(400, "BadRequest")));
         assert!(!names_no_folder(&refused(403, "ErrorAccessDenied")));
+    }
+
+    /// A whole command Graph refused is coded by what it answered, through
+    /// the context a command adds: the 429 of a mailbox throttling its
+    /// concurrent requests `rate-limited`.
+    #[test]
+    fn a_whole_refusal_is_coded() {
+        let code = |status, code| {
+            let err = MsgraphClientStdError::Send(refused(status, code));
+            error::code(&Error::from(err).context("Cannot list Graph messages"))
+        };
+
+        assert_eq!(
+            code(429, "MailboxConcurrency"),
+            Some(ErrorCode::RateLimited)
+        );
+        assert_eq!(
+            code(403, "ErrorAccessDenied"),
+            Some(ErrorCode::PermissionDenied)
+        );
+        assert_eq!(
+            code(403, "ErrorQuotaExceeded"),
+            Some(ErrorCode::QuotaExceeded)
+        );
+        assert_eq!(
+            code(507, "ErrorInternalServerError"),
+            Some(ErrorCode::QuotaExceeded)
+        );
+        assert_eq!(code(500, "ErrorInternalServerError"), None);
     }
 
     #[test]

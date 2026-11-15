@@ -57,10 +57,10 @@ use crate::{
         },
         vacation::{Vacation, VacationPatch, format_date, normalize_date},
     },
-    error::{ErrorCode, ItemError, missing_message},
+    error::{ErrorCode, ItemError, message_not_found, missing_message},
     jmap::{
         client::JmapClient,
-        error::{format_set_error, set_item_error},
+        error::{format_set_error, set_error, set_item_error},
     },
 };
 
@@ -289,11 +289,15 @@ impl JmapClient {
             },
         )?;
 
-        let email = output
-            .emails
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("Email/get returned no email for the requested id"))?;
+        let Some(email) = output.emails.into_iter().next() else {
+            if !output.unparsed.is_empty() {
+                let message = format!(
+                    "Cannot read message `{id}`: its Email/get object does not deserialize"
+                );
+                return Err(CodedError::new(ErrorCode::MessageUnreadable, message).into());
+            }
+            return Err(message_not_found(format!("Message `{id}` not found")));
+        };
         let blob_id = email
             .blob_id
             .ok_or_else(|| anyhow!("Email/get response did not include a blobId"))?;
@@ -465,10 +469,11 @@ impl JmapClient {
         self.forget_mailboxes();
 
         if let Some(err) = output.not_created.get(CREATED) {
-            bail!(
+            let message = format!(
                 "Create JMAP mailbox `{name}` error{}",
                 format_set_error(err)
             );
+            return Err(set_error(message, err));
         }
 
         output
@@ -495,10 +500,11 @@ impl JmapClient {
         self.forget_mailboxes();
 
         if let Some(err) = output.not_updated.get(mailbox) {
-            bail!(
+            let message = format!(
                 "Rename JMAP mailbox `{mailbox}` error{}",
                 format_set_error(err)
             );
+            return Err(set_error(message, err));
         }
 
         Ok(mailbox.to_string())
@@ -518,10 +524,11 @@ impl JmapClient {
         self.forget_mailboxes();
 
         if let Some(err) = output.not_destroyed.get(mailbox) {
-            bail!(
+            let message = format!(
                 "Delete JMAP mailbox `{mailbox}` error{}",
                 format_set_error(err)
             );
+            return Err(set_error(message, err));
         }
 
         Ok(())
@@ -819,7 +826,10 @@ fn imported(mut output: JmapEmailImportOutput, key: &str) -> Result<Imported> {
         Some(JmapEmailImportItemError::AlreadyExists { existing_id, .. }) => {
             Ok(Imported::Existing(existing_id))
         }
-        Some(err) => bail!("Import JMAP message error{}", format_set_error(&err)),
+        Some(err) => {
+            let message = format!("Import JMAP message error{}", format_set_error(&err));
+            Err(set_error(message, &err))
+        }
     }
 }
 
@@ -830,7 +840,8 @@ fn submission_error(err: &JmapEmailSubmissionSetItemError) -> anyhow::Error {
         invalid_recipients, ..
     } = err
     else {
-        return anyhow!("Submit JMAP message error{}", format_set_error(err));
+        let message = format!("Submit JMAP message error{}", format_set_error(err));
+        return set_error(message, err);
     };
 
     let mut message = String::from("JMAP server refused the recipients");
@@ -1752,6 +1763,32 @@ mod tests {
 
             recipient_refused(result);
             assert_eq!(names(&calls), ["Email/import", "EmailSubmission/set"]);
+        }
+
+        /// A read of an id the server does not find is
+        /// `message-not-found`, over the same scripted server.
+        #[test]
+        fn a_read_of_an_unknown_id_is_not_found() {
+            let not_found = json!({ "list": [], "notFound": ["E9"], "state": "s" });
+            let (url, server) = serve(vec![("Email/get", not_found)]);
+            let config = JmapConfig {
+                server: format!("{url}/session"),
+                tls: Default::default(),
+                proxy: None,
+                alpn: Vec::new(),
+                auth: JmapAuthConfig::Header(Secret::Raw(SecretString::from("token"))),
+                identity_id: None,
+                drafts_mailbox_id: None,
+                sent_mailbox_id: None,
+            };
+
+            let mut client = JmapClient::new(config).unwrap();
+            let err = client.get_message("INBOX", "E9", false).unwrap_err();
+            drop(client);
+            server.join().unwrap();
+
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
         }
 
         #[test]

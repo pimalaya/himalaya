@@ -11,7 +11,10 @@
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow, bail};
-use io_gmail::v1::client::{GmailClientStd as Inner, GmailClientStdConnectOptions};
+use io_gmail::v1::{
+    client::{GmailClientStd as Inner, GmailClientStdConnectOptions, GmailClientStdError},
+    send::{GmailApiError, GmailSendError},
+};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 
@@ -23,6 +26,7 @@ use crate::{
         proxy::ProxyConfig,
     },
     email::mailbox::{MailboxIndex, MailboxRole},
+    error::ErrorCode,
 };
 
 /// A live Gmail client and the label index it caches.
@@ -130,4 +134,70 @@ pub fn build_gmail_client(
 /// here and in another block spawns it once.
 pub fn gmail_token(config: GmailAuthConfig, resolver: &mut SecretResolver) -> Result<SecretString> {
     Ok(resolver.resolve(config.token)?)
+}
+
+/// The code of a Gmail refusal in an error chain, as [`refusal_of`] reads
+/// it.
+pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    let err = match cause.downcast_ref::<GmailClientStdError>() {
+        Some(GmailClientStdError::Send(err)) => err,
+        Some(_) => return None,
+        None => cause.downcast_ref::<GmailSendError>()?,
+    };
+
+    refusal_of(err.api()?)
+}
+
+/// The code of what Gmail refused: a rate limit (a 429, or a 403 naming
+/// one, `rateLimitExceeded`, `userRateLimitExceeded` or `quotaExceeded`)
+/// is `rate-limited`, any other 403 `permission-denied`.
+pub(crate) fn refusal_of(err: &GmailApiError) -> Option<ErrorCode> {
+    if err.is_rate_limited() {
+        Some(ErrorCode::RateLimited)
+    } else if err.status == 403 {
+        Some(ErrorCode::PermissionDenied)
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use io_gmail::v1::{
+        client::GmailClientStdError,
+        send::{GmailApiError, GmailSendError},
+    };
+
+    use crate::error::{self, ErrorCode};
+
+    fn refused(status: u16, reason: &str) -> Error {
+        let err = GmailApiError {
+            status,
+            message: String::from("Refused"),
+            reasons: vec![reason.into()],
+            ..Default::default()
+        };
+        let err = GmailClientStdError::Send(GmailSendError::Api(err));
+        Error::from(err).context("Cannot list Gmail labels")
+    }
+
+    /// A whole command Gmail refused is coded by what it answered: a rate
+    /// limit `rate-limited`, another 403 `permission-denied`, the rest
+    /// uncoded.
+    #[test]
+    fn a_whole_refusal_is_coded() {
+        let code = |status, reason| error::code(&refused(status, reason));
+
+        assert_eq!(code(429, "rateLimitExceeded"), Some(ErrorCode::RateLimited));
+        assert_eq!(
+            code(403, "userRateLimitExceeded"),
+            Some(ErrorCode::RateLimited)
+        );
+        assert_eq!(
+            code(403, "insufficientPermissions"),
+            Some(ErrorCode::PermissionDenied)
+        );
+        assert_eq!(code(500, "backendError"), None);
+    }
 }

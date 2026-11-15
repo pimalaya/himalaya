@@ -16,6 +16,7 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset};
 use io_msgraph::v1::{
+    client::MsgraphClientStdError,
     field::MsgraphField,
     rest::{
         batch::{MsgraphBatchRequest, MsgraphBatchResponse},
@@ -46,8 +47,11 @@ use crate::{
         outcome::Outcome,
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, missing_message},
-    msgraph::{client::MsgraphClient, search},
+    error::{ErrorCode, ItemError, missing_message, unknown_message},
+    msgraph::{
+        client::{MsgraphClient, names_no_message, refusal_of},
+        search,
+    },
 };
 
 /// OData `$select` for envelope listing: the message fields backing the
@@ -428,7 +432,17 @@ impl MsgraphClient {
     /// Fetches one message's raw RFC 5322 bytes via
     /// `GET /messages/{id}/$value`. `mailbox` is unused.
     pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
-        let raw = self.message_get_raw(id)?.response;
+        let raw = match self.message_get_raw(id) {
+            Ok(output) => output.response,
+            Err(MsgraphClientStdError::Send(err))
+                if err
+                    .api()
+                    .is_some_and(|api| names_no_message(api.status, &api.code)) =>
+            {
+                return Err(unknown_message(id, err));
+            }
+            Err(err) => return Err(err.into()),
+        };
 
         // NOTE: fetching `$value` never changes read state, so `--seen`
         // costs a separate PATCH setting `isRead`.
@@ -695,12 +709,9 @@ fn part_error(id: &str, response: MsgraphBatchResponse) -> ItemError {
         _ => (String::new(), String::new()),
     };
 
-    let item_code = match (status, code.as_str()) {
-        (404, _) | (400, "ErrorInvalidIdMalformed") => Some(ErrorCode::MessageNotFound),
-        (_, "ErrorQuotaExceeded") | (507, _) => Some(ErrorCode::QuotaExceeded),
-        (429, _) => Some(ErrorCode::RateLimited),
-        (403, _) => Some(ErrorCode::PermissionDenied),
-        _ => None,
+    let item_code = match names_no_message(status, &code) {
+        true => Some(ErrorCode::MessageNotFound),
+        false => refusal_of(status, &code),
     };
 
     let mut sources = vec![format!("HTTP {status}")];

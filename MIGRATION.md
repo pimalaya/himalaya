@@ -50,7 +50,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 ### JSON output
 
 - **Keys are camelCase.** `messages-total` is `messagesTotal`, `next_page` is `nextPage`, `thread-id` is `threadId`. Values keep their spelling: error codes, flags and mailbox roles stay kebab-case or lowercase, provider passthrough keeps the provider's keys.
-- **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message. `message parse` prints the same view.
+- **`message read --json` is a designed view**, the same on every backend (`headers`, `text`, `html`, `parts`), no longer mail-parser's model of the message, beside the message's `id` and an `etag`, always `null`. `message parse` prints the same view, without `id` and `etag`.
+- **A UTC instant ends with `Z`.** `imap fetch --internal-date` prints `"internalDate": "2026-07-17T10:00:00Z"` where v2 printed `"2026-07-17T10:00:00+00:00"`, as envelope dates already did; the read view's `headers.date` is spelled the same, any other offset kept. Parse the value as RFC 3339 rather than matching its suffix.
 - **Piped `--json` prints one value per line**, and every schema `json-schema` writes carries an `$id` naming the contract version.
 - **A failure carries a stable `code`** when a caller is expected to act on it (`body-pending`, `search-unsupported`, `capability-missing`, `message-not-found`, `mailbox-not-found`, the pimdir store codes), described by the `himalaya-error` schema, and `null` otherwise. Match on the code, never on the message, which may be reworded.
 - **No output is a sentence any more.** The `{"message": "..."}` confirmations are gone: every write prints what it acted on. `message copy|move` print `{count, queued}`; `message send` and a composer's `--save`/`--send` print `{id, saved, sent, queued}`; a protocol write prints `{id}` or `{ids}` (a Gmail label's id, the UIDs of an IMAP append or copy, a Sieve script's name). A unified write's `queued` is `true` when a sync engine applies it later (pimdir).
@@ -97,6 +98,13 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 
 - `himalaya repl` runs commands over connections kept for the session, and `himalaya mcp` serves the unified API to MCP clients, read-only unless `--allow-write` or `--allow-send` is given.
 - Unified verbs that used to be protocol-only: `mailbox create|rename|delete`, the `important` and `junk` flags, and `vacation get|set`, which reads the auto-reply from JMAP or Gmail whatever backend stores the mail. `himalaya jmap`, `gmail` and the other namespaces keep their own commands.
+
+### From a development build of v3
+
+What a build of the v3 branch did before the release and the release does not:
+
+- **The MCP message tools take `message-id`.** `message_read`, `message_reply` and `message_forward` took the message as `id`; they take `message-id`, as `attachment_list` and `attachment_download` do, and refuse `id` as an unknown argument coded `usage-invalid`: `{"id": "42"}` becomes `{"message-id": "42"}`.
+- **`pimdir attachment list|search` page with `--page-token` alone.** `-t` is `--to` everywhere else, so it is gone here: `-t <TOKEN>` becomes `--page-token <TOKEN>`.
 
 ## From v1 to v2
 

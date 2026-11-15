@@ -120,6 +120,40 @@ fn a_session_answers_each_line_and_survives_its_failures() {
 }
 
 #[test]
+fn a_session_refuses_a_session_inside_it() {
+    let dir = TempDir::new().unwrap();
+    let answers = session(
+        dir.path(),
+        "repl\n\
+         mcp --allow-write\n\
+         envelope list\n",
+    );
+
+    assert_eq!(answers.len(), 3, "{answers:#?}");
+    for answer in &answers[..2] {
+        let error = "Cannot start a session inside a session";
+        assert_eq!(answer["error"], error, "{answer}");
+    }
+    assert_eq!(answers[2]["envelopes"][0]["id"], "m1");
+}
+
+/// A message the mailbox does not hold answers `message-not-found`, and
+/// the session goes on.
+#[test]
+fn a_read_of_an_unknown_id_is_coded_and_the_session_goes_on() {
+    let dir = TempDir::new().unwrap();
+    let answers = session(
+        dir.path(),
+        "message read nope\n\
+         message read m1\n",
+    );
+
+    assert_eq!(answers.len(), 2, "{answers:#?}");
+    assert_eq!(answers[0]["code"], "message-not-found", "{}", answers[0]);
+    assert_eq!(answers[1]["id"], "m1", "{}", answers[1]);
+}
+
+#[test]
 fn a_session_refuses_input_from_stdin() {
     let dir = TempDir::new().unwrap();
     let answers = session(

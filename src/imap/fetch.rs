@@ -6,6 +6,7 @@ use io_imap::client::ImapClient as _;
 use std::fmt;
 
 use anyhow::Result;
+use chrono::SecondsFormat;
 use clap::Parser;
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
@@ -163,7 +164,7 @@ pub struct FetchedMessage {
     pub uid: Option<u32>,
     /// The flags set on the message.
     pub flags: Option<Vec<String>>,
-    /// The internal date, the received-at, as RFC 3339.
+    /// The internal date, the received-at, as RFC 3339, `Z` for UTC.
     pub internal_date: Option<String>,
     /// The size, in octets.
     pub size: Option<u32>,
@@ -200,7 +201,8 @@ impl FetchedMessage {
                     message.flags = Some(flags.iter().map(format_flag).collect())
                 }
                 MessageDataItem::InternalDate(date) => {
-                    message.internal_date = Some(date.as_ref().to_rfc3339())
+                    message.internal_date =
+                        Some(date.as_ref().to_rfc3339_opts(SecondsFormat::AutoSi, true))
                 }
                 MessageDataItem::Rfc822Size(size) => message.size = Some(size),
                 MessageDataItem::BodyExt {

@@ -3,13 +3,16 @@
 //! The `jmap identity update` command, the update half of RFC 8621
 //! `Identity/set`.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::{JmapIdentitySetArgs, JmapIdentityUpdate};
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
+    jmap::{
+        client::JmapClient,
+        error::{format_set_error, set_error},
+    },
     shared::receipt::IdReceipt,
 };
 
@@ -48,7 +51,7 @@ impl JmapIdentityUpdateCommand {
         if let Some(err) = output.not_updated.get(&self.id) {
             let mut msg = format!("Update identity `{}` error", self.id);
             msg.push_str(&format_set_error(err));
-            bail!(msg);
+            return Err(set_error(msg, err));
         }
 
         printer.out(IdReceipt {

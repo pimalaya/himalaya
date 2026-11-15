@@ -16,7 +16,7 @@ use pimalaya_cli::{printer::Printer, repl::Repl};
 
 use crate::{
     cli::{Command, resolve_account},
-    error::ErrorCode,
+    error::{self, ErrorCode},
     session::Session,
 };
 
@@ -48,7 +48,7 @@ impl ReplCommand {
             Command::Repl(_) | Command::Mcp(_) => {
                 Err(anyhow!("Cannot start a session inside a session"))
             }
-            cmd => cmd.execute(printer, session),
+            cmd => cmd.execute(printer, session).map_err(error::coded),
         })
     }
 }

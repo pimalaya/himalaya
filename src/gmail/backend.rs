@@ -37,8 +37,11 @@ use crate::{
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
         vacation::{Vacation, VacationPatch, date_from_millis},
     },
-    error::{ErrorCode, ItemError, missing_message},
-    gmail::{client::GmailClient, search},
+    error::{ErrorCode, ItemError, missing_message, unknown_message},
+    gmail::{
+        client::{GmailClient, refusal_of},
+        search,
+    },
     shared::message::header::parse_headers,
 };
 
@@ -316,7 +319,13 @@ impl GmailClient {
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
     /// (format=RAW), base64url-decoded.
     pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
-        let message = self.message_get(id, GmailMessageFormat::Raw, &[])?.response;
+        let message = match self.message_get(id, GmailMessageFormat::Raw, &[]) {
+            Ok(output) => output.response,
+            Err(GmailClientStdError::Send(err)) if err.api().is_some_and(is_unknown_id) => {
+                return Err(unknown_message(id, err));
+            }
+            Err(err) => return Err(err.into()),
+        };
         let raw = message
             .raw
             .ok_or_else(|| anyhow!("Gmail message has no raw payload"))?;
@@ -746,15 +755,7 @@ fn batch_item_error(id: &str, err: &GmailBatchResponseError) -> ItemError {
 /// The item error of the message `id` Gmail refused, coded by its status
 /// and reasons, which `sources` keeps.
 fn api_item_error(id: &str, err: &GmailApiError) -> ItemError {
-    let code = if err.is_rate_limited() {
-        Some(ErrorCode::RateLimited)
-    } else if err.status == 403 {
-        Some(ErrorCode::PermissionDenied)
-    } else if is_unknown_id(err) {
-        Some(ErrorCode::MessageNotFound)
-    } else {
-        None
-    };
+    let code = refusal_of(err).or_else(|| is_unknown_id(err).then_some(ErrorCode::MessageNotFound));
 
     let mut sources = vec![format!("HTTP {}", err.status)];
     sources.extend(

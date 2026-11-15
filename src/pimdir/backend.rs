@@ -66,7 +66,7 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{ErrorCode, missing_message, pimdir_error},
+    error::{ErrorCode, message_not_found, missing_message, pimdir_error},
     pimdir::client::PimdirClient,
 };
 
@@ -600,7 +600,9 @@ impl PimdirClient {
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let collection = self.hub_id(mailbox)?;
         let Some(item) = self.get(&collection, id)? else {
-            bail!("Message `{id}` not found in `{mailbox}`");
+            return Err(message_not_found(format!(
+                "Message `{id}` not found in `{mailbox}`"
+            )));
         };
         let bytes = match &item.object {
             Some(hash) => self.blobs.get(hash)?,
@@ -4214,6 +4216,20 @@ mod tests {
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
             Some(ErrorCode::BodyPending),
+            "{err}"
+        );
+    }
+
+    /// A read of an id the mailbox does not hold is `message-not-found`.
+    #[test]
+    fn a_read_of_an_unknown_id_is_not_found() {
+        let (_dir, mut client) = sent_store();
+
+        let err = client.get_message("imap/Sent", "999", false).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::MessageNotFound),
             "{err}"
         );
     }

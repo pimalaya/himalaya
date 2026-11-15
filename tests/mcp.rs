@@ -365,6 +365,45 @@ fn a_failing_command_carries_its_code_and_the_server_goes_on() {
     );
 }
 
+/// Every tool naming one message takes it as `message-id`, and a read of
+/// one the mailbox does not hold answers `message-not-found`.
+#[test]
+fn a_message_is_named_message_id() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let responses = serve(
+        &config,
+        &[],
+        &[
+            list(1),
+            call(2, "message_read", json!({ "message-id": "m1" })),
+            call(3, "message_read", json!({ "message-id": "nope" })),
+            call(4, "message_read", json!({ "id": "m1" })),
+        ],
+    );
+
+    let tools = ["message_read", "message_reply", "message_forward"];
+    for name in tools.into_iter().chain(["attachment_list"]) {
+        let properties = &tool(&responses[0], name).unwrap()["inputSchema"]["properties"];
+        assert!(
+            properties.get("message-id").is_some(),
+            "{name}: {properties}"
+        );
+        assert!(properties.get("id").is_none(), "{name}: {properties}");
+    }
+
+    let read = &responses[1]["result"];
+    assert_ne!(read["isError"], true, "{read}");
+    assert_eq!(read["structuredContent"]["id"], "m1", "{read}");
+    assert_eq!(read["structuredContent"]["etag"], Value::Null, "{read}");
+
+    assert_eq!(refusal(&responses[2])["code"], "message-not-found");
+    let refused = refusal(&responses[3]);
+    let error = refused["error"].as_str().unwrap();
+    assert_eq!(refused["code"], "usage-invalid", "{refused}");
+    assert!(error.contains("message-id"), "{error}");
+}
+
 /// An argument the tool's schema refuses, and a value it admits but the
 /// command's grammar refuses, fail the call coded `usage-invalid`.
 #[test]
@@ -961,13 +1000,13 @@ fn a_reply_and_a_forward_carry_inline_attachments() {
             call(
                 1,
                 "message_reply",
-                json!({ "id": "m1", "body": "Re", "save": "inbox", "attach-data": item }),
+                json!({ "message-id": "m1", "body": "Re", "save": "inbox", "attach-data": item }),
             ),
             call(
                 2,
                 "message_forward",
                 json!({
-                    "id": "m1",
+                    "message-id": "m1",
                     "to": ["c@example.org"],
                     "body": "Fwd",
                     "save": "inbox",

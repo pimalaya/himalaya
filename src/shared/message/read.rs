@@ -43,12 +43,13 @@ use crate::{
 /// The `[ID]` prefixing a summary is the part's position in the message,
 /// the same id `attachment list` reports and `attachment download` takes.
 ///
-/// `--json` prints a view of the message, the same whatever the backend:
-/// its headers decoded, its text and HTML bodies decoded to UTF-8, and
-/// every leaf part with its id, role (body, inline or attachment), type,
-/// file name and size. `--raw` dumps the original RFC 5322 bytes instead.
-/// Plain output replaces terminal control and bidi characters, retaining
-/// body tabs and newlines. JSON and raw output keep their contents.
+/// `--json` prints the message's id and etag beside a view of it, the
+/// same whatever the backend: its headers decoded, its text and HTML
+/// bodies decoded to UTF-8, and every leaf part with its id, role (body,
+/// inline or attachment), type, file name and size. `--raw` dumps the
+/// original RFC 5322 bytes instead. Plain output replaces terminal
+/// control and bidi characters, retaining body tabs and newlines. JSON
+/// and raw output keep their contents.
 ///
 /// A message nested deeper than 8 levels, or holding more than 200 parts
 /// or 500 header lines, is refused whole with the `message-too-complex`
@@ -56,7 +57,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     /// Identifier of the message.
-    #[arg(value_name = "ID")]
+    #[arg(value_name = "MESSAGE-ID")]
     pub id: String,
     #[command(flatten)]
     pub mailbox: MailboxArg,
@@ -90,17 +91,41 @@ impl MessageReadCommand {
             });
         }
 
-        printer.out(MessageReadOutput::from_raw(&raw)?)
+        printer.out(MessageReadOutput {
+            id: self.id,
+            etag: None,
+            view: MessageReadView::from_raw(&raw)?,
+        })
     }
 }
 
-/// The `message read` output: under `--json` the view of the message,
-/// built from its raw bytes so it is the same on every backend; as text
+/// The `message read` output: under `--json` the message's id and etag
+/// beside its view; as text the view alone.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageReadOutput {
+    /// The id of the message read, as the command took it.
+    pub id: String,
+    /// The version of the message, always `null`: a message's body never
+    /// changes, and no write takes a version to match.
+    pub etag: Option<String>,
+    #[serde(flatten)]
+    pub view: MessageReadView,
+}
+
+impl fmt::Display for MessageReadOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.view.fmt(f)
+    }
+}
+
+/// The view of a message, built from its raw bytes so it is the same on
+/// every backend: what `message read` and `message parse` print. As text
 /// a header block, then one summary line per MIME part with the decoded
 /// contents of the text ones.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MessageReadOutput {
+pub struct MessageReadView {
     /// The headers a reader acts on, decoded.
     pub headers: MessageHeaders,
     /// Every `text/plain` body part decoded to UTF-8, in order, joined by
@@ -115,7 +140,7 @@ pub struct MessageReadOutput {
     view: MessageView,
 }
 
-impl MessageReadOutput {
+impl MessageReadView {
     /// Parses a raw message within the bounds of [`part::parse`] and
     /// builds its view: what `message read` and `message parse` print.
     pub fn from_raw(raw: &[u8]) -> Result<Self> {
@@ -162,7 +187,7 @@ impl MessageReadOutput {
     }
 }
 
-impl fmt::Display for MessageReadOutput {
+impl fmt::Display for MessageReadView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.view.fmt(f)
     }
@@ -180,8 +205,8 @@ pub struct MessageHeaders {
     pub sender: Vec<MailAddress>,
     /// The subject, RFC 2047 decoded.
     pub subject: Option<String>,
-    /// The date as RFC 3339, with the offset the header carries; `null`
-    /// when absent or unreadable.
+    /// The date as RFC 3339, with the offset the header carries, `Z` for
+    /// UTC; `null` when absent or unreadable.
     pub date: Option<String>,
     /// The `Message-ID`, without angle brackets.
     pub message_id: Option<String>,
@@ -248,7 +273,7 @@ impl MessageHeaders {
             date: root
                 .header::<DATE>()
                 .filter(MimeDateTime::is_valid)
-                .map(|date| date.to_rfc3339()),
+                .map(rfc3339),
             message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
             in_reply_to: ids(root.header::<IN_REPLY_TO>()),
             references: ids(root.header::<REFERENCES>()),
@@ -257,6 +282,17 @@ impl MessageHeaders {
             precedence: text("Precedence"),
             auto_submitted: text("Auto-Submitted"),
         }
+    }
+}
+
+/// A header date as RFC 3339, its offset kept, UTC spelled `Z` as every
+/// instant Himalaya prints is.
+fn rfc3339(date: MimeDateTime) -> String {
+    let text = date.to_rfc3339();
+
+    match date.offset {
+        0 => format!("{}Z", &text[..text.len() - "+00:00".len()]),
+        _ => text,
     }
 }
 
@@ -690,7 +726,7 @@ mod tests {
     use super::*;
 
     fn render(raw: &[u8]) -> String {
-        MessageReadOutput::new(part::parse(raw).expect("parse")).to_string()
+        MessageReadView::new(part::parse(raw).expect("parse")).to_string()
     }
 
     /// A parameter value holding a blank, `;` or `=` prints quoted, so it
@@ -711,7 +747,7 @@ mod tests {
             "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n",
             base64::encode(text.as_bytes())
         );
-        let view = MessageReadOutput::from_raw(raw.as_bytes()).unwrap();
+        let view = MessageReadView::from_raw(raw.as_bytes()).unwrap();
         let rendered = view.to_string();
         assert!(
             !rendered
@@ -854,7 +890,7 @@ mod tests {
     }
 
     fn view(raw: &[u8]) -> serde_json::Value {
-        serde_json::to_value(MessageReadOutput::new(part::parse(raw).expect("parse"))).unwrap()
+        serde_json::to_value(MessageReadView::new(part::parse(raw).expect("parse"))).unwrap()
     }
 
     #[test]
@@ -1006,7 +1042,7 @@ mod tests {
     }
 
     #[test]
-    fn date_keeps_its_offset_and_an_unreadable_one_is_null() {
+    fn date_keeps_its_offset_utc_as_z_and_an_unreadable_one_is_null() {
         let at = |date: &str| {
             let raw = format!("Date: {date}\r\nContent-Type: text/plain\r\n\r\nbody\r\n");
             view(raw.as_bytes())["headers"]["date"].clone()
@@ -1022,8 +1058,9 @@ mod tests {
         );
         assert_eq!(
             at("Thu, 24 Jul 2025 10:00:00 +0000"),
-            "2025-07-24T10:00:00+00:00"
+            "2025-07-24T10:00:00Z"
         );
+        assert_eq!(at("Thu, 24 Jul 2025 10:00:00 GMT"), "2025-07-24T10:00:00Z");
         assert_eq!(at("not a date"), serde_json::Value::Null);
         assert_eq!(
             at("Mon, 31 Feb 2025 10:00:00 +0000"),

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `id` and `etag` to `message read --json`: the id the command took, and `etag` `null`, a message's body never changing and no write taking a version to match. `message parse` prints the view without them.
 - Added `account_capability` to `himalaya mcp`, a reading tool listed whatever the flags, answering the rows `account capability` prints, as Calendula and Cardamum do.
 - Added `total` to the `envelope list` JSON output: how many messages the mailbox holds, read within the listing itself (IMAP `SELECT` `EXISTS`, JMAP `calculateTotal`, the entries Maildir, mbox and pimdir hold), `null` on Gmail and Microsoft Graph and always for `envelope search`.
 - Added a library target, for himalaya-tui alone, which pins it by git revision and runs Himalaya's commands in-process; it carries no semver promise beyond the CLI grammar and its `--json` output.
@@ -76,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Changed the top level, the account blocks and the `message` table to refuse a key they do not know, as every other table did, so a typo fails the load naming the key and its line instead of being ignored. The rest of a v1 `[message]` table (`read`, `write`, `send.backend`) is refused with them. himalaya-tui's own keys go under a `[tui]` table at the top level and `[accounts.<name>.tui]` in an account, which Himalaya loads whatever they hold and never reads: `keybinds`, `contact-command`, `contact-complete-key` and `theme` at the top level, `contact-command` in an account.
 - **BREAKING**: Changed `flag add|set|remove`, `message copy`, `message move` and `message delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on; given none it holds, they print `count: 0` where they printed the failure object and exited 1.
+- **BREAKING**: Changed `imap fetch --internal-date` to print `internalDate` with `Z` for a UTC instant (`2026-07-17T10:00:00Z`), where it printed `+00:00`, and the read view of `message read` and `message parse` its `headers.date` the same, as `envelope list`, `envelope search` and the `vacation` dates already did; any other offset is kept.
+- **BREAKING**: Changed the MCP tools `message_read`, `message_reply` and `message_forward` to take the message as `message-id`, as `attachment_list` and `attachment_download` do, where they took `id`; the positional prints as `<MESSAGE-ID>` in their `--help`.
+- Changed a whole command a server refused to carry the code of that refusal, in a one-shot run, a `repl` line, an MCP call and an `account check` row: an IMAP `NOPERM` `permission-denied` and `OVERQUOTA` `quota-exceeded`, a Gmail or Microsoft Graph refusal coded as an item's is (a Graph 429 `MailboxConcurrency` printed `code: null`), a JMAP HTTP 403 `permission-denied` or 429 `rate-limited`, a JMAP method error `forbidden`, and the SetError of a command's one write by its type.
+- Changed a read of an id the backend does not hold (`message read`, `attachment list|download`, the source of `message reply|forward`) to fail coded `message-not-found` on every backend, where Maildir, JMAP, Gmail, Microsoft Graph and pimdir failed uncoded (``Maildir message locate failed: message 999 not found``).
+- Changed the Nix package to build from the repository's package.nix, a replacement for the nixpkgs derivation, which default.nix overrode.
 - Changed `mailbox list --counts` to list a mailbox whose counts could not be fetched without them, beside a `mailbox-unreadable` entry: an IMAP `STATUS` refused or not decoding, a Gmail `labels.get` refused, an mbox index that does not sync. An IMAP `LIST` line that does not decode is a `mailbox-unreadable` entry with a `null` id.
 - Changed the Gmail listings to read the envelopes' metadata through batched `messages.get`, 50 per request, where they sent one request per message.
 
@@ -197,6 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **BREAKING**: Removed `-t` from `pimdir attachment list` and `pimdir attachment search`: `--page-token` is long only, `-t` being `--to` across Himalaya.
 - **BREAKING**: Removed the m2dir backend: the `himalaya m2dir` commands, the `m2dir` value of `-b/--backend`, the `m2dir` cargo feature, its JSON Schemas and the io-m2dir dependency.
 
   io-m2dir left the Pimalaya family, pimdir superseding it. An `m2dir` block still loads, ignored whatever it holds, and an account left with no other backend fails naming it and pointing at MIGRATION.md: move to a Maildir or a pimdir store.
