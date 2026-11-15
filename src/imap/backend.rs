@@ -703,7 +703,8 @@ impl ImapClient {
     }
 
     /// Permanently deletes a UID set from the trash, returning how many
-    /// of the UIDs the mailbox held and whether they were really removed.
+    /// of the UIDs the mailbox held and whether the mailbox removes them
+    /// rather than flag them, whatever it held.
     ///
     /// They are flagged `\Deleted`, then `UID EXPUNGE`d one by one when
     /// the server advertises RFC 4315 UIDPLUS, which leaves every other
@@ -729,12 +730,15 @@ impl ImapClient {
         let present = self.stored_uids(echoes, sequence_set.clone(), ids.len())?;
         let outcome = found_uids(ids, &present);
 
-        if outcome.value > 0 && self.supports_uidplus() {
+        // NOTE: what removes says how the mailbox deletes, so a delete
+        // that found nothing never reads as flagged and asks for an
+        // expunge; only the expunge waits for a found UID.
+        let removes = self.supports_uidplus();
+        if removes && outcome.value > 0 {
             self.uid_expunge(sequence_set)?;
-            return Ok(outcome.map(|count| (count, true)));
         }
 
-        Ok(outcome.map(|count| (count, false)))
+        Ok(outcome.map(|count| (count, removes)))
     }
 
     /// The UIDs of `requested` a `UID STORE` found, from its `echoes` when
@@ -2262,6 +2266,24 @@ mod tests {
             assert_eq!(missing, ["999"]);
 
             assert_eq!(run(PLAIN, &[1], none, delete(&["999"])).0, 0);
+        }
+
+        /// Whether a trash delete removes says how the mailbox deletes,
+        /// whatever it found: a UIDPLUS trash removes even when no id
+        /// was found, so it never reads as flagged and asks for an
+        /// expunge (#814).
+        #[test]
+        fn a_trash_delete_finding_nothing_still_says_how_it_deletes() {
+            for (capabilities, removes) in [(UIDPLUS, true), (PLAIN, false)] {
+                let (server, handle) = serve(capabilities, vec![1], none);
+                let mut client = client(&server);
+                let outcome = client.delete_messages("INBOX", &["999"]).unwrap();
+                drop(client);
+                let commands = handle.join().unwrap();
+
+                assert_eq!(outcome.value, (0, removes), "{capabilities}");
+                assert!(!has(&commands, "UID EXPUNGE"), "{commands:?}");
+            }
         }
 
         /// A UID neither echoed by the `UID STORE` nor found by the

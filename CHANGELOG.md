@@ -229,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed an IMAP `message delete` in the trash that found no id reporting `flagged` and advising an expunge ([#814]): with UIDPLUS it reports `deleted` with `count` 0, and the expunge advice prints only when messages were flagged.
 - Fixed an IMAP listing dropping a message whose `FETCH` line does not decode, with a warning only ([#801]): the message is listed with the items that decoded, `hasAttachment` `null` when `BODYSTRUCTURE` failed, beside a `message-unreadable` entry naming its UID and the failed items; a line that does not decode at all is an entry with a `null` id.
 - Fixed a Maildir listing skipping an unreadable message file or folder with a warning only: each is a `message-unreadable` or `mailbox-unreadable` entry with its id, a file's on the first page of a paged listing.
 - Fixed the Microsoft Graph lookups counting every 400 as an id or a folder not found: only one Graph codes `ErrorInvalidIdMalformed` is, another 400 being an entry coded `null` for a message id and a failure for a folder.
@@ -1746,6 +1747,7 @@ Few major concepts changed:
 [#786]: https://github.com/pimalaya/himalaya/issues/786
 [#790]: https://github.com/pimalaya/himalaya/issues/790
 [#801]: https://github.com/pimalaya/himalaya/issues/801
+[#814]: https://github.com/pimalaya/himalaya/issues/814
 [#802]: https://github.com/pimalaya/himalaya/issues/802
 [#805]: https://github.com/pimalaya/himalaya/issues/805
 [#806]: https://github.com/pimalaya/himalaya/issues/806

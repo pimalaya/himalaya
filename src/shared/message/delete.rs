@@ -148,6 +148,11 @@ impl fmt::Display for MessageDeleteOutput {
             (DeleteAction::Deleted, false) => {
                 writeln!(f, "Successfully deleted {count} message(s) from the trash")
             }
+            // NOTE: an expunge removes every `\Deleted` message of the
+            // trash, so it is advised only when this run flagged some.
+            (DeleteAction::Flagged, _) if count == 0 => {
+                writeln!(f, "Flagged no message as deleted")
+            }
             (DeleteAction::Flagged, _) => writeln!(
                 f,
                 "Flagged {count} message(s) as deleted; run an expunge on the trash to remove them",
@@ -214,6 +219,24 @@ mod tests {
                 "error": "Message not found in the mailbox",
                 "sources": [],
             }])
+        );
+    }
+
+    /// An expunge removes every `\Deleted` message of the trash, so a
+    /// delete that flagged nothing never advises one (#814).
+    #[test]
+    fn a_flag_delete_advises_an_expunge_only_when_it_flagged() {
+        let mut output = moved(false);
+        output.action = DeleteAction::Flagged;
+
+        assert!(output.to_string().contains("run an expunge"), "{output}");
+
+        output.count = 0;
+        output.errors = vec![missing_message("99")];
+        assert_eq!(
+            output.to_string(),
+            "Flagged no message as deleted\n\n\
+             Error:  99  message-not-found  Message not found in the mailbox\n"
         );
     }
 }
