@@ -130,6 +130,10 @@ pub struct PimdirFlagStageOutput {
     /// One entry per message, in the order given.
     #[serde(rename = "messages")]
     pub queued: Vec<PimdirFlagRow>,
+    /// What a source supports of the change only in part, each once, as
+    /// its declaration words it: the rows are queued, and the server may
+    /// keep less than they ask.
+    pub warnings: Vec<String>,
 }
 
 /// One message's staged change.
@@ -160,14 +164,22 @@ impl PimdirFlagStageOutput {
 
 impl From<Vec<PimdirFlagged>> for PimdirFlagStageOutput {
     fn from(staged: Vec<PimdirFlagged>) -> Self {
+        let mut warnings: Vec<String> = Vec::new();
         let queued = staged
             .into_iter()
-            .map(|flagged| PimdirFlagRow {
-                id: flagged.id,
-                queue_id: flagged.queue_id,
+            .map(|flagged| {
+                for partial in flagged.partial {
+                    if !warnings.contains(&partial) {
+                        warnings.push(partial);
+                    }
+                }
+                PimdirFlagRow {
+                    id: flagged.id,
+                    queue_id: flagged.queue_id,
+                }
             })
             .collect();
-        Self { queued }
+        Self { queued, warnings }
     }
 }
 
@@ -186,7 +198,11 @@ impl fmt::Display for PimdirFlagStageOutput {
             "Flags staged on {} message(s): {}",
             self.queued.len(),
             rows.join(", ")
-        )
+        )?;
+        for warning in &self.warnings {
+            writeln!(f, "Warning: {}", sanitize::text(warning))?;
+        }
+        Ok(())
     }
 }
 
@@ -295,10 +311,12 @@ mod tests {
             PimdirFlagged {
                 id: "42".into(),
                 queue_id: Some(7),
+                partial: Vec::new(),
             },
             PimdirFlagged {
                 id: "43".into(),
                 queue_id: None,
+                partial: Vec::new(),
             },
         ]);
         assert_eq!(
@@ -307,7 +325,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"messages":[{"id":"42","row":7},{"id":"43","row":null}]}"#
+            r#"{"messages":[{"id":"42","row":7},{"id":"43","row":null}],"warnings":[]}"#
         );
     }
 }

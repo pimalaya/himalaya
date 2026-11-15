@@ -6,12 +6,22 @@
 use std::fmt;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, builder::PossibleValuesParser};
+use io_pimdir::capability;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::pimdir::client::PimdirClient;
+
+/// The intents Himalaya queues, each performed by one source (pimdir
+/// STORAGE Annex B.2).
+const INTENTS: [&str; 4] = [
+    capability::MAIL_SUBMIT,
+    capability::COLLECTION_CREATE,
+    capability::COLLECTION_RENAME,
+    capability::COLLECTION_DELETE,
+];
 
 /// Show or choose the source performing an intent for this account.
 ///
@@ -20,8 +30,10 @@ use crate::pimdir::client::PimdirClient;
 /// this records the choice, applied on the sync engine's next run.
 #[derive(Debug, Parser)]
 pub struct PimdirPerformerCommand {
-    /// The intent, `mail.submit` for sending.
+    /// The intent: `mail.submit` for sending, `collection.create`,
+    /// `collection.rename` or `collection.delete` for a mailbox write.
     #[arg(value_name = "CAPABILITY")]
+    #[arg(value_parser = PossibleValuesParser::new(INTENTS))]
     pub capability: String,
     /// The source to perform it; omitted, the candidates are listed.
     #[arg(value_name = "SOURCE")]
@@ -99,6 +111,32 @@ impl fmt::Display for PimdirPerformerChosen {
                 "The choice of performer for {} is withdrawn",
                 self.capability
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::{Parser, error::ErrorKind};
+
+    use crate::cli::Cli;
+
+    /// An intent Himalaya does not queue is refused by the grammar, which
+    /// lists the ones it knows, rather than answering no candidate.
+    #[test]
+    fn an_unknown_capability_is_refused_naming_the_known_ones() {
+        let parse =
+            |capability: &str| Cli::try_parse_from(["himalaya", "pimdir", "performer", capability]);
+
+        let err = parse("bogus.cap").unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidValue);
+        let message = err.to_string();
+        for known in super::INTENTS {
+            assert!(message.contains(known), "{message}");
+        }
+
+        for known in super::INTENTS {
+            assert!(parse(known).is_ok(), "{known}");
         }
     }
 }

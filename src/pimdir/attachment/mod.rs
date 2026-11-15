@@ -5,19 +5,22 @@
 //! attachments collection as each message body enters it (pimdir STORAGE
 //! §14.3), read with the message attaching each.
 //!
-//! A listing reads the store's index only: no body is opened, so a store
-//! lists every attachment whose message body was ever stored, newest
-//! message first. A message whose body never entered the store attaches
-//! nothing yet.
+//! A listing finds the files in the store's index, so a store lists every
+//! attachment whose message body was ever stored, newest message first. A
+//! message whose body never entered the store attaches nothing yet. Only
+//! the bodies of a page's messages are opened, to number each file's part
+//! as `attachment download` takes it.
 
 pub mod cli;
 pub mod list;
 pub mod search;
 
+use std::collections::{HashMap, hash_map::Entry};
+
 use anyhow::{Context, Result, anyhow, bail};
 use io_pimdir::client::reader::{PimdirAccountAttachment, PimdirAccountAttachmentCursor};
 
-use crate::{error::pimdir_error, pimdir::client::PimdirClient};
+use crate::{error::pimdir_error, pimdir::client::PimdirClient, shared::message::part};
 
 /// How many stand-ins a search reads per keyset page, so a sparse match
 /// does not cost a query per row.
@@ -84,6 +87,61 @@ impl PimdirClient {
         };
 
         Ok(PimdirAttachmentPage { attachments, next })
+    }
+
+    /// The part id `attachment download` takes for each of `attachments`,
+    /// in order: the id of the part standing at its section in its
+    /// message's body, read once per message. `None` where the body is not
+    /// local, does not parse, or holds no leaf part at that section.
+    pub fn part_ids(&self, attachments: &[PimdirAccountAttachment]) -> Result<Vec<Option<String>>> {
+        let mut parts: HashMap<(&str, i64), Vec<(String, String)>> = HashMap::new();
+        let mut ids = Vec::with_capacity(attachments.len());
+
+        for attachment in attachments {
+            let key = (
+                attachment.message_collection.as_str(),
+                attachment.message_seq,
+            );
+            let parts = match parts.entry(key) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => entry.insert(self.sections(key.0, key.1)?),
+            };
+            let section = attachment
+                .summary
+                .as_ref()
+                .and_then(|summary| summary.part.as_deref());
+            let id = parts
+                .iter()
+                .find(|(at, _)| Some(at.as_str()) == section)
+                .map(|(_, id)| id.clone());
+            ids.push(id);
+        }
+
+        Ok(ids)
+    }
+
+    /// Each leaf part's section and id in the body of the message `seq`
+    /// of `collection`, none when the body is not local or does not parse.
+    fn sections(&self, collection: &str, seq: i64) -> Result<Vec<(String, String)>> {
+        let item = self
+            .store
+            .get_item(collection, seq)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read `{seq}` in `{collection}`"))?;
+        let body = match item.and_then(|item| item.object) {
+            Some(hash) => self.blobs.get(&hash)?,
+            None => None,
+        };
+        let Some(body) = body else {
+            return Ok(Vec::new());
+        };
+        let Ok(message) = part::parse(&body) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(part::leaves(&message)
+            .filter_map(|leaf| Some((leaf.section?, leaf.id)))
+            .collect())
     }
 }
 

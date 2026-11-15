@@ -81,6 +81,8 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **mbox `INBOX` needs `mbox.inbox`** unless the root holds a file of that name: set the spool, or pass the mailbox by name.
 - **`--page 0` is refused** by `envelope list` and `envelope search`, where it listed every envelope: pass `--page-size 0` for the whole mailbox.
 - **`--no-save` needs `--send`** on `message compose`, `reply` and `forward`.
+- **A JMAP read is scoped to its mailbox.** `message read`, and `message reply|forward` and `attachment list|download` reading their source, fail `message-not-found` naming the mailbox when it does not hold the email, as IMAP does, where JMAP read any email of the account whatever `-m` named: pass the mailbox `envelope list -m` listed the email in, `message read -m sent <id>` for a sent one.
+- **A JMAP get names the ids it did not find.** `jmap email get|query` and `jmap mailbox get|query` print one `errors` entry per id the server did not find (`message-not-found`, `mailbox-not-found`) or answered unreadable, and exit 3, where `jmap email get <bogus>` printed `{"emails":[]}` and exited 0: read `errors`, or take exit 3 as a partial answer.
 
 ### Search results that change
 
@@ -109,6 +111,9 @@ What a build of the v3 branch did before the release and the release does not:
 - **The MCP message tools take `message-id`.** `message_read`, `message_reply` and `message_forward` took the message as `id`; they take `message-id`, as `attachment_list` and `attachment_download` do, and refuse `id` as an unknown argument coded `usage-invalid`: `{"id": "42"}` becomes `{"message-id": "42"}`.
 - **`pimdir attachment list|search` page with `--page-token` alone.** `-t` is `--to` everywhere else, so it is gone here: `-t <TOKEN>` becomes `--page-token <TOKEN>`.
 - **`pimdir search` pages with `nextPage`.** It printed `more`; it prints `nextPage`, the next page number while hits or threads follow and `null` on the last page, which `--page-token` takes back (`--page` still works): `"more":true` on page 1 becomes `"nextPage":"2"`, `"more":false` `"nextPage":null`. A hit the store cannot read is an entry of `errors` and exits 3, where the whole search failed.
+- **`pimdir attachment list|search` print the part `attachment download` takes.** Each file carries `part` beside `section`, and the text prints the part where it printed the section: `attachment download -m <mailbox> <messageId> <part>` writes the file, where the section named another part (the text body for section `2` of a mixed message). `part` is `null` when the message's body is no longer local; `section` stays for `message parse --section`.
+- **A pimdir mailbox the store lists is not created again.** `mailbox create` and `pimdir mailbox create` fail `item-duplicate`, naming the mailbox, when the source creating it syncs one of that name there already, or has its creation queued, where the creation was queued and the server refused it.
+- **`pimdir performer` takes the four intents Himalaya queues**, `mail.submit`, `collection.create`, `collection.rename` and `collection.delete`, and refuses any other with exit 2 (`usage-invalid`), where it answered an unknown one with no candidate.
 
 ## From v1 to v2
 

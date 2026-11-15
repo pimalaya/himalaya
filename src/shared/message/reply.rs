@@ -54,7 +54,8 @@ pub struct MessageReplyCommand {
     #[arg(long, value_name = "ADDR")]
     pub cc: Vec<String>,
     /// Reply to everyone: the source's `To` and `Cc` go in `Cc`, without
-    /// the account's `email` nor anyone already in `To`.
+    /// the user's addresses (the reply's `From`, the account's `email`, its
+    /// IMAP and SMTP logins naming an address) nor anyone already in `To`.
     ///
     /// An explicit `--to` or `--cc` takes precedence over the list it
     /// would derive.
@@ -139,6 +140,12 @@ impl MessageReplyCommand {
         let source = client.get_message(&mailbox, &self.id, false)?;
 
         let (from, from_name) = account.resolve_from(self.from.as_deref());
+        let own: Vec<&str> = account
+            .email
+            .iter()
+            .chain(&account.logins)
+            .map(String::as_str)
+            .collect();
         let template = printer.is_json() && !self.send && self.save.is_none();
         let signature_file = self.signature_file.as_deref().filter(|_| !template);
         let signature = match template {
@@ -169,7 +176,7 @@ impl MessageReplyCommand {
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
                 no_attachments: true,
                 reply_all: self.all,
-                own_email: account.email.as_deref(),
+                own: &own,
             }),
         )?;
 

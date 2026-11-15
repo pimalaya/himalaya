@@ -38,9 +38,10 @@ use crate::{
 /// takes; the last page has none. A token stays valid across syncs: the
 /// next page starts after the last file shown, whatever arrived since.
 ///
-/// A file's bytes are its message's part: read the message raw with
-/// `message read --raw -m <MAILBOX> <MESSAGE-ID>`, then pipe it to
-/// `message parse --section <SECTION> -`.
+/// A file is its message's part: `attachment download -m <MAILBOX>
+/// <MESSAGE-ID> <PART>` writes it, the part numbered as `attachment list`
+/// and `message read` number it. Its IMAP section is printed too, which
+/// `message parse --section` takes.
 #[derive(Debug, Parser)]
 pub struct PimdirAttachmentListCommand {
     #[command(flatten)]
@@ -83,8 +84,12 @@ impl PageArgs {
             .unwrap_or_else(|| account.envelopes_list_page_size())
             .max(1) as usize;
         let page = client.list_attachments(after.as_ref(), limit, query)?;
+        let parts = client.part_ids(&page.attachments)?;
 
         let mut output = PimdirAttachmentListOutput::from(page);
+        for (file, part) in output.attachments.iter_mut().zip(parts) {
+            file.part = part;
+        }
         output.account = account.name().to_string();
         output.query = query.map(|query| query.words.join(" "));
         output.datetime_fmt = account.datetime_fmt().to_string();
@@ -118,6 +123,10 @@ pub struct PimdirAttachmentEntry {
     pub media_type: Option<String>,
     /// Its size in octets, transfer encoding undone.
     pub size: Option<u64>,
+    /// The id of its part in the message, the one `attachment download`
+    /// takes and `attachment list` and `message read` print; `null` when
+    /// the message's body is not local or holds no part at `section`.
+    pub part: Option<String>,
     /// Its IMAP section in the message (RFC 3501 §6.4.5: `2`, `1.2`),
     /// which `message parse --section` takes.
     pub section: Option<String>,
@@ -142,6 +151,7 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
             name: Some(summary.name).filter(|name| !name.is_empty()),
             media_type: summary.media_type,
             size: summary.size,
+            part: None,
             section: summary.part,
             message_id: attachment.message_seq.to_string(),
             mailbox: attachment.message_collection,
@@ -225,7 +235,7 @@ impl fmt::Display for PimdirAttachmentListOutput {
                 sanitize::text(&file.id).into_owned(),
                 size.unwrap_or_default(),
                 text(file.media_type.as_deref()),
-                text(file.section.as_deref()),
+                text(file.part.as_deref()),
                 sanitize::text(&file.message_id).into_owned(),
                 sanitize::text(&file.mailbox).into_owned(),
                 date.unwrap_or_default(),

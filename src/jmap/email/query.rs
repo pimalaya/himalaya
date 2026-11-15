@@ -27,8 +27,9 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
+    error::{ErrorCode, ItemError, partial_when},
     jmap::{
-        backend::{envelope_from, parse_rfc3339, query_page_follows},
+        backend::{envelope_from, get_errors, parse_rfc3339, query_page_follows},
         client::JmapClient,
     },
     shared::envelope::list::envelope_cells,
@@ -179,8 +180,15 @@ impl JmapEmailQueryCommand {
         emails.mailbox = mailbox;
         emails.page = Some((page, self.page_size));
         emails.next_page = follows.then(|| (page + 1).to_string());
+        emails.errors = get_errors(
+            output.not_found,
+            output.unparsed,
+            ErrorCode::MessageNotFound,
+            ErrorCode::MessageUnreadable,
+        );
 
-        printer.out(emails)
+        printer.out(&emails)?;
+        partial_when(&emails.errors)
     }
 }
 
@@ -208,6 +216,9 @@ pub struct JmapEmailQueryOutput {
     /// The number of the next page, `null` once the query is complete and
     /// for a get, given back through `--page-token`.
     pub next_page: Option<String>,
+    /// The error of each email the server did not find or that did not
+    /// deserialize, in the order met.
+    pub errors: Vec<ItemError>,
 }
 
 impl JmapEmailQueryOutput {
@@ -221,6 +232,7 @@ impl JmapEmailQueryOutput {
             page: None,
             emails,
             next_page: None,
+            errors: Vec::new(),
         }
     }
 }
@@ -247,6 +259,10 @@ impl fmt::Display for JmapEmailQueryOutput {
             let page = ListingPage::Numbered { page, size };
             let next = self.next_page.as_deref();
             listing.page(page, count, ["email", "emails"], next);
+        }
+
+        for error in &self.errors {
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")
@@ -323,6 +339,7 @@ mod tests {
             page: Some((2, 2)),
             emails: vec![email("E3"), email("E4")],
             next_page: None,
+            errors: Vec::new(),
         };
 
         let json = serde_json::to_value(&output).unwrap();

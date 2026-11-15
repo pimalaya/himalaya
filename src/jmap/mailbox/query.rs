@@ -26,7 +26,11 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    jmap::{backend::query_page_follows, client::JmapClient},
+    error::{ErrorCode, ItemError, partial_when},
+    jmap::{
+        backend::{get_errors, query_page_follows},
+        client::JmapClient,
+    },
     listing,
 };
 
@@ -121,12 +125,21 @@ impl JmapMailboxQueryCommand {
         let listed = output.mailboxes.len() + output.unparsed.len() + output.not_found.len();
         let follows = query_page_follows(output.total, listed, page, self.page_size);
 
-        printer.out(JmapMailboxQueryOutput {
+        let mailboxes = JmapMailboxQueryOutput {
             account: account.name().to_string(),
             page: Some((page, self.page_size)),
             mailboxes: output.mailboxes,
             next_page: follows.then(|| (page + 1).to_string()),
-        })
+            errors: get_errors(
+                output.not_found,
+                output.unparsed,
+                ErrorCode::MailboxNotFound,
+                ErrorCode::MailboxUnreadable,
+            ),
+        };
+
+        printer.out(&mailboxes)?;
+        partial_when(&mailboxes.errors)
     }
 }
 
@@ -146,6 +159,9 @@ pub struct JmapMailboxQueryOutput {
     /// The number of the next page, `null` once the query is complete and
     /// for a get, given back through `--page-token`.
     pub next_page: Option<String>,
+    /// The error of each mailbox the server did not find or that did not
+    /// deserialize, in the order met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for JmapMailboxQueryOutput {
@@ -179,6 +195,10 @@ impl fmt::Display for JmapMailboxQueryOutput {
             let page = ListingPage::Numbered { page, size };
             let next = self.next_page.as_deref();
             listing.page(page, count, ["mailbox", "mailboxes"], next);
+        }
+
+        for error in &self.errors {
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")
@@ -293,6 +313,7 @@ mod tests {
             page: Some((1, 2)),
             mailboxes: vec![mailbox("M1"), mailbox("M2")],
             next_page: None,
+            errors: Vec::new(),
         };
 
         let json = serde_json::to_value(&output).unwrap();

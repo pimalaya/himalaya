@@ -39,7 +39,7 @@ use crate::{
     account::context::Account,
     backend::Backend,
     capability::{Capability, Resolution},
-    config::{AccountConfig, Config},
+    config::{AccountConfig, Config, sasl::SaslConfig},
     email::{
         envelope::EnvelopePage,
         flag::{Flag, FlagOp},
@@ -107,6 +107,7 @@ impl EmailClient {
         backend: Backend,
     ) -> Result<(Account, Self)> {
         let resolution = Resolution::of(name, &account_config, backend);
+        let logins = logins(&account_config);
         let mut resolver = SecretResolver::new();
         let storage = open_storage(&mut account_config, resolution.storage, &mut resolver)?;
 
@@ -136,6 +137,7 @@ impl EmailClient {
 
         let account = Account {
             name: Some(name.to_string()),
+            logins,
             ..Account::from(config).merge(Account::from(account_config))
         };
 
@@ -906,6 +908,69 @@ fn open_storage(
     };
 
     Ok(client)
+}
+
+/// The addresses the account logs in as: the user names its IMAP and SMTP
+/// SASL blocks transmit holding an `@` (for PLAIN the identity acted as
+/// too), each once.
+fn logins(account_config: &AccountConfig) -> Vec<String> {
+    let blocks = [
+        account_config.imap.as_ref().and_then(|c| c.sasl.as_ref()),
+        account_config.smtp.as_ref().and_then(|c| c.sasl.as_ref()),
+    ];
+    let mut logins: Vec<String> = Vec::new();
+
+    for sasl in blocks.into_iter().flatten() {
+        let names = match sasl {
+            SaslConfig::Anonymous(_) => vec![],
+            SaslConfig::Login(config) => vec![Some(&config.username)],
+            SaslConfig::Plain(config) => vec![Some(&config.authcid), config.authzid.as_ref()],
+            SaslConfig::Oauthbearer(config) => vec![Some(&config.username)],
+            SaslConfig::Xoauth2(config) => vec![Some(&config.username)],
+            SaslConfig::ScramSha256(config) => vec![Some(&config.username)],
+        };
+        for name in names.into_iter().flatten() {
+            if name.contains('@') && !logins.contains(name) {
+                logins.push(name.clone());
+            }
+        }
+    }
+
+    logins
+}
+
+#[cfg(test)]
+mod logins_tests {
+    use pimalaya_config::toml::TomlConfig;
+
+    use crate::config::Config;
+
+    /// An account's logins are its IMAP and SMTP SASL user names reading
+    /// as addresses, each once.
+    #[test]
+    fn the_logins_are_the_sasl_names_holding_an_address() {
+        let toml = "[accounts.icloud]\n\
+                    imap.server = \"imap.example.org\"\n\
+                    imap.sasl.plain.username = \"me@example.org\"\n\
+                    imap.sasl.plain.password.raw = \"x\"\n\
+                    imap.sasl.plain.authzid = \"shared@example.org\"\n\
+                    smtp.server = \"smtp.example.org\"\n\
+                    smtp.sasl.login.username = \"me@example.org\"\n\
+                    smtp.sasl.login.password.raw = \"x\"\n\
+                    [accounts.local]\n\
+                    imap.server = \"imap.example.org\"\n\
+                    imap.sasl.login.username = \"me\"\n\
+                    imap.sasl.login.password.raw = \"x\"\n";
+
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let (_, icloud) = config.take_account(Some("icloud")).unwrap();
+        assert_eq!(
+            super::logins(&icloud),
+            ["me@example.org", "shared@example.org"]
+        );
+        let (_, local) = config.take_account(Some("local")).unwrap();
+        assert!(super::logins(&local).is_empty());
+    }
 }
 
 #[cfg(all(test, feature = "imap", feature = "smtp"))]

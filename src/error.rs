@@ -125,7 +125,8 @@ pub enum ErrorCode {
     /// write: nothing was written. Retry.
     LockReplaced,
     /// The mailbox already holds the message, or has its creation
-    /// queued: nothing was staged.
+    /// queued, or the pimdir store lists the mailbox a creation names, or
+    /// has that creation queued: nothing was staged.
     ItemDuplicate,
     /// The pimdir store cannot hold the flag: empty, or holding a space, a
     /// control or a non-ASCII character. Nothing was staged.

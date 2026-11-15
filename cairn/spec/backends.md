@@ -195,7 +195,7 @@ An added message SHALL derive its link id through io-pimdir's mail derivation (`
 - THEN the command fails with the code `body-pending`
 
 ### Requirement: A pimdir body is written under the staging lock
-A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the body to its producer with the action in one step (`enqueue_with_body_checked`): the capability gate and, for an add, the duplicate check run on the bytes in hand, then the body is written inside the producer's staging window (pimdir STORAGE §8) and the row pinning it appended, in one transaction. A write refused by the gate or the duplicate check SHALL leave no body in the blob tree. No body SHALL reach the blob tree while a collector holds the lock: the write waits for it.
+A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the body to its producer with the action in one step (`enqueue_with_body_checked`): the capability gate and, for an add, the duplicate check run on the bytes in hand, then the body is written inside the producer's staging window (pimdir STORAGE §8) and the row pinning it appended, in one transaction. A write refused by the gate or the duplicate check SHALL leave no body in the blob tree. No body SHALL reach the blob tree while a collector holds the lock: the write waits for it. The gate reads a collection's own row before its source's (pimdir STORAGE §15.6): a source declaring `mail.message.add` `none` and `full` on the folder of its drafts role, as neverest declares a Graph source, SHALL see an add to any other mailbox refused with `unsupported`, naming the mailbox and the declared detail, nothing queued, rather than queued for every sync to reject.
 
 #### Scenario: A collector running beside a staged add
 - GIVEN a pimdir store whose collector holds `objects.lock` exclusively
@@ -206,6 +206,11 @@ A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the bo
 - GIVEN a pimdir mailbox holding a message whose `Message-ID` is `d1@x.org`
 - WHEN another body with that `Message-ID` is added to it
 - THEN the add fails with `item-duplicate` and its body is not in the blob tree
+
+#### Scenario: An add where the source adds nothing
+- GIVEN a pimdir account whose `msgraph` source declares `mail.message.add` `none` with the detail `Drafts only`, and `full` on `msgraph/Drafts`
+- WHEN `himalaya message add -m msgraph/Archive` stages a message
+- THEN the command fails with the code `unsupported`, naming `msgraph/Archive` and `Drafts only`, and neither a row nor a body is left; the same add to `msgraph/Drafts` is queued
 
 ### Requirement: A pimdir store failure carries its code
 A failure io-pimdir reports SHALL keep io-pimdir's message as a cause and carry, under `--json`, the code `PimdirError::code()` gives it, spelled the same, when it is one a caller acts on: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `sync-version`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `lock-replaced`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer` and `ambiguous-performer`. An SQL, I/O or JSON failure carries none. Himalaya SHALL NOT derive a code from a message, and SHALL NOT advise deleting the store.
@@ -255,7 +260,7 @@ Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); 
 - THEN the command fails saying the row is not in the account's queue, and the row stays queued
 
 ### Requirement: pimdir writes name their queue row
-`pimdir message add` and `pimdir message send` SHALL stage a message as the unified `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"row": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyRow": i64` (a copy queued beside the send, when its performer declares no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found: `{"messages": [{"id": string, "row": i64 | null}]}`, `null` for a message the change left as it was, for which nothing was staged. The unified commands SHALL keep printing no queue detail. `pimdir queue list` and `queue cancel` SHALL name a row `row` as well.
+`pimdir message add` and `pimdir message send` SHALL stage a message as the unified `message add` and `message send` do, and print the queue row it waits in with the message's bare `Message-ID`: `{"row": i64, "messageId": string}` for an add, plus `"copy": bool` (the `submit` row carries the copy) and `"copyRow": i64` (a copy queued beside the send, when its performer declares no capabilities) for a send. `pimdir flag add|set|remove` SHALL print the row of each message they found and what a source supports of the change only in part: `{"messages": [{"id": string, "row": i64 | null}], "warnings": [string]}`, `null` for a message the change left as it was, for which nothing was staged, each warning once, in the words of the source's declaration (`Source gmail supports mail.flags.keywords in part: …`), `Warning:` lines after the sentence in text. The unified commands SHALL keep printing no queue detail. `pimdir queue list` and `queue cancel` SHALL name a row `row` as well.
 
 `pimdir queue show <ROW>` SHALL say where a row of the account's queue stands, read through io-pimdir's `action_status` (pimdir STORAGE §15.4): `{"row", "state": "pending" | "parked" | "unconfirmed" | "applied" | "unknown" | "reset", "collection", "kind", "attempts", "error", "appliedAt", "seq"}`, a key the state does not carry being `null`. A pending or parked row carries `collection`, `kind` and `attempts`, a parked one `error` too; an applied one carries `collection`, `appliedAt` and, for an add, `seq`, the public id of the message it created. An intent its performer sent without learning its outcome (pimdir STORAGE §15.2), a send or a mailbox change that may have taken effect, SHALL read `unconfirmed`, never `parked`, with `collection`, `kind`, `attempts` and, as `error`, what the performer recorded; the plain output says it was sent and maybe performed. `reset` is io-pimdir's answer to a handle another store drew (§4.5); a row id states no store, so Himalaya never asks for it, and prints it as it comes. A row neither queued nor in the store's receipts (kept seven days), or one anchored on another account's collection, SHALL read as `unknown`: cancelled, or applied long ago. A row the sync engine performed rather than applied, a message sent or a mailbox created, renamed or deleted, reads as `applied` without `seq`, its receipt recorded on acknowledgement (pimdir STORAGE §15.5). A receipt follows the collection its row was queued on and outlives it (pimdir STORAGE §15.4): a renamed mailbox's row reads `applied` under the mailbox's new id, and a row whose mailbox is gone since, a performed deletion's included, still reads `applied`, with `collection` `null`, the plain output saying the mailbox was deleted since. Such a row names no collection an account could be told from, so it reads `applied` under any account of the store.
 
@@ -283,14 +288,24 @@ The plain output of every `pimdir` subcommand SHALL end with a newline.
 - THEN the row is listed as parked with its error, and `pimdir queue cancel` on its id removes it
 
 ### Requirement: pimdir creates a mailbox by queueing an intent
-`pimdir mailbox create <NAME> [--parent <MAILBOX>]` SHALL enqueue one `collection-create` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text, "parent": collection?}`, and print `{"row": i64, "name": text, "parent": collection | null, "source": id}`. It SHALL NOT create a collection in the store: the mailbox arrives with the sync that performs the intent.
+`pimdir mailbox create <NAME> [--parent <MAILBOX>]` SHALL enqueue one `collection-create` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text, "parent": collection?}`, and print `{"row": i64, "name": text, "parent": collection | null, "source": id}`, `parent` `null` at the top, never left out. It SHALL NOT create a collection in the store: the mailbox arrives with the sync that performs the intent.
 
-The row SHALL be anchored on `parent`, which must be a mailbox of the account, else on the account's first mailbox by id, and queued through io-pimdir's `enqueue_collection_create`. The performer SHALL be named as for a send (capability `collection.create`): several candidates and no recorded choice are refused, naming them. A store whose sources declare no capabilities SHALL be refused, its owner predating the intent. An empty name, or one holding a control character, SHALL be refused before anything is staged. A name the server already holds is the server's to refuse: the row parks, and `pimdir queue show` says why.
+The row SHALL be anchored on `parent`, which must be a mailbox of the account, else on the account's first mailbox by id, and queued through io-pimdir's `enqueue_collection_create`. The performer SHALL be named as for a send (capability `collection.create`): several candidates and no recorded choice are refused, naming them. A store whose sources declare no capabilities SHALL be refused, its owner predating the intent. An empty name, or one holding a control character, SHALL be refused before anything is staged. A mailbox the store lists already SHALL be refused with `item-duplicate`, naming it, before anything is queued, as "Unified mailbox writes" refuses creating an existing mailbox: one the performer's source syncs under NAME at the top, or under the parent's name, a hierarchy delimiter (`/` or `.`, the store recording none) and NAME, names compared exactly; so SHALL a creation of NAME under that parent the same source has queued already. A name the store does not list yet is the server's to refuse: the row parks, and `pimdir queue show` says why.
 
 #### Scenario: A folder is created through the sync engine
 - GIVEN a pimdir account whose `imap` source declares `collection.create`
 - WHEN `himalaya --json pimdir mailbox create Projets` runs
 - THEN one `collection-create` row is queued with `{"v":1,"source":"imap","name":"Projets"}`, and the command prints its `row` and `"source":"imap"`
+
+#### Scenario: A mailbox at the top
+- GIVEN a pimdir account whose `gmail` source declares `collection.create`
+- WHEN `himalaya --json pimdir mailbox create Projets` runs
+- THEN it prints `"parent":null` beside `row`, `name` and `source`
+
+#### Scenario: A mailbox the store lists
+- GIVEN a pimdir account whose `imap` source declares `collection.create` and syncs `imap/Projets`, named `Projets`
+- WHEN `himalaya mailbox create Projets` or `himalaya pimdir mailbox create Projets` runs
+- THEN the command fails with the code `item-duplicate`, naming `imap/Projets`, and nothing is queued
 
 ### Requirement: pimdir renames or deletes a mailbox by queueing an intent
 `pimdir mailbox rename <MAILBOX> <NAME>` SHALL enqueue one `collection-rename` intent (pimdir STORAGE Annex B.2) with the `v: 1` payload `{"v": 1, "source": id, "name": text}` and print `{"row": i64, "mailbox": collection, "name": text, "source": id}`. `pimdir mailbox delete <MAILBOX>` SHALL enqueue one `collection-delete` intent with `{"v": 1, "source": id}` and print `{"row": i64, "mailbox": collection, "source": id}`. Neither SHALL rename or delete a collection in the store: the change arrives with the sync that performs the intent.
@@ -309,17 +324,30 @@ A rename keeps the mailbox's parent, `name` being one level of the hierarchy. Th
 - WHEN `himalaya pimdir mailbox delete imap/Projets` runs and the sync engine performs the row
 - THEN the server deletes nothing, the row parks naming `Projets/2025`, and `pimdir queue show` prints it as `parked` with that error
 
+### Requirement: pimdir performer takes the intents Himalaya queues
+`pimdir performer <CAPABILITY> [SOURCE] [--clear]` SHALL take the capability of an intent Himalaya queues (pimdir STORAGE Annex B.2): `mail.submit`, `collection.create`, `collection.rename` or `collection.delete`. Any other SHALL be refused by the grammar, exit 2 and `usage-invalid` under `--json`, naming the ones it takes, rather than answering that no source performs it.
+
+#### Scenario: An unknown capability
+- GIVEN a pimdir account
+- WHEN `himalaya --json pimdir performer bogus.cap` runs
+- THEN it exits 2 with the failure object coded `usage-invalid`, its error listing `mail.submit`, `collection.create`, `collection.rename` and `collection.delete`
+
 ### Requirement: pimdir stages flags by their raw spelling
 `himalaya pimdir flag list|add|set|remove` SHALL read and stage the flags of a pimdir message by their raw spelling, verbatim. A value naming an IANA flag SHALL be accepted only in its canonical spelling, compared without case and staged in the canonical case, a bare `seen` or `$seen` being refused naming `\Seen`; `\Deleted` and `\Recent` SHALL be refused. A backslash names a system flag, so one in front of any other word SHALL be refused, as SHALL a character IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`). A value the store cannot hold (pimdir STORAGE §13), empty or holding whitespace, a control character or a character outside ASCII, SHALL be refused with the code `flag-invalid`, the code io-pimdir's enqueue gives a flag set holding one, and nothing staged. Any other value is a keyword.
 
-`add`, `set` and `remove` SHALL fail when no message is named or none of the named ones exists, and SHALL stage one `SetFlags` per message through the backend's `stage_flags`, appended as one batch (io-pimdir's `enqueue_batch`, pimdir STORAGE §15.1) whose enqueue runs the gate of the sources' declarations once per row (§15.6), so a change refused on any message stages nothing and the failure names that message: a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it with the declaration's warning as it is. A change on `$Important` or `$Junk` SHALL be gated by `mail.flags.important` or `mail.flags.junk` from a source stating that row, `none` included, and by `mail.flags.keywords` from one stating none (pimdir STORAGE Annex B.1), io-pimdir's gate deciding which. `list` SHALL print the flags a message carries as the overlaying reader shows them, and `null` under `--json` for a message whose flags the sync engine never read.
+`add`, `set` and `remove` SHALL fail when no message is named or none of the named ones exists, and SHALL stage one `SetFlags` per message through the backend's `stage_flags`, appended as one batch (io-pimdir's `enqueue_batch`, pimdir STORAGE §15.1) whose enqueue runs the gate of the sources' declarations once per row (§15.6), so a change refused on any message stages nothing and the failure names that message: a source declaring `mail.flags.keywords` as `none` SHALL refuse a keyword change with its detail, and one declaring it in part SHALL queue it, its receipt carrying the declaration's warning under `warnings`, never claiming the server keeps the keyword. A change on `$Important` or `$Junk` SHALL be gated by `mail.flags.important` or `mail.flags.junk` from a source stating that row, `none` included, and by `mail.flags.keywords` from one stating none (pimdir STORAGE Annex B.1), io-pimdir's gate deciding which. `list` SHALL print the flags a message carries as the overlaying reader shows them, and `null` under `--json` for a message whose flags the sync engine never read.
 
 An add or a remove SHALL match the flags a message carries as flags, not as spellings: a marker the store holds as `\seen`, or as Thunderbird's `Junk`, is the one `\Seen` or `$Junk` keeps on an add and drops on a remove. This holds for the shared flag commands on a pimdir account, which stage through the same path.
 
 #### Scenario: A keyword is staged and read back
 - GIVEN a pimdir account whose `imap` source declares `mail.flags.keywords`
 - WHEN `himalaya --json pimdir flag add -m imap/INBOX -f act 42` runs
-- THEN it prints `{"messages":[{"id":"42","row":7}]}`, and `pimdir flag list -m imap/INBOX 42` lists `act` before the next sync
+- THEN it prints `{"messages":[{"id":"42","row":7}],"warnings":[]}`, and `pimdir flag list -m imap/INBOX 42` lists `act` before the next sync
+
+#### Scenario: A keyword kept in part
+- GIVEN a pimdir account whose `gmail` source declares `mail.flags.keywords` in part, `$Important only`
+- WHEN `himalaya --json pimdir flag add -m gmail/INBOX -f act 42` runs
+- THEN the row is queued and the receipt prints `"warnings":["Source gmail supports mail.flags.keywords in part: $Important only"]`
 
 #### Scenario: A source without keywords refuses one
 - GIVEN a pimdir account whose `msgraph` source declares `mail.flags.keywords` as `none`
@@ -367,7 +395,7 @@ An add or a remove SHALL match the flags a message carries as flags, not as spel
 - THEN the store reads the 50 newest items, and one more per queued removal, rather than the 50,000
 
 ### Requirement: pimdir lists the account's attachments
-`pimdir attachment list` SHALL list the files the account's messages attach, read from the stand-ins of the account's attachments collection (pimdir STORAGE §14.3) through io-pimdir's `list_attachments_by_account`, newest message first, opening no body. It SHALL print `{"attachments": [...], "nextPage"}`, each file as `{"id", "name", "mediaType", "size", "section", "messageId", "mailbox", "sender", "senderName", "date"}`: `id` the stand-in's public id; `name` its decoded name, `null` when the part names none; `mediaType` lowercased without parameters; `size` in octets once the transfer encoding is undone; `section` its IMAP section in the message (RFC 3501 §6.4.5); `messageId` and `mailbox` the public id and collection of one live placement of the message attaching it, as `envelope list` and `message read` take them; `sender` and `senderName` the message's sender; `date` its date, RFC 3339. Ids SHALL be strings.
+`pimdir attachment list` SHALL list the files the account's messages attach, read from the stand-ins of the account's attachments collection (pimdir STORAGE §14.3) through io-pimdir's `list_attachments_by_account`, newest message first, opening only the bodies of the page's messages, each once, to number their parts. It SHALL print `{"attachments": [...], "nextPage"}`, each file as `{"id", "name", "mediaType", "size", "part", "section", "messageId", "mailbox", "sender", "senderName", "date"}`: `id` the stand-in's public id; `name` its decoded name, `null` when the part names none; `mediaType` lowercased without parameters; `size` in octets once the transfer encoding is undone; `part` the id `attachment download` takes and `attachment list` and `message read` print, the position of the part standing at `section` in the message's body, `null` when the body is not local or holds no leaf part there; `section` its IMAP section in the message (RFC 3501 §6.4.5), which `message parse --section` takes; `messageId` and `mailbox` the public id and collection of one live placement of the message attaching it, as `envelope list` and `message read` take them; `sender` and `senderName` the message's sender; `date` its date, RFC 3339. Ids SHALL be strings.
 
 A page SHALL hold `--page-size` files (else `envelope.list.page-size`, else 25). `nextPage` SHALL be an opaque token that `--page-token`, long only (`-t` is `--to` across Himalaya), takes to start after the page's last file, and `null` exactly when no file follows. Pages SHALL follow one another by keyset on the message's sort key and the stand-in's id, so a write between two pages neither repeats nor skips a file already listed. A token this command did not print SHALL be refused. An account with no attachments collection, or a store without stand-ins, SHALL list none rather than fail.
 
@@ -377,6 +405,11 @@ A page SHALL hold `--page-size` files (else `envelope.list.page-size`, else 25).
 - GIVEN a pimdir account whose stored messages attach four files
 - WHEN `himalaya --json pimdir attachment list -s 3` runs
 - THEN it prints the three files of the newest messages and a `nextPage` token, and `pimdir attachment list -s 3 --page-token <TOKEN>` prints the fourth with `"nextPage":null`
+
+#### Scenario: A file downloads by its part
+- GIVEN a pimdir message whose body is `multipart/mixed` of a `multipart/alternative` text and a PDF, the PDF at section `2`
+- WHEN `himalaya --json pimdir attachment list` runs
+- THEN the PDF prints `"part":"5"` and `"section":"2"`, and `attachment download --stdout -m <mailbox> <messageId> 5` writes the PDF
 
 #### Scenario: Invoices from one sender
 - GIVEN a pimdir account where `billing@shop.test` sent `Facture-Octobre.pdf` and another sender `plage.jpg`
@@ -433,6 +466,14 @@ A JMAP send SHALL stage the message in the drafts mailbox with `$draft`, then su
 
 ### Requirement: JMAP writes are scoped to the mailbox given
 The JMAP backend SHALL scope `flag add|set|remove`, `message copy`, `message move` and `message delete` to the mailbox given, reading the `mailboxIds` of the ids first (`Email/get`); an id the mailbox does not hold counts as not found. A move onto its own mailbox SHALL change nothing. A removal from the trash SHALL destroy an email only the trash holds and only take the trash out of the mailboxes of one held elsewhere too. Each id an `Email/set` refuses SHALL be an `errors` entry coded by its SetError type, the others written.
+
+### Requirement: A JMAP read is scoped to the mailbox given
+The JMAP backend SHALL read one message (`message read`, and the source of `message reply|forward` and `attachment list|download`) only when the mailbox given holds it, reading its `mailboxIds` with its `blobId` in the one `Email/get`: an email the mailbox does not hold SHALL fail `message-not-found`, naming the mailbox, as on IMAP, though a JMAP id names an email account-wide. The mailbox SHALL be resolved through the mailbox listing only when it is not among the email's mailbox ids.
+
+#### Scenario: An inbox email read under the sent mailbox
+- GIVEN a JMAP account whose email `E1` the inbox alone holds
+- WHEN `himalaya message read -m sent E1` runs
+- THEN the command fails with the code `message-not-found`, naming `sent`, where it printed the email
 
 ### Requirement: A JMAP duplicate import files the existing email
 A JMAP server forbidding duplicates refuses an import of bytes the account holds with `alreadyExists` (RFC 8621 section 4.8): `message add` and a save SHALL then file the existing email into the mailbox with the flags and report its id, and a send SHALL submit the existing email. Any other import or submission refusal SHALL fail naming its type and description.

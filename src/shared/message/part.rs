@@ -161,7 +161,9 @@ pub struct Leaf<'t, 'a> {
     /// depth first, so the ids gap where a container sits.
     pub id: String,
     pub part: &'t MimeEntity<'a>,
-    section: Option<String>,
+    /// Its IMAP section (RFC 3501 §6.4.5), `None` past the depth the walk
+    /// numbers.
+    pub section: Option<String>,
 }
 
 /// The leaf parts of a message, depth first.

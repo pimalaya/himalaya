@@ -278,13 +278,20 @@ impl JmapClient {
     }
 
     /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the
-    /// blob id, then `Blob/download`. The id names the email account-wide,
-    /// so `mailbox` is not checked.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    /// blob id and the mailboxes holding the email, then `Blob/download`.
+    ///
+    /// The id names the email account-wide, so an email `mailbox` does not
+    /// hold is not found, as on the backends whose ids are the mailbox's.
+    /// The mailbox is resolved through the listing only when it is not
+    /// one of the email's ids already.
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let output = self.email_get(
             vec![id.to_string()],
             JmapEmailGetOptions {
-                properties: Some(vec![JmapEmailProperty::BlobId]),
+                properties: Some(vec![
+                    JmapEmailProperty::BlobId,
+                    JmapEmailProperty::MailboxIds,
+                ]),
                 ..Default::default()
             },
         )?;
@@ -298,6 +305,15 @@ impl JmapClient {
             }
             return Err(message_not_found(format!("Message `{id}` not found")));
         };
+        let held = |mailbox: &str| {
+            let mailboxes = email.mailbox_ids.as_ref();
+            mailboxes.is_some_and(|ids| ids.get(mailbox).copied().unwrap_or(false))
+        };
+        if !held(mailbox) && !held(&self.resolve_mailbox_id(mailbox)?) {
+            return Err(message_not_found(format!(
+                "Message `{id}` not found in `{mailbox}`"
+            )));
+        }
         let blob_id = email
             .blob_id
             .ok_or_else(|| anyhow!("Email/get response did not include a blobId"))?;
@@ -923,6 +939,25 @@ fn missing_from(
             error.cloned().unwrap_or_else(|| missing_message(id))
         })
         .collect()
+}
+
+/// The item errors of a get's answer: each id the server did not find,
+/// coded `missing`, then each object that did not deserialize, coded
+/// `unreadable`.
+pub(crate) fn get_errors(
+    not_found: Vec<String>,
+    objects: Vec<JmapUnparsed>,
+    missing: ErrorCode,
+    unreadable: ErrorCode,
+) -> Vec<ItemError> {
+    let not_found = not_found.into_iter().map(|id| ItemError {
+        id: Some(id),
+        code: Some(missing),
+        error: String::from("The JMAP server found no object with this id"),
+        sources: Vec::new(),
+    });
+
+    not_found.chain(unparsed(objects, unreadable)).collect()
 }
 
 /// The item error of each object a get could not deserialize, coded
@@ -1709,6 +1744,8 @@ mod tests {
 
                     let reply = if path == "/session" {
                         session.clone()
+                    } else if path.starts_with("/download/") {
+                        json!({ "downloaded": path })
                     } else if path.starts_with("/upload/") {
                         json!({ "accountId": "A", "blobId": "B1", "type": "message/rfc822", "size": len })
                     } else {
@@ -1816,6 +1853,120 @@ mod tests {
 
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+        }
+
+        /// A client of the scripted server at `url`.
+        fn client_at(url: &str) -> JmapClient {
+            JmapClient::new(JmapConfig {
+                server: format!("{url}/session"),
+                tls: Default::default(),
+                proxy: None,
+                alpn: Vec::new(),
+                auth: JmapAuthConfig::Header(Secret::Raw(SecretString::from("token"))),
+                identity_id: None,
+                drafts_mailbox_id: None,
+                sent_mailbox_id: None,
+            })
+            .unwrap()
+        }
+
+        /// The `Email/get` answer of one email `E1` the inbox `I` holds.
+        fn inbox_email() -> Answer {
+            let email = json!({ "id": "E1", "blobId": "B1", "mailboxIds": { "I": true } });
+            (
+                "Email/get",
+                json!({ "list": [email], "notFound": [], "state": "s" }),
+            )
+        }
+
+        /// A read names the mailbox it reads in, as IMAP does: an email the
+        /// mailbox does not hold is `message-not-found`, though JMAP ids
+        /// name emails account-wide, and one it holds is read.
+        #[test]
+        fn a_read_of_an_email_another_mailbox_holds_is_not_found() {
+            let mailboxes = json!({
+                "list": [
+                    { "id": "I", "name": "Inbox", "role": "inbox" },
+                    { "id": "S", "name": "Sent", "role": "sent" },
+                ],
+                "notFound": [],
+                "state": "s",
+            });
+            let (url, server) = serve(vec![inbox_email(), ("Mailbox/get", mailboxes)]);
+
+            let mut client = client_at(&url);
+            let err = client.get_message("sent", "E1", false).unwrap_err();
+            drop(client);
+            let calls = server.join().unwrap();
+
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+            assert!(err.to_string().contains("`sent`"), "{err}");
+            assert_eq!(calls[0][1]["properties"], json!(["blobId", "mailboxIds"]));
+
+            let (url, server) = serve(vec![inbox_email()]);
+            let mut client = client_at(&url);
+            let raw = client.get_message("I", "E1", false).unwrap();
+            drop(client);
+            server.join().unwrap();
+            assert!(String::from_utf8(raw).unwrap().contains("/download/A/B1"));
+        }
+
+        /// `jmap email get` lists the emails found, then an entry of
+        /// `errors` per id the server did not find, and ends as a partial
+        /// outcome.
+        #[test]
+        fn an_email_get_reports_each_id_not_found() {
+            use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
+
+            use crate::{account::context::Account, jmap::email::get::JmapEmailGetCommand};
+
+            let found = json!({ "list": [{ "id": "E1" }], "notFound": ["Mbogus"], "state": "s" });
+            let (url, server) = serve(vec![("Email/get", found)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapEmailGetCommand {
+                ids: vec![String::from("E1"), String::from("Mbogus")],
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["emails"][0]["id"], "E1");
+            assert_eq!(output["errors"][0]["id"], "Mbogus");
+            assert_eq!(output["errors"][0]["code"], "message-not-found");
+        }
+
+        /// `jmap mailbox get` reports an id not found the same way, coded
+        /// `mailbox-not-found`.
+        #[test]
+        fn a_mailbox_get_reports_each_id_not_found() {
+            use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
+
+            use crate::{account::context::Account, jmap::mailbox::get::JmapMailboxGetCommand};
+
+            let found = json!({ "list": [], "notFound": ["Pbogus"], "state": "s" });
+            let (url, server) = serve(vec![("Mailbox/get", found)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapMailboxGetCommand {
+                ids: vec![String::from("Pbogus")],
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["mailboxes"], json!([]));
+            assert_eq!(output["errors"][0]["id"], "Pbogus");
+            assert_eq!(output["errors"][0]["code"], "mailbox-not-found");
         }
 
         #[test]

@@ -39,6 +39,10 @@ pub struct Account {
     pub name: Option<String>,
     /// Address the account sends as.
     pub email: Option<String>,
+    /// Addresses the account logs in as (its IMAP and SMTP logins holding
+    /// an `@`), which a reply to all leaves out beside `email`. Read from
+    /// the account's blocks before its client takes them.
+    pub logins: Vec<String>,
     /// Name that address carries.
     pub display_name: Option<String>,
     /// Signature appended to a composed message.
@@ -76,6 +80,7 @@ impl Account {
             name: other.name.or(self.name),
 
             email: other.email.or(self.email),
+            logins: [self.logins, other.logins].concat(),
             display_name: other.display_name.or(self.display_name),
             signature: other.signature.or(self.signature),
             signature_delim: other.signature_delim.or(self.signature_delim),
@@ -280,6 +285,7 @@ impl From<Config> for Account {
             // NOTE: the address is per-account by nature, so only the
             // name it carries has a global default.
             email: None,
+            logins: Vec::new(),
             display_name: config.display_name,
             signature: config.signature,
             signature_delim: config.signature_delim,
@@ -304,6 +310,7 @@ impl From<AccountConfig> for Account {
             name: None,
 
             email: config.email,
+            logins: Vec::new(),
             display_name: config.display_name,
             signature: config.signature,
             signature_delim: config.signature_delim,

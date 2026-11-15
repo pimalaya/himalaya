@@ -288,6 +288,7 @@ fn every_file_lists_newest_message_first_with_its_message() {
             "name": "Facture-Octobre.pdf",
             "mediaType": "application/pdf",
             "size": 9,
+            "part": "5",
             "section": "2",
             "messageId": message_id,
             "mailbox": "imap/INBOX",
@@ -298,6 +299,7 @@ fn every_file_lists_newest_message_first_with_its_message() {
     );
     assert_eq!(page["attachments"][1]["senderName"], "\u{c9}lise Martin");
     assert_eq!(page["attachments"][1]["section"], "3");
+    assert_eq!(page["attachments"][1]["part"], "6");
     assert_eq!(page["attachments"][2]["section"], "2");
     assert_eq!(page["attachments"][3]["mailbox"], "imap/Archive");
 
@@ -360,6 +362,61 @@ fn a_file_s_bytes_are_its_message_s_section() {
     assert_eq!(part["mime"], "image/png");
     assert_eq!(part["data"], "iVBORw0KGgo=");
     assert_eq!(part["size"], file["size"]);
+}
+
+/// The part a file lists is the id `attachment download` takes, where its
+/// section names another part of the message.
+#[test]
+fn a_file_s_part_is_the_one_attachment_download_takes() {
+    let himalaya = Himalaya::new(store);
+    let page = himalaya.json(&["pimdir", "attachment", "list"]);
+
+    for file in page["attachments"].as_array().unwrap() {
+        let mailbox = file["mailbox"].as_str().unwrap();
+        let message_id = file["messageId"].as_str().unwrap();
+        let part = file["part"].as_str().unwrap();
+        assert_ne!(Some(part), file["section"].as_str(), "{file}");
+
+        let downloaded = himalaya.json(&[
+            "attachment",
+            "download",
+            "--stdout",
+            "-m",
+            mailbox,
+            message_id,
+            part,
+        ]);
+        assert_eq!(downloaded["filename"], file["name"], "{file}");
+        assert_eq!(downloaded["size"], file["size"], "{file}");
+    }
+
+    let newest = &page["attachments"][0];
+    let message_id = newest["messageId"].as_str().unwrap();
+    let listed = himalaya.json(&["attachment", "list", "-m", "imap/INBOX", message_id]);
+    assert_eq!(listed["attachments"][0]["id"], newest["part"]);
+}
+
+/// A file whose message body is gone from the store lists with no part,
+/// its section kept.
+#[test]
+fn a_file_whose_body_is_gone_lists_no_part() {
+    let himalaya = Himalaya::new(|root| {
+        store(root);
+        let body = message(
+            "old@shop.test",
+            "Shop <billing@shop.test>",
+            1,
+            &[("Facture-Septembre.pdf", "application/pdf", "JVBERi0xLjQK")],
+        );
+        let blobs = io_pimdir::client::blobs::PimdirBlobs::open(root);
+        fs::remove_file(blobs.path(&hash::hash(&body)).unwrap()).unwrap();
+    });
+
+    let page = himalaya.json(&["pimdir", "attachment", "list"]);
+    let file = &page["attachments"][3];
+    assert_eq!(file["name"], "Facture-Septembre.pdf");
+    assert_eq!(file["part"], Value::Null);
+    assert_eq!(file["section"], "2");
 }
 
 #[test]

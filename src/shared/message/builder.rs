@@ -102,8 +102,9 @@ pub struct SourceArgs<'a> {
     pub no_attachments: bool,
     /// Whether a reply also goes to the other recipients of the source.
     pub reply_all: bool,
-    /// The account's own address, left out of a reply to all.
-    pub own_email: Option<&'a str>,
+    /// The account's own addresses (its `email`, its logins naming an
+    /// address), left out of a reply to all beside the reply's `From`.
+    pub own: &'a [&'a str],
 }
 
 /// A mailbox: its display name, when it carries one, and its address.
@@ -171,7 +172,11 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
                     to.extend(parse_mailboxes(value)?.into_iter().map(|(_, email)| email));
                 }
 
-                cc = reply_all_cc(root, &to, source.own_email);
+                // NOTE: the reply's own `From` is the user's too, whatever
+                // the account configures.
+                let mut own = source.own.to_vec();
+                own.extend(sender.as_deref());
+                cc = reply_all_cc(root, &to, &own);
             }
         }
 
@@ -568,13 +573,13 @@ fn reply_recipients(source: &MimeEntity) -> Vec<Mailbox> {
 }
 
 /// Derives the carbon-copy recipients of a reply to all: the `To` and
-/// `Cc` of the source, without the account's own address nor anyone
+/// `Cc` of the source, without the account's own addresses nor anyone
 /// already in `to`, and without duplicates, compared ignoring case.
-fn reply_all_cc(source: &MimeEntity, to: &[String], own: Option<&str>) -> Vec<Mailbox> {
+fn reply_all_cc(source: &MimeEntity, to: &[String], own: &[&str]) -> Vec<Mailbox> {
     let mut seen: Vec<String> = to
         .iter()
         .map(String::as_str)
-        .chain(own)
+        .chain(own.iter().copied())
         .map(|email| email.trim().to_ascii_lowercase())
         .collect();
     let mut cc = Vec::new();
@@ -701,7 +706,7 @@ Original body line.\r\n";
             quote_headline: "On a day, Alice wrote:",
             no_attachments: true,
             reply_all: false,
-            own_email: None,
+            own: &[],
         }
     }
 
@@ -824,7 +829,7 @@ Original body line.\r\n";
             quote_headline: "",
             no_attachments: true,
             reply_all: false,
-            own_email: None,
+            own: &[],
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
@@ -844,7 +849,7 @@ Original body line.\r\n";
             quote_headline: "",
             no_attachments: true,
             reply_all: false,
-            own_email: None,
+            own: &[],
         };
         let empty: Vec<String> = Vec::new();
         let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
@@ -890,7 +895,7 @@ Body.\r\n";
             quote_headline: "",
             no_attachments: true,
             reply_all,
-            own_email: Some("me@example.com"),
+            own: &["me@example.com"],
         };
 
         let raw = build(a, Some(source)).unwrap();
@@ -933,7 +938,7 @@ Body.\r\n";
                 quote_headline: "",
                 no_attachments: true,
                 reply_all: true,
-                own_email: Some("me@example.com"),
+                own: &["me@example.com"],
             }),
         )
         .unwrap();
@@ -947,7 +952,7 @@ Body.\r\n";
         let msg = parse(GROUP_SOURCE);
         let to = vec!["bob@example.com".to_string()];
 
-        let cc: Vec<_> = reply_all_cc(&msg, &to, Some("me@example.com"))
+        let cc: Vec<_> = reply_all_cc(&msg, &to, &["me@example.com"])
             .into_iter()
             .map(|(_, email)| email)
             .collect();
@@ -974,8 +979,35 @@ Body.\r\n";
     #[test]
     fn reply_all_without_own_email_keeps_every_recipient() {
         let msg = parse(GROUP_SOURCE);
-        let cc = reply_all_cc(&msg, &[], None);
+        let cc = reply_all_cc(&msg, &[], &[]);
         assert_eq!(cc.len(), 4);
+    }
+
+    /// An account naming no `email` still leaves out the address its reply
+    /// is sent from, and the logins it passes as its own.
+    #[test]
+    fn reply_all_leaves_out_the_reply_s_from_and_the_logins() {
+        let reply = |from: &str, own: &[&str]| {
+            let source = SourceArgs {
+                raw: GROUP_SOURCE,
+                mode: SourceMode::Reply,
+                posting_style: PostingStyle::Top,
+                quote_headline: "",
+                no_attachments: true,
+                reply_all: true,
+                own,
+            };
+            let raw = build(args(from, &[], None, "r"), Some(source)).unwrap();
+            parse(&raw)
+                .mailboxes("Cc")
+                .into_iter()
+                .map(|(_, email)| email)
+                .collect::<Vec<_>>()
+        };
+
+        let others = ["bob@example.com", "CAROL@example.com", "dave@example.com"];
+        assert_eq!(reply("Me <me@example.com>", &[]), others);
+        assert_eq!(reply("alias@example.org", &["me@example.com"]), others);
     }
 
     #[test]

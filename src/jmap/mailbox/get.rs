@@ -5,15 +5,18 @@
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::get::JmapMailboxGetOptions;
-use log::warn;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    jmap::{client::JmapClient, mailbox::query::JmapMailboxQueryOutput},
+    error::{ErrorCode, partial_when},
+    jmap::{backend::get_errors, client::JmapClient, mailbox::query::JmapMailboxQueryOutput},
 };
 
 /// Get JMAP mailboxes by ID (Mailbox/get).
+///
+/// An id the server does not find is an entry of `errors`, coded
+/// `mailbox-not-found`, and exits 3.
 #[derive(Debug, Parser)]
 pub struct JmapMailboxGetCommand {
     /// Mailbox ID(s) to retrieve.
@@ -22,7 +25,8 @@ pub struct JmapMailboxGetCommand {
 }
 
 impl JmapMailboxGetCommand {
-    /// Fetches the mailboxes and lists them.
+    /// Fetches the mailboxes and lists them, then the error of each id not
+    /// found.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -34,15 +38,20 @@ impl JmapMailboxGetCommand {
             properties: None,
         })?;
 
-        for id in output.not_found {
-            warn!("mailbox `{id}` not found, ignoring it");
-        }
-
-        printer.out(JmapMailboxQueryOutput {
+        let mailboxes = JmapMailboxQueryOutput {
             account: account.name().to_string(),
             page: None,
             mailboxes: output.mailboxes,
             next_page: None,
-        })
+            errors: get_errors(
+                output.not_found,
+                output.unparsed,
+                ErrorCode::MailboxNotFound,
+                ErrorCode::MailboxUnreadable,
+            ),
+        };
+
+        printer.out(&mailboxes)?;
+        partial_when(&mailboxes.errors)
     }
 }

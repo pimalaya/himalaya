@@ -749,12 +749,18 @@ impl PimdirClient {
             .into_iter()
             .map(|(id, changed)| {
                 let row = changed.then(|| rows.next()).flatten();
-                for partial in row.iter().flat_map(|row| &row.partial) {
+                let partial: Vec<String> = row
+                    .iter()
+                    .flat_map(|row| &row.partial)
+                    .map(ToString::to_string)
+                    .collect();
+                for partial in &partial {
                     warn!("{partial}");
                 }
                 PimdirFlagged {
                     id: id.to_owned(),
                     queue_id: row.map(|row| row.handle.id),
+                    partial,
                 }
             })
             .collect();
@@ -974,13 +980,17 @@ impl PimdirClient {
     /// The performer is named as for a send. A store whose sources declare
     /// nothing has an owner predating the intent, which would never perform
     /// it, so the creation is refused there rather than left to wait.
+    ///
+    /// A mailbox the performer's source already syncs under that name, or
+    /// whose creation is already queued, is refused with `item-duplicate`
+    /// before anything is queued.
     pub fn create_mailbox(
         &mut self,
         name: &str,
         parent: Option<&str>,
     ) -> Result<PimdirQueuedIntent> {
-        // NOTE: a name the server already holds is its to refuse: the row
-        // parks, and `pimdir queue show` says why.
+        // NOTE: a name the store does not list yet is the server's to
+        // refuse: the row parks, and `pimdir queue show` says why.
         let parent = parent.map(|parent| self.hub_id(parent)).transpose()?;
         let anchor = match &parent {
             Some(parent) => parent.clone(),
@@ -1003,11 +1013,91 @@ impl PimdirClient {
             );
         };
 
+        if let Some(held) = self.held_mailbox(&source, name, parent.as_deref())? {
+            let message =
+                format!("Cannot create mailbox `{name}`: the store lists it already as `{held}`");
+            return Err(CodedError::new(ErrorCode::ItemDuplicate, message).into());
+        }
+        if self.creation_queued(&anchor, &source, name, parent.as_deref())? {
+            let message = format!("Cannot create mailbox `{name}`: its creation is queued already");
+            return Err(CodedError::new(ErrorCode::ItemDuplicate, message).into());
+        }
+
         let enqueued = producer
             .enqueue_collection_create(&anchor, name, parent.as_deref(), Some(&source))
             .map_err(pimdir_error)
             .with_context(|| format!("Queue the creation of `{name}`"))?;
         Ok(PimdirQueuedIntent::new(enqueued, source))
+    }
+
+    /// The mail collection of the account `source` syncs that creating
+    /// `name` under `parent` would make, if the store lists one: at the
+    /// top, one named `name`; under a parent, one named the parent's name,
+    /// a hierarchy delimiter (`/` or `.`, the store recording none) and
+    /// `name`. Names are the server's own, compared exactly.
+    fn held_mailbox(
+        &self,
+        source: &str,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<Option<String>> {
+        let collections = self.mail_collections()?;
+        let names: Vec<String> = match parent {
+            None => vec![name.to_owned()],
+            Some(parent) => {
+                let parent = collections
+                    .iter()
+                    .find(|collection| collection.id == parent)
+                    .map_or(parent, |collection| collection.name.as_str());
+                ['/', '.']
+                    .iter()
+                    .map(|delimiter| format!("{parent}{delimiter}{name}"))
+                    .collect()
+            }
+        };
+
+        for collection in collections {
+            if !names.contains(&collection.name) {
+                continue;
+            }
+            let sources = self
+                .store
+                .collection_sources(&collection.id)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Read the sources of `{}`", collection.id))?;
+            if sources.iter().any(|synced| synced == source) {
+                return Ok(Some(collection.id));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Whether a creation of `name` under `parent` by `source` is pending
+    /// on `anchor`, where every such creation is queued.
+    fn creation_queued(
+        &self,
+        anchor: &str,
+        source: &str,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<bool> {
+        let pending = self
+            .store
+            .pending_actions(anchor)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read the queue of `{anchor}`"))?;
+
+        Ok(pending.iter().any(|row| match &row.action {
+            PimdirAction::Unknown { kind, payload, .. } if kind == "collection-create" => {
+                intent::PimdirCollectionCreate::from_payload(payload).is_ok_and(|create| {
+                    create.source == source
+                        && create.name == name
+                        && create.parent.as_ref().map(|parent| parent.as_str()) == parent
+                })
+            }
+            _ => false,
+        }))
     }
 
     /// Queues the renaming of `mailbox` to `name` for the store's owner,
@@ -1448,6 +1538,10 @@ pub struct PimdirFlagged {
     /// The `set-flags` row it waits in, `None` when the change left the
     /// message as it shows and nothing was staged.
     pub queue_id: Option<i64>,
+    /// What a source supports of the change only in part, as its
+    /// declaration words it: the row is queued, and the server may keep
+    /// less than it asks.
+    pub partial: Vec<String>,
 }
 
 /// One queued creation or send, as `pimdir queue list` shows it: the row an
@@ -2920,6 +3014,65 @@ mod tests {
         );
     }
 
+    /// A mailbox the performer's source syncs under the name asked, at the
+    /// top or under the parent, is refused `item-duplicate` before anything
+    /// is queued, as is one whose creation is queued already; another
+    /// source's mailbox of that name is no obstacle.
+    #[test]
+    fn a_mailbox_the_store_lists_is_not_created_again() {
+        let (dir, mut client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_CREATE]);
+        for (id, name, source) in [
+            ("imap/Sent", "Sent", "imap"),
+            ("imap/Projets", "Projets", "imap"),
+            ("imap/Sent/2025", "Sent/2025", "imap"),
+            ("msgraph/AQMk", "Archives", "msgraph"),
+        ] {
+            let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+            store.ensure_collection(id, MAIL_KIND).unwrap();
+            store.set_collection_name(id, name).unwrap();
+            store
+                .for_source(source)
+                .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
+                    collection: PimdirCollectionId(id.into()),
+                    checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
+                }])
+                .unwrap();
+        }
+
+        for (name, parent, held) in [
+            ("Projets", None, "imap/Projets"),
+            ("2025", Some("imap/Sent"), "imap/Sent/2025"),
+        ] {
+            let err = client.create_mailbox(name, parent).unwrap_err();
+            assert_eq!(
+                pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                Some(ErrorCode::ItemDuplicate),
+                "{err:#}"
+            );
+            assert!(err.to_string().contains(held), "{err:#}");
+        }
+        assert!(
+            client
+                .store
+                .pending_actions("msgraph/AQMk")
+                .unwrap()
+                .is_empty()
+        );
+        for id in ["imap/Projets", "imap/Sent"] {
+            assert!(client.store.pending_actions(id).unwrap().is_empty(), "{id}");
+        }
+
+        client.create_mailbox("Archives", None).unwrap();
+        let err = client.create_mailbox("Archives", None).unwrap_err();
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::ItemDuplicate),
+            "{err:#}"
+        );
+        client.create_mailbox("2026", Some("imap/Sent")).unwrap();
+    }
+
     /// The one pending intent of `imap/Sent`: its row id, kind and payload.
     fn intent(client: &PimdirClient) -> (i64, String, serde_json::Value) {
         let pending = client.store.pending_actions("imap/Sent").unwrap();
@@ -2951,6 +3104,82 @@ mod tests {
 
         // NOTE: a read is the store's own, whatever its sources declare.
         assert_eq!(client.store_support(Capability::MessageRead).unwrap(), None);
+    }
+
+    /// A store whose `msgraph` source syncs `msgraph/Drafts` and
+    /// `msgraph/Archive` and adds to its drafts folder alone, as neverest
+    /// declares a Graph source: `mail.message.add` `none` source-wide,
+    /// `full` on the folder of the drafts role.
+    fn drafts_only_store() -> (tempfile::TempDir, PimdirClient) {
+        use io_pimdir::capability::{PimdirCapability, PimdirSupport};
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("msgraph");
+        for id in ["msgraph/Drafts", "msgraph/Archive"] {
+            store.ensure_collection(id, MAIL_KIND).unwrap();
+            store
+                .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
+                    collection: PimdirCollectionId(id.into()),
+                    checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
+                }])
+                .unwrap();
+        }
+        let add = |collection: Option<&str>, support, detail: Option<&str>| PimdirCapability {
+            collection: collection.map(String::from),
+            name: capability::MAIL_MESSAGE_ADD.into(),
+            support,
+            detail: detail.map(String::from),
+        };
+        let detail = "Drafts only: Graph creates every MIME message as a draft";
+        store
+            .declare(
+                "msgraph",
+                &[
+                    add(None, PimdirSupport::None, Some(detail)),
+                    add(Some("msgraph/Drafts"), PimdirSupport::Full, None),
+                ],
+            )
+            .unwrap();
+        drop(store);
+
+        let config = crate::config::pimdir::PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        };
+        (dir, PimdirClient::new(config).unwrap())
+    }
+
+    /// A collection's own `mail.message.add` row wins over its source's:
+    /// an add elsewhere is refused before anything is staged, naming the
+    /// mailbox, while the drafts folder takes it.
+    #[test]
+    fn an_add_where_the_source_adds_nothing_is_refused_up_front() {
+        let (_dir, mut client) = drafts_only_store();
+
+        let err = client
+            .add_message("msgraph/Archive", &[], DRAFT.to_vec())
+            .unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::Unsupported),
+            "{err:#}"
+        );
+        let message = format!("{err:#}");
+        assert!(message.contains("msgraph/Archive"), "{message}");
+        assert!(message.contains("Drafts only"), "{message}");
+        let pending = client.store.pending_actions("msgraph/Archive").unwrap();
+        assert!(pending.is_empty());
+        let body = client.blobs.path(&client.blobs.hash(DRAFT)).unwrap();
+        assert!(!body.exists(), "a refused add left its body behind");
+
+        let staged = client
+            .add_message("msgraph/Drafts", &[], DRAFT.to_vec())
+            .unwrap();
+        let pending = client.store.pending_actions("msgraph/Drafts").unwrap();
+        assert_eq!(pending[0].id, staged.queue_id);
     }
 
     #[test]
@@ -3874,6 +4103,32 @@ mod tests {
             client.read_flags("imap/INBOX", &act).unwrap(),
             Some(vec!["\\Seen".to_string()])
         );
+    }
+
+    /// A keyword a source keeps only in part is queued, and the receipt
+    /// says so with the source's own words rather than the log alone.
+    #[test]
+    fn a_keyword_kept_in_part_is_queued_with_its_warning() {
+        use io_pimdir::capability::{MAIL_FLAGS_KEYWORDS, PimdirSupport};
+
+        use crate::pimdir::flag::PimdirFlagStageOutput;
+
+        let (_dir, mut client) = flag_store(Some(&[(MAIL_FLAGS_KEYWORDS, PimdirSupport::Partial)]));
+        let ids = [id_of(&mut client, 0), id_of(&mut client, 1)];
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+
+        let staged = client
+            .stage_flags("imap/INBOX", &ids, &[keyword("todo")], FlagOp::Add)
+            .unwrap();
+
+        let warning = "Source imap supports mail.flags.keywords in part: \
+                       mail.flags.keywords as declared";
+        assert_eq!(staged[0].partial, [warning]);
+        let output = PimdirFlagStageOutput::from(staged);
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["warnings"], serde_json::json!([warning]));
+        let text = output.to_string();
+        assert!(text.contains(&format!("\nWarning: {warning}\n")), "{text}");
     }
 
     #[test]

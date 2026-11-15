@@ -61,8 +61,7 @@ pub struct PimdirMailboxCreateOutput {
     pub queue_id: i64,
     /// The new mailbox's name.
     pub name: String,
-    /// The mailbox it is created in, if any.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The mailbox it is created in, `null` at the top.
     pub parent: Option<String>,
     /// The source creating it.
     pub source: String,
@@ -77,5 +76,33 @@ impl fmt::Display for PimdirMailboxCreateOutput {
             sanitize::text(&self.source),
             self.queue_id
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pimalaya_cli::clap::commands::json_schema::output_schema;
+    use serde_json::{Value, json};
+
+    use super::PimdirMailboxCreateOutput;
+
+    /// A mailbox created at the top prints its `parent` as `null`, a key
+    /// the schema requires, rather than leaving it out.
+    #[test]
+    fn a_mailbox_at_the_top_prints_a_null_parent() {
+        let output = PimdirMailboxCreateOutput {
+            queue_id: 89,
+            name: String::from("Projets"),
+            parent: None,
+            source: String::from("google/gmail"),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&output).unwrap(),
+            json!({"row": 89, "name": "Projets", "parent": null, "source": "google/gmail"})
+        );
+        let schema = output_schema::<PimdirMailboxCreateOutput>();
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.contains(&Value::from("parent")), "{schema}");
     }
 }

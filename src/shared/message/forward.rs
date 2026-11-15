@@ -167,7 +167,7 @@ impl MessageForwardCommand {
                 quote_headline: self.quote_headline.as_deref().unwrap_or(""),
                 no_attachments: self.no_attachments,
                 reply_all: false,
-                own_email: None,
+                own: &[],
             }),
         )?;
 
