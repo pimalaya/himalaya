@@ -629,12 +629,12 @@ mod tests {
     fn an_option_after_jmap_method_calls_is_the_option() {
         use crate::{cli::Command, jmap::cli::JmapCommand};
 
-        let cli = parse(&["jmap", "query", "[]", "--using", "urn:x", "--json"]);
+        let cli = parse(&["jmap", "request", "[]", "--using", "urn:x", "--json"]);
         assert!(cli.json.enabled);
-        let Some(Command::Jmap(JmapCommand::Query(query))) = cli.cmd else {
+        let Some(Command::Jmap(JmapCommand::Request(request))) = cli.cmd else {
             panic!("{:?}", cli.cmd);
         };
-        assert_eq!(query.method_calls, ["[]"]);
-        assert_eq!(query.using, ["urn:x"]);
+        assert_eq!(request.method_calls, ["[]"]);
+        assert_eq!(request.using, ["urn:x"]);
     }
 }

@@ -10,7 +10,7 @@ pub mod email;
 pub mod error;
 pub mod identity;
 pub mod mailbox;
-pub mod query;
+pub mod request;
 pub mod submission;
 pub mod thread;
 pub mod vacation;

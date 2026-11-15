@@ -217,7 +217,10 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "jmap")]
     {
-        insert!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
+        // The former name keeps its schema beside the new one.
+        for key in ["himalaya-jmap-request", "himalaya-jmap-query"] {
+            insert!(key, crate::jmap::request::JmapRequestOutput);
+        }
         insert!(
             "himalaya-jmap-mailbox-get",
             crate::jmap::mailbox::query::JmapMailboxQueryOutput

@@ -1,7 +1,7 @@
-//! # JMAP query
+//! # JMAP request
 //!
-//! The `jmap query` command, a raw method-calls array sent as it is
-//! written.
+//! The `jmap request` command, a raw method-calls array sent as one JMAP
+//! request, as it is written.
 
 use std::{
     fmt,
@@ -21,16 +21,16 @@ use serde_json::Value;
 
 use crate::{error::ErrorCode, jmap::client::JmapClient};
 
-/// Send a raw JMAP method-calls array and print the response.
+/// Send a raw JMAP request and print the response.
 ///
-/// The argument is a JSON array of method call tuples, as in
+/// The argument is the request's JSON array of method call tuples, as in
 /// `'[["Mailbox/query", {"filter": {"role": "inbox"}}, "c0"]]'`, read
 /// from stdin when it is `-` or absent.
 ///
 /// An `accountId` is injected into each call's arguments when it names
 /// none itself.
 #[derive(Debug, Parser)]
-pub struct JmapQueryCommand {
+pub struct JmapRequestCommand {
     /// Extra capability URNs to declare (core and mail are always included).
     #[arg(long = "using", value_name = "URN")]
     pub using: Vec<String>,
@@ -42,7 +42,7 @@ pub struct JmapQueryCommand {
     pub method_calls: Vec<String>,
 }
 
-impl JmapQueryCommand {
+impl JmapRequestCommand {
     /// Sends the method calls and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let raw = if self.method_calls.is_empty()
@@ -129,18 +129,18 @@ impl JmapQueryCommand {
             })
             .collect::<Result<_>>()?;
 
-        printer.out(JmapQueryOutput { method_responses })
+        printer.out(JmapRequestOutput { method_responses })
     }
 }
 
 /// Wraps the raw method_responses for display.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct JmapQueryOutput {
+pub(crate) struct JmapRequestOutput {
     method_responses: Vec<(String, Value, String)>,
 }
 
-impl fmt::Display for JmapQueryOutput {
+impl fmt::Display for JmapRequestOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match serde_json::to_string_pretty(&self.method_responses) {
             Ok(s) => writeln!(f, "{s}"),
