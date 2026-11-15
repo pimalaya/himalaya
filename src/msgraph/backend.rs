@@ -48,7 +48,10 @@ use crate::{
         outcome::Outcome,
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, message_not_found, missing_message, unknown_message},
+    error::{
+        ErrorCode, ItemError, existing_mailbox, mailbox_duplicate, message_not_found,
+        missing_message, unknown_message,
+    },
     msgraph::{
         client::{MsgraphClient, names_no_message, refusal_of},
         search,
@@ -568,13 +571,32 @@ impl MsgraphClient {
     /// io-msgraph creates top-level folders only, so a folder under a
     /// parent is created at the top then moved under it, two requests: a
     /// failed move leaves it at the top, which the error says.
+    ///
+    /// A folder of that name under the parent, hidden ones included, is
+    /// refused `mailbox-duplicate` before anything is created, as is one
+    /// at the top Graph answers exists (`409 ErrorFolderExists`).
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
+        if let Some(parent) = parent
+            && self.holds_child(parent, name)?
+        {
+            let message = format!("Cannot create mailbox `{name}`: `{parent}` holds it already");
+            return Err(mailbox_duplicate(message));
+        }
+
         let folder = MsgraphMailFolder {
             display_name: name.to_string(),
             ..Default::default()
         };
 
-        let created = self.mail_folder_create(&folder)?.response;
+        // NOTE: under a parent, a namesake at the top blocks the step
+        // through the top: it is no duplicate of the folder asked.
+        let created = match self.mail_folder_create(&folder) {
+            Ok(created) => created.response,
+            Err(err) if parent.is_none() && names_existing_folder(&err) => {
+                return Err(existing_mailbox(name, err));
+            }
+            Err(err) => return Err(err.into()),
+        };
         self.forget_mailboxes();
 
         let Some(parent) = parent else {
@@ -589,6 +611,28 @@ impl MsgraphClient {
             .response;
 
         Ok(moved.id)
+    }
+
+    /// Whether the folder `parent` holds one named `name`, hidden ones
+    /// included, every page read.
+    fn holds_child(&mut self, parent: &str, name: &str) -> Result<bool> {
+        let params = MsgraphMailFoldersListParams {
+            top: Some(100),
+            include_hidden_folders: Some(true),
+            ..Default::default()
+        };
+        let mut page = self.mail_child_folders_list(parent, &params)?.response;
+
+        loop {
+            if page.value.iter().any(|folder| folder.display_name == name) {
+                return Ok(true);
+            }
+
+            let Some(next) = page.next_link else {
+                return Ok(false);
+            };
+            page = self.page_get(&next, None)?.response;
+        }
     }
 
     /// Renames the folder `mailbox` to `name`, its parent kept (`PATCH
@@ -642,6 +686,16 @@ fn read_error(id: &str, err: MsgraphClientStdError) -> anyhow::Error {
         }
         err => err.into(),
     }
+}
+
+/// Whether Graph refused a folder creation as naming a folder it holds:
+/// `409 ErrorFolderExists`.
+fn names_existing_folder(err: &MsgraphClientStdError) -> bool {
+    matches!(
+        err,
+        MsgraphClientStdError::Send(err)
+            if err.api().is_some_and(|api| api.status == 409 && api.code == "ErrorFolderExists")
+    )
 }
 
 /// Converts one Graph mail folder named `name` into the shared
@@ -1574,5 +1628,47 @@ mod read_tests {
         let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
         assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
         assert_eq!(requests.lock().unwrap().len(), 1);
+    }
+
+    /// Graph's answer to a folder creation naming one it holds.
+    fn folder_exists() -> Vec<u8> {
+        let message = "A folder with the specified name already exists.";
+        let body = json!({"error": {"code": "ErrorFolderExists", "message": message}});
+        let body = body.to_string();
+        let len = body.len();
+        let head = "HTTP/1.1 409 Conflict\r\nContent-Type: application/json";
+        format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
+    }
+
+    /// A folder Graph answers exists at the top, or one the parent holds,
+    /// is `mailbox-duplicate`, the latter before anything is created; a
+    /// namesake at the top of a folder asked under a parent is not.
+    #[test]
+    fn a_create_of_an_existing_folder_is_a_duplicate() {
+        let code = |err: &anyhow::Error| pimalaya_cli::error::code_of::<ErrorCode>(err);
+
+        let (mut client, _) = graph(vec![folder_exists()]);
+        let err = client.create_mailbox("Kid", None).unwrap_err();
+        assert_eq!(code(&err), Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        assert!(format!("{err:#}").contains("ErrorFolderExists"), "{err:#}");
+
+        let children = reply(json!({"value": [{"id": "K", "displayName": "Kid"}]}));
+        let (mut client, requests) = graph(vec![children]);
+        let err = client.create_mailbox("Kid", Some("I")).unwrap_err();
+        assert_eq!(code(&err), Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 1, "{requests:#?}");
+        assert!(requests[0].starts_with("GET "), "{}", requests[0]);
+        assert!(requests[0].contains("/mailFolders/I/childFolders"));
+
+        let none = || reply(json!({"value": []}));
+        let (mut client, _) = graph(vec![none(), folder_exists()]);
+        let err = client.create_mailbox("Kid", Some("I")).unwrap_err();
+        assert_eq!(code(&err), None, "{err:#}");
+
+        let created = reply(json!({"id": "N", "displayName": "Kid"}));
+        let moved = reply(json!({"id": "M", "displayName": "Kid"}));
+        let (mut client, _) = graph(vec![none(), created, moved]);
+        assert_eq!(client.create_mailbox("Kid", Some("I")).unwrap(), "M");
     }
 }

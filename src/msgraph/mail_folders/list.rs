@@ -25,11 +25,14 @@ use crate::{
     listing,
     msgraph::{
         client::MsgraphClient,
-        messages::list::{next_page_token, page_skip},
+        messages::list::{next_page, resume, skip_of},
     },
 };
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).
+///
+/// `nextPage` is Graph's next link as Graph gives it: `--page-token`
+/// follows it as is, the query it carries replacing the other options.
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderListCommand {
     /// Maximum number of folders to return (OData `$top`).
@@ -59,12 +62,17 @@ impl MsgraphMailFolderListCommand {
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
             top: self.top,
-            skip: page_skip(self.page_token.token.as_deref(), self.skip)?,
+            skip: self.skip,
             select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
-        let response = client.mail_folders_list(&params)?.response;
-        let next = next_page_token(response.next_link, params.skip);
+
+        let token = self.page_token.token.as_deref();
+        let response = match token {
+            Some(link) => resume(client, link)?,
+            None => client.mail_folders_list(&params)?.response,
+        };
+        let next = next_page(response.next_link, token.map_or(self.skip, skip_of));
 
         printer.out(MsgraphMailFolderListOutput::page(
             account,
@@ -82,8 +90,8 @@ pub struct MsgraphMailFolderListOutput {
     #[serde(skip)]
     account: String,
     folders: Vec<MsgraphMailFolder>,
-    /// The cursor of the next page, `null` once the listing is complete
-    /// and for `get`, given back through `--page-token`.
+    /// Graph's next link, `null` once the listing is complete and for
+    /// `get`, given back through `--page-token`.
     next_page: Option<String>,
     #[serde(skip)]
     paged: bool,

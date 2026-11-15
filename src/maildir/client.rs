@@ -27,7 +27,7 @@ use crate::{
         maildir::{MaildirConfig, MaildirKeywordHeaderConfig, MaildirLayoutConfig},
     },
     email::mailbox::{validate_level, validate_name},
-    error::mailbox_not_found,
+    error::{mailbox_duplicate, mailbox_not_found},
 };
 
 /// The name the Maildir at the store root lists under, the inbox
@@ -302,6 +302,22 @@ pub fn validate_maildir_level(name: &str) -> Result<()> {
 
     if name.starts_with('.') {
         bail!("Maildir folder name `{name}` must not start with a dot: it would be hidden");
+    }
+
+    Ok(())
+}
+
+/// Refuses creating the Maildir `name` at `target`, the path it resolves
+/// to, when something is there: a folder under `mailbox-duplicate`, any
+/// other file uncoded, being no mailbox.
+pub fn refuse_existing(target: &Path, name: &str) -> Result<()> {
+    if target.is_dir() {
+        let message = format!("Cannot create Maildir `{name}`: it already exists");
+        return Err(mailbox_duplicate(message));
+    }
+
+    if target.exists() {
+        bail!("Cannot create Maildir `{name}`: a file of that name is in the way");
     }
 
     Ok(())

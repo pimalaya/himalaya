@@ -17,7 +17,7 @@ use crate::{
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
     error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
-    maildir::client::{MaildirClient, validate_maildir_name},
+    maildir::client::{MaildirClient, refuse_existing, validate_maildir_name},
 };
 use anyhow::{Result, bail};
 use io_maildir::{
@@ -268,7 +268,8 @@ impl MaildirClient {
     /// Creates the Maildir `name` at the top of the store, or under
     /// `parent`, returning its id, its path on disk, and its name.
     ///
-    /// An existing folder is refused, as IMAP's `CREATE` refuses one.
+    /// An existing folder is refused under `mailbox-duplicate`, as IMAP's
+    /// `CREATE` refuses one.
     pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<(String, String)> {
         self.validate_level(name)?;
 
@@ -285,9 +286,7 @@ impl MaildirClient {
 
         validate_maildir_name(Path::new(&path))?;
         let target = self.store.resolve(&path.as_str().into());
-        if Path::new(target.as_str()).exists() {
-            bail!("Cannot create Maildir `{path}`: it already exists");
-        }
+        refuse_existing(Path::new(target.as_str()), &path)?;
         self.create_maildir(path.clone())?;
 
         let id = self.resolve_maildir(Path::new(&path))?.path().to_string();
@@ -670,6 +669,26 @@ mod tests {
         let err = client.delete_mailbox("A").unwrap_err().to_string();
         assert!(err.contains("A/Kid2"), "{err}");
         assert!(dir.path().join("A/Kid2/cur").is_dir());
+    }
+
+    /// A folder the store holds already, at the top or under a parent, is
+    /// refused `mailbox-duplicate` and keeps its messages; a file in the
+    /// way is no mailbox, refused uncoded.
+    #[test]
+    fn an_existing_folder_is_not_created_again() {
+        let (dir, client, id) = fixture();
+        client.create_mailbox("Kid", Some("A")).unwrap();
+
+        for (name, parent) in [("A", None), ("Kid", Some("A"))] {
+            let err = client.create_mailbox(name, parent).unwrap_err();
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        }
+        assert!(client.get_message("A", &id, false).is_ok());
+
+        fs::write(dir.path().join("F"), b"").unwrap();
+        let err = client.create_mailbox("F", None).unwrap_err();
+        assert_eq!(pimalaya_cli::error::code_of::<ErrorCode>(&err), None);
     }
 
     #[test]

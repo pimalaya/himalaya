@@ -39,7 +39,9 @@ use crate::{
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
         vacation::{Vacation, VacationPatch, date_from_millis},
     },
-    error::{ErrorCode, ItemError, message_not_found, missing_message, unknown_message},
+    error::{
+        ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message, unknown_message,
+    },
     gmail::{
         client::{GmailClient, refusal_of},
         search,
@@ -423,6 +425,9 @@ impl GmailClient {
 
     /// Creates the label `name` at the top, or under `parent` as
     /// `<parent>/<name>`, Gmail nesting labels by name, returning its id.
+    ///
+    /// Gmail answers a name a label holds already with a 409, which is
+    /// `mailbox-duplicate`.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
         validate_level(name, '/')?;
 
@@ -439,7 +444,13 @@ impl GmailClient {
             ..Default::default()
         };
 
-        let label = self.label_create(&label)?.response;
+        let label = match self.label_create(&label) {
+            Ok(created) => created.response,
+            Err(err) if names_existing_label(&err) => {
+                return Err(existing_mailbox(&label.name, err));
+            }
+            Err(err) => return Err(err.into()),
+        };
         self.forget_mailboxes();
         Ok(label.id)
     }
@@ -655,6 +666,12 @@ fn sublabel_renames(labels: &[GmailLabel], old: &str, new: &str) -> Vec<(String,
 /// right shape, `400 Invalid id value` for one it cannot parse.
 fn is_unknown_id(err: &GmailApiError) -> bool {
     err.status == 404 || (err.status == 400 && err.message == "Invalid id value")
+}
+
+/// Whether Gmail refused a label creation as naming a label it holds:
+/// `409 Label name exists or conflicts`.
+fn names_existing_label(err: &GmailClientStdError) -> bool {
+    matches!(err, GmailClientStdError::Send(err) if err.api().is_some_and(|api| api.status == 409))
 }
 
 /// Sends `requests` through `send`, at most [`BATCH_SIZE`] to a batch,
@@ -1436,5 +1453,34 @@ mod script_tests {
         let raw = client.get_message("INBOX", "m1", false).unwrap();
         assert_eq!(raw, b"Subject: hi\r\n\r\nbody\r\n");
         assert_eq!(requests.lock().unwrap().len(), 1);
+    }
+
+    /// An error answer of `status`, Google's error body carrying
+    /// `message`.
+    fn refused(status: u16, message: &str) -> Vec<u8> {
+        let body = json!({"error": {"code": status, "message": message, "errors": []}});
+        let body = body.to_string();
+        let len = body.len();
+        let head = format!("HTTP/1.1 {status} Refused\r\nContent-Type: application/json");
+        format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
+    }
+
+    /// A label Gmail answers exists with its 409 is `mailbox-duplicate`,
+    /// Gmail's words kept; another refusal keeps its own code.
+    #[test]
+    fn a_create_of_an_existing_label_is_a_duplicate() {
+        let conflict = refused(409, "Label name exists or conflicts");
+        let (mut client, _) = gmail(vec![conflict]);
+        let err = client.create_mailbox("Work", None).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        assert!(
+            format!("{err:#}").contains("exists or conflicts"),
+            "{err:#}"
+        );
+
+        let (mut client, _) = gmail(vec![refused(403, "Forbidden")]);
+        let err = client.create_mailbox("Work", None).unwrap_err();
+        assert_eq!(crate::error::code(&err), Some(ErrorCode::PermissionDenied));
     }
 }

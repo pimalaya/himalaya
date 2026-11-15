@@ -16,6 +16,7 @@ use std::{
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, FixedOffset};
 use io_imap::{
+    client::ImapClientError,
     rfc3501::{
         append::ImapMessageAppendOptions,
         copy::{ImapCopyUid, ImapMessageCopyOptions},
@@ -36,6 +37,7 @@ use io_imap::{
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
         flag::{Flag as ImapFlag, FlagFetch, FlagNameAttribute, FlagPerm, StoreType},
         mailbox::{ListMailbox, Mailbox as ImapMailbox},
+        response::{Code, StatusKind},
         search::SearchKey,
         sequence::SequenceSet,
         status::{StatusDataItem, StatusDataItemName},
@@ -63,7 +65,10 @@ use crate::{
             sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
         },
     },
-    error::{ErrorCode, ItemError, mailbox_not_found, message_not_found, missing_message},
+    error::{
+        ErrorCode, ItemError, existing_mailbox, mailbox_not_found, message_not_found,
+        missing_message,
+    },
     imap::{client::ImapClient, utils::output_data},
     shared::message::{header, part},
 };
@@ -583,8 +588,40 @@ impl ImapClient {
             }
         };
 
-        self.create(parse_mailbox(&path)?)?;
-        Ok(path)
+        match self.create(parse_mailbox(&path)?) {
+            Ok(()) => Ok(path),
+            Err(err) => Err(self.create_refusal(&path, err)),
+        }
+    }
+
+    /// The failure of a `CREATE` of `path`, under `mailbox-duplicate` when
+    /// the server names the mailbox as existing (`ALREADYEXISTS`, RFC 5530
+    /// section 3) or, refusing it with no code, lists it.
+    fn create_refusal(&mut self, path: &str, err: ImapClientError) -> anyhow::Error {
+        let (exists, refused) = match err.status() {
+            Some(status) => {
+                let exists = matches!(
+                    &status.code,
+                    Some(Code::Other(code)) if code.inner().eq_ignore_ascii_case(b"ALREADYEXISTS")
+                );
+                (
+                    exists,
+                    status.kind == StatusKind::No && status.code.is_none(),
+                )
+            }
+            None => return err.into(),
+        };
+
+        let listed = !exists
+            && refused
+            && self
+                .mailbox_rows()
+                .is_ok_and(|rows| rows.iter().any(|(known, _)| same_name(known, path)));
+
+        match exists || listed {
+            true => existing_mailbox(path, err),
+            false => err.into(),
+        }
     }
 
     /// Renames the last level of `mailbox` to `name`, its parent kept,
@@ -2024,6 +2061,9 @@ mod tests {
                              {tag} OK done\r\n"
                         ),
                         ["FETCH", "1:*", ..] => format!("{}{tag} OK done\r\n", fetch_lines()),
+                        ["CREATE", "Dup"] => format!("{tag} NO [ALREADYEXISTS] exists\r\n"),
+                        ["CREATE", "Locked"] => format!("{tag} NO already there\r\n"),
+                        ["CREATE", "Fresh"] => format!("{tag} NO [NOPERM] denied\r\n"),
                         ["STATUS", "Locked", ..] => format!("{tag} NO denied\r\n"),
                         ["STATUS", ..] => {
                             format!("* STATUS INBOX (MESSAGES 1 UNSEEN 0)\r\n{tag} OK done\r\n")
@@ -2110,6 +2150,25 @@ mod tests {
             handle.join().unwrap();
 
             assert_eq!(total, Some(3));
+        }
+
+        /// A `CREATE` the server refuses naming the mailbox as existing,
+        /// or refuses without a code while listing the mailbox, is
+        /// `mailbox-duplicate`; any other refusal keeps its own code.
+        #[test]
+        fn a_create_of_an_existing_mailbox_is_a_duplicate() {
+            let duplicate = Some(ErrorCode::MailboxDuplicate);
+            let denied = Some(ErrorCode::PermissionDenied);
+
+            for (name, code) in [("Dup", duplicate), ("Locked", duplicate), ("Fresh", denied)] {
+                let (server, handle) = serve(PLAIN, Vec::new(), none);
+                let mut client = client(&server);
+                let err = client.create_mailbox(name, None).unwrap_err();
+                drop(client);
+                handle.join().unwrap();
+
+                assert_eq!(crate::error::code(&err), code, "{name}: {err:#}");
+            }
         }
 
         #[test]

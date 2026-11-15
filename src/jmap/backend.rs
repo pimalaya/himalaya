@@ -57,7 +57,7 @@ use crate::{
         },
         vacation::{Vacation, VacationPatch, format_date, normalize_date},
     },
-    error::{ErrorCode, ItemError, message_not_found, missing_message},
+    error::{ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message},
     jmap::{
         client::JmapClient,
         error::{format_set_error, set_error, set_item_error},
@@ -469,6 +469,9 @@ impl JmapClient {
 
     /// Creates `name` at the top or under `parent` (`Mailbox/set`
     /// create), returning the new mailbox's id.
+    ///
+    /// No two siblings share a name (RFC 8621 section 2), so a refusal
+    /// coded no other way while one holds `name` is `mailbox-duplicate`.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
         let mailbox = JmapMailboxCreate {
             name: Some(name.to_string()),
@@ -489,7 +492,12 @@ impl JmapClient {
                 "Create JMAP mailbox `{name}` error{}",
                 format_set_error(err)
             );
-            return Err(set_error(message, err));
+            let err = set_error(message, err);
+
+            return Err(match self.holds_sibling(name, parent) {
+                true => existing_mailbox(name, err),
+                false => err,
+            });
         }
 
         output
@@ -497,6 +505,21 @@ impl JmapClient {
             .remove(CREATED)
             .and_then(|mailbox| mailbox.id)
             .ok_or_else(|| anyhow!("JMAP server created mailbox `{name}` without naming its id"))
+    }
+
+    /// Whether a mailbox named `name` sits under `parent`, at the top when
+    /// `None`, as the server lists them, `false` when it lists none.
+    fn holds_sibling(&mut self, name: &str, parent: Option<&str>) -> bool {
+        let listed = self.mailbox_get(JmapMailboxGetOptions {
+            ids: None,
+            properties: None,
+        });
+
+        listed.is_ok_and(|output| {
+            output.mailboxes.iter().any(|mailbox| {
+                mailbox.name.as_deref() == Some(name) && mailbox.parent_id.as_deref() == parent
+            })
+        })
     }
 
     /// Renames `mailbox` to `name`, its parent kept (`Mailbox/set`
@@ -1860,6 +1883,37 @@ mod tests {
 
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+        }
+
+        /// A create the server refuses while a sibling holds the name is
+        /// `mailbox-duplicate`; one refused with no such sibling, the
+        /// namesake under another parent, keeps its refusal uncoded.
+        #[test]
+        fn a_create_of_an_existing_mailbox_is_a_duplicate() {
+            let refused = || {
+                let err = json!({ "type": "invalidProperties", "properties": ["name"] });
+                ("Mailbox/set", json!({ "notCreated": { "new": err } }))
+            };
+            let listed = || {
+                let mailboxes = json!([
+                    { "id": "I", "name": "Inbox", "role": "inbox" },
+                    { "id": "A", "name": "Archive", "parentId": "I" },
+                ]);
+                let list = json!({ "list": mailboxes, "notFound": [], "state": "s" });
+                ("Mailbox/get", list)
+            };
+
+            for (parent, code) in [(Some("I"), Some(ErrorCode::MailboxDuplicate)), (None, None)] {
+                let (url, server) = serve(vec![refused(), listed()]);
+                let mut client = client_at(&url);
+                let err = client.create_mailbox("Archive", parent).unwrap_err();
+                drop(client);
+                server.join().unwrap();
+
+                let found = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+                assert_eq!(found, code, "{err:#}");
+                assert!(format!("{err:#}").contains("invalidProperties"), "{err:#}");
+            }
         }
 
         /// A client of the scripted server at `url`.

@@ -24,14 +24,25 @@ pub struct MsgraphAttachmentListCommand {
 }
 
 impl MsgraphAttachmentListCommand {
-    /// Lists the attachments of the message and prints them.
+    /// Lists the attachments of the message, every page Graph links to
+    /// read, and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
         account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
-        let attachments = client.attachments_list(&self.message_id)?.response.value;
+        let mut page = client.attachments_list(&self.message_id)?.response;
+        let mut attachments = Vec::new();
+
+        loop {
+            attachments.append(&mut page.value);
+
+            let Some(next) = page.next_link else {
+                break;
+            };
+            page = client.page_get(&next, None)?.response;
+        }
 
         printer.out(MsgraphAttachmentListOutput {
             account: account.name().to_string(),

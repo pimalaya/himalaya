@@ -5,14 +5,14 @@
 
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     maildir::{
         arg::MaildirNameArg,
-        client::{MaildirClient, validate_maildir_name},
+        client::{MaildirClient, refuse_existing, validate_maildir_name},
     },
     shared::receipt::IdReceipt,
 };
@@ -22,7 +22,7 @@ use crate::{
 /// Its `cur`, `new` and `tmp` subdirectories are laid out under the
 /// store root. NAME is the path relative to the root, every level of it
 /// one a listing shows: no `cur`, `new` or `tmp`, no leading dot. An
-/// existing folder is refused.
+/// existing folder is refused, coded `mailbox-duplicate`.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxCreateCommand {
     #[command(flatten)]
@@ -44,9 +44,7 @@ impl MaildirMailboxCreateCommand {
         // the bare name goes through: pre-joining the root would land the
         // Maildir under a second copy of it.
         let target = client.store.resolve(&name.as_str().into());
-        if Path::new(target.as_str()).exists() {
-            bail!("Cannot create Maildir `{name}`: it already exists");
-        }
+        refuse_existing(Path::new(target.as_str()), &name)?;
         client.create_maildir(name.clone())?;
 
         printer.out(IdReceipt {

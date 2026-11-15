@@ -518,3 +518,34 @@ fn an_mbox_flag_set_without_a_flag_is_refused() {
     assert_eq!(out["code"], "usage-invalid", "{out}");
     assert_eq!(fs::read_to_string(root.join("A")).unwrap(), flagged);
 }
+
+/// A create naming a mailbox the store holds fails coded
+/// `mailbox-duplicate`, exiting 1, unified and raw, on Maildir and mbox
+/// alike, and the store is left as it was.
+#[test]
+fn a_mailbox_created_twice_is_a_duplicate() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir);
+    maildir_at(&maildir.join("Archive"));
+    let mbox = dir.path().join("mbox");
+    fs::create_dir_all(&mbox).unwrap();
+    fs::write(mbox.join("Archive"), MESSAGE).unwrap();
+
+    let stores = [
+        (maildir_lines(&maildir, ""), "maildir"),
+        (mbox_lines(&mbox, ""), "mbox"),
+    ];
+    for (lines, raw) in &stores {
+        for args in [["mailbox", "create", "Archive"], [raw, "create", "Archive"]] {
+            let output = run(dir.path(), lines, &[&["--json"], &args[..]].concat());
+            let out: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(output.status.code(), Some(1), "{args:?}: {out}");
+            assert_eq!(out["code"], "mailbox-duplicate", "{args:?}: {out}");
+        }
+    }
+
+    assert_eq!(fs::read_to_string(mbox.join("Archive")).unwrap(), MESSAGE);
+    let entries = fs::read_dir(maildir.join("Archive")).unwrap().count();
+    assert_eq!(entries, 3);
+}

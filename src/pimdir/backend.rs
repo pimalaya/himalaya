@@ -20,7 +20,7 @@
 use std::{collections::BTreeSet, ops::ControlFlow};
 
 use anyhow::{Context, Result, anyhow, bail};
-use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
 use io_pimdir::{
     capability,
     client::{
@@ -33,9 +33,10 @@ use io_pimdir::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
     },
-    codec::PimdirAction,
+    codec::{PimdirAction, action_from_payload},
     collection::{PimdirCollectionId, PimdirCoverage},
     intent::{self, PimdirSubmit},
+    object::PimdirHash,
     placement::PimdirFlags,
     summary::{
         PimdirAddress, PimdirSummary,
@@ -44,8 +45,6 @@ use io_pimdir::{
 };
 use log::{info, warn};
 use pimalaya_cli::{capability::CapabilityLevel, error::CodedError};
-use schemars::JsonSchema;
-use serde::Serialize;
 
 use crate::{
     capability::{Capability, StoreSupport},
@@ -66,8 +65,8 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{ErrorCode, message_not_found, missing_message, pimdir_error},
-    pimdir::client::PimdirClient,
+    error::{ErrorCode, mailbox_duplicate, message_not_found, missing_message, pimdir_error},
+    pimdir::{client::PimdirClient, queue::list::PimdirQueueRow},
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
@@ -571,24 +570,129 @@ impl PimdirClient {
         Ok(eval::matches_filter(envelope, Some(&copies), &body, filter))
     }
 
-    /// The mailbox's queued creations and sends, rendered as mail.
+    /// The mailbox's queued creations and sends, in append order, as
+    /// `pimdir queue list` prints them.
     ///
-    /// The operator CLI is kind-agnostic and prints ids, hashes and flags.
     /// A queued action carries no summary, the owner deriving one from the
-    /// body when it applies the action, so this reads the body the action
-    /// pins and derives the same way.
-    pub fn queued_envelopes(&mut self, mailbox: &str) -> Result<Vec<PimdirQueued>> {
+    /// body when it applies the action, so the subject is read off the body
+    /// the action pins, derived the same way.
+    pub fn queued_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRow>> {
         let queued = self.queued_mail(mailbox)?;
 
-        let mut rows = Vec::new();
-        for action in &queued {
-            let body = match action.action.object_hash() {
-                Some(hash) => self.blobs.get(hash)?,
-                None => None,
-            };
-            rows.extend(queued_from_action(action, body.as_deref()));
+        Ok(queued
+            .into_iter()
+            .map(|queued| {
+                let addressed = self.addressed(&queued.collection, &queued.action);
+
+                PimdirQueueRow {
+                    row: queued.id,
+                    kind: queued.action.kind().to_owned(),
+                    collection: queued.collection,
+                    link_id: addressed.link_id,
+                    item_id: addressed.item_id,
+                    producer: queued.producer,
+                    queued_at: queued.created_at,
+                    attempts: queued.attempts,
+                    unconfirmed: false,
+                    error: None,
+                    subject: addressed.subject,
+                }
+            })
+            .collect())
+    }
+
+    /// The mailbox's parked rows, any action kind, in append order, as
+    /// `pimdir queue list` prints them.
+    pub fn parked_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRow>> {
+        let parked = self.parked_actions(mailbox)?;
+
+        Ok(parked
+            .into_iter()
+            .map(|parked| {
+                // NOTE: a payload the store parked for not decoding
+                // addresses nothing Himalaya can name.
+                let addressed = action_from_payload(&parked.action, &parked.payload)
+                    .map(|action| self.addressed(&parked.collection, &action))
+                    .unwrap_or_default();
+
+                PimdirQueueRow {
+                    row: parked.id,
+                    unconfirmed: parked.unconfirmed().is_some(),
+                    kind: parked.action,
+                    collection: parked.collection,
+                    link_id: addressed.link_id,
+                    item_id: addressed.item_id,
+                    producer: parked.producer,
+                    queued_at: parked.created_at,
+                    attempts: parked.attempts,
+                    error: Some(parked.error),
+                    subject: addressed.subject,
+                }
+            })
+            .collect())
+    }
+
+    /// What a row of `collection` holding `action` addresses: the message
+    /// it creates by its link id, the stored message it acts on by its
+    /// public id, and the subject of the body it pins, else of the message
+    /// it acts on. A parked `submit` names no body, its payload's subject
+    /// standing in.
+    fn addressed(&self, collection: &str, action: &PimdirAction) -> Addressed {
+        let pinned = |hash: &PimdirHash| {
+            let body = self.blobs.get(hash).ok().flatten()?;
+            let summary = mail::derive(&body).summary;
+            mail_summary(summary.as_ref()).map(|mail| mail.subject.clone())
+        };
+
+        let stored = |seq: i64| {
+            let item = self.store.get_item(collection, seq).ok().flatten();
+            let subject = item.and_then(|item| {
+                mail_summary(item.summary.as_ref()).map(|mail| mail.subject.clone())
+            });
+
+            Addressed {
+                item_id: Some(seq.to_string()),
+                subject,
+                ..Default::default()
+            }
+        };
+
+        match action {
+            PimdirAction::Add {
+                link_id, object, ..
+            } => Addressed {
+                link_id: link_id.as_ref().map(|id| id.0.clone()),
+                subject: object.as_ref().and_then(pinned),
+                ..Default::default()
+            },
+            PimdirAction::Update { seq, object, .. } => {
+                let addressed = stored(*seq);
+
+                Addressed {
+                    subject: pinned(object).or(addressed.subject),
+                    ..addressed
+                }
+            }
+            PimdirAction::SetFlags { seq, .. }
+            | PimdirAction::Remove { seq, .. }
+            | PimdirAction::Move { seq, .. }
+            | PimdirAction::Copy { seq, .. } => stored(*seq),
+            PimdirAction::Unknown {
+                kind,
+                payload,
+                object_hash,
+            } if kind == intent::SUBMIT => {
+                let declared = || PimdirSubmit::from_payload(payload).ok()?.subject;
+
+                Addressed {
+                    subject: object_hash.as_ref().and_then(pinned).or_else(declared),
+                    ..Default::default()
+                }
+            }
+            PimdirAction::SetPerformer { .. } | PimdirAction::Unknown { .. } => {
+                Addressed::default()
+            }
         }
-        Ok(rows)
     }
 
     /// Reads one message's raw bytes from its content-addressed blob.
@@ -982,7 +1086,7 @@ impl PimdirClient {
     /// it, so the creation is refused there rather than left to wait.
     ///
     /// A mailbox the performer's source already syncs under that name, or
-    /// whose creation is already queued, is refused with `item-duplicate`
+    /// whose creation is already queued, is refused with `mailbox-duplicate`
     /// before anything is queued.
     pub fn create_mailbox(
         &mut self,
@@ -1016,11 +1120,11 @@ impl PimdirClient {
         if let Some(held) = self.held_mailbox(&source, name, parent.as_deref())? {
             let message =
                 format!("Cannot create mailbox `{name}`: the store lists it already as `{held}`");
-            return Err(CodedError::new(ErrorCode::ItemDuplicate, message).into());
+            return Err(mailbox_duplicate(message));
         }
         if self.creation_queued(&anchor, &source, name, parent.as_deref())? {
             let message = format!("Cannot create mailbox `{name}`: its creation is queued already");
-            return Err(CodedError::new(ErrorCode::ItemDuplicate, message).into());
+            return Err(mailbox_duplicate(message));
         }
 
         let enqueued = producer
@@ -1544,95 +1648,16 @@ pub struct PimdirFlagged {
     pub partial: Vec<String>,
 }
 
-/// One queued creation or send, as `pimdir queue list` shows it: the row an
-/// operator acts on, plus the mail the action carries.
-#[derive(Clone, Debug)]
-pub struct PimdirQueued {
-    /// The queue row id, which `pimdir queue cancel` takes.
-    pub id: i64,
-    /// The RFC 3339 instant the row was enqueued, stamped by the store.
-    pub created_at: String,
-    /// The process that staged it.
-    pub producer: String,
-    /// Whether the row sends the message rather than files it.
-    pub send: bool,
-    /// The message the action carries, derived from the body it pins.
-    pub envelope: PimdirQueuedEnvelope,
-}
-
-/// The message a queued creation or send carries: the shared envelope's
-/// fields, its id aside.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct PimdirQueuedEnvelope {
-    /// Always `None`: a create has no id until the owner applies it, a send
-    /// none at all. The queue row id names the action, not the message, so
-    /// it does not stand in.
-    pub id: Option<String>,
-    /// The bare `Message-ID:`.
-    pub message_id: Option<String>,
-    /// The bare ids of its `In-Reply-To:`.
-    pub in_reply_to: Vec<String>,
-    /// The flags it is staged with.
-    pub flags: BTreeSet<Flag>,
-    /// The `Subject:` header.
-    pub subject: String,
-    /// The senders.
-    pub from: Vec<Address>,
-    /// The primary recipients.
-    pub to: Vec<Address>,
-    /// The `Date:` header, `None` when missing or unparseable.
-    pub date: Option<DateTime<FixedOffset>>,
-    /// The size of the raw message, in bytes, `None` when unknown.
-    pub size: Option<u64>,
-    /// Whether the message carries an attachment.
-    pub has_attachment: Option<bool>,
-}
-
-/// Builds a queued row from a pending add or send and the body it pins,
-/// skipping every other action.
-///
-/// The envelope has no id: the message has none yet, and the queue row id
-/// belongs to another space than the field every command reads back.
-fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Option<PimdirQueued> {
-    // NOTE: a send is filed nowhere and carries no flags; it shows as read,
-    // the way a sent copy is saved.
-    let seen: PimdirFlags = [Flag::from_iana(IanaFlag::Seen)]
-        .iter()
-        .map(Flag::raw)
-        .collect();
-    let (send, flags) = match &queued.action {
-        PimdirAction::Add { flags, .. } => (false, flags),
-        action if is_queued_mail(action) => (true, &seen),
-        _ => return None,
-    };
-
-    let summary = body.map(mail::derive).and_then(|derived| derived.summary);
-    let mail = mail_summary(summary.as_ref()).cloned().unwrap_or_default();
-
-    let envelope = PimdirQueuedEnvelope {
-        id: None,
-        message_id: mail.message_id,
-        in_reply_to: mail.in_reply_to,
-        flags: known_flags(flags),
-        subject: mail.subject,
-        from: mail.from.into_iter().map(address).collect(),
-        to: mail.to.into_iter().map(address).collect(),
-        date: mail
-            .date
-            .as_deref()
-            .and_then(|date| DateTime::parse_from_rfc3339(date).ok()),
-        size: mail.size,
-        has_attachment: mail.attachment,
-    };
-
-    Some(PimdirQueued {
-        id: queued.id,
-        created_at: queued.created_at.clone(),
-        producer: queued.producer.clone(),
-        send,
-        envelope,
-    })
+/// What a queue row addresses, as `pimdir queue list` prints it.
+#[derive(Clone, Debug, Default)]
+struct Addressed {
+    /// The link id of the message the row creates.
+    link_id: Option<String>,
+    /// The public id of the stored message the row acts on.
+    item_id: Option<String>,
+    /// The subject of the body the row pins, else of the message it acts
+    /// on.
+    subject: Option<String>,
 }
 
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
@@ -2170,59 +2195,45 @@ mod tests {
         assert!(staged.contains("\\Seen"));
     }
 
-    /// A queued add carries no summary, so the row is derived from the body
-    /// the action pins, the way the owner will derive it.
+    /// A queued add carries no summary, so its row's subject is derived
+    /// from the body it pins, the way the owner will derive it; the row
+    /// names the link id its receipt printed and no stored message, and
+    /// no placeholder stands in for the id the message lacks.
     #[test]
-    fn a_queued_creation_renders_as_mail_with_a_null_id() {
-        let queued = PimdirPendingAction {
-            id: 7,
-            created_at: "2026-08-27T10:00:00Z".into(),
-            producer: "himalaya".into(),
-            collection: "INBOX".into(),
-            action: PimdirAction::Add {
-                link_id: Some(PimdirLinkId("draft@x.org".into())),
-                flags: known(&["\\Draft"]),
-                object: Some(PimdirHash("cafe".into())),
-                supersedes: None,
-            },
-            attempts: 0,
-        };
-        let body = b"Message-ID: <draft@x.org>\r\nSubject: Re: lunch\r\nTo: Alice <alice@x.org>\r\n\r\nbody";
+    fn a_queued_creation_names_its_link_id_and_its_subject() {
+        let (_dir, mut client) = sent_store();
+        let body = b"Message-ID: <draft@x.org>\r\nSubject: Re: lunch\r\n\r\nbody";
+        let staged = client.add_message("imap/Sent", &[], body.to_vec()).unwrap();
 
-        let queued = queued_from_action(&queued, Some(body)).unwrap();
+        let rows = client.queued_rows("imap/Sent").unwrap();
 
-        assert_eq!(queued.id, 7);
-        assert_eq!(queued.created_at, "2026-08-27T10:00:00Z");
-        assert_eq!(queued.envelope.subject, "Re: lunch");
-        assert_eq!(queued.envelope.to[0].email, "alice@x.org");
-        assert_eq!(queued.envelope.message_id.as_deref(), Some("draft@x.org"));
-        assert!(queued.envelope.flags.iter().any(|f| f.raw() == "\\Draft"));
-        // NOTE: the row id names an action rather than a message, so it
-        // belongs to another space than the field commands read back, and
-        // no placeholder stands in for the id the message lacks.
-        let json = serde_json::to_value(&queued.envelope).unwrap();
-        assert_eq!(json["id"], serde_json::Value::Null);
-        assert_eq!(json["subject"], "Re: lunch");
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].row, staged.queue_id);
+        assert_eq!(rows[0].kind, "add");
+        assert_eq!(rows[0].collection, "imap/Sent");
+        assert_eq!(rows[0].link_id.as_deref(), Some("draft@x.org"));
+        assert_eq!(rows[0].item_id, None);
+        assert_eq!(rows[0].subject.as_deref(), Some("Re: lunch"));
+        assert_eq!((rows[0].attempts, rows[0].unconfirmed), (0, false));
+        assert_eq!(rows[0].error, None);
     }
 
+    /// A row acting on a stored message names it by its public id, its
+    /// subject `null` when the store holds no such message.
     #[test]
-    fn only_a_queued_creation_renders_as_mail() {
-        let queued = PimdirPendingAction {
-            id: 8,
-            created_at: "2026-08-27T10:00:00Z".into(),
-            producer: "himalaya".into(),
-            collection: "INBOX".into(),
-            action: PimdirAction::Remove {
-                seq: 42,
-                if_match: None,
-                resolves: None,
-            },
-            attempts: 0,
+    fn a_row_acting_on_a_message_names_its_public_id() {
+        let (_dir, client) = sent_store();
+        let removal = PimdirAction::Remove {
+            seq: 42,
+            if_match: None,
+            resolves: None,
         };
 
-        // NOTE: a staged removal addresses a message that exists, so the
-        // ordinary listing shows it and nothing is rendered here.
-        assert!(queued_from_action(&queued, None).is_none());
+        let addressed = client.addressed("imap/Sent", &removal);
+
+        assert_eq!(addressed.item_id.as_deref(), Some("42"));
+        assert_eq!(addressed.link_id, None);
+        assert_eq!(addressed.subject, None);
     }
 
     /// A store holding one mail collection, `imap/Sent`, and the client
@@ -2292,10 +2303,17 @@ mod tests {
         // removes; Graph derives its recipients from it.
         assert_eq!(client.blobs.get(hash).unwrap().as_deref(), Some(RAW));
 
-        let queued = client.queued_envelopes("imap/Sent").unwrap();
+        // NOTE: a send creates no message in the store, so its row names
+        // no link id; its subject is read off the body it pins.
+        let queued = client.queued_rows("imap/Sent").unwrap();
         assert_eq!(queued.len(), 1);
-        assert!(queued[0].send);
-        assert_eq!(queued[0].envelope.subject, "hi");
+        assert_eq!(queued[0].row, pending[0].id);
+        assert_eq!(queued[0].kind, "submit");
+        assert_eq!(queued[0].collection, "imap/Sent");
+        assert_eq!(queued[0].link_id, None);
+        assert_eq!(queued[0].item_id, None);
+        assert_eq!(queued[0].subject.as_deref(), Some("hi"));
+        assert_eq!(queued[0].error, None);
     }
 
     #[test]
@@ -3015,7 +3033,7 @@ mod tests {
     }
 
     /// A mailbox the performer's source syncs under the name asked, at the
-    /// top or under the parent, is refused `item-duplicate` before anything
+    /// top or under the parent, is refused `mailbox-duplicate` before anything
     /// is queued, as is one whose creation is queued already; another
     /// source's mailbox of that name is no obstacle.
     #[test]
@@ -3047,7 +3065,7 @@ mod tests {
             let err = client.create_mailbox(name, parent).unwrap_err();
             assert_eq!(
                 pimalaya_cli::error::code_of::<ErrorCode>(&err),
-                Some(ErrorCode::ItemDuplicate),
+                Some(ErrorCode::MailboxDuplicate),
                 "{err:#}"
             );
             assert!(err.to_string().contains(held), "{err:#}");
@@ -3067,7 +3085,7 @@ mod tests {
         let err = client.create_mailbox("Archives", None).unwrap_err();
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
-            Some(ErrorCode::ItemDuplicate),
+            Some(ErrorCode::MailboxDuplicate),
             "{err:#}"
         );
         client.create_mailbox("2026", Some("imap/Sent")).unwrap();
@@ -4559,6 +4577,17 @@ mod tests {
         assert_eq!(parked[0].action, "add");
         assert!(!parked[0].error.is_empty());
 
+        // NOTE: the parked add keeps the link id its receipt printed and
+        // the subject of the body it pins, in the pending row's shape.
+        let rows = client.parked_rows("imap/Sent").unwrap();
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!((rows[0].row, rows[0].kind.as_str()), (twin.queue_id, "add"));
+        assert_eq!(rows[0].link_id.as_deref(), Some(twin.message_id.as_str()));
+        assert_eq!(rows[0].item_id, None);
+        assert_eq!(rows[0].subject.as_deref(), Some("hi"));
+        assert_eq!(rows[0].error.as_deref(), Some(parked[0].error.as_str()));
+        assert!(!rows[0].unconfirmed);
+
         assert_eq!(client.cancel_queued(twin.queue_id).unwrap(), "add");
         assert!(client.parked_actions("imap/Sent").unwrap().is_empty());
     }
@@ -4668,6 +4697,13 @@ mod tests {
         assert_eq!((parked[0].id, parked[0].action.as_str()), (row, "move"));
         assert!(parked[0].error.contains(&theirs.0), "{}", parked[0].error);
         assert!(client.parked_actions("imap/Trash").unwrap().is_empty());
+
+        // NOTE: the parked move names the message it acts on, as
+        // `envelope list` prints it, and that message's subject.
+        let rows = client.parked_rows("imap/Drafts").unwrap();
+        assert_eq!(rows[0].item_id.as_deref(), Some(drafts[0].as_str()));
+        assert_eq!(rows[0].link_id, None);
+        assert_eq!(rows[0].subject.as_deref(), Some("hi"));
 
         let shown = PimdirQueueShowOutput::new(row, client.queue_row(row).unwrap());
         assert_eq!(shown.state, PimdirQueueState::Parked);

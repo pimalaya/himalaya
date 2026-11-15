@@ -69,6 +69,10 @@ pub enum ErrorCode {
     CapabilityMissing,
     /// The mailbox named does not exist: nothing was done.
     MailboxNotFound,
+    /// The mailbox a create names exists already: the store lists it, or
+    /// has its creation queued, or the server answered that it exists.
+    /// Nothing was created nor staged.
+    MailboxDuplicate,
     /// A message id given is not in the mailbox: an item error beside what
     /// was done, or the failure of a command reading that one message.
     MessageNotFound,
@@ -134,8 +138,7 @@ pub enum ErrorCode {
     /// write: nothing was written. Retry.
     LockReplaced,
     /// The mailbox already holds the message, or has its creation
-    /// queued, or the pimdir store lists the mailbox a creation names, or
-    /// has that creation queued: nothing was staged.
+    /// queued: nothing was staged.
     ItemDuplicate,
     /// The pimdir store cannot hold the flag: empty, or holding a space, a
     /// control or a non-ASCII character. Nothing was staged.
@@ -250,6 +253,31 @@ fn account_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> 
 )]
 pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
+}
+
+/// A refusal under `mailbox-duplicate`: the mailbox a create names
+/// exists already.
+#[cfg_attr(
+    not(any(feature = "msgraph", feature = "maildir", feature = "pimdir")),
+    allow(dead_code)
+)]
+pub fn mailbox_duplicate(message: impl Into<String>) -> anyhow::Error {
+    CodedError::new(ErrorCode::MailboxDuplicate, message.into()).into()
+}
+
+/// The failure of a create naming the mailbox `name` the backend answered
+/// exists already, under `mailbox-duplicate`, `cause` what it answered
+/// kept in `sources`.
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "mbox"
+))]
+pub fn existing_mailbox(name: &str, cause: impl Into<Error>) -> Error {
+    with_code(cause.into(), |_| Some(ErrorCode::MailboxDuplicate))
+        .context(format!("Cannot create mailbox `{name}`: it exists already"))
 }
 
 /// A refusal under `message-not-found`: the message asked for is not in

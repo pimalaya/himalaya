@@ -13,12 +13,15 @@ use crate::{
     msgraph::{
         client::MsgraphClient,
         mail_folders::list::MsgraphMailFolderListOutput,
-        messages::list::{next_page_token, page_skip},
+        messages::list::{next_page, resume, skip_of},
     },
 };
 
 /// List a mail folder's child folders (`GET
 /// /me/mailFolders/{id}/childFolders`).
+///
+/// `nextPage` is Graph's next link as Graph gives it: `--page-token`
+/// follows it as is, the query it carries replacing the other options.
 #[derive(Debug, Parser)]
 pub struct MsgraphChildFoldersListCommand {
     /// The id or well-known name of the parent folder.
@@ -51,12 +54,17 @@ impl MsgraphChildFoldersListCommand {
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
             top: self.top,
-            skip: page_skip(self.page_token.token.as_deref(), self.skip)?,
+            skip: self.skip,
             select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
-        let response = client.mail_child_folders_list(&self.id, &params)?.response;
-        let next = next_page_token(response.next_link, params.skip);
+
+        let token = self.page_token.token.as_deref();
+        let response = match token {
+            Some(link) => resume(client, link)?,
+            None => client.mail_child_folders_list(&self.id, &params)?.response,
+        };
+        let next = next_page(response.next_link, token.map_or(self.skip, skip_of));
 
         printer.out(MsgraphMailFolderListOutput::page(
             account,

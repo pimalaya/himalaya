@@ -5,10 +5,11 @@
 
 use std::fmt;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result};
 use clap::Parser;
-use io_msgraph::v1::rest::users::messages::{
-    MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
+use io_msgraph::v1::{
+    page::MsgraphPage,
+    rest::users::messages::{MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams},
 };
 use pimalaya_cli::{
     clap::args::PageTokenArg,
@@ -16,7 +17,7 @@ use pimalaya_cli::{
     printer::Printer,
 };
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     account::context::Account,
@@ -27,6 +28,9 @@ use crate::{
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
+///
+/// `nextPage` is Graph's next link as Graph gives it: `--page-token`
+/// follows it as is, the query it carries replacing the other options.
 #[derive(Debug, Parser)]
 pub struct MsgraphMessageListCommand {
     /// Restrict the listing to a folder id or well-known name (e.g.
@@ -87,11 +91,9 @@ impl MsgraphMessageListCommand {
             None => self.count.then_some(true),
         };
 
-        let skip = page_skip(self.page_token.token.as_deref(), self.skip)?;
-
         let params = MsgraphMessagesListParams {
             top: self.top,
-            skip,
+            skip: self.skip,
             select: self.select.as_deref(),
             filter: self.filter.as_deref(),
             search,
@@ -99,11 +101,18 @@ impl MsgraphMessageListCommand {
             count,
             ..Default::default()
         };
-        let response = client
-            .messages_list(self.folder.as_deref(), &params)?
-            .response;
 
-        let next_page = next_page_token(response.next_link, skip);
+        let token = self.page_token.token.as_deref();
+        let response = match token {
+            Some(link) => resume(client, link)?,
+            None => {
+                let folder = self.folder.as_deref();
+                client.messages_list(folder, &params)?.response
+            }
+        };
+
+        let skip = token.map_or(self.skip, skip_of);
+        let next_page = next_page(response.next_link, skip);
         printer.out(MsgraphMessageListOutput {
             account: account.name().to_string(),
             datetime_fmt: account.datetime_fmt().to_string(),
@@ -147,8 +156,8 @@ pub struct MsgraphMessageListOutput {
     messages: Vec<MsgraphMessage>,
     /// How many messages match, with `--count`, `null` otherwise.
     count: Option<u64>,
-    /// The cursor of the next page, `null` once the listing is complete,
-    /// given back through `--page-token`.
+    /// Graph's next link, `null` once the listing is complete, given back
+    /// through `--page-token`.
     next_page: Option<String>,
 }
 
@@ -183,44 +192,34 @@ impl fmt::Display for MsgraphMessageListOutput {
         let next = self.next_page.as_deref();
         listing.page(ListingPage::Token, count, ["message", "messages"], next);
 
-        // NOTE: a whole next link is no page token, so it replaces the
-        // `Next page:` line `--page-token` would refuse.
-        if let Some(link) = next.filter(|next| next.parse::<u32>().is_err()) {
-            listing.header.pop();
-            listing.head("Next link", link);
-        }
-
         write!(f, "{listing}")
     }
 }
 
-/// The `$skip` a listing resumes from: the page token, the `$skip` of the
-/// next link Graph returned, so a listing resumes with the same
-/// parameters, else `skip`.
-pub(crate) fn page_skip(token: Option<&str>, skip: Option<u32>) -> Result<Option<u32>> {
-    let Some(token) = token else {
-        return Ok(skip);
-    };
+/// The page behind `link`, the next link a Graph listing printed, sent as
+/// it is: it carries the query of the listing it resumes. A link off
+/// Graph's origin is refused before any request, the bearer token never
+/// leaving it.
+pub(crate) fn resume<T: DeserializeOwned>(
+    client: &mut MsgraphClient,
+    link: &str,
+) -> Result<MsgraphPage<T>> {
+    let page = client.page_get(link, None).with_context(|| {
+        format!("Cannot resume a Microsoft Graph listing from page token {link}")
+    })?;
 
-    let skip = token
-        .parse::<u32>()
-        .map_err(|_| anyhow!("Cannot resume a Microsoft Graph listing from page token {token}"))?;
-
-    Ok(Some(skip))
+    Ok(page.response)
 }
 
-/// The page token of a Graph next link, its `$skip`, `None` without a
-/// link or when it leads back to the page at `skip` (a `$top` of 0).
-///
-/// A next link without one (a `$search` page, resumed by `$skiptoken`)
-/// comes back whole, which `--page-token` refuses.
-pub(crate) fn next_page_token(link: Option<String>, skip: Option<u32>) -> Option<String> {
+/// The cursor of the next page, Graph's next link as Graph gives it,
+/// `None` without one or when it leads back to the page at `skip` (a
+/// `$top` of 0).
+pub(crate) fn next_page(link: Option<String>, skip: Option<u32>) -> Option<String> {
     let link = link?;
 
     match skip_of(&link) {
         Some(next) if next <= skip.unwrap_or(0) => None,
-        Some(next) => Some(next.to_string()),
-        None => Some(link),
+        _ => Some(link),
     }
 }
 
@@ -236,7 +235,7 @@ fn quote_search(search: &str) -> String {
 
 /// The `$skip` query parameter of a Graph next link, percent-encoded or
 /// not.
-fn skip_of(link: &str) -> Option<u32> {
+pub(crate) fn skip_of(link: &str) -> Option<u32> {
     let (_, query) = link.split_once('?')?;
 
     query.split('&').find_map(|param| {
@@ -247,7 +246,18 @@ fn skip_of(link: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use crate::msgraph::messages::list::{next_page_token, quote_search, skip_of};
+    use io_msgraph::v1::client::MsgraphClientStd;
+    use pimalaya_cli::{clap::args::PageTokenArg, printer::CapturePrinter};
+    use serde_json::{Value, json};
+
+    use crate::{
+        account::context::Account,
+        msgraph::{
+            client::MsgraphClient,
+            messages::list::{MsgraphMessageListCommand, next_page, quote_search, skip_of},
+        },
+        shared::http_script::{Script, ok},
+    };
 
     #[test]
     fn a_raw_search_is_quoted_once() {
@@ -263,15 +273,84 @@ mod tests {
                 "https://graph.microsoft.com/v1.0/me/messages?%24top=0&%24skip={skip}"
             ))
         };
-        assert_eq!(next_page_token(link(0), None), None);
-        assert_eq!(next_page_token(link(20), Some(10)).as_deref(), Some("20"));
+        assert_eq!(next_page(link(0), None), None);
+        assert_eq!(next_page(link(20), Some(10)), link(20));
 
         let search = String::from("https://graph.microsoft.com/v1.0/me/messages?%24skiptoken=x");
-        assert_eq!(next_page_token(Some(search.clone()), None), Some(search));
+        assert_eq!(next_page(Some(search.clone()), None), Some(search));
+    }
+
+    /// The `msgraph messages list` of `token`, against a Graph server
+    /// answering `pages` in order: the JSON it printed, or its failure,
+    /// and the requests the server read.
+    fn list(token: Option<&str>, pages: &[Value]) -> (anyhow::Result<Value>, Vec<String>) {
+        let responses = pages
+            .iter()
+            .map(|page| ok("application/json", &page.to_string()));
+        let (script, requests) = Script::new(responses.collect());
+        let mut client =
+            MsgraphClient::over(MsgraphClientStd::new(script, "token", Default::default()));
+
+        let command = MsgraphMessageListCommand {
+            folder: None,
+            top: Some(1),
+            skip: None,
+            page_token: PageTokenArg {
+                token: token.map(String::from),
+            },
+            filter: None,
+            search: Some(String::from("report")),
+            orderby: None,
+            select: None,
+            count: false,
+        };
+        let mut printer = CapturePrinter::default();
+        let result = command
+            .execute(&mut printer, &mut Account::default(), &mut client)
+            .and_then(|()| printer.into_single());
+
+        let requests = requests.lock().unwrap().clone();
+        (result, requests)
+    }
+
+    /// A listing prints Graph's next link as `nextPage`, a `$search` one
+    /// carrying no `$skip` included, and `--page-token` follows it as is,
+    /// the query it carries kept; a link off Graph's origin is refused
+    /// before any request.
+    #[test]
+    fn a_listing_resumes_from_the_next_link_it_printed() {
+        let first = "https://graph.microsoft.com/v1.0/me/messages?%24search=%22report%22&%24top=1&%24skiptoken=a";
+        let second = "https://graph.microsoft.com/v1.0/me/messages?%24search=%22report%22&%24top=1&%24skiptoken=b";
+        let page =
+            |id: &str, next: Option<&str>| json!({"value": [{"id": id}], "@odata.nextLink": next});
+
+        let (printed, requests) = list(None, &[page("m1", Some(first))]);
+        let printed = printed.unwrap();
+        assert_eq!(printed["nextPage"], first);
+        assert!(printed.get("@odata.nextLink").is_none(), "{printed}");
+        assert!(requests[0].contains("%24search"), "{}", requests[0]);
+
+        let (printed, requests) = list(Some(first), &[page("m2", Some(second))]);
+        let printed = printed.unwrap();
+        assert_eq!(printed["messages"][0]["id"], "m2");
+        assert_eq!(printed["nextPage"], second);
+        let line = format!(
+            "GET {} ",
+            first.trim_start_matches("https://graph.microsoft.com")
+        );
+        assert!(requests[0].starts_with(&line), "{}", requests[0]);
+
+        let (printed, _) = list(Some(second), &[page("m3", None)]);
+        assert_eq!(printed.unwrap()["nextPage"], Value::Null);
+
+        let (refused, requests) = list(Some("https://example.org/v1.0/me/messages"), &[]);
+        let err = format!("{:#}", refused.unwrap_err());
+        assert!(err.contains("page token"), "{err}");
+        assert!(requests.is_empty(), "{requests:#?}");
     }
 
     #[test]
-    fn the_skip_of_a_next_link_is_its_page_token() {
+    fn the_skip_of_a_next_link_is_read_encoded_or_not() {
         let link = "https://graph.microsoft.com/v1.0/me/messages?%24top=10&%24skip=20";
         assert_eq!(skip_of(link), Some(20));
         assert_eq!(

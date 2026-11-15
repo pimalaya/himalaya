@@ -30,7 +30,11 @@ use io_mbox::{
     },
     flag::{MboxFlag, MboxFlags, MboxKeyword},
     index::MboxIndex,
-    mbox::{create::MboxCreate, delete::MboxDelete, rename::MboxRename},
+    mbox::{
+        create::{MboxCreate, MboxCreateError},
+        delete::MboxDelete,
+        rename::MboxRename,
+    },
     path::MboxFsPath,
     store::{INBOX, SBD},
 };
@@ -44,10 +48,13 @@ use crate::{
         outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
+    error::{
+        ErrorCode, ItemError, existing_mailbox, headerless_message, message_not_found,
+        missing_message,
+    },
     mbox::{
         cache::MboxCache,
-        client::{MboxClient, validate_mbox_name},
+        client::{MboxClient, mbox_error, validate_mbox_name},
     },
 };
 
@@ -477,7 +484,8 @@ impl MboxClient {
     /// In the plain layout a mailbox nests only under a directory: one
     /// under an mbox file is refused, naming `mbox.thunderbird`. In the
     /// Thunderbird layout a missing parent mbox is created empty, so the
-    /// children listed under it can be renamed with it.
+    /// children listed under it can be renamed with it. An existing mbox is
+    /// refused under `mailbox-duplicate`, a directory in its way uncoded.
     pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
         let name = match parent {
             Some(parent) => child_path(parent, '/', name),
@@ -502,8 +510,15 @@ impl MboxClient {
         }
 
         let path = self.resolve_name(&name)?;
-        self.exec(MboxCreate::new(path))?;
-        Ok(name)
+        match self.run(MboxCreate::new(path.clone())) {
+            Ok(()) => Ok(name),
+            Err(err @ MboxClientError::Create(MboxCreateError::AlreadyExists(_)))
+                if Path::new(path.as_str()).is_file() =>
+            {
+                Err(existing_mailbox(&name, err))
+            }
+            Err(err) => Err(mbox_error(err)),
+        }
     }
 
     /// Renames the last level of the mbox `mailbox` to `name`, its parent
@@ -1318,6 +1333,28 @@ mod tests {
         assert_eq!(names(&client), ["Ghost", "Ghost/Kid"]);
         client.rename_mailbox("Ghost", "G2").unwrap();
         assert_eq!(names(&client), ["G2", "G2/Kid"]);
+    }
+
+    /// An mbox the store holds already, at the top or under a parent, is
+    /// refused `mailbox-duplicate` and left as it was; a directory in the
+    /// way is no mailbox, refused uncoded.
+    #[test]
+    fn an_existing_mbox_is_not_created_again() {
+        let (root, client) = client(MboxFormatConfig::Mboxrd, false);
+        client.create_mailbox("A", None).unwrap();
+        client.add_message("A", &[], MESSAGE.to_vec()).unwrap();
+        client.create_mailbox("Kid", Some("dir")).unwrap();
+        let before = fs::read(root.path().join("A")).unwrap();
+
+        for (name, parent) in [("A", None), ("Kid", Some("dir"))] {
+            let err = client.create_mailbox(name, parent).unwrap_err();
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        }
+        assert_eq!(fs::read(root.path().join("A")).unwrap(), before);
+
+        let err = client.create_mailbox("dir", None).unwrap_err();
+        assert_eq!(pimalaya_cli::error::code_of::<ErrorCode>(&err), None);
     }
 
     #[test]

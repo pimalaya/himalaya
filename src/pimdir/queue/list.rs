@@ -1,7 +1,7 @@
 //! # pimdir queue list
 //!
 //! The `pimdir queue list` command, listing the creations and sends staged
-//! in one mailbox.
+//! in one mailbox and the rows parked there.
 
 use std::fmt;
 
@@ -12,13 +12,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    backend::Backend,
-    pimdir::{backend::PimdirQueuedEnvelope, client::PimdirClient},
-    shared::{
-        envelope::list::{format_flags, format_names},
-        mailbox::arg::MailboxArg,
-    },
+    account::context::Account, backend::Backend, pimdir::client::PimdirClient,
+    shared::mailbox::arg::MailboxArg,
 };
 
 /// List the messages staged for creation or sending in a mailbox.
@@ -27,7 +22,8 @@ use crate::{
 /// has no id until then, so `envelope list` cannot show it. A sent message
 /// waits there until the store's owner sends it, filed under the mailbox it
 /// was saved to or the account's sent alias. This is where both show: the
-/// row id to cancel one by, when it was queued, and the mail.
+/// row id to cancel one by, when it was queued, its kind (`add` or
+/// `submit`) and its subject.
 ///
 /// Staged flags, moves and deletions need no such view, addressing messages
 /// that already exist. A row of any kind the sync engine parked, refusing to
@@ -36,6 +32,11 @@ use crate::{
 /// conflict parks so, listed in the mailbox the message stays in. One the
 /// engine sent without learning its outcome is listed `unconfirmed`
 /// instead: it may have taken effect.
+///
+/// JSON output: `{"messages": [<row>], "parked": [<row>]}`, each row,
+/// pending or parked, `{"row", "kind", "collection", "linkId", "itemId",
+/// "producer", "queuedAt", "attempts", "unconfirmed", "error",
+/// "subject"}`, as every Pimalaya program prints a queue row.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     #[command(flatten)]
@@ -43,7 +44,8 @@ pub struct PimdirQueueListCommand {
 }
 
 impl PimdirQueueListCommand {
-    /// Lists the creations and sends staged in the mailbox and prints them.
+    /// Lists the creations and sends staged in the mailbox and the rows
+    /// parked there, and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -51,80 +53,55 @@ impl PimdirQueueListCommand {
         client: &mut PimdirClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let queued = client.queued_envelopes(&mailbox)?;
-        let parked = client.parked_actions(&mailbox)?;
+        let messages = client.queued_rows(&mailbox)?;
+        let parked = client.parked_rows(&mailbox)?;
 
         printer.out(PimdirQueueListOutput {
             account: account.name().to_string(),
             mailbox,
-            messages: queued
-                .into_iter()
-                .map(|queued| PimdirQueuedMessage {
-                    id: queued.id,
-                    queued_at: queued.created_at,
-                    producer: queued.producer,
-                    send: queued.send,
-                    envelope: queued.envelope,
-                })
-                .collect(),
-            parked: parked
-                .into_iter()
-                .map(|parked| PimdirParkedRow {
-                    unconfirmed: parked.unconfirmed().is_some(),
-                    id: parked.id,
-                    queued_at: parked.created_at,
-                    producer: parked.producer,
-                    kind: parked.action,
-                    attempts: parked.attempts,
-                    error: parked.error,
-                })
-                .collect(),
+            messages,
+            parked,
         })
     }
 }
 
-/// One message waiting in the store's queue.
+/// One row of the store's queue, pending or parked, in the one shape
+/// every Pimalaya program prints it (pimalaya-cli's output contract, "A
+/// queue row keeps one shape"), every key printed.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PimdirQueuedMessage {
-    /// The queue row id, which `pimdir queue cancel` takes. It names a
-    /// pending action, not a message: the message has no id until the sync
-    /// engine applies the action, and gets a different one then.
-    #[serde(rename = "row")]
-    pub id: i64,
-    /// When the row was appended, stamped by the store's own clock.
-    pub queued_at: String,
-    /// The process that staged it.
-    pub producer: String,
-    /// Whether the row sends the message rather than files it.
-    pub send: bool,
-    /// The mail the action carries, derived from the body it pins. Its `id`
-    /// is `null`, a queued message having none yet.
-    pub envelope: PimdirQueuedEnvelope,
-}
-
-/// One row the sync engine parked: it will not apply it again without an
-/// operator.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct PimdirParkedRow {
-    /// The queue row id, which `pimdir queue cancel` takes.
-    #[serde(rename = "row")]
-    pub id: i64,
-    /// When the row was appended, stamped by the store's own clock.
-    pub queued_at: String,
-    /// The process that staged it.
-    pub producer: String,
-    /// The action kind: `add`, `submit`, `set-flags`, ...
+pub struct PimdirQueueRow {
+    /// The queue row id, which `pimdir queue show` and `cancel` take. It
+    /// names a queued action, not a message: a creation has no id until
+    /// the sync engine applies it, and gets a different one then.
+    pub row: i64,
+    /// The row's action as the store holds it, never re-spelled: `add`,
+    /// `submit`, `set-flags`, `move`, `remove`, `collection-create`, ...
     pub kind: String,
-    /// How many times the engine tried it before parking it.
+    /// The mailbox the row is queued on, as `mailbox list` prints its id.
+    pub collection: String,
+    /// The link id of the message the row creates, the bare `Message-ID`
+    /// `message add` printed, `null` when the row creates none.
+    pub link_id: Option<String>,
+    /// The id of the stored message the row addresses (a flag change, a
+    /// move, a copy, a removal), as `envelope list` prints it, `null` when
+    /// it addresses none, a creation among them.
+    pub item_id: Option<String>,
+    /// The process that staged the row.
+    pub producer: String,
+    /// When the row was appended, stamped by the store's own clock.
+    pub queued_at: String,
+    /// How many times the sync engine tried the row.
     pub attempts: i64,
-    /// Whether the row is unconfirmed: the engine sent its request and
-    /// cannot tell whether it took effect, so it may have.
+    /// Whether the row's outcome is unknown: the engine sent its request
+    /// and cannot tell whether it took effect, so it may have.
     pub unconfirmed: bool,
-    /// Why it was parked, as the store records it: an unconfirmed row's
-    /// starts with `unconfirmed: `.
-    pub error: String,
+    /// Why the row was parked, as the store records it, an unconfirmed
+    /// row's beginning `unconfirmed: `; `null` while the row is pending.
+    pub error: Option<String>,
+    /// The subject of the body the row pins, else of the message it
+    /// addresses, `null` when there is none to read.
+    pub subject: Option<String>,
 }
 
 /// The `pimdir queue list` output.
@@ -137,10 +114,10 @@ pub struct PimdirQueueListOutput {
     /// The mailbox listed, its alias resolved.
     #[serde(skip)]
     pub mailbox: String,
-    /// The messages staged for creation in the mailbox.
-    pub messages: Vec<PimdirQueuedMessage>,
+    /// The creations and sends staged in the mailbox.
+    pub messages: Vec<PimdirQueueRow>,
     /// The mailbox's parked rows, any kind.
-    pub parked: Vec<PimdirParkedRow>,
+    pub parked: Vec<PimdirQueueRow>,
 }
 
 impl fmt::Display for PimdirQueueListOutput {
@@ -149,36 +126,18 @@ impl fmt::Display for PimdirQueueListOutput {
         listing.head("Mailbox", &self.mailbox);
 
         for queued in &self.messages {
-            let envelope = &queued.envelope;
-            let to = match envelope.to.is_empty() {
-                true => String::new(),
-                false => format!("to {}", format_names(&envelope.to)),
-            };
-
-            listing.items.push([
-                queued.id.to_string(),
-                String::from("queued"),
-                format_flags(&envelope.flags, envelope.has_attachment),
-                sanitize::text(&queued.queued_at).into_owned(),
-                String::from(if queued.send { "send" } else { "save" }),
-                sanitize::text(&to).into_owned(),
-                sanitize::text(&envelope.subject).into_owned(),
-            ]);
+            let what = queued.subject.as_deref().or(queued.item_id.as_deref());
+            listing.items.push(cells(queued, "queued", what));
         }
 
         for parked in &self.parked {
-            listing.items.push([
-                parked.id.to_string(),
-                String::from(match parked.unconfirmed {
-                    true => "unconfirmed",
-                    false => "parked",
-                }),
-                String::from("    "),
-                sanitize::text(&parked.queued_at).into_owned(),
-                sanitize::text(&parked.kind).into_owned(),
-                String::new(),
-                sanitize::text(&parked.error).into_owned(),
-            ]);
+            let state = match parked.unconfirmed {
+                true => "unconfirmed",
+                false => "parked",
+            };
+            listing
+                .items
+                .push(cells(parked, state, parked.error.as_deref()));
         }
 
         if !listing.items.rows.is_empty() {
@@ -187,5 +146,102 @@ impl fmt::Display for PimdirQueueListOutput {
         }
 
         write!(f, "{listing}")
+    }
+}
+
+/// The text cells of `row`: its id, its `state`, when it was queued, its
+/// kind, then `last`.
+fn cells(row: &PimdirQueueRow, state: &str, last: Option<&str>) -> [String; 5] {
+    [
+        row.row.to_string(),
+        String::from(state),
+        sanitize::text(&row.queued_at).into_owned(),
+        sanitize::text(&row.kind).into_owned(),
+        sanitize::text(last.unwrap_or_default()).into_owned(),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{PimdirQueueListOutput, PimdirQueueRow};
+
+    /// A pending row of `kind` in `imap/Sent`.
+    fn row(row: i64, kind: &str) -> PimdirQueueRow {
+        PimdirQueueRow {
+            row,
+            kind: kind.into(),
+            collection: "imap/Sent".into(),
+            link_id: None,
+            item_id: None,
+            producer: "himalaya".into(),
+            queued_at: "2026-11-15T09:00:00Z".into(),
+            attempts: 0,
+            unconfirmed: false,
+            error: None,
+            subject: None,
+        }
+    }
+
+    /// A pending and a parked row print in one shape, every key present,
+    /// as every Pimalaya program prints them, and one line each under the
+    /// way to cancel one.
+    #[test]
+    fn a_pending_and_a_parked_row_keep_one_shape() {
+        let output = PimdirQueueListOutput {
+            account: "perso".into(),
+            mailbox: "imap/Sent".into(),
+            messages: vec![
+                PimdirQueueRow {
+                    link_id: Some("d1@x.org".into()),
+                    subject: Some("hi".into()),
+                    ..row(3, "add")
+                },
+                row(4, "submit"),
+            ],
+            parked: vec![PimdirQueueRow {
+                item_id: Some("7".into()),
+                attempts: 1,
+                unconfirmed: true,
+                error: Some("unconfirmed: timed out".into()),
+                subject: Some("Report".into()),
+                ..row(2, "move")
+            }],
+        };
+
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(
+            json["messages"][1],
+            json!({
+                "row": 4,
+                "kind": "submit",
+                "collection": "imap/Sent",
+                "linkId": null,
+                "itemId": null,
+                "producer": "himalaya",
+                "queuedAt": "2026-11-15T09:00:00Z",
+                "attempts": 0,
+                "unconfirmed": false,
+                "error": null,
+                "subject": null,
+            })
+        );
+        let parked = json["parked"][0].as_object().unwrap();
+        let keys: Vec<&str> = parked.keys().map(String::as_str).collect();
+        let pending = json["messages"][0].as_object().unwrap();
+        assert_eq!(keys, pending.keys().map(String::as_str).collect::<Vec<_>>());
+        assert_eq!(parked["itemId"], "7");
+
+        let text = output.to_string();
+        assert!(text.contains("Cancel:"), "{text}");
+        let lines: Vec<&str> = text.lines().skip_while(|l| !l.is_empty()).collect();
+        assert!(
+            lines[1].starts_with("3 ") && lines[1].contains("add"),
+            "{text}"
+        );
+        assert!(lines[1].ends_with("hi"), "{text}");
+        assert!(lines[3].contains("unconfirmed"), "{text}");
+        assert!(lines[3].ends_with("unconfirmed: timed out"), "{text}");
     }
 }
