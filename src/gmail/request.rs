@@ -6,17 +6,20 @@
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use io_gmail::v1::send::{GMAIL_API_BASE, GmailSend};
+use io_gmail::v1::send::{GMAIL_API_BASE as BASE, GmailSend};
 use pimalaya_cli::printer::Printer;
 use serde_json::Value;
-use url::Url;
 
-use crate::{gmail::client::GmailClient, shared::raw_json::RawJsonOutput};
+use crate::{
+    gmail::client::GmailClient,
+    shared::raw_json::{RawJsonOutput, api_url},
+};
 
 /// Send a raw Gmail API request and print the JSON response.
 ///
-/// The path is joined onto the Gmail `gmail/v1/` base, or a full URL is
-/// used as is. JSON output: `{response}`, the raw Gmail response.
+/// The path is joined onto the Gmail `gmail/v1/` base, or a full URL on the
+/// same API taken as is, any other host refused before sending. JSON
+/// output: `{response}`, the raw Gmail response.
 #[derive(Debug, Parser)]
 pub struct GmailRequestCommand {
     /// HTTP method: get, post, put, patch, delete.
@@ -34,7 +37,7 @@ pub struct GmailRequestCommand {
 impl GmailRequestCommand {
     /// Sends the request and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let url = resolve_url(&self.path)?;
+        let url = api_url(BASE, &self.path)?;
         let auth = client.auth.clone();
         let body = || parse_body(self.body.as_deref());
 
@@ -56,16 +59,6 @@ impl GmailRequestCommand {
 /// Parses the raw body argument, an absent body meaning JSON `null`.
 fn parse_body(body: Option<&str>) -> Result<Value> {
     serde_json::from_str(body.unwrap_or("null")).context("Parse request body JSON error")
-}
-
-/// Resolves a Gmail path onto the `gmail/v1/` base, a full URL being
-/// taken as is.
-fn resolve_url(path: &str) -> Result<Url> {
-    if path.starts_with("http") {
-        Ok(Url::parse(path)?)
-    } else {
-        Ok(Url::parse(GMAIL_API_BASE)?.join(path.trim_start_matches('/'))?)
-    }
 }
 
 #[cfg(test)]

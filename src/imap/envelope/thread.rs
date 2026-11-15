@@ -436,8 +436,8 @@ mod tests {
         };
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
+Account:  work (imap)
+Mailbox:  INBOX
 
 1        2026-11-11 10:00  Me     Lunch
 2  *     2026-11-11 10:00  Alice    Re: Lunch

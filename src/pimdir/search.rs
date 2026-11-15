@@ -432,10 +432,11 @@ Incomplete:  1 message(s) have no local body and matched on their headers alone
 Account:     work (pimdir)
 Query:       report
 Page:        1, message 1
-Next page:   --page 2
 Incomplete:  1 message(s) have no local body and matched on their headers alone
 
 7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
+
+Next page: --page 2
 
 Error:  9  message-unreadable  Read message `9`
 ";

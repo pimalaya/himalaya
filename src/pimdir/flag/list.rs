@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn the_list_names_one_flag_per_line() {
-        let head = "Account:    work (pimdir)\nMailbox:    INBOX\nMessage:    7\n";
+        let head = "Account:  work (pimdir)\nMailbox:  INBOX\nMessage:  7\n";
 
         let known = list(Some(vec!["\\Seen", "act"]));
         assert_eq!(known.to_string(), format!("{head}\n\\Seen\nact\n"));

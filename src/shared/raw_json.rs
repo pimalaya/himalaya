@@ -1,13 +1,34 @@
 //! # Raw JSON
 //!
 //! The output type of the protocol `request` passthroughs, printing the
-//! payload a backend answered as is.
+//! payload a backend answered as is, and the URL they send to, kept on
+//! the provider's API.
 
 use std::fmt;
 
+use anyhow::{Result, bail};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
+use url::Url;
+
+/// The URL of `path` under the API at `base`: a path joined onto it, a
+/// leading `/` dropped, or a full URL taken as is. A URL off the origin of
+/// `base` is refused before any request, so the bearer token the request
+/// carries never leaves for another host.
+pub fn api_url(base: &str, path: &str) -> Result<Url> {
+    let base = Url::parse(base)?;
+    let url = base.join(path.trim_start_matches('/'))?;
+
+    if url.origin() != base.origin() {
+        let origin = base.origin().ascii_serialization();
+        bail!(
+            "Refused URL `{url}`: it leaves the API at {origin}, which the request's bearer token is for"
+        );
+    }
+
+    Ok(url)
+}
 
 /// A raw JSON payload: pretty on stdout, verbatim under `response` with
 /// `--json`.
@@ -39,6 +60,28 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::RawJsonOutput;
+
+    /// A path joins the API, a full URL on it stays as given, and a URL off
+    /// its origin is refused, whatever its case or spelling, the bearer
+    /// token never leaving for another host.
+    #[test]
+    fn a_url_off_the_api_is_refused() {
+        let base = "https://graph.microsoft.com/v1.0/";
+        let url = |path| super::api_url(base, path).map(|url| url.to_string());
+
+        let me = "https://graph.microsoft.com/v1.0/me";
+        assert_eq!(url("/me").unwrap(), me);
+        assert_eq!(url(me).unwrap(), me);
+        for path in [
+            "https://evil.example/v1.0/me",
+            "HTTPS://evil.example/me",
+            "http://graph.microsoft.com/v1.0/me",
+            "https://graph.microsoft.com.evil.example/me",
+        ] {
+            let err = url(path).unwrap_err().to_string();
+            assert!(err.contains("Refused URL"), "{path}: {err}");
+        }
+    }
 
     /// A body prints pretty; none prints nothing.
     #[test]

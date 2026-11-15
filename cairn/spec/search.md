@@ -42,7 +42,7 @@ Each backend SHALL translate the shared query into its native surface. IMAP tran
 Graph SHALL refuse a filter holding a flag clause with the code `search-unsupported`, naming the flag: KQL has no flag property and Graph accepts no `$filter` beside `$search`, so dropping the clause would widen the result.
 
 ### Requirement: pimdir searches through the store's index
-`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-11 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
+`himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-13 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
 
 Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page SHALL print `{hits, nextPage, coverage, errors}`, `{threads, nextPage, coverage, errors}` with `--threads`: `nextPage` the number of the next page, as a string, while hits or threads follow the page, `null` once the answer is complete, which `--page-token` SHALL take back, winning over `--page`, a token that is no page number from 1 being refused. A hit whose message the store cannot read SHALL be an `errors` entry carrying its id, coded `message-unreadable` unless the store names its own code, the other hits listed (a thread without that hit) and the exit status 3; in text the entries print after the items, as every list prints them.
 
@@ -110,7 +110,7 @@ A store with no search index SHALL fail every index command with the code `index
 - THEN the command exits 1 with the code `index-missing`
 
 #### Scenario: An index of an earlier draft
-- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-10`
+- GIVEN a pimdir store whose `index_meta.format_version` is `search-draft-11`
 - WHEN `himalaya --json pimdir search lunch` runs
 - THEN the command exits 1 with the code `index-version`, and the index is left as it is
 

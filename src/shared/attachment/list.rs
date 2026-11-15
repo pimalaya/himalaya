@@ -309,9 +309,9 @@ mod tests {
         };
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Message:    42
+Account:  work (imap)
+Mailbox:  INBOX
+Message:  42
 
 2  inline  1KiB  image/png        logo.png
 5  -       1KiB  application/pdf  /tmp/report.pdf
@@ -331,9 +331,9 @@ Message:    42
         };
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Message:    42
+Account:  work (imap)
+Mailbox:  INBOX
+Message:  42
 
 No attachments
 ";

@@ -66,7 +66,10 @@ use crate::{
         submission::SubmissionEnvelope,
     },
     error::{ErrorCode, existing_mailbox, message_not_found, missing_message, pimdir_error},
-    pimdir::{client::PimdirClient, queue::list::PimdirQueueRow},
+    pimdir::{
+        client::PimdirClient,
+        queue::list::{PimdirQueueRefused, PimdirQueueRow},
+    },
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
@@ -597,6 +600,30 @@ impl PimdirClient {
                     error: None,
                     subject: addressed.subject,
                 }
+            })
+            .collect())
+    }
+
+    /// The refusals standing in the mailbox, per message and source, as
+    /// `pimdir queue list` prints them beside its rows (pimdir STORAGE
+    /// §15.4): a change applied in the store that a server refused for good,
+    /// which the sync engine holds until the message changes again.
+    pub fn refused_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRefused>> {
+        let collection = self.hub_id(mailbox)?;
+        let refusals = self
+            .store
+            .refusals(&collection)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read the refusals of pimdir mailbox `{mailbox}`"))?;
+
+        Ok(refusals
+            .into_iter()
+            .map(|refusal| PimdirQueueRefused {
+                collection: collection.clone(),
+                item_id: refusal.seq.to_string(),
+                source: refusal.source,
+                reason: refusal.reason,
+                refused_at: refusal.refused_at,
             })
             .collect())
     }
@@ -2659,7 +2686,7 @@ mod tests {
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        stamp_format(dir.path(), "storage-draft-10");
+        stamp_format(dir.path(), "storage-draft-11");
 
         let err = client.cancel_queued(staged.queue_id).unwrap_err();
 
@@ -2682,7 +2709,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            version, "storage-draft-10",
+            version, "storage-draft-11",
             "the cancel restamped the store"
         );
         assert_eq!(queued, 1, "the cancel dropped the row");
@@ -2727,12 +2754,12 @@ mod tests {
         .unwrap();
     }
 
-    /// A store of another draft, earlier or later, is refused pointing at
-    /// the reinstall neverest's MIGRATION.md walks through, never at
-    /// deleting the store.
+    /// A store of another draft, a draft-11 one an earlier neverest wrote
+    /// or a later one, is refused `store-version`, pointing at the rebuild
+    /// neverest's MIGRATION.md walks through, never at deleting the store.
     #[test]
     fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
-        for version in ["storage-draft-10", "storage-draft-12"] {
+        for version in ["storage-draft-11", "storage-draft-14"] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
 
@@ -2750,7 +2777,9 @@ mod tests {
             );
             let err = format!("{err:#}");
             assert!(err.contains(version), "{err}");
-            assert!(err.contains("upgrade Himalaya"), "{err}");
+            assert!(err.contains(io_pimdir::sql::FORMAT_VERSION), "{err}");
+            assert!(err.contains("move the store aside"), "{err}");
+            assert!(err.contains("upgrade himalaya"), "{err}");
             assert!(err.contains("neverest's MIGRATION.md"), "{err}");
             assert!(!err.contains("delete"), "{err}");
         }
@@ -4031,6 +4060,64 @@ mod tests {
 
     fn keyword(raw: &str) -> Flag {
         Flag::from_raw(raw)
+    }
+
+    /// A flag change applied, then refused for good by the server it was
+    /// pushed to, reads applied on its message with the refusal in `pimdir
+    /// queue show`, and lists beside the mailbox's queue (pimdir STORAGE
+    /// §15.4).
+    #[test]
+    fn a_refused_push_shows_on_its_row_and_beside_the_queue() {
+        use io_pimdir::{
+            change::{PimdirChangeKey, PimdirWriteOp},
+            collection::PimdirCollectionId,
+            placement::PimdirHandle,
+        };
+
+        use crate::pimdir::queue::show::PimdirQueueShowOutput;
+
+        let (dir, mut client) = flag_store(None);
+        let id = id_of(&mut client, 0);
+        let staged = client
+            .stage_flags(
+                "imap/INBOX",
+                &[id.as_str()],
+                &[keyword("todo")],
+                FlagOp::Add,
+            )
+            .unwrap();
+        let row = staged[0].queue_id.unwrap();
+
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        owner
+            .write(vec![PimdirWriteOp::RefusePlacement {
+                collection: PimdirCollectionId::from("imap/INBOX"),
+                handle: PimdirHandle("k0".into()),
+                key: PimdirChangeKey::from("892471aec94fc225"),
+                reason: String::from("NO [CANNOT] keyword refused"),
+            }])
+            .unwrap();
+        drop(owner);
+
+        let show = PimdirQueueShowOutput::new(row, client.queue_row(row).unwrap());
+        let json = serde_json::to_value(&show).unwrap();
+        assert_eq!(json["state"], "applied", "{json}");
+        assert_eq!(json["seq"].to_string(), id, "{json}");
+        assert_eq!(json["refusals"][0]["source"], "imap", "{json}");
+        assert_eq!(json["refusals"][0]["collection"], "imap/INBOX", "{json}");
+        let reason = "NO [CANNOT] keyword refused";
+        assert_eq!(json["refusals"][0]["reason"], reason, "{json}");
+        let text = show.to_string();
+        assert!(text.contains("Refused by imap in imap/INBOX at "), "{text}");
+
+        let refused = client.refused_rows("imap/INBOX").unwrap();
+        assert_eq!(refused.len(), 1);
+        assert_eq!(refused[0].item_id, id);
+        assert_eq!(refused[0].source, "imap");
+        assert_eq!(refused[0].reason, reason);
     }
 
     #[test]

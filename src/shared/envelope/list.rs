@@ -354,9 +354,9 @@ mod tests {
         envelopes.envelopes = vec![unread, answered, seen];
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       1, envelopes 1 to 3, the last
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     1, envelopes 1 to 3, the last
 
 42  * !@  2026-11-11 10:00  Alice            Lunch on Friday?
 41   R    2026-11-11 10:00  bob@example.org  Re: the report
@@ -381,13 +381,14 @@ Page:       1, envelopes 1 to 3, the last
         ];
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       2, envelopes 3 to 4
-Next page:  --page 3
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     2, envelopes 3 to 4
 
 4        2026-11-11 10:00  Alice  Hi
 3        2026-11-11 10:00  Alice  Re: Hi
+
+Next page: --page 3
 ";
         assert_eq!(envelopes.to_string(), expected);
 
@@ -396,9 +397,9 @@ Next page:  --page 3
         envelopes.envelopes.truncate(1);
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       3, envelope 5, the last
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     3, envelope 5, the last
 
 4        2026-11-11 10:00  Alice  Hi
 ";
@@ -408,9 +409,9 @@ Page:       3, envelope 5, the last
         envelopes.envelopes.clear();
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       4, empty
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     4, empty
 ";
         assert_eq!(envelopes.to_string(), expected);
     }
@@ -442,12 +443,13 @@ Page:       4, empty
         ];
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       1, envelope 1
-Next page:  --page 2
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     1, envelope 1
 
 4        2026-11-11 10:00  Alice  Hi
+
+Next page: --page 2
 
 Error:  -  message-unreadable  Cannot decode a line of the FETCH response
 Error:  3  -                   Gone
@@ -466,10 +468,10 @@ Error:  3  -                   Gone
         envelopes.query = Some(String::from("from alice order by date asc"));
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Query:      from alice order by date asc
-Page:       1, empty
+Account:  work (imap)
+Mailbox:  INBOX
+Query:    from alice order by date asc
+Page:     1, empty
 ";
         assert_eq!(envelopes.to_string(), expected);
     }
@@ -490,9 +492,9 @@ Page:       1, empty
         envelopes.envelopes = vec![sent, draft];
 
         let expected = "\
-Account:    work (imap)
-Mailbox:    INBOX
-Page:       1, envelopes 1 to 2, the last
+Account:  work (imap)
+Mailbox:  INBOX
+Page:     1, envelopes 1 to 2, the last
 
 2        2026-11-11 10:00  to Bob  Hi
 1        -                 -       Notes

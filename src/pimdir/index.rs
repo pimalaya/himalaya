@@ -1319,7 +1319,7 @@ mod tests {
         let (dir, client) = indexed_store();
         let conn = rusqlite::Connection::open(dir.path().join("index.db")).unwrap();
         conn.execute(
-            "UPDATE index_meta SET format_version = 'search-draft-10'",
+            "UPDATE index_meta SET format_version = 'search-draft-11'",
             [],
         )
         .unwrap();
@@ -1335,7 +1335,7 @@ mod tests {
             "{err:#}"
         );
         let err = format!("{err:#}");
-        assert!(err.contains("search-draft-10"), "{err}");
+        assert!(err.contains("search-draft-11"), "{err}");
         assert!(err.contains("sync engine"), "{err}");
         assert!(!err.contains("delete"), "{err}");
         let version: String = conn
@@ -1343,7 +1343,7 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(version, "search-draft-10", "the index was rebuilt");
+        assert_eq!(version, "search-draft-11", "the index was rebuilt");
     }
 
     #[test]

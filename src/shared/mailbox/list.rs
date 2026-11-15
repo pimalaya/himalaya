@@ -142,7 +142,7 @@ mod tests {
         };
 
         let expected = "\
-Account:    work
+Account:  work
 
 INBOX  inbox  3/120  INBOX
 Lists  -      -      Lists
@@ -150,7 +150,7 @@ Lists  -      -      Lists
         assert_eq!(output(true).to_string(), expected);
 
         let expected = "\
-Account:    work
+Account:  work
 
 INBOX  inbox  INBOX
 Lists  -      Lists
@@ -166,7 +166,7 @@ Lists  -      Lists
         }];
 
         let expected = "\
-Account:    work
+Account:  work
 
 INBOX  inbox  3/120  INBOX
 Lists  -      -      Lists

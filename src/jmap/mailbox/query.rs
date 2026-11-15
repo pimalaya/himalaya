@@ -335,6 +335,6 @@ mod tests {
         output.next_page = Some(String::from("2"));
         assert_eq!(serde_json::to_value(&output).unwrap()["nextPage"], "2");
         let text = output.to_string();
-        assert!(text.contains("Next page:  --page 2"), "{text}");
+        assert!(text.contains("Next page: --page 2"), "{text}");
     }
 }

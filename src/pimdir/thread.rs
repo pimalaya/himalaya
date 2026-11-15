@@ -220,8 +220,8 @@ mod tests {
         };
 
         let expected = "\
-Account:    work (pimdir)
-Thread:     t1
+Account:  work (pimdir)
+Thread:   t1
 
 1        2026-11-11 10:00  INBOX          Me     Lunch
 2  *     2026-11-11 10:00  INBOX,Archive  Alice    Re: Lunch
