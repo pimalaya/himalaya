@@ -6,11 +6,12 @@
 //!
 //! pimalaya-cli's [`Repl`] runs the loop: each line split as a shell splits
 //! it, parsed with the one-shot grammar plus `--json` and run over the
-//! [`Session`] kept here, every answer on stdout, the session flags refused
-//! by name. It claims stdin, so a command that would read its own input
-//! there is refused (`pimalaya_cli::session::check_stdin`).
+//! [`Session`] kept here, every answer on stdout, the session flags and a
+//! `repl` or `mcp` line refused by name, a `--version` line answered. It
+//! claims stdin, so a command that would read its own input there is
+//! refused (`pimalaya_cli::session::check_stdin`).
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::{printer::Printer, repl::Repl};
 
@@ -44,11 +45,8 @@ impl ReplCommand {
         let mut repl = Repl::new("himalaya", printer.is_json());
         repl.fixed.extend(["-b", "--backend"]);
 
-        repl.run::<Command, ErrorCode>(|printer, cmd| match cmd {
-            Command::Repl(_) | Command::Mcp(_) => {
-                Err(anyhow!("Cannot start a session inside a session"))
-            }
-            cmd => cmd.execute(printer, session).map_err(error::coded),
+        repl.run::<Command, ErrorCode>(|printer, cmd| {
+            cmd.execute(printer, session).map_err(error::coded)
         })
     }
 }

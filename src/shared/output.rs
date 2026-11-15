@@ -3,15 +3,16 @@
 //! What the commands returning raw content print through.
 
 use std::{
-    fmt, fs,
+    fs,
     io::{self, IsTerminal},
     path::Path,
 };
 
 use anyhow::{Context, Result, bail};
-use pimalaya_cli::{output::Bytes, printer::Printer};
-use schemars::JsonSchema;
-use serde::Serialize;
+use pimalaya_cli::{
+    output::{Bytes, SavedOutput},
+    printer::Printer,
+};
 
 /// Writes bytes to the given path, or prints them when there is none.
 ///
@@ -45,22 +46,6 @@ pub fn write_bytes_or_save(
         data: bytes,
         mime: mime.to_owned(),
     })
-}
-
-/// What a command saving bytes to a file prints.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SavedOutput {
-    /// The file written.
-    pub path: String,
-    /// How many bytes were written.
-    pub size: usize,
-}
-
-impl fmt::Display for SavedOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Saved {} bytes to {}", self.size, self.path)
-    }
 }
 
 /// Whether `bytes` read as binary, which is what a terminal must be

@@ -102,10 +102,14 @@ pub struct Cli {
 
 /// Top-level subcommands.
 ///
+/// The version it carries is what a `-V` or `--version` line of a session
+/// prints, as the command line does.
+///
 /// NOTE: parsed once per run, so the size of its largest variant, which
 /// depends on the features built, costs nothing worth a box.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Subcommand)]
+#[command(version, long_version = long_version!())]
 pub enum Command {
     #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, alias = "mailboxes")]

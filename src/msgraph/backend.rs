@@ -13,11 +13,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, FixedOffset};
 use io_msgraph::v1::{
     client::MsgraphClientStdError,
     field::MsgraphField,
+    page::MsgraphPage,
     rest::{
         batch::{MsgraphBatchRequest, MsgraphBatchResponse},
         users::{
@@ -89,28 +90,39 @@ const BATCH_MAX_WAIT: u64 = 10;
 
 impl MsgraphClient {
     /// Lists every Graph mail folder as a mailbox, nested ones named by
-    /// their path (`Parent/Child`). Graph carries counts inline, kept
-    /// only with `with_counts` as the other backends do.
-    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
+    /// their path (`Parent/Child`). With `with_counts`, counts the
+    /// messages of each folder through `$batch`, a folder whose counts
+    /// Graph refuses listed without them, beside its error.
+    pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let roles = self.folder_roles()?;
         let mut folders = Vec::new();
         self.list_folders_under(None, "", &mut folders)?;
 
-        Ok(folders
+        let requests = match with_counts {
+            true => count_requests(&self.user_id, &folders)?,
+            false => Vec::new(),
+        };
+        let responses = match requests.is_empty() {
+            true => Vec::new(),
+            false => self.batch_all(requests.clone())?,
+        };
+
+        let mut mailboxes: Vec<Mailbox> = folders
             .into_iter()
             .map(|(name, folder)| {
                 let role = roles
                     .iter()
                     .find(|(id, _)| *id == folder.id)
                     .map(|(_, role)| role.clone());
-                let mut mailbox = mailbox_from(name, folder, role);
-                if !with_counts {
-                    mailbox.total = None;
-                    mailbox.unread = None;
-                }
-                mailbox
+                mailbox_from(name, folder, role, with_counts)
             })
-            .collect())
+            .collect();
+        let errors = counts_from(&mut mailboxes, &requests, responses);
+
+        Ok(Outcome {
+            value: mailboxes,
+            errors,
+        })
     }
 
     /// Appends the folders under `parent` (the top when `None`) to
@@ -569,15 +581,125 @@ pub(super) fn well_known_role(name: &str) -> Option<MailboxRole> {
 }
 
 /// Converts one Graph mail folder named `name` into the shared
-/// [`Mailbox`] shape; Graph folders carry their counts inline.
-fn mailbox_from(name: String, folder: MsgraphMailFolder, role: Option<MailboxRole>) -> Mailbox {
+/// [`Mailbox`] shape, its counts left for [`counts_from`] to fill.
+///
+/// A folder's `totalItemCount` and `unreadItemCount` count its contacts
+/// and events too (a deleted one lands in Deleted Items), so only a 0 is
+/// a message count: a folder holding no item holds no message.
+fn mailbox_from(
+    name: String,
+    folder: MsgraphMailFolder,
+    role: Option<MailboxRole>,
+    with_counts: bool,
+) -> Mailbox {
+    let zero = |items: Option<u64>| (with_counts && items == Some(0)).then_some(0);
+
     Mailbox {
         id: folder.id,
         name,
         role,
-        total: folder.total_item_count,
-        unread: folder.unread_item_count,
+        total: zero(folder.total_item_count),
+        unread: zero(folder.unread_item_count),
     }
+}
+
+/// The `$batch` requests counting the messages of `folders`, by their
+/// index: `t<index>` all of them, `u<index>` the unread ones, through
+/// `$count` over a one-message page.
+///
+/// A folder holding no item, or no unread one, holds no such message,
+/// so it is not asked.
+fn count_requests(
+    user_id: &str,
+    folders: &[(String, MsgraphMailFolder)],
+) -> Result<Vec<MsgraphBatchRequest>> {
+    let user = user_path(user_id)?;
+    let mut requests = Vec::new();
+
+    for (index, (_, folder)) in folders.iter().enumerate() {
+        let messages = format!(
+            "/{user}/mailFolders/{}/messages?$select=id&$top=1&$count=true",
+            path_segment(&folder.id)?,
+        );
+
+        if folder.total_item_count != Some(0) {
+            requests.push(MsgraphBatchRequest {
+                id: format!("t{index}"),
+                method: "GET".into(),
+                url: messages.clone(),
+                ..Default::default()
+            });
+        }
+
+        if folder.unread_item_count != Some(0) {
+            requests.push(MsgraphBatchRequest {
+                id: format!("u{index}"),
+                method: "GET".into(),
+                url: format!("{messages}&$filter=isRead%20eq%20false"),
+                ..Default::default()
+            });
+        }
+    }
+
+    Ok(requests)
+}
+
+/// Fills the counts of `mailboxes` from the answers to `requests`
+/// ([`count_requests`]), returning the error of each mailbox a count
+/// failed for, coded `mailbox-unreadable`, both its counts then `null`.
+fn counts_from(
+    mailboxes: &mut [Mailbox],
+    requests: &[MsgraphBatchRequest],
+    mut responses: Vec<MsgraphBatchResponse>,
+) -> Vec<ItemError> {
+    let mut failed: BTreeMap<usize, ItemError> = BTreeMap::new();
+
+    for request in requests {
+        let (kind, index) = request.id.split_at(1);
+        let Some(index) = index.parse::<usize>().ok() else {
+            continue;
+        };
+        let Some(mailbox) = mailboxes.get_mut(index) else {
+            continue;
+        };
+
+        let response = responses
+            .iter()
+            .position(|response| response.id == request.id)
+            .map(|position| responses.swap_remove(position));
+
+        let count = match response {
+            Some(response) => response
+                .parse::<MsgraphPage<Value>>()
+                .map_err(anyhow::Error::from)
+                .and_then(|page| page.count.context("Graph answered no `@odata.count`")),
+            None => Err(anyhow!(
+                "Graph batch answer holds no response for this count"
+            )),
+        };
+
+        match (count, kind) {
+            (Ok(count), "t") => mailbox.total = Some(count),
+            (Ok(count), _) => mailbox.unread = Some(count),
+            (Err(err), _) => {
+                let err = err.context("Cannot count the messages of the folder");
+                let mut error = ItemError::new(Some(&mailbox.id), &err);
+                error.code = Some(ErrorCode::MailboxUnreadable);
+                failed.entry(index).or_insert(error);
+            }
+        }
+    }
+
+    failed
+        .into_iter()
+        .map(|(index, error)| {
+            if let Some(mailbox) = mailboxes.get_mut(index) {
+                mailbox.total = None;
+                mailbox.unread = None;
+            }
+            error
+        })
+        .collect()
 }
 
 /// Reads the well-known folder ids off their `$batch` responses.
@@ -1080,5 +1202,195 @@ mod tests {
                 (Some("c"), Some(ErrorCode::PermissionDenied)),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod count_tests {
+    use std::{
+        collections::VecDeque,
+        io::{Cursor, Read, Result, Write},
+        sync::{Arc, Mutex},
+    };
+
+    use io_msgraph::v1::client::MsgraphClientStd;
+    use serde_json::{Value, json};
+
+    use crate::{error::ErrorCode, msgraph::client::MsgraphClient};
+
+    /// A Graph server answering each request with the next scripted
+    /// response, keeping the requests it reads.
+    struct Script {
+        responses: VecDeque<Vec<u8>>,
+        response: Cursor<Vec<u8>>,
+        requests: Arc<Mutex<Vec<String>>>,
+        answered: bool,
+    }
+
+    impl Read for Script {
+        fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+            if !self.answered {
+                let response = self.responses.pop_front().unwrap_or_default();
+                self.response = Cursor::new(response);
+                self.answered = true;
+            }
+
+            self.response.read(buf)
+        }
+    }
+
+    impl Write for Script {
+        fn write(&mut self, buf: &[u8]) -> Result<usize> {
+            let mut requests = self.requests.lock().unwrap();
+
+            if self.answered {
+                requests.push(String::new());
+                self.answered = false;
+            }
+
+            let request = requests.last_mut().unwrap();
+            request.push_str(&String::from_utf8_lossy(buf));
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A client over a Graph server answering `bodies` in order, each a
+    /// 200 carrying JSON, and the requests it reads.
+    fn graph(bodies: &[Value]) -> (MsgraphClient, Arc<Mutex<Vec<String>>>) {
+        let responses = bodies.iter().map(|body| {
+            let body = body.to_string();
+            let len = body.len();
+            let head = "HTTP/1.1 200 OK\r\nContent-Type: application/json";
+            format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
+        });
+
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let script = Script {
+            responses: responses.collect(),
+            response: Cursor::default(),
+            requests: requests.clone(),
+            answered: true,
+        };
+        let inner = MsgraphClientStd::new(script, "token", Default::default());
+
+        (MsgraphClient::over(inner), requests)
+    }
+
+    /// The `$batch` answer of the well-known folder lookups, two batches
+    /// of four requests at most, the trash alone found.
+    fn roles() -> [Value; 2] {
+        let missing = |id: &str| {
+            let body = json!({"error": {"code": "ErrorItemNotFound"}});
+            json!({"id": id, "status": 404, "body": body})
+        };
+        let trash = json!({"id": "deleteditems", "status": 200, "body": {"id": "D"}});
+        let first = [
+            missing("inbox"),
+            missing("sentitems"),
+            missing("drafts"),
+            trash,
+        ];
+
+        [
+            json!({ "responses": first }),
+            json!({"responses": [missing("junkemail"), missing("archive")]}),
+        ]
+    }
+
+    /// Graph's `totalItemCount` counts the contacts and events a folder
+    /// holds too: the Deleted Items of the Microsoft test account said 835
+    /// where its messages were 26. The counts are its messages', and a
+    /// folder holding no unread item is not asked for its unread ones.
+    #[test]
+    fn a_folder_counts_its_messages_not_its_items() {
+        let [inbox, junk] = roles();
+        let folders = json!({"value": [{
+            "id": "D",
+            "displayName": "Deleted Items",
+            "childFolderCount": 0,
+            "unreadItemCount": 0,
+            "totalItemCount": 835,
+        }]});
+        let counts = json!({"responses": [{
+            "id": "t0",
+            "status": 200,
+            "body": {"@odata.count": 26, "value": [{"id": "m1"}]},
+        }]});
+        let (mut client, requests) = graph(&[inbox, junk, folders, counts]);
+
+        let outcome = client.list_mailboxes(true).unwrap();
+        assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+        let [trash] = outcome.value.as_slice() else {
+            panic!("{:?}", outcome.value);
+        };
+        assert_eq!((trash.total, trash.unread), (Some(26), Some(0)));
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 4, "{requests:#?}");
+        let batch = &requests[3];
+        let url = "/me/mailFolders/D/messages?$select=id&$top=1&$count=true";
+        assert!(batch.contains(&format!(r#""url":"{url}""#)), "{batch}");
+        assert!(!batch.contains("isRead"), "{batch}");
+    }
+
+    /// The unread messages are counted apart, and a folder whose count
+    /// Graph refuses is listed without counts beside its error.
+    #[test]
+    fn a_refused_count_leaves_the_folder_uncounted() {
+        let [inbox, junk] = roles();
+        let folder = |id: &str, total: u64, unread: u64| {
+            json!({
+                "id": id,
+                "displayName": id,
+                "childFolderCount": 0,
+                "unreadItemCount": unread,
+                "totalItemCount": total,
+            })
+        };
+        let folders = json!({"value": [folder("A", 12, 3), folder("B", 4, 0)]});
+        let count = |id: &str, count: u64| {
+            let body = json!({"@odata.count": count, "value": []});
+            json!({"id": id, "status": 200, "body": body})
+        };
+        let denied = json!({
+            "id": "t1",
+            "status": 403,
+            "body": {"error": {"code": "ErrorAccessDenied", "message": "Denied"}},
+        });
+        let counts = json!({"responses": [count("t0", 10), count("u0", 2), denied]});
+        let (mut client, requests) = graph(&[inbox, junk, folders, counts]);
+
+        let outcome = client.list_mailboxes(true).unwrap();
+        let [a, b] = outcome.value.as_slice() else {
+            panic!("{:?}", outcome.value);
+        };
+        assert_eq!((a.total, a.unread), (Some(10), Some(2)));
+        assert_eq!((b.total, b.unread), (None, None));
+
+        let [error] = outcome.errors.as_slice() else {
+            panic!("{:?}", outcome.errors);
+        };
+        assert_eq!(error.id.as_deref(), Some("B"));
+        assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
+
+        let requests = requests.lock().unwrap();
+        let unread = "$count=true&$filter=isRead%20eq%20false";
+        assert!(requests[3].contains(unread), "{}", requests[3]);
+    }
+
+    /// Without `--counts`, nothing is counted and nothing asked.
+    #[test]
+    fn an_uncounted_listing_asks_no_count() {
+        let [inbox, junk] = roles();
+        let folders = json!({"value": [{"id": "D", "displayName": "Deleted Items"}]});
+        let (mut client, requests) = graph(&[inbox, junk, folders]);
+
+        let outcome = client.list_mailboxes(false).unwrap();
+        assert_eq!(outcome.value[0].total, None);
+        assert_eq!(requests.lock().unwrap().len(), 3);
     }
 }

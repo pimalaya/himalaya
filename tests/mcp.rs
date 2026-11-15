@@ -346,9 +346,9 @@ fn a_failing_command_carries_its_code_and_the_server_goes_on() {
     let config = account(dir.path());
     let responses = serve(
         &config,
-        &["--allow-write"],
+        &[],
         &[
-            call(1, "message_add", json!({ "mailbox": "inbox" })),
+            call(1, "attachment_list", json!({ "message-id": "nope" })),
             call(2, "envelope_list", json!({})),
         ],
     );
@@ -357,7 +357,7 @@ fn a_failing_command_carries_its_code_and_the_server_goes_on() {
     let report: Value =
         serde_json::from_str(failed["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(failed["isError"], true);
-    assert_eq!(report["code"], "stdin-taken");
+    assert_eq!(report["code"], "message-not-found", "{report}");
 
     assert_eq!(
         responses[1]["result"]["structuredContent"]["envelopes"][0]["id"],
@@ -404,8 +404,9 @@ fn a_message_is_named_message_id() {
     assert!(error.contains("message-id"), "{error}");
 }
 
-/// An argument the tool's schema refuses, and a value it admits but the
-/// command's grammar refuses, fail the call coded `usage-invalid`.
+/// An argument the tool's schema refuses, a value it admits but the
+/// command's grammar refuses, and a required argument left out fail the
+/// call coded `usage-invalid`.
 #[test]
 fn a_refused_argument_is_a_usage_failure() {
     let dir = TempDir::new().unwrap();
@@ -416,17 +417,25 @@ fn a_refused_argument_is_a_usage_failure() {
         &[
             call(1, "envelope_list", json!({ "query": "hello" })),
             call(2, "envelope_list", json!({ "page-size": -1 })),
+            call(3, "message_read", json!({})),
         ],
     );
 
     let unknown = refusal(&responses[0]);
     assert_eq!(unknown["code"], "usage-invalid", "{unknown}");
 
+    // Named as the tool's input names it, not as clap renders the flag.
     let invalid = refusal(&responses[1]);
     let error = invalid["error"].as_str().unwrap();
     assert_eq!(invalid["code"], "usage-invalid", "{invalid}");
-    assert!(error.contains("--page-size"), "{error}");
-    assert!(!error.starts_with("error:"), "{error}");
+    assert!(
+        error.starts_with("Invalid value `-1` for `page-size`: "),
+        "{error}"
+    );
+
+    let missing = refusal(&responses[2]);
+    assert_eq!(missing["code"], "usage-invalid", "{missing}");
+    assert_eq!(missing["error"], "Missing argument `message-id`");
 }
 
 #[test]
@@ -709,10 +718,10 @@ fn the_download_tool_takes_exactly_one_part_id() {
         ],
     );
 
-    // Two ids are refused by the tool's grammar, none by the command.
+    // Two ids and none are refused by the tool's grammar.
     let refusals = [
         "Argument `attachment-id` takes exactly one value",
-        "`--stdout` takes exactly one attachment id",
+        "Missing argument `attachment-id`",
     ];
 
     for (refused, error) in responses.iter().zip(refusals) {

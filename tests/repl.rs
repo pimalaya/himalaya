@@ -133,8 +133,28 @@ fn a_session_refuses_a_session_inside_it() {
     for answer in &answers[..2] {
         let error = "Cannot start a session inside a session";
         assert_eq!(answer["error"], error, "{answer}");
+        assert_eq!(answer["code"], "usage-invalid", "{answer}");
     }
     assert_eq!(answers[2]["envelopes"][0]["id"], "m1");
+}
+
+/// A `-V` or `--version` line prints the version the binary prints, on
+/// stdout in a text session and on stderr in a JSON one.
+#[test]
+fn a_version_line_prints_the_version() {
+    let dir = TempDir::new().unwrap();
+    let version = env!("CARGO_PKG_VERSION");
+
+    // The short version, then the long one after a command, named after
+    // the command as the command line names it.
+    let (stdout, stderr) = run(dir.path(), &[], "-V\nenvelope list --version\n");
+    let expected = format!("himalaya {version}\nhimalaya-envelope-list v{version} ");
+    assert!(stdout.starts_with(&expected), "{stdout}{stderr}");
+    assert!(stdout.contains("\nbuild: "), "{stdout}");
+
+    let (stdout, stderr) = run(dir.path(), &["--json"], "--version\nenvelope list\n");
+    assert!(stderr.starts_with("himalaya v"), "{stderr}");
+    assert_eq!(values(&stdout)[0]["envelopes"][0]["id"], "m1");
 }
 
 /// A message the mailbox does not hold answers `message-not-found`, and

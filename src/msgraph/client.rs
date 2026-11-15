@@ -105,11 +105,23 @@ impl MsgraphClient {
 
     fn folder_index(&mut self) -> Result<&MailboxIndex> {
         if self.folder_index.is_none() {
-            let folders = self.list_mailboxes(false)?;
+            let folders = self.list_mailboxes(false)?.value;
             self.folder_index = Some(MailboxIndex(folders));
         }
 
         Ok(self.folder_index.get_or_insert_default())
+    }
+}
+
+#[cfg(test)]
+impl MsgraphClient {
+    /// A client over `inner`, such as one on a scripted stream, its
+    /// folders not fetched yet.
+    pub(crate) fn over(inner: Inner) -> Self {
+        Self {
+            inner,
+            folder_index: None,
+        }
     }
 }
 

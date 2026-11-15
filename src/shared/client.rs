@@ -163,7 +163,7 @@ impl EmailClient {
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.list_mailboxes(with_counts).map(Outcome::from),
+            BackendClient::Msgraph(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "maildir")]
             BackendClient::Maildir(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "mbox")]

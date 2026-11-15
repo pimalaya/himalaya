@@ -208,7 +208,7 @@ impl AccountConfig {
     }
 
     /// The backends whose block the account holds, compiled in or not.
-    fn configured(&self) -> Vec<Backend> {
+    pub(crate) fn configured(&self) -> Vec<Backend> {
         let blocks = [
             (Backend::Imap, self.imap.is_some()),
             (Backend::Jmap, self.jmap.is_some()),

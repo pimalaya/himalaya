@@ -6,16 +6,14 @@
 
 #[cfg(feature = "mbox")]
 use std::fs::File;
-use std::{fmt, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 #[cfg(feature = "mbox")]
 use anyhow::bail;
 use clap::Parser;
-use pimalaya_cli::{error::PartialOutcome, fields::Fields, printer::Printer};
+use pimalaya_cli::{account::AccountCheckOutput, error::PartialOutcome, printer::Printer};
 use pimalaya_config::secret::SecretResolver;
-use schemars::JsonSchema;
-use serde::Serialize;
 
 #[cfg(feature = "imap")]
 use crate::config::imap::ImapConfig;
@@ -59,7 +57,7 @@ impl AccountCheckCommand {
             )),
             allow(unused_mut)
         )]
-        let mut report = AccountCheckOutput {
+        let mut report = AccountCheckOutput::<ErrorCode> {
             account: name,
             backends: Vec::new(),
         };
@@ -83,37 +81,34 @@ impl AccountCheckCommand {
         if backend.allows_imap()
             && let Some(imap_config) = &account_config.imap
         {
-            report.backends.push(BackendCheck::from(
-                "imap",
-                connect_imap(imap_config, &mut resolver),
-            ));
+            report
+                .backends
+                .push(check("imap", connect_imap(imap_config, &mut resolver)));
         }
 
         #[cfg(feature = "jmap")]
         if backend.allows_jmap()
             && let Some(jmap_config) = &account_config.jmap
         {
-            report.backends.push(BackendCheck::from(
-                "jmap",
-                connect_jmap(jmap_config, &mut resolver),
-            ));
+            report
+                .backends
+                .push(check("jmap", connect_jmap(jmap_config, &mut resolver)));
         }
 
         #[cfg(feature = "gmail")]
         if backend.allows_gmail()
             && let Some(gmail_config) = &account_config.gmail
         {
-            report.backends.push(BackendCheck::from(
-                "gmail",
-                connect_gmail(gmail_config, &mut resolver),
-            ));
+            report
+                .backends
+                .push(check("gmail", connect_gmail(gmail_config, &mut resolver)));
         }
 
         #[cfg(feature = "msgraph")]
         if backend.allows_msgraph()
             && let Some(msgraph_config) = &account_config.msgraph
         {
-            report.backends.push(BackendCheck::from(
+            report.backends.push(check(
                 "msgraph",
                 connect_msgraph(msgraph_config, &mut resolver),
             ));
@@ -123,10 +118,9 @@ impl AccountCheckCommand {
         if backend.allows_maildir()
             && let Some(maildir_config) = &account_config.maildir
         {
-            report.backends.push(BackendCheck::from(
-                "maildir",
-                connect_maildir(maildir_config),
-            ));
+            report
+                .backends
+                .push(check("maildir", connect_maildir(maildir_config)));
         }
 
         #[cfg(feature = "mbox")]
@@ -135,7 +129,7 @@ impl AccountCheckCommand {
         {
             report
                 .backends
-                .push(BackendCheck::from("mbox", connect_mbox(mbox_config)));
+                .push(check("mbox", connect_mbox(mbox_config)));
         }
 
         #[cfg(feature = "pimdir")]
@@ -144,27 +138,25 @@ impl AccountCheckCommand {
         {
             report
                 .backends
-                .push(BackendCheck::from("pimdir", connect_pimdir(pimdir_config)));
+                .push(check("pimdir", connect_pimdir(pimdir_config)));
         }
 
         #[cfg(feature = "smtp")]
         if backend.allows_smtp()
             && let Some(smtp_config) = &account_config.smtp
         {
-            report.backends.push(BackendCheck::from(
-                "smtp",
-                connect_smtp(smtp_config, &mut resolver),
-            ));
+            report
+                .backends
+                .push(check("smtp", connect_smtp(smtp_config, &mut resolver)));
         }
 
         #[cfg(feature = "sieve")]
         if backend.allows_sieve()
             && let Some(sieve_config) = &account_config.sieve
         {
-            report.backends.push(BackendCheck::from(
-                "sieve",
-                connect_sieve(sieve_config, &mut resolver),
-            ));
+            report
+                .backends
+                .push(check("sieve", connect_sieve(sieve_config, &mut resolver)));
         }
 
         if report.backends.is_empty() {
@@ -410,76 +402,24 @@ fn connect_sieve(
     Ok(())
 }
 
-/// The `account check` output, one outcome per backend.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountCheckOutput {
-    /// The account that was checked.
-    pub account: String,
-    /// One entry per backend the account declares and `--backend` allows.
-    pub backends: Vec<BackendCheck>,
-}
-
-/// Outcome of checking one backend's connection.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct BackendCheck {
-    /// The backend that was checked.
-    pub backend: &'static str,
-    /// Whether it answered.
-    pub ok: bool,
-    /// The stable code of the failure, `null` when it answered or the
-    /// failure carries none.
-    pub code: Option<ErrorCode>,
-    /// Why it did not answer, `null` when it did.
-    pub error: Option<String>,
-}
-
-impl BackendCheck {
-    /// Folds a connection attempt into its outcome.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "mbox",
-        feature = "pimdir",
-        feature = "smtp",
-        feature = "sieve"
-    ))]
-    fn from(backend: &'static str, result: Result<()>) -> Self {
-        match result {
-            Ok(()) => Self {
-                backend,
-                ok: true,
-                code: None,
-                error: None,
-            },
-            Err(err) => Self {
-                backend,
-                ok: false,
-                code: crate::error::code(&err),
-                error: Some(format!("{err:#}")),
-            },
-        }
-    }
-}
-
-impl fmt::Display for AccountCheckOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut fields = Fields::default();
-        fields.push("Account", &self.account);
-
-        for check in &self.backends {
-            match &check.error {
-                None => fields.push(check.backend, "OK"),
-                Some(err) => fields.push(check.backend, format!("FAIL ({err})")),
-            }
-        }
-
-        write!(f, "{fields}")
-    }
+/// Folds a connection attempt to `backend` into its outcome, coded as a
+/// one-shot run codes its failure.
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "pimdir",
+    feature = "smtp",
+    feature = "sieve"
+))]
+fn check(
+    backend: &'static str,
+    result: Result<()>,
+) -> pimalaya_cli::account::BackendCheck<ErrorCode> {
+    pimalaya_cli::account::BackendCheck::new(backend, result.map_err(crate::error::coded))
 }
 
 #[cfg(all(test, feature = "pimdir"))]

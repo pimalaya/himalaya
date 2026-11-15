@@ -165,11 +165,11 @@ pub fn registry() -> JsonSchemaRegistry {
 
     insert!(
         "himalaya-account-list",
-        crate::account::list::AccountListOutput
+        pimalaya_cli::account::AccountListOutput
     );
     insert!(
         "himalaya-account-check",
-        crate::account::check::AccountCheckOutput
+        pimalaya_cli::account::AccountCheckOutput<ErrorCode>
     );
     insert!(
         "himalaya-account-capability",
@@ -609,7 +609,9 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "gmail")]
     {
-        use crate::{gmail::settings, shared::output::SavedOutput};
+        use pimalaya_cli::output::SavedOutput;
+
+        use crate::gmail::settings;
 
         for key in [
             "himalaya-gmail-drafts-delete",
@@ -674,7 +676,7 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "msgraph")]
     {
-        use crate::shared::output::SavedOutput;
+        use pimalaya_cli::output::SavedOutput;
 
         for key in [
             "himalaya-msgraph-attachments-create",

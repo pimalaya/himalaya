@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `-V` and `--version` lines to `himalaya repl`, printing what the command line prints, after a command too, on stderr in a JSON session (pimalaya-cli 0.5.1).
 - Added `id` and `etag` to `message read --json`: the id the command took, and `etag` `null`, a message's body never changing and no write taking a version to match. `message parse` prints the view without them.
 - Added `account_capability` to `himalaya mcp`, a reading tool listed whatever the flags, answering the rows `account capability` prints, as Calendula and Cardamum do.
 - Added `total` to the `envelope list` JSON output: how many messages the mailbox holds, read within the listing itself (IMAP `SELECT` `EXISTS`, JMAP `calculateTotal`, the entries Maildir, mbox and pimdir hold), `null` on Gmail and Microsoft Graph and always for `envelope search`.
@@ -75,6 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Changed `account list` to name under `backends` the blocks the build serves and under `notBuilt` the ones it leaves out, marked ` (not built)` in text, where `backends` named every declared block: only a reduced build lists differently, a full one adding `"notBuilt":[]`. `account list` and `account check` print pimalaya-cli's shared account outputs, the check's text sanitizing the account name and the errors.
+- Changed a `repl` or `mcp` line inside a session, by name, alias or prefix, to be refused coded `usage-invalid` by pimalaya-cli 0.5.1, where the refusal carried no code.
+- Changed a refused MCP tool call to name its argument as the tool's input names it (pimalaya-cli 0.5.1): a required argument left out is refused before the command runs, ``Missing argument `message-id` ``, and a value the command refuses reads ``Invalid value `-1` for `page-size`: <reason>``, where clap's text named the flag. `message_add` without `message` answers that refusal, where it failed `stdin-taken`.
 - **BREAKING**: Changed the top level, the account blocks and the `message` table to refuse a key they do not know, as every other table did, so a typo fails the load naming the key and its line instead of being ignored. The rest of a v1 `[message]` table (`read`, `write`, `send.backend`) is refused with them. himalaya-tui's own keys go under a `[tui]` table at the top level and `[accounts.<name>.tui]` in an account, which Himalaya loads whatever they hold and never reads: `keybinds`, `contact-command`, `contact-complete-key` and `theme` at the top level, `contact-command` in an account.
 - **BREAKING**: Changed `flag add|set|remove`, `message copy`, `message move` and `message delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on; given none it holds, they print `count: 0` where they printed the failure object and exited 1.
 - **BREAKING**: Changed `imap fetch --internal-date` to print `internalDate` with `Z` for a UTC instant (`2026-07-17T10:00:00Z`), where it printed `+00:00`, and the read view of `message read` and `message parse` its `headers.date` the same, as `envelope list`, `envelope search` and the `vacation` dates already did; any other offset is kept.
@@ -236,6 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `mailbox list --counts` on Microsoft Graph counting a folder's contacts and events with its messages: `total` and `unread` are the folder's message counts, Graph's `@odata.count` over its `/messages` through `$batch`, where they were its `totalItemCount` and `unreadItemCount` (a Deleted Items printed 835 for 26 messages). A count Graph refuses lists the folder without counts beside a `mailbox-unreadable` entry.
 - Fixed an IMAP `message delete` in the trash that found no id reporting `flagged` and advising an expunge ([#814]): with UIDPLUS it reports `deleted` with `count` 0, and the expunge advice prints only when messages were flagged.
 - Fixed an IMAP listing dropping a message whose `FETCH` line does not decode, with a warning only ([#801]): the message is listed with the items that decoded, `hasAttachment` `null` when `BODYSTRUCTURE` failed, beside a `message-unreadable` entry naming its UID and the failed items; a line that does not decode at all is an entry with a `null` id.
 - Fixed a Maildir listing skipping an unreadable message file or folder with a warning only: each is a `message-unreadable` or `mailbox-unreadable` entry with its id, a file's on the first page of a paged listing.

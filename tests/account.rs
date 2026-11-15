@@ -124,3 +124,52 @@ fn a_backend_flag_naming_a_backend_left_out_is_backend_not_built() {
     );
     assert_mbox_not_built(&printed(&output, 1));
 }
+
+/// `account list` names the backends this build serves under `backends`
+/// and the ones it leaves out under `notBuilt`, marked in text.
+#[test]
+fn account_list_splits_the_declared_backends_by_build() {
+    let home = TempDir::new().unwrap();
+    let toml = "[accounts.a]\ndefault = true\n\
+                maildir.root = \"/nonexistent\"\n\
+                mbox.root = \"/nonexistent\"\n";
+
+    let (mut built, mut not_built) = (Vec::new(), Vec::new());
+    for (backend, compiled) in [
+        ("maildir", cfg!(feature = "maildir")),
+        ("mbox", cfg!(feature = "mbox")),
+    ] {
+        match compiled {
+            true => built.push(backend),
+            false => not_built.push(backend),
+        }
+    }
+
+    let output = run(home.path(), toml, &["account", "list"]);
+    let json = printed(&output, 0);
+    let account = &json["accounts"][0];
+    assert_eq!(account["name"], "a", "{json}");
+    assert_eq!(account["backends"], serde_json::json!(built), "{json}");
+    assert_eq!(account["notBuilt"], serde_json::json!(not_built), "{json}");
+
+    let config = home.path().join("config.toml");
+    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .args(["-c", config.to_str().unwrap(), "account", "list"])
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path())
+        .env_remove("XDG_CONFIG_DIRS")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    let text = String::from_utf8(output.stdout).unwrap();
+    let marked: Vec<String> = not_built
+        .iter()
+        .map(|b| format!("{b} (not built)"))
+        .collect();
+    let cell = [built.join(","), marked.join(",")]
+        .into_iter()
+        .filter(|cell| !cell.is_empty())
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(text, format!("a  {cell}  default\n"));
+}
