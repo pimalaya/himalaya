@@ -299,9 +299,12 @@ impl MsgraphClient {
 
     /// Lists envelopes from the `mailbox` folder (id or well-known name
     /// such as `inbox`). Page 1 is the most recent window; the offset is
-    /// `(page - 1) * page_size` via OData `$skip`, and a page follows while
-    /// Graph gives a next link. Without a page size, every page is read and
-    /// `page` is moot.
+    /// `(page - 1) * page_size` via OData `$skip`. Without a page size,
+    /// every page is read and `page` is moot.
+    ///
+    /// Graph answers a next link after an exactly full last page too, so
+    /// the page is asked one message longer, a page following when that
+    /// one comes back; past the largest `$top`, the next link answers.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -311,7 +314,10 @@ impl MsgraphClient {
     ) -> Result<EnvelopePage> {
         let page = page.unwrap_or(1).max(1);
         let (top, skip) = match page_size {
-            Some(size) => (size, Some((page - 1) * size)),
+            Some(size) => (
+                size.saturating_add(1).min(MESSAGES_MAX_TOP),
+                Some((page - 1) * size),
+            ),
             None => (MESSAGES_MAX_TOP, None),
         };
 
@@ -324,6 +330,12 @@ impl MsgraphClient {
         let response = self.messages_list(Some(mailbox), &params)?.response;
 
         let (messages, more) = match page_size {
+            Some(size) if top > size => {
+                let mut messages = response.value;
+                let more = messages.len() > size as usize;
+                messages.truncate(size as usize);
+                (messages, more)
+            }
             Some(_) => (response.value, response.next_link.is_some()),
             None => (self.messages_to_the_end(response)?, false),
         };
@@ -338,8 +350,11 @@ impl MsgraphClient {
     ///
     /// Graph refuses `$skip` and `$orderby` beside `$search`, so a page is
     /// reached through the paging links and sorted locally, newest first
-    /// by default since Graph answers in relevance order. Without a page
-    /// size, every page is read.
+    /// by default since Graph answers in relevance order. The links are
+    /// followed up to one message past the page, the first request asking
+    /// that many at once, so a page follows when that message exists:
+    /// Graph answers a next link after an exactly full last page too.
+    /// Without a page size, every page is read.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -360,8 +375,21 @@ impl MsgraphClient {
             Some(odata_filter) => (None, Some(odata_filter)),
             None => (Some(search::filter_to_search(filter)?), None),
         };
+
+        // NOTE: the page's first message, and how many to read to know
+        // whether one follows it.
+        let window = page_size.map(|size| {
+            let start = (page.unwrap_or(1).max(1) as usize - 1).saturating_mul(size as usize);
+            (start, start.saturating_add(size as usize))
+        });
+        let top = match window {
+            Some((_, end)) => u32::try_from(end.saturating_add(1))
+                .map_or(MESSAGES_MAX_TOP, |top| top.min(MESSAGES_MAX_TOP)),
+            None => MESSAGES_MAX_TOP,
+        };
+
         let params = MsgraphMessagesListParams {
-            top: Some(page_size.unwrap_or(MESSAGES_MAX_TOP)),
+            top: Some(top),
             select: Some(ENVELOPE_SELECT),
             search: search.as_deref(),
             filter: odata_filter.as_deref(),
@@ -369,15 +397,25 @@ impl MsgraphClient {
         };
         let mut response = self.messages_list(Some(mailbox), &params)?.response;
 
-        let (messages, more) = match page_size {
-            Some(_) => {
-                for _ in 1..page.unwrap_or(1).max(1) {
+        let (messages, more) = match window {
+            Some((start, end)) => {
+                let mut messages = Vec::new();
+
+                loop {
+                    messages.append(&mut response.value);
+
+                    if messages.len() > end {
+                        break;
+                    }
                     let Some(next) = response.next_link else {
-                        return Ok(EnvelopePage::default());
+                        break;
                     };
                     response = self.messages_next_page(&next)?;
                 }
-                (response.value, response.next_link.is_some())
+
+                let more = messages.len() > end;
+                messages.truncate(end);
+                (messages.split_off(start.min(messages.len())), more)
             }
             None => (self.messages_to_the_end(response)?, false),
         };
@@ -581,34 +619,35 @@ pub(super) fn well_known_role(name: &str) -> Option<MailboxRole> {
 }
 
 /// Converts one Graph mail folder named `name` into the shared
-/// [`Mailbox`] shape, its counts left for [`counts_from`] to fill.
+/// [`Mailbox`] shape, its total left for [`counts_from`] to fill.
 ///
-/// A folder's `totalItemCount` and `unreadItemCount` count its contacts
-/// and events too (a deleted one lands in Deleted Items), so only a 0 is
-/// a message count: a folder holding no item holds no message.
+/// A folder's `totalItemCount` counts its contacts and events too (a
+/// deleted one lands in Deleted Items), so only a 0 is a message count:
+/// a folder holding no item holds no message. Its `unreadItemCount`
+/// matched its unread messages live, so `unread` reads it as is.
 fn mailbox_from(
     name: String,
     folder: MsgraphMailFolder,
     role: Option<MailboxRole>,
     with_counts: bool,
 ) -> Mailbox {
-    let zero = |items: Option<u64>| (with_counts && items == Some(0)).then_some(0);
+    let total = (with_counts && folder.total_item_count == Some(0)).then_some(0);
+    let unread = folder.unread_item_count.filter(|_| with_counts);
 
     Mailbox {
         id: folder.id,
         name,
         role,
-        total: zero(folder.total_item_count),
-        unread: zero(folder.unread_item_count),
+        total,
+        unread,
     }
 }
 
-/// The `$batch` requests counting the messages of `folders`, by their
-/// index: `t<index>` all of them, `u<index>` the unread ones, through
-/// `$count` over a one-message page.
+/// The `$batch` requests counting the messages of `folders`, each
+/// identified by the folder's index, through `$count` over a one-message
+/// page.
 ///
-/// A folder holding no item, or no unread one, holds no such message,
-/// so it is not asked.
+/// A folder holding no item holds no message, so it is not asked.
 fn count_requests(
     user_id: &str,
     folders: &[(String, MsgraphMailFolder)],
@@ -617,34 +656,25 @@ fn count_requests(
     let mut requests = Vec::new();
 
     for (index, (_, folder)) in folders.iter().enumerate() {
-        let messages = format!(
-            "/{user}/mailFolders/{}/messages?$select=id&$top=1&$count=true",
-            path_segment(&folder.id)?,
-        );
-
-        if folder.total_item_count != Some(0) {
-            requests.push(MsgraphBatchRequest {
-                id: format!("t{index}"),
-                method: "GET".into(),
-                url: messages.clone(),
-                ..Default::default()
-            });
+        if folder.total_item_count == Some(0) {
+            continue;
         }
 
-        if folder.unread_item_count != Some(0) {
-            requests.push(MsgraphBatchRequest {
-                id: format!("u{index}"),
-                method: "GET".into(),
-                url: format!("{messages}&$filter=isRead%20eq%20false"),
-                ..Default::default()
-            });
-        }
+        requests.push(MsgraphBatchRequest {
+            id: index.to_string(),
+            method: "GET".into(),
+            url: format!(
+                "/{user}/mailFolders/{}/messages?$select=id&$top=1&$count=true",
+                path_segment(&folder.id)?,
+            ),
+            ..Default::default()
+        });
     }
 
     Ok(requests)
 }
 
-/// Fills the counts of `mailboxes` from the answers to `requests`
+/// Fills the totals of `mailboxes` from the answers to `requests`
 /// ([`count_requests`]), returning the error of each mailbox a count
 /// failed for, coded `mailbox-unreadable`, both its counts then `null`.
 fn counts_from(
@@ -652,11 +682,10 @@ fn counts_from(
     requests: &[MsgraphBatchRequest],
     mut responses: Vec<MsgraphBatchResponse>,
 ) -> Vec<ItemError> {
-    let mut failed: BTreeMap<usize, ItemError> = BTreeMap::new();
+    let mut errors = Vec::new();
 
     for request in requests {
-        let (kind, index) = request.id.split_at(1);
-        let Some(index) = index.parse::<usize>().ok() else {
+        let Some(index) = request.id.parse::<usize>().ok() else {
             continue;
         };
         let Some(mailbox) = mailboxes.get_mut(index) else {
@@ -678,28 +707,20 @@ fn counts_from(
             )),
         };
 
-        match (count, kind) {
-            (Ok(count), "t") => mailbox.total = Some(count),
-            (Ok(count), _) => mailbox.unread = Some(count),
-            (Err(err), _) => {
+        match count {
+            Ok(count) => mailbox.total = Some(count),
+            Err(err) => {
                 let err = err.context("Cannot count the messages of the folder");
                 let mut error = ItemError::new(Some(&mailbox.id), &err);
                 error.code = Some(ErrorCode::MailboxUnreadable);
-                failed.entry(index).or_insert(error);
+                errors.push(error);
+                mailbox.total = None;
+                mailbox.unread = None;
             }
         }
     }
 
-    failed
-        .into_iter()
-        .map(|(index, error)| {
-            if let Some(mailbox) = mailboxes.get_mut(index) {
-                mailbox.total = None;
-                mailbox.unread = None;
-            }
-            error
-        })
-        .collect()
+    errors
 }
 
 /// Reads the well-known folder ids off their `$batch` responses.
@@ -872,7 +893,7 @@ fn is_retryable(status: u16) -> bool {
 }
 
 /// Folds a Graph message into the shared [`Envelope`] shape. `size` is
-/// left `0`: the listing selection does not expose a raw size.
+/// `None`, Graph's message resource carrying no raw size.
 pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     let flags = flags_from_message(&message);
     let message_id = message
@@ -912,7 +933,7 @@ pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
         from,
         to,
         date,
-        size: 0,
+        size: None,
         has_attachment: message.has_attachments,
     }
 }
@@ -1040,7 +1061,9 @@ mod tests {
         email::flag::{Flag, FlagOp, IanaFlag},
         email::mailbox::MailboxRole,
         error::{ErrorCode, ItemError},
-        msgraph::backend::{flag_patch, ids_found, roles_from, well_known_role, written},
+        msgraph::backend::{
+            envelope_from, flag_patch, ids_found, roles_from, well_known_role, written,
+        },
     };
 
     fn response(id: &str, status: u16, body: serde_json::Value) -> MsgraphBatchResponse {
@@ -1087,6 +1110,15 @@ mod tests {
         let seen = Flag::from_iana(IanaFlag::Seen);
         let patch = serde_json::to_value(flag_patch(&[seen], FlagOp::Set)).unwrap();
         assert_eq!(patch["categories"], json!([]));
+    }
+
+    /// Graph gives no size of the raw message, so an envelope prints it
+    /// `null`, where it printed `0`, an empty message's size.
+    #[test]
+    fn an_envelope_size_graph_does_not_give_is_null() {
+        let message = serde_json::from_value(json!({"id": "m1"})).unwrap();
+        let envelope = serde_json::to_value(envelope_from(message)).unwrap();
+        assert_eq!(envelope["size"], serde_json::Value::Null, "{envelope}");
     }
 
     #[test]
@@ -1207,74 +1239,24 @@ mod tests {
 
 #[cfg(test)]
 mod count_tests {
-    use std::{
-        collections::VecDeque,
-        io::{Cursor, Read, Result, Write},
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use io_msgraph::v1::client::MsgraphClientStd;
     use serde_json::{Value, json};
 
-    use crate::{error::ErrorCode, msgraph::client::MsgraphClient};
-
-    /// A Graph server answering each request with the next scripted
-    /// response, keeping the requests it reads.
-    struct Script {
-        responses: VecDeque<Vec<u8>>,
-        response: Cursor<Vec<u8>>,
-        requests: Arc<Mutex<Vec<String>>>,
-        answered: bool,
-    }
-
-    impl Read for Script {
-        fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-            if !self.answered {
-                let response = self.responses.pop_front().unwrap_or_default();
-                self.response = Cursor::new(response);
-                self.answered = true;
-            }
-
-            self.response.read(buf)
-        }
-    }
-
-    impl Write for Script {
-        fn write(&mut self, buf: &[u8]) -> Result<usize> {
-            let mut requests = self.requests.lock().unwrap();
-
-            if self.answered {
-                requests.push(String::new());
-                self.answered = false;
-            }
-
-            let request = requests.last_mut().unwrap();
-            request.push_str(&String::from_utf8_lossy(buf));
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> Result<()> {
-            Ok(())
-        }
-    }
+    use crate::{
+        error::ErrorCode,
+        msgraph::client::MsgraphClient,
+        shared::http_script::{Script, ok},
+    };
 
     /// A client over a Graph server answering `bodies` in order, each a
     /// 200 carrying JSON, and the requests it reads.
-    fn graph(bodies: &[Value]) -> (MsgraphClient, Arc<Mutex<Vec<String>>>) {
-        let responses = bodies.iter().map(|body| {
-            let body = body.to_string();
-            let len = body.len();
-            let head = "HTTP/1.1 200 OK\r\nContent-Type: application/json";
-            format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
-        });
-
-        let requests = Arc::new(Mutex::new(Vec::new()));
-        let script = Script {
-            responses: responses.collect(),
-            response: Cursor::default(),
-            requests: requests.clone(),
-            answered: true,
-        };
+    pub(super) fn graph(bodies: &[Value]) -> (MsgraphClient, Arc<Mutex<Vec<String>>>) {
+        let responses = bodies
+            .iter()
+            .map(|body| ok("application/json", &body.to_string()));
+        let (script, requests) = Script::new(responses.collect());
         let inner = MsgraphClientStd::new(script, "token", Default::default());
 
         (MsgraphClient::over(inner), requests)
@@ -1303,8 +1285,8 @@ mod count_tests {
 
     /// Graph's `totalItemCount` counts the contacts and events a folder
     /// holds too: the Deleted Items of the Microsoft test account said 835
-    /// where its messages were 26. The counts are its messages', and a
-    /// folder holding no unread item is not asked for its unread ones.
+    /// where its messages were 26, and 5 unread as its messages. The total
+    /// is its messages', the unread count the folder's own, asked of none.
     #[test]
     fn a_folder_counts_its_messages_not_its_items() {
         let [inbox, junk] = roles();
@@ -1312,11 +1294,11 @@ mod count_tests {
             "id": "D",
             "displayName": "Deleted Items",
             "childFolderCount": 0,
-            "unreadItemCount": 0,
+            "unreadItemCount": 5,
             "totalItemCount": 835,
         }]});
         let counts = json!({"responses": [{
-            "id": "t0",
+            "id": "0",
             "status": 200,
             "body": {"@odata.count": 26, "value": [{"id": "m1"}]},
         }]});
@@ -1327,7 +1309,7 @@ mod count_tests {
         let [trash] = outcome.value.as_slice() else {
             panic!("{:?}", outcome.value);
         };
-        assert_eq!((trash.total, trash.unread), (Some(26), Some(0)));
+        assert_eq!((trash.total, trash.unread), (Some(26), Some(5)));
 
         let requests = requests.lock().unwrap();
         assert_eq!(requests.len(), 4, "{requests:#?}");
@@ -1337,8 +1319,8 @@ mod count_tests {
         assert!(!batch.contains("isRead"), "{batch}");
     }
 
-    /// The unread messages are counted apart, and a folder whose count
-    /// Graph refuses is listed without counts beside its error.
+    /// A folder whose count Graph refuses is listed without counts beside
+    /// its error, and no request counts the unread messages.
     #[test]
     fn a_refused_count_leaves_the_folder_uncounted() {
         let [inbox, junk] = roles();
@@ -1357,18 +1339,18 @@ mod count_tests {
             json!({"id": id, "status": 200, "body": body})
         };
         let denied = json!({
-            "id": "t1",
+            "id": "1",
             "status": 403,
             "body": {"error": {"code": "ErrorAccessDenied", "message": "Denied"}},
         });
-        let counts = json!({"responses": [count("t0", 10), count("u0", 2), denied]});
+        let counts = json!({"responses": [count("0", 10), denied]});
         let (mut client, requests) = graph(&[inbox, junk, folders, counts]);
 
         let outcome = client.list_mailboxes(true).unwrap();
         let [a, b] = outcome.value.as_slice() else {
             panic!("{:?}", outcome.value);
         };
-        assert_eq!((a.total, a.unread), (Some(10), Some(2)));
+        assert_eq!((a.total, a.unread), (Some(10), Some(3)));
         assert_eq!((b.total, b.unread), (None, None));
 
         let [error] = outcome.errors.as_slice() else {
@@ -1378,8 +1360,8 @@ mod count_tests {
         assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
 
         let requests = requests.lock().unwrap();
-        let unread = "$count=true&$filter=isRead%20eq%20false";
-        assert!(requests[3].contains(unread), "{}", requests[3]);
+        assert_eq!(requests.len(), 4, "{requests:#?}");
+        assert!(!requests[3].contains("isRead"), "{}", requests[3]);
     }
 
     /// Without `--counts`, nothing is counted and nothing asked.
@@ -1392,5 +1374,75 @@ mod count_tests {
         let outcome = client.list_mailboxes(false).unwrap();
         assert_eq!(outcome.value[0].total, None);
         assert_eq!(requests.lock().unwrap().len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod page_tests {
+    use serde_json::{Value, json};
+
+    use crate::{email::search::query::SearchEmailsQuery, msgraph::backend::count_tests::graph};
+
+    /// A page of `ids`, with the next link Graph answers after an exactly
+    /// full last page too.
+    fn page(ids: &[&str]) -> Value {
+        let value: Vec<Value> = ids.iter().map(|id| json!({"id": id})).collect();
+        let link = "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=x";
+        json!({"value": value, "@odata.nextLink": link})
+    }
+
+    /// Five messages listed five a page: Graph's next link leads to an
+    /// empty page, which no page follows. A page is asked one message
+    /// longer, that message telling whether one follows.
+    #[test]
+    fn an_exactly_full_last_page_has_no_next() {
+        let (mut client, requests) = graph(&[page(&["1", "2", "3", "4", "5"])]);
+        let listed = client.list_envelopes("A", Some(1), Some(5), false).unwrap();
+        assert_eq!(listed.envelopes.len(), 5);
+        assert!(!listed.more);
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 1, "{requests:#?}");
+        assert!(requests[0].contains("%24top=6"), "{}", requests[0]);
+
+        let (mut client, _) = graph(&[page(&["1", "2", "3"])]);
+        let listed = client.list_envelopes("A", Some(1), Some(2), false).unwrap();
+        let ids: Vec<&str> = listed.envelopes.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["1", "2"]);
+        assert!(listed.more);
+    }
+
+    /// A search reaches its page through the links, reading one message
+    /// past it, so an exactly full last page has no next one either: the
+    /// first request asks the pages before it and that message at once.
+    #[test]
+    fn a_search_page_reads_one_message_past_it() {
+        let query: SearchEmailsQuery = "subject report".parse().unwrap();
+
+        let (mut client, requests) = graph(&[page(&["1", "2"]), json!({"value": []})]);
+        let found = client
+            .search_envelopes("A", Some(&query), Some(1), Some(2), false)
+            .unwrap();
+        assert_eq!(found.envelopes.len(), 2);
+        assert!(!found.more);
+        assert!(requests.lock().unwrap()[0].contains("%24top=3"));
+
+        let last = json!({"value": [{"id": "1"}, {"id": "2"}, {"id": "3"}, {"id": "4"}]});
+        let (mut client, requests) = graph(&[last]);
+        let found = client
+            .search_envelopes("A", Some(&query), Some(2), Some(2), false)
+            .unwrap();
+        let ids: Vec<&str> = found.envelopes.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["3", "4"]);
+        assert!(!found.more);
+        assert!(requests.lock().unwrap()[0].contains("%24top=5"));
+
+        let (mut client, _) = graph(&[page(&["1", "2", "3", "4", "5"])]);
+        let found = client
+            .search_envelopes("A", Some(&query), Some(2), Some(2), false)
+            .unwrap();
+        let ids: Vec<&str> = found.envelopes.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["3", "4"]);
+        assert!(found.more);
     }
 }

@@ -92,6 +92,18 @@ impl GmailClient {
     }
 }
 
+#[cfg(test)]
+impl GmailClient {
+    /// A client over `inner`, such as one on a scripted stream, its
+    /// labels not fetched yet.
+    pub(crate) fn over(inner: Inner) -> Self {
+        Self {
+            inner,
+            label_index: None,
+        }
+    }
+}
+
 impl Deref for GmailClient {
     type Target = Inner;
 

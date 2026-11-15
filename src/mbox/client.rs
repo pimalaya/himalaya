@@ -87,7 +87,8 @@ impl MboxClient {
     /// configuring it, as `mail -f` does.
     ///
     /// `INBOX` fails, naming `mbox.inbox`, when the spool is a directory,
-    /// or when no spool is set and the root holds no file of that name.
+    /// or when no spool is set and the root holds no file of that name,
+    /// coded `mailbox-not-found`.
     pub fn resolve_mbox(&self, mailbox: &str) -> Result<MboxFsPath> {
         let path = Path::new(mailbox);
         if path.is_absolute() {
@@ -101,9 +102,9 @@ impl MboxClient {
                     bail!("Mbox spool `{spool}` is a directory: set `mbox.inbox` to the spool file")
                 }
                 None if !Path::new(resolved.as_str()).exists() => {
-                    bail!(
+                    return Err(mailbox_not_found(format!(
                         "No `mbox.inbox` spool is set, so there is no `{mailbox}`: pass another mailbox, or set `mbox.inbox`"
-                    )
+                    )));
                 }
                 _ => {}
             }

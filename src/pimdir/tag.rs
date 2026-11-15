@@ -49,8 +49,11 @@ pub struct PimdirTagCommand {
     #[arg(long)]
     pub dry_run: bool,
     /// The query, its words joined by spaces.
+    ///
+    /// Options may come before, between or after its words. A word
+    /// opening on `-`, such as a negated term, goes after `--`:
+    /// `-- -from:alice`, or write `not from:alice`.
     #[arg(value_name = "QUERY", required = true)]
-    #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Vec<String>,
 }
 

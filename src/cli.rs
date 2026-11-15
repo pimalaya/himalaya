@@ -225,25 +225,36 @@ pub fn welcome<'a>(
 /// account's blocks before a new client connects, so a refusal costs no
 /// connection and drops no kept client. An account configuring no
 /// transport at all is left to the client's own error, which names the
-/// v1 configuration when that is the cause.
+/// v1 configuration when that is the cause. `no_copy` says the command
+/// sends keeping no copy (`--no-save`), which a transport filing every
+/// sent message itself refuses.
 #[cfg(any(backend, feature = "smtp"))]
 fn run_shared<P: Printer>(
     printer: &mut P,
     session: &mut Session,
     capabilities: Vec<Capability>,
+    no_copy: bool,
     command: impl FnOnce(&mut P, &mut Account, &mut EmailClient) -> Result<()>,
 ) -> Result<()> {
     let account = session.account;
     let backend = account.backend;
 
+    let require = |resolution: &Resolution| {
+        resolution.require(&capabilities)?;
+        match no_copy {
+            true => resolution.require_no_copy(),
+            false => Ok(()),
+        }
+    };
+
     if let Some((_, client)) = &session.email {
-        client.require(&capabilities)?;
+        require(client.resolution())?;
     }
 
     let build = |config, name: String, account_config| {
         let resolution = Resolution::of(&name, &account_config, backend);
         if resolution.storage.is_some() || resolution.sender.is_some() {
-            resolution.require(&capabilities)?;
+            require(&resolution)?;
         }
         EmailClient::new(config, &name, account_config, backend)
     };
@@ -309,6 +320,7 @@ impl Command {
                 printer,
                 session,
                 cmd.capabilities(),
+                false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
@@ -316,6 +328,7 @@ impl Command {
                 printer,
                 session,
                 cmd.capabilities()?,
+                false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
@@ -323,6 +336,7 @@ impl Command {
                 printer,
                 session,
                 cmd.capabilities(),
+                false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             // NOTE: `message parse` reads a raw message it is given, so it
@@ -334,6 +348,7 @@ impl Command {
                 printer,
                 session,
                 cmd.capabilities(),
+                cmd.keeps_no_copy(),
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
@@ -341,6 +356,7 @@ impl Command {
                 printer,
                 session,
                 vec![Capability::AttachmentList],
+                false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
@@ -532,5 +548,93 @@ mod tests {
 
         let (_, name, _) = resolve_account(&paths, Some("work")).unwrap();
         assert_eq!(name, "work");
+    }
+
+    #[cfg(any(backend, feature = "smtp", feature = "sieve"))]
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from([&["himalaya"], args].concat()).expect("parse")
+    }
+
+    /// An option after a pimdir query is the option, never a query word: a
+    /// trailing `--dry-run` once made `pimdir tag` stage for real.
+    #[cfg(feature = "pimdir")]
+    #[test]
+    fn an_option_after_a_pimdir_query_is_the_option() {
+        use crate::{cli::Command, pimdir::cli::PimdirCommand};
+
+        let cli = parse(&["pimdir", "tag", "--add", "x", "from:a", "--dry-run"]);
+        let Some(Command::Pimdir(PimdirCommand::Tag(tag))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert!(tag.dry_run);
+        assert_eq!(tag.query, ["from:a"]);
+
+        let cli = parse(&["pimdir", "search", "q", "-s", "3", "r", "--json"]);
+        assert!(cli.json.enabled);
+        let Some(Command::Pimdir(PimdirCommand::Search(search))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(search.page_size, Some(3));
+        assert_eq!(search.query, ["q", "r"]);
+
+        let cli = parse(&["pimdir", "count", "kind:mail", "--json"]);
+        assert!(cli.json.enabled);
+        let Some(Command::Pimdir(PimdirCommand::Count(count))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(count.query, ["kind:mail"]);
+
+        let cli = parse(&["pimdir", "count", "q", "--", "-from:a"]);
+        let Some(Command::Pimdir(PimdirCommand::Count(count))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(count.query, ["q", "-from:a"]);
+
+        let args = ["himalaya", "pimdir", "count", "q", "-from:a"];
+        assert!(Cli::try_parse_from(args).is_err());
+    }
+
+    /// An option after a message, a Sieve script or a JMAP call array is
+    /// the option, never one more word of it.
+    #[cfg(any(backend, feature = "smtp"))]
+    #[test]
+    fn an_option_after_a_message_is_the_option() {
+        use crate::{cli::Command, shared::message::cli::MessageCommand};
+
+        let message = "From: a@x.test\\n\\nx";
+        let cli = parse(&["message", "send", message, "--save", "Sent", "--json"]);
+        assert!(cli.json.enabled);
+        let Some(Command::Message(MessageCommand::Send(send))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(send.message.raw, [message]);
+        assert_eq!(send.save.as_deref(), Some("Sent"));
+    }
+
+    #[cfg(feature = "sieve")]
+    #[test]
+    fn an_option_after_a_sieve_script_is_the_option() {
+        use crate::{cli::Command, sieve::cli::SieveCommand};
+
+        let cli = parse(&["sieve", "put", "name", "keep;", "--json"]);
+        assert!(cli.json.enabled);
+        let Some(Command::Sieve(SieveCommand::Put(put))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(put.script.script, ["keep;"]);
+    }
+
+    #[cfg(feature = "jmap")]
+    #[test]
+    fn an_option_after_jmap_method_calls_is_the_option() {
+        use crate::{cli::Command, jmap::cli::JmapCommand};
+
+        let cli = parse(&["jmap", "query", "[]", "--using", "urn:x", "--json"]);
+        assert!(cli.json.enabled);
+        let Some(Command::Jmap(JmapCommand::Query(query))) = cli.cmd else {
+            panic!("{:?}", cli.cmd);
+        };
+        assert_eq!(query.method_calls, ["[]"]);
+        assert_eq!(query.using, ["urn:x"]);
     }
 }

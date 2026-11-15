@@ -1060,7 +1060,7 @@ pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
         .map(address_from)
         .collect();
     let date = email.sent_at.as_deref().and_then(parse_rfc3339);
-    let size = email.size.unwrap_or(0);
+    let size = email.size;
     let has_attachment = email.has_attachment;
     // NOTE: JMAP returns messageId as a list, RFC 5322 allowing several
     // header instances, and the first non-empty entry is canonical.
@@ -1372,7 +1372,7 @@ mod tests {
             from: Vec::new(),
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339(date).ok(),
-            size: 0,
+            size: None,
             has_attachment: None,
         }
     }

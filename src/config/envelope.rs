@@ -2,9 +2,9 @@
 //!
 //! The `envelope` block, global or per account.
 
-use serde::{Deserialize, Deserializer, de::IgnoredAny};
+use serde::Deserialize;
 
-use crate::config::removed;
+use crate::config::PLAIN_TEXT;
 
 /// Envelope-level rendering options.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -29,14 +29,19 @@ pub struct EnvelopeListConfig {
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
-    /// The v2 `table` block, refused naming MIGRATION.md.
-    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
-    _table: Option<IgnoredAny>,
+    /// The v2 `envelope.list.table` table, refused by name.
+    #[serde(default, rename = "table")]
+    _table: Option<EnvelopeTableRemoved>,
 }
 
-/// Refuses the v2 `envelope.list.table` block.
-fn refuse_table<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
-    Err(removed("envelope.list.table"))
+pimalaya_config::removed_key! {
+    /// The v2 `envelope.list.table` table, at the top level or in an
+    /// account.
+    pub EnvelopeTableRemoved: Table {
+        name: "envelope.list.table",
+        why: PLAIN_TEXT,
+        instead: "delete it",
+    }
 }
 
 #[cfg(test)]
@@ -54,8 +59,9 @@ mod tests {
 
         for toml in [root, account] {
             let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-            assert!(err.contains("`envelope.list.table` block"), "{err}");
-            assert!(err.contains("MIGRATION.md"), "{err}");
+            let sentence = "The `envelope.list.table` table is removed, the output being \
+                            plain text: delete it, see MIGRATION.md";
+            assert!(err.contains(sentence), "{err}");
         }
 
         let toml = "[accounts.example]\nenvelope.list.datetime-fnt = \"%F\"\n";

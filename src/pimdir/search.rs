@@ -37,8 +37,8 @@ use crate::{
 /// for a prefix), `field:value` terms (`from:`, `to:`, `subject:`,
 /// `body:`, `is:unread`, `has:attachment`, `date:2026-01..2026-03`,
 /// `folder:`, `thread:` and the others), `and`, `or`, `not` or a leading
-/// `-`, and parentheses. It is read over the account's mail, its dates
-/// in the local zone (`TZ`, then the system's).
+/// `-` (its word after `--`), and parentheses. It is read over the
+/// account's mail, its dates in the local zone (`TZ`, then the system's).
 ///
 /// The answer comes from the store's search index, which the sync engine
 /// builds and refreshes after each run: a message is found once it is
@@ -76,8 +76,11 @@ pub struct PimdirSearchCommand {
     #[arg(long)]
     pub threads: bool,
     /// The query, its words joined by spaces.
+    ///
+    /// Options may come before, between or after its words. A word
+    /// opening on `-`, such as a negated term, goes after `--`:
+    /// `-- -from:alice`, or write `not from:alice`.
     #[arg(value_name = "QUERY", required = true)]
-    #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Vec<String>,
 }
 
@@ -357,7 +360,7 @@ mod tests {
             }],
             to: Vec::new(),
             date: None,
-            size: 0,
+            size: None,
             has_attachment: Some(true),
         };
         PimdirSearchOutput {

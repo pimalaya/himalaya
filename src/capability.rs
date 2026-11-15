@@ -449,6 +449,21 @@ impl Resolution {
         Ok(())
     }
 
+    /// Refuses a send asked to keep no copy (`--no-save`) when the sending
+    /// transport files every message it sends itself, which would keep one
+    /// anyway.
+    pub fn require_no_copy(&self) -> Result<()> {
+        let Some(backend) = self.sender.filter(|b| FILES_SENT_COPY.contains(b)) else {
+            return Ok(());
+        };
+
+        let account = &self.account;
+        let detail = "it files every message it sends in its sent mailbox itself";
+        Err(missing(format!(
+            "Account `{account}` cannot send keeping no copy (`--no-save`) over {backend}: {detail}"
+        )))
+    }
+
     /// How `backend` serves `capability` for this account: its row, the
     /// Maildir keyword rows read from the account's configuration.
     fn backend_support(&self, backend: Backend, capability: Capability) -> Support {
@@ -559,6 +574,10 @@ const MAILDIR_KEYWORD: &str = "a keyword, kept only with `maildir.keywords.dovec
 /// Why a Maildir account without dovecot keywords refuses a keyword flag.
 const MAILDIR_NO_KEYWORD: &str =
     "a keyword is kept only in the dovecot-keywords file; set `maildir.keywords.dovecot = true`";
+
+/// The sending backends filing every message they send in their sent
+/// mailbox themselves, so a send keeping no copy is one they cannot make.
+const FILES_SENT_COPY: &[Backend] = &[Backend::Msgraph];
 
 /// Why a mail store holds no auto-reply.
 const NO_VACATION: &str = "the auto-reply lives on the provider; configure its JMAP or Gmail block";
@@ -809,7 +828,7 @@ const MSGRAPH: &[Row] = storage_rows![
     (
         C::SubmitCopy,
         Partial(
-            "Graph files every message it sends in Sent Items itself: the save options of a send (`--save`, `--no-save`, `message.send.save-copy`) are ignored"
+            "Graph files every message it sends in Sent Items itself: `--save` and `message.send.save-copy` are ignored on a send, `--no-save` refused"
         )
     ),
 ];

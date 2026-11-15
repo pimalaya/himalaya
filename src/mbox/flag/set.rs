@@ -28,10 +28,11 @@ pub struct MboxFlagSetCommand {
     pub ids: MessageIdsArg,
     #[command(flatten)]
     pub mbox: MboxPathFlag,
-    /// Flag(s) of the message. Repeat `-f` per flag (e.g. `-f seen -f
-    /// flagged`); a single `-f` takes one value so trailing message ids
-    /// are not swallowed as flags.
-    #[arg(long = "flag", short, value_name = "FLAG")]
+    /// Flag(s) of the message, at least one: `mbox flag remove` drops
+    /// them. Repeat `-f` per flag (e.g. `-f seen -f flagged`); a single
+    /// `-f` takes one value so trailing message ids are not swallowed as
+    /// flags.
+    #[arg(long = "flag", short, value_name = "FLAG", required = true)]
     pub flags: Vec<FlagArg>,
 }
 

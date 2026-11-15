@@ -225,3 +225,26 @@ fn a_message_the_store_cannot_read_is_an_item_error() {
     assert_eq!(errors[0]["code"], "message-unreadable", "{page}");
     assert!(errors[0]["id"].is_string(), "{page}");
 }
+
+/// Options after the query are read as options, `--json` included, where
+/// they once became query words matching nothing.
+#[test]
+fn an_option_after_the_query_is_the_option() {
+    let home = TempDir::new().unwrap();
+    let root = home.path().join("store");
+    fs::create_dir(&root).unwrap();
+    store(&root);
+    let run = |args: &[&str]| himalaya(home.path(), &root, args);
+
+    let page = run(&["pimdir", "search", "report", "-s", "2", "--json"]);
+    assert!(page.status.success());
+    let page = json(&page);
+    assert_eq!(subjects(&page), ["Report 3", "Report 2"], "{page}");
+    assert_eq!(page["nextPage"], "2", "{page}");
+
+    let count = json(&run(&["pimdir", "count", "report", "--json"]));
+    assert_eq!(count["count"], 3, "{count}");
+
+    let negated = run(&["--json", "pimdir", "count", "report", "--", "-subject:3"]);
+    assert_eq!(json(&negated)["count"], 2);
+}

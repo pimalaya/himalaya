@@ -35,7 +35,9 @@ pub struct JmapQueryCommand {
     #[arg(long = "using", value_name = "URN")]
     pub using: Vec<String>,
     /// The JMAP methodCalls JSON array (or omit / pass `-` to read stdin).
-    #[arg(trailing_var_arg = true)]
+    ///
+    /// Options may come before or after it. Put it after `--` when a word
+    /// of it opens on a hyphen.
     #[arg(name = "method-calls", value_name = "METHOD_CALLS")]
     pub method_calls: Vec<String>,
 }

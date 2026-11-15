@@ -488,7 +488,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>What does the exit code mean?</summary>
 
-  `0` is a success and `1` a failure, printed on stdout as the failure object under `--json`, its `code` naming it when a caller can act on it. `2` is a command line Himalaya refuses (an unknown flag, a missing argument, a bad value): clap's message goes to stderr, or, with `--json`, the failure object coded `usage-invalid` to stdout. `3` means the command printed its result without fully succeeding: an `account check` with a failed backend, or a protocol command whose server refused (an IMAP `NO` or `BAD`, an SMTP 4xx or 5xx, a ManageSieve `NO` or `BYE`).
+  `0` is a success and `1` a failure, printed on stdout as the failure object under `--json`, its `code` naming it when a caller can act on it. `2` is a command line Himalaya refuses (an unknown flag, a missing argument, a bad value): clap's message goes to stderr, or, with `--json`, the failure object coded `usage-invalid` to stdout. `3` means the command printed its result without fully succeeding: a result whose `errors` is not empty (a `flag add` or a `message move` given an id the mailbox does not hold, an envelope listing meeting a message it cannot read), an `account check` with a failed backend, or a protocol command whose server refused (an IMAP `NO` or `BAD`, an SMTP 4xx or 5xx, a ManageSieve `NO` or `BYE`).
 </details>
 
 <details>

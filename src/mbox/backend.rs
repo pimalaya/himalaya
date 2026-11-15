@@ -416,6 +416,16 @@ impl MboxClient {
             });
         }
 
+        // NOTE: a move onto its own mailbox changes nothing, as on every
+        // backend, where io-mbox would append the copy then drop the
+        // original, moving the message to the end of the file.
+        if same_mbox(&source, &target) {
+            return Ok(Outcome {
+                value: entries.into_iter().map(|entry| entry.id).collect(),
+                errors,
+            });
+        }
+
         let opts = MboxEntryMoveOptions {
             index: Some(index),
             format: self.format,
@@ -746,6 +756,19 @@ impl MboxClient {
 }
 
 /// Fails when `path` is a directory, which holds mailboxes but is none.
+/// Whether `a` and `b` name one mbox file, however spelled (a name, an
+/// absolute path, a link).
+fn same_mbox(a: &MboxFsPath, b: &MboxFsPath) -> bool {
+    if a == b {
+        return true;
+    }
+
+    match (fs::canonicalize(a.as_str()), fs::canonicalize(b.as_str())) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
 fn refuse_dir(path: &MboxFsPath, verb: &str, name: &str) -> Result<()> {
     if Path::new(path.as_str()).is_dir() {
         bail!("Cannot {verb} `{name}`: it is a directory holding mailboxes, not an mbox");

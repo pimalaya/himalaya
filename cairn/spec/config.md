@@ -99,12 +99,17 @@ An account's `proxy` SHALL apply to every network backend of that account (IMAP,
 `proxy.url` SHALL take `socks5://`, `socks5h://` or `http://`. `proxy.username` and `proxy.password` SHALL override the URL's user info, the password being a secret like any credential; a password without a username SHALL be rejected.
 
 ### Requirement: Unknown keys are refused
-Every table of the configuration SHALL refuse a key it does not know, the top level and the account blocks included, the error naming the key and the line. The one exception SHALL be the `tui` table, at the top level and in an account, which holds himalaya-tui's own keys: Himalaya SHALL load it whatever it holds and read none of it. A block a previous major version read and v3 dropped (`table`, `attachment`, the top-level `account`, `envelope.list.table`) SHALL be refused naming the block and MIGRATION.md. The v1 `backend` table and the `m2dir` block SHALL load as their requirements say.
+Every table of the configuration SHALL refuse a key it does not know, the top level and the account blocks included, the error naming the key and the line. The one exception SHALL be the `tui` table, at the top level and in an account, which holds himalaya-tui's own keys: Himalaya SHALL load it whatever it holds and read none of it. A table a previous major version read and v3 dropped SHALL be refused by name in pimalaya-config's sentence (`removed_key!`), ``The `<name>` table is removed, <why>: <instead>, see MIGRATION.md``: `table`, `attachment`, the top-level `account` and `envelope.list.table`, `the output being plain text: delete it`, and v1's `folder`, which v2 renamed `mailbox`, ``v2 renaming it `mailbox`: move `folder.alias` to `mailbox.alias` and delete the rest``. The v1 `backend` table and the `m2dir` block SHALL load as their requirements say.
 
 #### Scenario: A typo at the top level
 - GIVEN a configuration setting `downloads-dri` at the top level
 - WHEN any command reads it
 - THEN it is refused naming `downloads-dri` and its line
+
+#### Scenario: A v1 folder alias
+- GIVEN an account setting `folder.alias.inbox = "INBOX"`
+- WHEN any command reads it
+- THEN it is refused with ``The `folder` table is removed, v2 renaming it `mailbox`: move `folder.alias` to `mailbox.alias` and delete the rest, see MIGRATION.md``
 
 #### Scenario: himalaya-tui keys
 - GIVEN a configuration holding `[tui]` with `keybinds`, `contact-command`, `contact-complete-key` and `theme`, and `[accounts.work.tui]` with `contact-command`
@@ -134,7 +139,7 @@ The configuration SHALL hold no colour, no table shape and no glyph. The v2 bloc
 #### Scenario: A v2 glyph key
 - GIVEN an account setting `envelope.list.table.unseen-char = "N"`
 - WHEN any command reads the configuration
-- THEN it is refused with ``The `envelope.list.table` block is removed since v3: delete it, see MIGRATION.md``
+- THEN it is refused with ``The `envelope.list.table` table is removed, the output being plain text: delete it, see MIGRATION.md``
 
 #### Scenario: A typo under envelope.list
 - GIVEN an account setting `envelope.list.datetime-fnt`

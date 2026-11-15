@@ -438,3 +438,83 @@ fn a_read_carries_its_id_and_an_unknown_one_is_not_found() {
         assert!(error.contains("`999`"), "{error}");
     }
 }
+
+/// A move onto its own mbox changes nothing and counts the messages, the
+/// unified and the raw command alike, where io-mbox appended the copy,
+/// dropped the original, then failed to find the copy it had written.
+#[test]
+fn an_mbox_move_onto_its_own_file_changes_nothing() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("store");
+    fs::create_dir_all(&root).unwrap();
+    let two = format!("{MESSAGE}\nFrom a@b Mon Jan  1 00:00:00 2024\nSubject: two\n\nbody\n");
+    fs::write(root.join("A"), &two).unwrap();
+    let lines = mbox_lines(&root, "");
+
+    let (_, out) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
+    let id = out["envelopes"][1]["id"].as_str().unwrap().to_owned();
+
+    let args = ["message", "move", "-f", "A", "-t", "A", &id];
+    let (ok, out) = himalaya(dir.path(), &lines, &args);
+    assert!(ok, "{out}");
+    assert_eq!(out["count"], 1, "{out}");
+    assert_eq!(fs::read_to_string(root.join("A")).unwrap(), two);
+
+    let absolute = root.join("A");
+    let absolute = absolute.to_str().unwrap();
+    let args = ["mbox", "message", "move", "-m", "A", "-t", absolute, &id];
+    let (ok, out) = himalaya(dir.path(), &lines, &args);
+    assert!(ok, "{out}");
+    assert_eq!(out["ids"], serde_json::json!([id]));
+    assert_eq!(fs::read_to_string(root.join("A")).unwrap(), two);
+}
+
+/// The inbox of an mbox store without `mbox.inbox` is a mailbox that does
+/// not exist, coded as one, as on Maildir.
+#[test]
+fn an_mbox_inbox_without_a_spool_is_not_found() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("store");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("A"), MESSAGE).unwrap();
+    let lines = mbox_lines(&root, "");
+
+    for args in [
+        &["envelope", "list"][..],
+        &["envelope", "list", "-m", "INBOX"],
+    ] {
+        let (ok, out) = himalaya(dir.path(), &lines, args);
+        assert!(!ok, "{args:?}");
+        assert_eq!(out["code"], "mailbox-not-found", "{args:?}: {out}");
+        assert!(
+            out["error"].as_str().unwrap().contains("mbox.inbox"),
+            "{out}"
+        );
+    }
+}
+
+/// `mbox flag set` without a flag is refused, as `maildir flag set` is,
+/// where it wiped every flag of the message.
+#[test]
+fn an_mbox_flag_set_without_a_flag_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("store");
+    fs::create_dir_all(&root).unwrap();
+    let flagged =
+        "From a@b Mon Jan  1 00:00:00 2024\nStatus: RO\nX-Status: F\nSubject: one\n\nbody\n";
+    fs::write(root.join("A"), flagged).unwrap();
+    let lines = mbox_lines(&root, "");
+
+    let (_, out) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
+    let id = out["envelopes"][0]["id"].as_str().unwrap().to_owned();
+
+    let output = run(
+        dir.path(),
+        &lines,
+        &["--json", "mbox", "flag", "set", "-m", "A", &id],
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let out: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(out["code"], "usage-invalid", "{out}");
+    assert_eq!(fs::read_to_string(root.join("A")).unwrap(), flagged);
+}

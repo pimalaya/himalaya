@@ -401,7 +401,7 @@ mod tests {
             }],
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339("2026-11-11T10:00:00+01:00").ok(),
-            size: 0,
+            size: None,
             has_attachment: None,
         };
 

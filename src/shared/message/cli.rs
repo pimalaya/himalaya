@@ -98,6 +98,18 @@ impl MessageCommand {
         }
     }
 
+    /// Whether the subcommand sends keeping no copy (`--no-save`), which
+    /// the resolver checks beside its capabilities.
+    pub fn keeps_no_copy(&self) -> bool {
+        match self {
+            Self::Compose(cmd) => cmd.no_save,
+            Self::Forward(cmd) => cmd.no_save,
+            Self::Reply(cmd) => cmd.no_save,
+            Self::Send(cmd) => cmd.no_save,
+            _ => false,
+        }
+    }
+
     /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,

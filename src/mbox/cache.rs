@@ -133,7 +133,7 @@ mod tests {
             from: Vec::new(),
             to: Vec::new(),
             date: None,
-            size: 1,
+            size: Some(1),
             has_attachment: Some(false),
         }
     }

@@ -176,7 +176,7 @@ mod tests {
             from: Vec::new(),
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339(date).ok(),
-            size: 1024,
+            size: Some(1024),
             has_attachment: None,
         }
     }

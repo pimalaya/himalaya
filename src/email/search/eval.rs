@@ -205,7 +205,7 @@ mod tests {
                 email: String::from("team@example.org"),
             }],
             date: DateTime::parse_from_rfc3339("2026-05-15T10:00:00+00:00").ok(),
-            size: 1024,
+            size: Some(1024),
             has_attachment: None,
         }
     }

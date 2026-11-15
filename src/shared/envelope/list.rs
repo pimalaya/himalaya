@@ -319,7 +319,7 @@ mod tests {
             from: vec![from],
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339("2026-11-11T10:00:00+01:00").ok(),
-            size: 2048,
+            size: Some(2048),
             has_attachment: None,
         }
     }
@@ -516,7 +516,7 @@ Page:       1, envelopes 1 to 2, the last
             }],
             to: Vec::new(),
             date: None,
-            size: 0,
+            size: None,
             has_attachment: None,
         });
 

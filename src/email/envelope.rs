@@ -49,9 +49,10 @@ pub struct Envelope {
     /// it is missing or unparseable.
     #[serde(default)]
     pub date: Option<DateTime<FixedOffset>>,
-    /// The size of the raw RFC 5322 message, in bytes.
+    /// The size of the raw RFC 5322 message, in bytes, `None` when the
+    /// backend gives none.
     #[serde(default)]
-    pub size: u64,
+    pub size: Option<u64>,
     /// Whether the message carries an attachment, `None` when the caller
     /// did not ask or the backend cannot tell.
     #[serde(default, alias = "has-attachment")]
@@ -103,6 +104,32 @@ pub fn parse_message_ids(raw: &str) -> Vec<String> {
     raw.split_whitespace()
         .filter_map(normalize_message_id)
         .collect()
+}
+
+/// Parses an RFC 2822 date, retrying without its day-of-week token.
+#[cfg(any(feature = "imap", feature = "gmail"))]
+pub fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // NOTE: chrono rejects the whole timestamp when the day-of-week
+    // disagrees with the date, which a surprising number of senders get
+    // wrong. The token is redundant, so the retry drops it.
+    DateTime::parse_from_rfc2822(trimmed)
+        .or_else(|_| DateTime::parse_from_rfc2822(strip_weekday(trimmed)))
+        .ok()
+}
+
+/// Drops the leading day-of-week token of an RFC 2822 date, leaving the
+/// unambiguous remainder chrono parses without the weekday check.
+#[cfg(any(feature = "imap", feature = "gmail"))]
+fn strip_weekday(date: &str) -> &str {
+    match date.split_once(", ") {
+        Some((dow, rest)) if dow.len() == 3 && dow.bytes().all(|b| b.is_ascii_alphabetic()) => rest,
+        _ => date,
+    }
 }
 
 /// Strips the whitespace and the one pair of angle brackets wrapping a
@@ -201,7 +228,7 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
         from: addresses(root.header::<FROM>()),
         to: addresses(root.header::<TO>()),
         date,
-        size: raw.len() as u64,
+        size: Some(raw.len() as u64),
         has_attachment: with_attachment.then(|| part::has_attachment(&message)),
     })
 }
@@ -243,6 +270,30 @@ mod tests {
         assert!(parse_message_ids("<>").is_empty());
 
         assert!(parse_message_ids("<a@x.org").is_empty());
+    }
+
+    #[test]
+    fn parses_a_well_formed_date() {
+        let date = parse_rfc2822_date("Fri, 17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn parses_despite_a_wrong_weekday() {
+        let date = parse_rfc2822_date("Thu, 17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn parses_without_a_weekday() {
+        let date = parse_rfc2822_date("17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn rejects_empty_and_garbage() {
+        assert!(parse_rfc2822_date("   ").is_none());
+        assert!(parse_rfc2822_date("not a date").is_none());
     }
 
     #[test]

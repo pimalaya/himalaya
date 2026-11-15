@@ -9,7 +9,7 @@
 use std::{collections::BTreeSet, thread, time::Duration};
 
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use io_gmail::v1::{
     batch::{GmailBatch, GmailBatchRequest, GmailBatchResponse, GmailBatchResponseError},
     client::GmailClientStdError,
@@ -30,7 +30,9 @@ use serde::de::{DeserializeOwned, IgnoredAny};
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, EnvelopePage, normalize_message_id, parse_message_ids},
+        envelope::{
+            Envelope, EnvelopePage, normalize_message_id, parse_message_ids, parse_rfc2822_date,
+        },
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
         outcome::Outcome,
@@ -70,6 +72,9 @@ const BATCH_DEFAULT_WAIT: Duration = Duration::from_secs(1);
 /// The longest `Retry-After` honoured between two tries.
 const BATCH_MAX_WAIT: Duration = Duration::from_secs(10);
 
+/// The largest page `messages.list` serves (`maxResults`).
+const LIST_MAX_RESULTS: u32 = 500;
+
 impl GmailClient {
     /// Lists every Gmail label as a mailbox. With `with_counts`, issues
     /// one `labels.get` per label to fill totals/unread, a label Gmail
@@ -104,10 +109,9 @@ impl GmailClient {
         })
     }
 
-    /// Lists envelopes from the `mailbox` label: `messages.list` (walking
-    /// the opaque page token to the requested 1-indexed page) then the
-    /// metadata of the ids, through batched `messages.get`. A page follows
-    /// while Gmail gives a next page token.
+    /// Lists envelopes from the `mailbox` label: the ids of the page
+    /// ([`Self::page_ids`]), then their metadata through batched
+    /// `messages.get`.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -115,39 +119,7 @@ impl GmailClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Outcome<EnvelopePage>> {
-        let label_ids = vec![mailbox.to_string()];
-        let spam_trash = include_spam_trash(mailbox);
-        let skip = page.unwrap_or(1).max(1) - 1;
-
-        let mut page_token: Option<String> = None;
-        for _ in 0..skip {
-            let params = GmailMessagesListParams {
-                label_ids: &label_ids,
-                max_results: page_size,
-                page_token: page_token.as_deref(),
-                include_spam_trash: spam_trash,
-                ..Default::default()
-            };
-            match self.messages_list(&params)?.response.next_page_token {
-                Some(token) => page_token = Some(token),
-                None => return Ok(Outcome::from(EnvelopePage::default())),
-            }
-        }
-
-        let params = GmailMessagesListParams {
-            label_ids: &label_ids,
-            max_results: page_size,
-            page_token: page_token.as_deref(),
-            include_spam_trash: spam_trash,
-            ..Default::default()
-        };
-        let response = self.messages_list(&params)?.response;
-        let more = page_size.is_some() && response.next_page_token.is_some();
-        let ids: Vec<String> = response
-            .messages
-            .into_iter()
-            .map(|message| message.id)
-            .collect();
+        let (ids, more) = self.page_ids(mailbox, None, page, page_size)?;
 
         let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
         let answers = self.messages_get_batch(&ids, GmailMessageFormat::Metadata)?;
@@ -171,39 +143,7 @@ impl GmailClient {
             None => None,
         };
 
-        let label_ids = vec![mailbox.to_string()];
-        let spam_trash = include_spam_trash(mailbox);
-        let skip = page.unwrap_or(1).max(1) - 1;
-
-        let mut page_token: Option<String> = None;
-        for _ in 0..skip {
-            let params = GmailMessagesListParams {
-                q: q.as_deref(),
-                label_ids: &label_ids,
-                max_results: page_size,
-                page_token: page_token.as_deref(),
-                include_spam_trash: spam_trash,
-            };
-            match self.messages_list(&params)?.response.next_page_token {
-                Some(token) => page_token = Some(token),
-                None => return Ok(Outcome::from(EnvelopePage::default())),
-            }
-        }
-
-        let params = GmailMessagesListParams {
-            q: q.as_deref(),
-            label_ids: &label_ids,
-            max_results: page_size,
-            page_token: page_token.as_deref(),
-            include_spam_trash: spam_trash,
-        };
-        let response = self.messages_list(&params)?.response;
-        let more = page_size.is_some() && response.next_page_token.is_some();
-        let ids: Vec<String> = response
-            .messages
-            .into_iter()
-            .map(|message| message.id)
-            .collect();
+        let (ids, more) = self.page_ids(mailbox, q.as_deref(), page, page_size)?;
 
         let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
         let answers = self.messages_get_batch(&ids, GmailMessageFormat::Metadata)?;
@@ -214,6 +154,57 @@ impl GmailClient {
         }
 
         Ok(outcome.map(|envelopes| EnvelopePage { envelopes, more }))
+    }
+
+    /// The ids of the 1-indexed page `page` of the `mailbox` label, those
+    /// matching `q` when given, and whether a page follows.
+    ///
+    /// Gmail answers a next page token after an exactly full last page
+    /// too, so `messages.list` is read up to one id past the page, the
+    /// first call asking the pages before it and that id at once: a page
+    /// follows when that id exists. Without a page size, the first page
+    /// Gmail serves is the listing.
+    fn page_ids(
+        &mut self,
+        mailbox: &str,
+        q: Option<&str>,
+        page: Option<u32>,
+        page_size: Option<u32>,
+    ) -> Result<(Vec<String>, bool)> {
+        let label_ids = vec![mailbox.to_string()];
+        let include_spam_trash = include_spam_trash(mailbox);
+
+        let Some(size) = page_size else {
+            let params = GmailMessagesListParams {
+                q,
+                label_ids: &label_ids,
+                include_spam_trash,
+                ..Default::default()
+            };
+            let response = self.messages_list(&params)?.response;
+            let ids = response.messages.into_iter().map(|m| m.id).collect();
+            return Ok((ids, false));
+        };
+
+        let start = (page.unwrap_or(1).max(1) as usize - 1).saturating_mul(size as usize);
+        let end = start.saturating_add(size as usize);
+
+        let mut ids = list_ids(end.saturating_add(1), |max_results, page_token| {
+            let params = GmailMessagesListParams {
+                q,
+                label_ids: &label_ids,
+                max_results: Some(max_results),
+                page_token,
+                include_spam_trash,
+            };
+            let response = self.messages_list(&params)?.response;
+            let ids = response.messages.into_iter().map(|m| m.id).collect();
+            Ok((ids, response.next_page_token))
+        })?;
+
+        let more = ids.len() > end;
+        ids.truncate(end);
+        Ok((ids.split_off(start.min(ids.len())), more))
     }
 
     /// Adds, sets, or removes `flags` via `messages.modify` on the ids
@@ -599,6 +590,36 @@ fn reply_parents(raw: &[u8]) -> Vec<String> {
         .collect()
 }
 
+/// The first `wanted` ids of a listing, fewer when it ends first.
+///
+/// `list` answers one page of at most the ids it is asked for, after the
+/// page token it is given, and the next page's token. A page bringing no
+/// id ends the listing, whatever token it carries.
+fn list_ids(
+    wanted: usize,
+    mut list: impl FnMut(u32, Option<&str>) -> Result<(Vec<String>, Option<String>)>,
+) -> Result<Vec<String>> {
+    let mut ids = Vec::new();
+    let mut token = None;
+
+    while ids.len() < wanted {
+        let left = u32::try_from(wanted - ids.len()).unwrap_or(LIST_MAX_RESULTS);
+        let (mut page, next) = list(left.min(LIST_MAX_RESULTS), token.as_deref())?;
+
+        if page.is_empty() {
+            break;
+        }
+        ids.append(&mut page);
+
+        let Some(next) = next else {
+            break;
+        };
+        token = Some(next);
+    }
+
+    Ok(ids)
+}
+
 /// Whether listing `mailbox` requires `includeSpamTrash`: Gmail hides
 /// SPAM and TRASH messages from `messages.list` unless asked.
 fn include_spam_trash(mailbox: &str) -> bool {
@@ -807,7 +828,7 @@ fn label_role(id: &str) -> Option<MailboxRole> {
 /// expose the MIME structure.
 fn envelope_from(message: GmailMessage) -> Envelope {
     let flags = flags_from_labels(&message.label_ids);
-    let size = message.size_estimate.unwrap_or(0);
+    let size = message.size_estimate;
 
     let mut subject = String::new();
     let mut from = Vec::new();
@@ -820,7 +841,7 @@ fn envelope_from(message: GmailMessage) -> Envelope {
         subject = payload.header("Subject").unwrap_or_default().to_string();
         from = parse_addresses(payload.header("From").unwrap_or_default());
         to = parse_addresses(payload.header("To").unwrap_or_default());
-        date = payload.header("Date").and_then(parse_rfc2822);
+        date = payload.header("Date").and_then(parse_rfc2822_date);
         message_id = payload.header("Message-ID").and_then(normalize_message_id);
         in_reply_to = parse_message_ids(payload.header("In-Reply-To").unwrap_or_default());
     }
@@ -980,15 +1001,6 @@ fn parse_address(part: &str) -> Address {
         name: None,
         email: part.to_string(),
     }
-}
-
-/// Parses an RFC 2822 `Date:` header value.
-fn parse_rfc2822(raw: &str) -> Option<DateTime<FixedOffset>> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    DateTime::parse_from_rfc2822(trimmed).ok()
 }
 
 #[cfg(test)]
@@ -1232,5 +1244,152 @@ mod tests {
         let raw = b"In-Reply-To: <a@x.org> <{d}@x.org> <e@x.org>\r\n\r\nbody\r\n";
         assert_eq!(reply_parents(raw), ["a@x.org", "e@x.org"]);
         assert!(reply_parents(b"Subject: hi\r\n\r\nbody\r\n").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod script_tests {
+    use std::sync::{Arc, Mutex};
+
+    use io_gmail::v1::client::GmailClientStd;
+    use serde_json::{Value, json};
+
+    use crate::{
+        gmail::{backend::list_ids, client::GmailClient},
+        shared::http_script::{Script, ok},
+    };
+
+    /// The boundary of the scripted batch answers.
+    const BOUNDARY: &str = "batch_x";
+
+    /// A `messages.list` answer holding `ids`, with `token` for a next
+    /// page.
+    fn listing(ids: &[&str], token: Option<&str>) -> Vec<u8> {
+        let messages: Vec<Value> = ids.iter().map(|id| json!({"id": id})).collect();
+        let body = json!({"messages": messages, "nextPageToken": token});
+        ok("application/json", &body.to_string())
+    }
+
+    /// The batch answer of `messages.get` for `messages`, one part each,
+    /// named by its index as the batch names its requests.
+    fn metadata(messages: &[Value]) -> Vec<u8> {
+        let mut body = String::new();
+
+        for (index, message) in messages.iter().enumerate() {
+            body.push_str(&format!(
+                "--{BOUNDARY}\r\nContent-Type: application/http\r\n\
+                 Content-ID: <response-{index}>\r\n\r\n\
+                 HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n\
+                 {message}\r\n"
+            ));
+        }
+        body.push_str(&format!("--{BOUNDARY}--\r\n"));
+
+        ok(&format!("multipart/mixed; boundary={BOUNDARY}"), &body)
+    }
+
+    fn message(id: &str) -> Value {
+        json!({"id": id, "labelIds": ["L"]})
+    }
+
+    fn gmail(responses: Vec<Vec<u8>>) -> (GmailClient, Arc<Mutex<Vec<String>>>) {
+        let (script, requests) = Script::new(responses);
+        let inner = GmailClientStd::new(script, "token", Default::default());
+        (GmailClient::over(inner), requests)
+    }
+
+    /// Two messages listed two a page: Gmail answers a next page token
+    /// after that exactly full last page, whose page is empty, so no page
+    /// follows. A page is asked one id longer, that id telling whether one
+    /// follows.
+    #[test]
+    fn an_exactly_full_last_page_has_no_next() {
+        let (mut client, requests) = gmail(vec![
+            listing(&["a", "b"], Some("T")),
+            listing(&[], None),
+            metadata(&[message("a"), message("b")]),
+        ]);
+        let listed = client.list_envelopes("L", Some(1), Some(2), false).unwrap();
+        assert!(listed.errors.is_empty(), "{:?}", listed.errors);
+        assert_eq!(listed.value.envelopes.len(), 2);
+        assert!(!listed.value.more);
+
+        let requests = requests.lock().unwrap();
+        assert!(requests[0].contains("maxResults=3"), "{}", requests[0]);
+        assert!(requests[1].contains("pageToken=T"), "{}", requests[1]);
+
+        let (mut client, requests) = gmail(vec![
+            listing(&["a", "b", "c"], Some("T")),
+            metadata(&[message("a"), message("b")]),
+        ]);
+        let listed = client.list_envelopes("L", Some(1), Some(2), false).unwrap();
+        let ids: Vec<&str> = listed
+            .value
+            .envelopes
+            .iter()
+            .map(|e| e.id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", "b"]);
+        assert!(listed.value.more);
+        assert_eq!(requests.lock().unwrap().len(), 2);
+    }
+
+    /// A later page is read in one call holding the pages before it and
+    /// one id past it, where each page took a call of its own.
+    #[test]
+    fn a_later_page_is_read_in_one_call() {
+        let (mut client, requests) = gmail(vec![
+            listing(&["a", "b", "c"], None),
+            metadata(&[message("c")]),
+        ]);
+        let found = client
+            .search_envelopes("L", None, Some(2), Some(2), false)
+            .unwrap();
+        let ids: Vec<&str> = found
+            .value
+            .envelopes
+            .iter()
+            .map(|e| e.id.as_str())
+            .collect();
+        assert_eq!(ids, ["c"]);
+        assert!(!found.value.more);
+
+        let requests = requests.lock().unwrap();
+        assert!(requests[0].contains("maxResults=5"), "{}", requests[0]);
+        assert_eq!(requests.len(), 2);
+    }
+
+    /// Past the largest page Gmail serves, the listing goes on by token,
+    /// asking only what is left.
+    #[test]
+    fn a_listing_past_the_largest_page_goes_on_by_token() {
+        let first: Vec<String> = (0..500).map(|id| id.to_string()).collect();
+        let mut asked = Vec::new();
+
+        let ids = list_ids(501, |max, token| {
+            asked.push((max, token.map(str::to_string)));
+            match token {
+                None => Ok((first.clone(), Some("T".into()))),
+                Some(_) => Ok((vec!["500".into()], Some("U".into()))),
+            }
+        })
+        .unwrap();
+
+        assert_eq!(ids.len(), 501);
+        assert_eq!(asked, [(500, None), (1, Some("T".into()))]);
+    }
+
+    /// A `Date:` naming the wrong weekday (15 November 2026 is a Sunday)
+    /// reads as the date it names, as on IMAP, Maildir and mbox, where the
+    /// envelope dropped it.
+    #[test]
+    fn a_wrong_weekday_keeps_its_date() {
+        let date = json!({"name": "Date", "value": "Mon, 15 Nov 2026 11:00:00 +0000"});
+        let eta = json!({"id": "e", "labelIds": ["L"], "payload": {"headers": [date]}});
+        let (mut client, _) = gmail(vec![listing(&["e"], None), metadata(&[eta])]);
+
+        let listed = client.list_envelopes("L", Some(1), Some(2), false).unwrap();
+        let date = listed.value.envelopes[0].date.unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-11-15T11:00:00+00:00");
     }
 }

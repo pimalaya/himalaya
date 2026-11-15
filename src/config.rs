@@ -46,10 +46,7 @@ pub mod tls;
 use std::{collections::HashMap, path::PathBuf};
 
 use pimalaya_config::toml::{TomlConfig, opt_shell_expanded_path};
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, IgnoredAny},
-};
+use serde::{Deserialize, de::IgnoredAny};
 
 use crate::config::{
     envelope::EnvelopeConfig, gmail::GmailConfig, imap::ImapConfig, jmap::JmapConfig,
@@ -87,18 +84,18 @@ pub struct Config {
     /// himalaya-tui's own keys, which the file shares with it.
     #[serde(default)]
     pub tui: Option<IgnoredAny>,
-    /// The v2 `table` block, always `None`: present, it fails the load
-    /// naming MIGRATION.md.
-    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
-    pub v2_table: Option<IgnoredAny>,
-    /// The v2 `attachment` block, always `None`: present, it fails the load
-    /// naming MIGRATION.md.
-    #[serde(default, rename = "attachment", deserialize_with = "refuse_attachment")]
-    pub v2_attachment: Option<IgnoredAny>,
-    /// The v2 `account` block, always `None`: present, it fails the load
-    /// naming MIGRATION.md.
-    #[serde(default, rename = "account", deserialize_with = "refuse_account")]
-    pub v2_account: Option<IgnoredAny>,
+    /// The v2 `table` table, refused by name.
+    #[serde(default, rename = "table")]
+    pub v2_table: Option<TableRemoved>,
+    /// The v2 `attachment` table, refused by name.
+    #[serde(default, rename = "attachment")]
+    pub v2_attachment: Option<AttachmentRemoved>,
+    /// The v2 `account` table, refused by name.
+    #[serde(default, rename = "account")]
+    pub v2_account: Option<AccountRemoved>,
+    /// The v1 `folder` table, refused by name.
+    #[serde(default, rename = "folder")]
+    pub v1_folder: Option<FolderRemoved>,
 }
 
 impl TomlConfig for Config {
@@ -226,36 +223,48 @@ pub struct AccountConfig {
     /// himalaya-tui's own keys of this account.
     #[serde(default)]
     pub tui: Option<IgnoredAny>,
-    /// The v2 `table` block, always `None`: present, it fails the load
-    /// naming MIGRATION.md.
-    #[serde(default, rename = "table", deserialize_with = "refuse_table")]
-    pub v2_table: Option<IgnoredAny>,
-    /// The v2 `attachment` block, always `None`: present, it fails the load
-    /// naming MIGRATION.md.
-    #[serde(default, rename = "attachment", deserialize_with = "refuse_attachment")]
-    pub v2_attachment: Option<IgnoredAny>,
+    /// The v2 `table` table, refused by name.
+    #[serde(default, rename = "table")]
+    pub v2_table: Option<TableRemoved>,
+    /// The v2 `attachment` table, refused by name.
+    #[serde(default, rename = "attachment")]
+    pub v2_attachment: Option<AttachmentRemoved>,
+    /// The v1 `folder` table, refused by name.
+    #[serde(default, rename = "folder")]
+    pub v1_folder: Option<FolderRemoved>,
 }
 
-/// The error of a block v3 removed, naming it and the migration guide.
-pub(crate) fn removed<E: de::Error>(block: &str) -> E {
-    E::custom(format!(
-        "The `{block}` block is removed since v3: delete it, see MIGRATION.md"
-    ))
-}
+/// Why v3 removed the tables of its table layouts and colours.
+pub(crate) const PLAIN_TEXT: &str = "the output being plain text";
 
-/// Refuses the v2 `table` block.
-fn refuse_table<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
-    Err(removed("table"))
-}
+pimalaya_config::removed_key! {
+    /// The v2 `table` table, at the top level or in an account.
+    pub TableRemoved: Table {
+        name: "table",
+        why: PLAIN_TEXT,
+        instead: "delete it",
+    }
 
-/// Refuses the v2 `attachment` block.
-fn refuse_attachment<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
-    Err(removed("attachment"))
-}
+    /// The v2 `attachment` table, at the top level or in an account.
+    pub AttachmentRemoved: Table {
+        name: "attachment",
+        why: PLAIN_TEXT,
+        instead: "delete it",
+    }
 
-/// Refuses the v2 `account` block.
-fn refuse_account<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>, D::Error> {
-    Err(removed("account"))
+    /// The v2 top-level `account` table.
+    pub AccountRemoved: Table {
+        name: "account",
+        why: PLAIN_TEXT,
+        instead: "delete it",
+    }
+
+    /// The v1 `folder` table, at the top level or in an account.
+    pub FolderRemoved: Table {
+        name: "folder",
+        why: "v2 renaming it `mailbox`",
+        instead: "move `folder.alias` to `mailbox.alias` and delete the rest",
+    }
 }
 
 #[cfg(test)]
@@ -351,8 +360,9 @@ mod tests {
         assert!(err.contains("unknown field `tuix`"), "{err}");
     }
 
-    /// The v2 blocks Himalaya v3 dropped are refused by name, pointing at
-    /// the migration guide, at the root and in an account.
+    /// The v2 tables Himalaya v3 dropped are refused by name in the
+    /// family's sentence, pointing at the migration guide, at the root
+    /// and in an account.
     #[test]
     fn the_v2_blocks_are_refused_naming_migration() {
         let blocks = [
@@ -366,15 +376,34 @@ mod tests {
 
             for toml in [root, account] {
                 let err = toml::from_str::<Config>(&toml).unwrap_err().to_string();
-                assert!(err.contains(&format!("`{block}` block")), "{err}");
-                assert!(err.contains("MIGRATION.md"), "{err}");
+                let sentence = format!(
+                    "The `{block}` table is removed, the output being plain text: delete it, see MIGRATION.md"
+                );
+                assert!(err.contains(&sentence), "{err}");
             }
         }
 
         let toml = "account.list.table.name-color = \"red\"\n[accounts.example]\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-        assert!(err.contains("`account` block"), "{err}");
+        assert!(err.contains("The `account` table is removed"), "{err}");
         assert!(err.contains("MIGRATION.md"), "{err}");
+    }
+
+    /// The v1 `folder` table, which v2 renamed `mailbox`, is refused by
+    /// name, naming `mailbox.alias` and the migration guide, where serde
+    /// answered an unknown field.
+    #[test]
+    fn the_v1_folder_table_names_mailbox_alias() {
+        let root = "folder.alias.inbox = \"INBOX\"\n[accounts.example]\n";
+        let account = "[accounts.example]\nfolder.alias.inbox = \"INBOX\"\n";
+
+        for toml in [root, account] {
+            let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
+            let sentence = "The `folder` table is removed, v2 renaming it `mailbox`: move \
+                            `folder.alias` to `mailbox.alias` and delete the rest, see \
+                            MIGRATION.md";
+            assert!(err.contains(sentence), "{err}");
+        }
     }
 
     /// The rest of a v1 `[message]` table is refused as unknown keys.

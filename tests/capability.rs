@@ -132,6 +132,39 @@ fn graph_lets_a_send_keep_its_own_copy() {
     assert!(json.to_string().contains("Secret command"), "{json}");
 }
 
+/// Graph would file the copy `--no-save` asks it not to keep, so the
+/// send is refused before the token is asked for; another sending
+/// transport goes on to connect.
+#[test]
+fn graph_refuses_a_send_keeping_no_copy() {
+    let message = "From: a@example.org\r\nTo: b@example.org\r\n\r\nx\r\n";
+
+    refused(
+        MSGRAPH,
+        &["message", "send", "--no-save", "--", message],
+        "capability-missing",
+        "--no-save",
+    );
+    refused(
+        MSGRAPH,
+        &[
+            "message",
+            "compose",
+            "--to",
+            "b@example.org",
+            "--send",
+            "--no-save",
+        ],
+        "capability-missing",
+        "--no-save",
+    );
+
+    let (ok, json) = run(GMAIL, &["message", "send", "--no-save", "--", message]);
+    assert!(!ok, "{json}");
+    assert_eq!(json["code"], Value::Null, "{json}");
+    assert!(json.to_string().contains("Secret command"), "{json}");
+}
+
 #[test]
 fn a_send_only_account_refuses_the_storage_verbs() {
     refused(

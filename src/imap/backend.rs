@@ -49,7 +49,10 @@ use crate::{
     capability,
     email::{
         address::Address,
-        envelope::{Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids},
+        envelope::{
+            Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids,
+            parse_rfc2822_date,
+        },
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level},
         outcome::Outcome,
@@ -482,6 +485,13 @@ impl ImapClient {
 
         self.select(source, ImapMailboxSelectOptions::default())?;
 
+        // NOTE: a move onto its own mailbox changes nothing, as on every
+        // backend, where a server would give the messages new UIDs.
+        if same_mailbox(from, to) {
+            let present = self.present_uids(sequence_set)?;
+            return Ok(found_uids(ids, &present));
+        }
+
         if self.supports_move() {
             // NOTE: `UID MOVE` takes the messages out of the source, so
             // without a readable `COPYUID` nothing is left there to tell
@@ -910,7 +920,7 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
     let mut from = Vec::new();
     let mut to = Vec::new();
     let mut date: Option<DateTime<FixedOffset>> = None;
-    let mut size: u64 = 0;
+    let mut size: Option<u64> = None;
     let mut has_attachment: Option<bool> = None;
 
     for item in items {
@@ -937,7 +947,7 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
                 from = env.from.iter().map(address_from).collect();
                 to = env.to.iter().map(address_from).collect();
             }
-            MessageDataItem::Rfc822Size(n) => size = u64::from(n),
+            MessageDataItem::Rfc822Size(n) => size = Some(u64::from(n)),
             MessageDataItem::BodyStructure(structure) => {
                 has_attachment = Some(body_structure_has_attachment(&structure));
             }
@@ -1125,6 +1135,12 @@ fn sanitise_atom(raw: &str) -> String {
         .collect()
 }
 
+/// Whether `a` and `b` name one mailbox, `INBOX` in any case (RFC 3501
+/// section 5.1).
+fn same_mailbox(a: &str, b: &str) -> bool {
+    a == b || (a.eq_ignore_ascii_case("INBOX") && b.eq_ignore_ascii_case("INBOX"))
+}
+
 /// Parses a shared mailbox name into an IMAP Mailbox token.
 fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
     String::from(name)
@@ -1242,30 +1258,6 @@ fn uid_sequence_set(uids: Vec<u32>) -> Result<SequenceSet> {
         .collect::<Result<_>>()?;
 
     SequenceSet::try_from(uids).map_err(|_| anyhow!("Invalid UID set"))
-}
-
-/// Parses an RFC 2822 date, retrying without its day-of-week token.
-fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    // NOTE: chrono rejects the whole timestamp when the day-of-week
-    // disagrees with the date, which a surprising number of senders get
-    // wrong. The token is redundant, so the retry drops it.
-    DateTime::parse_from_rfc2822(trimmed)
-        .or_else(|_| DateTime::parse_from_rfc2822(strip_weekday(trimmed)))
-        .ok()
-}
-
-/// Drops the leading day-of-week token of an RFC 2822 date, leaving the
-/// unambiguous remainder chrono parses without the weekday check.
-fn strip_weekday(date: &str) -> &str {
-    match date.split_once(", ") {
-        Some((dow, rest)) if dow.len() == 3 && dow.bytes().all(|b| b.is_ascii_alphabetic()) => rest,
-        _ => date,
-    }
 }
 
 /// Renders bytes as UTF-8, falling back to latin-1 when they are not.
@@ -1562,7 +1554,7 @@ mod tests {
 
     use super::{
         SearchKey, body_structure_has_attachment, convert_filter, envelope_from, paginate_uids,
-        parse_rfc2822_date, refuse_impermanent, root_message_ids, search_keys,
+        refuse_impermanent, root_message_ids, search_keys,
     };
     use crate::{
         email::{
@@ -1884,30 +1876,6 @@ mod tests {
                 r#"("APPLICATION" "PDF" NIL NIL NIL "BASE64" 14 NIL ("INLINE" NIL) NIL NIL)"#
             ));
         }
-    }
-
-    #[test]
-    fn parses_a_well_formed_date() {
-        let date = parse_rfc2822_date("Fri, 17 Jul 2026 10:00:00 +0000").unwrap();
-        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
-    }
-
-    #[test]
-    fn parses_despite_a_wrong_weekday() {
-        let date = parse_rfc2822_date("Thu, 17 Jul 2026 10:00:00 +0000").unwrap();
-        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
-    }
-
-    #[test]
-    fn parses_without_a_weekday() {
-        let date = parse_rfc2822_date("17 Jul 2026 10:00:00 +0000").unwrap();
-        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
-    }
-
-    #[test]
-    fn rejects_empty_and_garbage() {
-        assert!(parse_rfc2822_date("   ").is_none());
-        assert!(parse_rfc2822_date("not a date").is_none());
     }
 
     /// Write counts and item errors against a scripted IMAP server.
@@ -2252,6 +2220,23 @@ mod tests {
             let (count, commands) = run(MOVE, &[1], valid, mv(&["999"]));
             assert_eq!(count, 0);
             assert!(!has(&commands, "UID MOVE"), "{commands:?}");
+        }
+
+        /// A move onto its own mailbox looks the UIDs up and changes
+        /// nothing, where the server would give the messages new UIDs.
+        #[test]
+        fn a_move_onto_its_own_mailbox_changes_nothing() {
+            for capabilities in [MOVE, PLAIN] {
+                let onto_itself =
+                    |client: &mut ImapClient| client.move_messages("INBOX", "inbox", &["1", "999"]);
+                let (count, missing, commands) = run_outcome(capabilities, &[1], none, onto_itself);
+                assert_eq!(count, 1);
+                assert_eq!(missing, ["999"]);
+                assert!(has(&commands, "UID SEARCH UID 1,999"), "{commands:?}");
+                assert!(!has(&commands, "UID MOVE"), "{commands:?}");
+                assert!(!has(&commands, "UID COPY"), "{commands:?}");
+                assert!(!has(&commands, "UID STORE"), "{commands:?}");
+            }
         }
 
         #[test]

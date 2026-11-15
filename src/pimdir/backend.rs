@@ -948,8 +948,14 @@ impl PimdirClient {
     ///
     /// A move states no resolution (pimdir SYNC §7): the owner parks it
     /// over a message a sync left in conflict, as it does a remove, and
-    /// the message stays listed where it was (STORAGE §15.4).
+    /// the message stays listed where it was (STORAGE §15.4). A move onto
+    /// its own mailbox stages nothing, counting the ids it holds.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
+        let source = self.hub_id(from)?;
+        if source == self.hub_id(to)? {
+            return Ok(self.found(&source, ids)?.map(|found| found.len()));
+        }
+
         self.refile(from, to, ids, |seq, target| PimdirAction::Move {
             seq,
             to: target,
@@ -1353,7 +1359,7 @@ pub(crate) fn envelope(
             .date
             .as_deref()
             .and_then(|date| DateTime::parse_from_rfc3339(date).ok()),
-        size: mail.size.unwrap_or(0),
+        size: mail.size,
         has_attachment: mail.attachment,
     }
 }
@@ -1483,8 +1489,8 @@ pub struct PimdirQueuedEnvelope {
     pub to: Vec<Address>,
     /// The `Date:` header, `None` when missing or unparseable.
     pub date: Option<DateTime<FixedOffset>>,
-    /// The size of the raw message, in bytes.
-    pub size: u64,
+    /// The size of the raw message, in bytes, `None` when unknown.
+    pub size: Option<u64>,
     /// Whether the message carries an attachment.
     pub has_attachment: Option<bool>,
 }
@@ -1522,7 +1528,7 @@ fn queued_from_action(queued: &PimdirPendingAction, body: Option<&[u8]>) -> Opti
             .date
             .as_deref()
             .and_then(|date| DateTime::parse_from_rfc3339(date).ok()),
-        size: mail.size.unwrap_or(0),
+        size: mail.size,
         has_attachment: mail.attachment,
     };
 
@@ -1989,7 +1995,7 @@ mod tests {
             envelope.date.map(|date| date.to_rfc3339()).as_deref(),
             Some("2026-08-01T10:00:00+00:00")
         );
-        assert_eq!(envelope.size, 99);
+        assert_eq!(envelope.size, Some(99));
         assert_eq!(envelope.has_attachment, Some(true));
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
@@ -4158,7 +4164,8 @@ mod tests {
     }
 
     /// A refile or a delete stages the ids the mailbox holds and counts them,
-    /// an unknown one an item error; none known stages nothing.
+    /// an unknown one an item error; none known stages nothing, nor does a
+    /// move onto its own mailbox.
     #[test]
     fn a_refile_or_delete_stages_the_ids_it_found() {
         let (dir, mut client) = flag_store(None);
@@ -4173,6 +4180,11 @@ mod tests {
         assert_eq!(queued(&client), 1);
         let moved = client.move_messages("imap/INBOX", "imap/Archive", &[&ids[1], "999"]);
         assert_eq!(moved.unwrap().value, 1);
+        assert_eq!(queued(&client), 2);
+        let stayed = client.move_messages("imap/INBOX", "imap/INBOX", &[&ids[2], "999"]);
+        let stayed = stayed.unwrap();
+        assert_eq!(stayed.value, 1);
+        assert_eq!(stayed.errors[0].id.as_deref(), Some("999"));
         assert_eq!(queued(&client), 2);
         let deleted = client.delete_messages("imap/INBOX", &[&ids[2], "999"]);
         assert_eq!(deleted.unwrap().value, 1);

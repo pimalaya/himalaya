@@ -21,7 +21,10 @@ pub struct SieveScriptArg {
     #[arg(long = "script-file", value_name = "PATH", conflicts_with = "script")]
     pub script_file: Option<PathBuf>,
     /// Inline script text, or omit it and pipe the script on stdin.
-    #[arg(name = "script", value_name = "SCRIPT", trailing_var_arg = true)]
+    ///
+    /// Options may come before or after it. Put it after `--` when a word
+    /// of it opens on a hyphen.
+    #[arg(name = "script", value_name = "SCRIPT")]
     pub script: Vec<String>,
 }
 

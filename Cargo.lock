@@ -1605,9 +1605,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-config"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8fe720198d49083f777f07b9f1617b6b387d4bcdbf69e38a3ab4e7f238e9a5"
+checksum = "f88b64de5d579c8931c5117a6fa79998dbd6c61349c7346f0f0dd3d452e58416"
 dependencies = [
  "anyhow",
  "dirs",

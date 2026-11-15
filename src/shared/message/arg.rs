@@ -28,10 +28,9 @@ pub struct MessageArg {
     /// A path to a file, the message itself, or the standard input when
     /// piped.
     ///
-    /// It comes last, every word after it taken as part of it: put it
-    /// after `--` when it opens on a hyphen.
+    /// Options may come before or after it. Put it after `--` when a word
+    /// of it opens on a hyphen.
     #[arg(name = "message-raw", value_name = "MESSAGE")]
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub raw: Vec<String>,
 }
 

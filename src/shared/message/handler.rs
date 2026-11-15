@@ -78,7 +78,7 @@ pub fn apply(
     let mailbox = save.map(|name| account.resolve_mailbox(name));
 
     // NOTE: a backend filing every sent message itself (Graph) keeps that
-    // copy whatever is asked, so the save options of a send are moot there.
+    // copy wherever `--save` points, `--no-save` being refused up front.
     if send && client.files_sent_copy() {
         if let Some(mailbox) = mailbox {
             debug!("the backend files the sent copy itself, ignoring `{mailbox}`");
