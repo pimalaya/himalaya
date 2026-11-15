@@ -575,7 +575,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -794,7 +794,7 @@ dependencies = [
  "io-smtp",
  "jiff",
  "log",
- "mime-rs 0.2.0",
+ "mime-rs",
  "mime_guess",
  "percent-encoding",
  "pimalaya-cli",
@@ -995,7 +995,7 @@ dependencies = [
  "imap-codec",
  "io-sasl",
  "log",
- "mime-rs 0.2.0",
+ "mime-rs",
  "pimalaya-stream",
  "rand",
  "secrecy",
@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d11d62e181a0d63b6068e222f2dafc748eba384847ae2ce67e7082acd1f61c9"
+checksum = "772eaa836ddb21349245eda71daca1cd32060e46bc7b5f42c72e726e5087c12d"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1115,7 +1115,7 @@ dependencies = [
  "ical-rs",
  "jiff",
  "log",
- "mime-rs 0.1.0",
+ "mime-rs",
  "rusqlite",
  "rustix",
  "serde",
@@ -1381,19 +1381,6 @@ name = "mime"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5848f5a9e8117cf94f2f90faac24a87ff81600ff8628c1e3deaab572e76bfa1"
-
-[[package]]
-name = "mime-rs"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44ca77080cce04174d6788fb762d0a5576a1a4902291da9f30862fa4180ec130"
-dependencies = [
- "base64-codec",
- "encoding_rs",
- "memchr",
- "quoted-printable-codec",
- "simd-cpu",
-]
 
 [[package]]
 name = "mime-rs"
@@ -1888,7 +1875,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1946,7 +1933,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2298,7 +2285,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2565,7 +2552,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
