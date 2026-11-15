@@ -312,8 +312,7 @@ pub fn validate_maildir_level(name: &str) -> Result<()> {
 /// other file uncoded, being no mailbox.
 pub fn refuse_existing(target: &Path, name: &str) -> Result<()> {
     if target.is_dir() {
-        let message = format!("Cannot create Maildir `{name}`: it already exists");
-        return Err(mailbox_duplicate(message));
+        return Err(mailbox_duplicate(name));
     }
 
     if target.exists() {

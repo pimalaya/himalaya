@@ -1346,10 +1346,12 @@ mod tests {
         client.create_mailbox("Kid", Some("dir")).unwrap();
         let before = fs::read(root.path().join("A")).unwrap();
 
-        for (name, parent) in [("A", None), ("Kid", Some("dir"))] {
+        for (name, parent, path) in [("A", None, "A"), ("Kid", Some("dir"), "dir/Kid")] {
             let err = client.create_mailbox(name, parent).unwrap_err();
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MailboxDuplicate), "{err:#}");
+            let sentence = format!("Cannot create mailbox `{path}`: it exists already");
+            assert_eq!(err.to_string(), sentence);
         }
         assert_eq!(fs::read(root.path().join("A")).unwrap(), before);
 

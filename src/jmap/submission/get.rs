@@ -35,7 +35,7 @@ impl JmapSubmissionGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = raw::get(client, "EmailSubmission", &self.ids)?;
+        let output = raw::get(client, "EmailSubmission", Some(&self.ids))?;
 
         let submissions = JmapSubmissionQueryOutput {
             account: account.name().to_string(),

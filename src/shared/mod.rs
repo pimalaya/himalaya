@@ -30,6 +30,8 @@ pub mod message;
 pub mod output;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 pub mod raw;
+#[cfg(any(feature = "gmail", feature = "jmap", feature = "msgraph"))]
+pub mod raw_json;
 #[cfg(any(
     feature = "gmail",
     feature = "msgraph",

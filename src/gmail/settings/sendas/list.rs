@@ -7,10 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::send_as::{GmailSendAs, list::GmailSendAsList};
+use io_gmail::v1::rest::settings::send_as::GmailSendAs;
 use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
@@ -19,6 +20,9 @@ use crate::{
 };
 
 /// List all Gmail send-as aliases (settings.sendAs.list).
+///
+/// JSON output: Gmail's answer as Gmail sent it, `{"sendAs": [<Gmail
+/// send-as>...]}`.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsSendAsListCommand;
 
@@ -30,14 +34,12 @@ impl GmailSettingsSendAsListCommand {
         account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
-        let out = {
-            let c = GmailSendAsList::new(&client.auth, &client.user_id)?;
-            client.run(c)?
-        };
+        let page = client.raw_list_at(&["settings", "sendAs"], "sendAs", Vec::new())?;
 
         printer.out(GmailSettingsSendAsListOutput {
             account: account.name().to_string(),
-            send_as: out.response.send_as,
+            send_as: page.items,
+            rest: page.rest,
         })
     }
 }
@@ -48,7 +50,12 @@ impl GmailSettingsSendAsListCommand {
 pub struct GmailSettingsSendAsListOutput {
     #[serde(skip)]
     account: String,
-    send_as: Vec<GmailSendAs>,
+    /// The send-as aliases, each as Gmail sent it.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    send_as: Vec<Value>,
+    /// The rest of Gmail's answer as Gmail sent it.
+    #[serde(flatten)]
+    rest: Map<String, Value>,
 }
 
 impl fmt::Display for GmailSettingsSendAsListOutput {
@@ -57,6 +64,7 @@ impl fmt::Display for GmailSettingsSendAsListOutput {
         let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for send_as in &self.send_as {
+            let send_as: GmailSendAs = serde_json::from_value(send_as.clone()).unwrap_or_default();
             let default = if send_as.is_default == Some(true) {
                 "default"
             } else {
@@ -69,10 +77,10 @@ impl fmt::Display for GmailSettingsSendAsListOutput {
             let name = send_as.display_name.as_deref().unwrap_or_default();
 
             listing.items.push([
-                default,
-                status,
-                &*sanitize::text(&send_as.send_as_email),
-                &*sanitize::text(name),
+                default.to_string(),
+                status.to_string(),
+                sanitize::text(&send_as.send_as_email).into_owned(),
+                sanitize::text(name).into_owned(),
             ]);
         }
 

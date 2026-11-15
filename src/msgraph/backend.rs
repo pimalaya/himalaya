@@ -49,8 +49,7 @@ use crate::{
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
     error::{
-        ErrorCode, ItemError, existing_mailbox, mailbox_duplicate, message_not_found,
-        missing_message, unknown_message,
+        ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message, unknown_message,
     },
     msgraph::{
         client::{MsgraphClient, names_no_message, refusal_of},
@@ -579,8 +578,8 @@ impl MsgraphClient {
         if let Some(parent) = parent
             && self.holds_child(parent, name)?
         {
-            let message = format!("Cannot create mailbox `{name}`: `{parent}` holds it already");
-            return Err(mailbox_duplicate(message));
+            let cause = anyhow!("Microsoft Graph folder `{parent}` holds `{name}`");
+            return Err(existing_mailbox(name, cause));
         }
 
         let folder = MsgraphMailFolder {
@@ -1656,6 +1655,10 @@ mod read_tests {
         let (mut client, requests) = graph(vec![children]);
         let err = client.create_mailbox("Kid", Some("I")).unwrap_err();
         assert_eq!(code(&err), Some(ErrorCode::MailboxDuplicate), "{err:#}");
+        assert_eq!(
+            err.to_string(),
+            "Cannot create mailbox `Kid`: it exists already"
+        );
         let requests = requests.lock().unwrap();
         assert_eq!(requests.len(), 1, "{requests:#?}");
         assert!(requests[0].starts_with("GET "), "{}", requests[0]);

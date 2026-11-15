@@ -11,7 +11,8 @@ use crate::{
     gmail::{
         attachments::GmailAttachmentsCommand, client::GmailClient, drafts::GmailDraftsCommand,
         history::GmailHistoryCommand, labels::GmailLabelsCommand, messages::GmailMessagesCommand,
-        profile::GmailProfileCommand, settings::GmailSettingsCommand, threads::GmailThreadsCommand,
+        profile::GmailProfileCommand, request::GmailRequestCommand, settings::GmailSettingsCommand,
+        threads::GmailThreadsCommand,
     },
 };
 
@@ -21,6 +22,7 @@ use crate::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailCommand {
+    Request(GmailRequestCommand),
     #[command(subcommand)]
     Profile(GmailProfileCommand),
     #[command(subcommand)]
@@ -62,6 +64,7 @@ impl GmailCommand {
             Self::Threads(cmd) => cmd.execute(printer, account, client),
             Self::History(cmd) => cmd.execute(printer, account, client),
             Self::Settings(cmd) => cmd.execute(printer, account, client),
+            Self::Request(cmd) => cmd.execute(printer, client),
         }
     }
 }

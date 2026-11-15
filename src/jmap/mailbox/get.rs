@@ -34,7 +34,7 @@ impl JmapMailboxGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = raw::get(client, "Mailbox", &self.ids)?;
+        let output = raw::get(client, "Mailbox", Some(&self.ids))?;
 
         let mailboxes = JmapMailboxQueryOutput {
             account: account.name().to_string(),

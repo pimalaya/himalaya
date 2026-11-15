@@ -47,7 +47,7 @@ impl MsgraphMailFoldersCommand {
         match self {
             Self::List(cmd) => cmd.execute(printer, account, client),
             Self::ChildFolders(cmd) => cmd.execute(printer, account, client),
-            Self::Get(cmd) => cmd.execute(printer, account, client),
+            Self::Get(cmd) => cmd.execute(printer, client),
             Self::Create(cmd) => cmd.execute(printer, client),
             Self::Rename(cmd) => cmd.execute(printer, client),
             Self::Copy(cmd) => cmd.execute(printer, client),

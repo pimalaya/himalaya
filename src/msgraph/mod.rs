@@ -10,4 +10,5 @@ pub mod client;
 pub mod mail_folders;
 pub mod messages;
 pub mod profile;
+pub mod request;
 mod search;

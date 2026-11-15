@@ -255,29 +255,37 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
 }
 
-/// A refusal under `mailbox-duplicate`: the mailbox a create names
-/// exists already.
-#[cfg_attr(
-    not(any(feature = "msgraph", feature = "maildir", feature = "pimdir")),
-    allow(dead_code)
-)]
-pub fn mailbox_duplicate(message: impl Into<String>) -> anyhow::Error {
-    CodedError::new(ErrorCode::MailboxDuplicate, message.into()).into()
+/// The sentence of every refusal under `mailbox-duplicate`, the family's
+/// one wording of a create naming a collection that exists.
+fn mailbox_duplicate_sentence(name: &str) -> String {
+    format!("Cannot create mailbox `{name}`: it exists already")
 }
 
-/// The failure of a create naming the mailbox `name` the backend answered
-/// exists already, under `mailbox-duplicate`, `cause` what it answered
-/// kept in `sources`.
+/// A refusal under `mailbox-duplicate`: the mailbox `name` a create names
+/// exists already, as the local store holding it tells.
+#[cfg_attr(not(feature = "maildir"), allow(dead_code))]
+pub fn mailbox_duplicate(name: &str) -> Error {
+    CodedError::new(
+        ErrorCode::MailboxDuplicate,
+        mailbox_duplicate_sentence(name),
+    )
+    .into()
+}
+
+/// The failure of a create naming the mailbox `name` the backend or the
+/// store answered exists already, under `mailbox-duplicate`, `cause` what
+/// it answered kept in `sources`.
 #[cfg(any(
     feature = "imap",
     feature = "jmap",
     feature = "gmail",
     feature = "msgraph",
-    feature = "mbox"
+    feature = "mbox",
+    feature = "pimdir"
 ))]
 pub fn existing_mailbox(name: &str, cause: impl Into<Error>) -> Error {
     with_code(cause.into(), |_| Some(ErrorCode::MailboxDuplicate))
-        .context(format!("Cannot create mailbox `{name}`: it exists already"))
+        .context(mailbox_duplicate_sentence(name))
 }
 
 /// A refusal under `message-not-found`: the message asked for is not in

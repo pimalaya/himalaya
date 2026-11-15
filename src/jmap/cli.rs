@@ -10,7 +10,7 @@ use crate::{
     account::context::Account,
     jmap::{
         client::JmapClient, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
-        mailbox::cli::JmapMailboxCommand, request::JmapRequestCommand,
+        mailbox::cli::JmapMailboxCommand, query::JmapQueryCommand, request::JmapRequestCommand,
         submission::cli::JmapSubmissionCommand, thread::cli::JmapThreadCommand,
         vacation::cli::JmapVacationCommand,
     },
@@ -43,9 +43,10 @@ pub enum JmapCommand {
     #[command(subcommand, visible_alias = "vacation")]
     VacationResponse(JmapVacationCommand),
 
-    // The former name of `request`, kept with its schema key.
+    // The former form of `request`, a method-calls array printing
+    // `{methodResponses}`, kept with its schema key.
     #[command(hide = true)]
-    Query(JmapRequestCommand),
+    Query(JmapQueryCommand),
 }
 
 impl JmapCommand {
@@ -63,7 +64,8 @@ impl JmapCommand {
             Self::Identity(cmd) => cmd.execute(printer, account, client),
             Self::Submission(cmd) => cmd.execute(printer, account, client),
             Self::VacationResponse(cmd) => cmd.execute(printer, account, client),
-            Self::Request(cmd) | Self::Query(cmd) => cmd.execute(printer, client),
+            Self::Request(cmd) => cmd.execute(printer, client),
+            Self::Query(cmd) => cmd.execute(printer, client),
         }
     }
 }
@@ -74,8 +76,10 @@ mod tests {
 
     use crate::{cli::Cli, json_schema::registry};
 
-    /// `request` names the escape hatch of an HTTP API across the family;
-    /// `query`, its former name, still runs it, hidden, its schema kept.
+    /// `request` names the escape hatch of an HTTP API across the family,
+    /// taking one whole request object and printing `{response}`; `query`,
+    /// its former form, still takes a method-calls array, hidden, its
+    /// schema kept.
     #[test]
     fn the_raw_request_is_jmap_request() {
         let mut cli = Cli::command();
@@ -92,13 +96,17 @@ mod tests {
         assert!(!listed("query"), "{help}");
         assert!(help.contains("Send a raw JMAP request"), "{help}");
 
-        for name in ["request", "query"] {
-            let args = ["himalaya", "jmap", name, "[]", "--using", "urn:x"];
-            assert!(Cli::try_parse_from(args).is_ok(), "{name}");
-        }
+        let request = ["himalaya", "jmap", "request", r#"{"methodCalls": []}"#];
+        assert!(Cli::try_parse_from(request).is_ok());
+        let query = ["himalaya", "jmap", "query", "[]", "--using", "urn:x"];
+        assert!(Cli::try_parse_from(query).is_ok());
+        let request = ["himalaya", "jmap", "request", "{}", "--using", "urn:x"];
+        assert!(Cli::try_parse_from(request).is_err());
 
         let schemas = registry().schemas;
         let request = &schemas["himalaya-jmap-request"];
-        assert_eq!(request, &schemas["himalaya-jmap-query"]);
+        assert!(request.to_string().contains("response"), "{request}");
+        let query = &schemas["himalaya-jmap-query"];
+        assert!(query.to_string().contains("methodResponses"), "{query}");
     }
 }

@@ -679,10 +679,12 @@ mod tests {
         let (dir, client, id) = fixture();
         client.create_mailbox("Kid", Some("A")).unwrap();
 
-        for (name, parent) in [("A", None), ("Kid", Some("A"))] {
+        for (name, parent, path) in [("A", None, "A"), ("Kid", Some("A"), "A/Kid")] {
             let err = client.create_mailbox(name, parent).unwrap_err();
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MailboxDuplicate), "{err:#}");
+            let sentence = format!("Cannot create mailbox `{path}`: it exists already");
+            assert_eq!(err.to_string(), sentence);
         }
         assert!(client.get_message("A", &id, false).is_ok());
 

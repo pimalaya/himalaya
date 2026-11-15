@@ -87,8 +87,8 @@ impl MsgraphMailFolderListCommand {
     }
 }
 
-/// The Microsoft Graph mail folders, as `list`, `get` and
-/// `child-folders` print them.
+/// The Microsoft Graph mail folders, as `list` and `child-folders` print
+/// them.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MsgraphMailFolderListOutput {
@@ -98,25 +98,12 @@ pub struct MsgraphMailFolderListOutput {
     /// kept.
     #[schemars(with = "Vec<Map<String, Value>>")]
     folders: Vec<Value>,
-    /// Graph's next link, `null` once the listing is complete and for
-    /// `get`, given back through `--page-token`.
+    /// Graph's next link, `null` once the listing is complete, given back
+    /// through `--page-token`.
     next_page: Option<String>,
-    #[serde(skip)]
-    paged: bool,
 }
 
 impl MsgraphMailFolderListOutput {
-    /// Wraps the folders the server returned for `account`.
-    pub fn new(account: &Account, folders: Vec<MsgraphMailFolder>) -> Self {
-        let folders = folders.iter().filter_map(|f| serde_json::to_value(f).ok());
-        Self {
-            account: account.name().to_string(),
-            folders: folders.collect(),
-            next_page: None,
-            paged: false,
-        }
-    }
-
     /// Wraps one page of the folders the server listed for `account`,
     /// `next` resuming the listing.
     pub fn page(account: &Account, folders: Vec<Value>, next: Option<String>) -> Self {
@@ -124,7 +111,6 @@ impl MsgraphMailFolderListOutput {
             account: account.name().to_string(),
             folders,
             next_page: next,
-            paged: true,
         }
     }
 }
@@ -144,11 +130,9 @@ impl fmt::Display for MsgraphMailFolderListOutput {
             ]);
         }
 
-        if self.paged {
-            let count = self.folders.len();
-            let next = self.next_page.as_deref();
-            listing.page(ListingPage::Token, count, ["folder", "folders"], next);
-        }
+        let count = self.folders.len();
+        let next = self.next_page.as_deref();
+        listing.page(ListingPage::Token, count, ["folder", "folders"], next);
 
         write!(f, "{listing}")
     }

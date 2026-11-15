@@ -34,7 +34,7 @@ impl JmapEmailGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = raw::get(client, "Email", &self.ids)?;
+        let output = raw::get(client, "Email", Some(&self.ids))?;
 
         let mut emails = JmapEmailQueryOutput::new(account, output.list, output.rest);
         emails.errors = not_found_errors(output.not_found, ErrorCode::MessageNotFound);

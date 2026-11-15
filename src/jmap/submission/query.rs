@@ -138,12 +138,13 @@ pub struct JmapSubmissionQueryOutput {
     /// The page listed and its size, `None` for a get or a create.
     #[serde(skip)]
     pub page: Option<(u64, u64)>,
-    /// The submissions, each as the server sent it, in its order.
+    /// The submissions, each as the server sent it, in its order; for a
+    /// create, the properties the server set on the one it created.
     #[schemars(with = "Vec<Map<String, Value>>")]
     pub submissions: Vec<Value>,
     /// The rest of the server's answers: the query's `queryState`,
-    /// `canCalculateChanges`, `position` and `total`, the get's `state`;
-    /// nothing for a create.
+    /// `canCalculateChanges`, `position` and `total`, the get's `state`,
+    /// a create's `oldState` and `newState`.
     #[serde(flatten)]
     pub rest: Map<String, Value>,
     /// The number of the next page, `null` once the query is complete and

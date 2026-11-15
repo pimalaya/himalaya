@@ -65,7 +65,7 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{ErrorCode, mailbox_duplicate, message_not_found, missing_message, pimdir_error},
+    error::{ErrorCode, existing_mailbox, message_not_found, missing_message, pimdir_error},
     pimdir::{client::PimdirClient, queue::list::PimdirQueueRow},
 };
 
@@ -592,7 +592,7 @@ impl PimdirClient {
                     item_id: addressed.item_id,
                     producer: queued.producer,
                     queued_at: queued.created_at,
-                    attempts: queued.attempts,
+                    attempts: u64::try_from(queued.attempts).unwrap_or_default(),
                     unconfirmed: false,
                     error: None,
                     subject: addressed.subject,
@@ -624,7 +624,7 @@ impl PimdirClient {
                     item_id: addressed.item_id,
                     producer: parked.producer,
                     queued_at: parked.created_at,
-                    attempts: parked.attempts,
+                    attempts: u64::try_from(parked.attempts).unwrap_or_default(),
                     error: Some(parked.error),
                     subject: addressed.subject,
                 }
@@ -1118,13 +1118,12 @@ impl PimdirClient {
         };
 
         if let Some(held) = self.held_mailbox(&source, name, parent.as_deref())? {
-            let message =
-                format!("Cannot create mailbox `{name}`: the store lists it already as `{held}`");
-            return Err(mailbox_duplicate(message));
+            let cause = anyhow!("The pimdir store lists it as `{held}`");
+            return Err(existing_mailbox(name, cause));
         }
         if self.creation_queued(&anchor, &source, name, parent.as_deref())? {
-            let message = format!("Cannot create mailbox `{name}`: its creation is queued already");
-            return Err(mailbox_duplicate(message));
+            let cause = anyhow!("The pimdir store has its creation queued");
+            return Err(existing_mailbox(name, cause));
         }
 
         let enqueued = producer
@@ -3068,7 +3067,9 @@ mod tests {
                 Some(ErrorCode::MailboxDuplicate),
                 "{err:#}"
             );
-            assert!(err.to_string().contains(held), "{err:#}");
+            let sentence = format!("Cannot create mailbox `{name}`: it exists already");
+            assert_eq!(err.to_string(), sentence);
+            assert!(format!("{err:#}").contains(held), "{err:#}");
         }
         assert!(
             client

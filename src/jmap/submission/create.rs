@@ -3,12 +3,11 @@
 //! The `jmap submission create` command, the create half of RFC 8621
 //! `EmailSubmission/set`.
 
-use std::collections::BTreeMap;
-
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::{
-    JmapEmailAddressWithParameters, JmapEnvelope, set::JmapEmailSubmissionCreate,
+    JmapEmailAddressWithParameters, JmapEmailSubmissionSetItemError, JmapEnvelope,
+    set::JmapEmailSubmissionCreate,
 };
 use pimalaya_cli::printer::Printer;
 
@@ -17,6 +16,7 @@ use crate::{
     jmap::{
         client::JmapClient,
         error::{format_set_error, set_error},
+        raw,
         submission::query::JmapSubmissionQueryOutput,
     },
 };
@@ -79,27 +79,23 @@ impl JmapSubmissionCreateCommand {
             email_id: self.email_id.clone(),
             envelope,
         };
+        let submission = serde_json::to_value(submission)?;
 
-        let mut submissions = BTreeMap::new();
-        submissions.insert(self.email_id.clone(), submission);
+        let output = raw::create(client, "EmailSubmission", &self.email_id, submission)?;
 
-        let output = client.email_submission_set(submissions)?;
-
-        if let Some(err) = output.not_created.get(&self.email_id) {
+        if let Some(err) = output.not_created {
+            let err: JmapEmailSubmissionSetItemError = serde_json::from_value(err)
+                .context("Cannot read why the JMAP server refused the submission")?;
             let mut msg = format!("Send email `{}` error", self.email_id);
-            msg.push_str(&format_set_error(err));
-            return Err(set_error(msg, err));
+            msg.push_str(&format_set_error(&err));
+            return Err(set_error(msg, &err));
         }
 
         printer.out(JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: None,
-            submissions: output
-                .created
-                .into_values()
-                .filter_map(|submission| serde_json::to_value(submission).ok())
-                .collect(),
-            rest: Default::default(),
+            submissions: output.created.into_iter().collect(),
+            rest: output.rest,
             next_page: None,
             errors: Vec::new(),
         })

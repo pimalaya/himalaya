@@ -217,10 +217,12 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "jmap")]
     {
-        // The former name keeps its schema beside the new one.
-        for key in ["himalaya-jmap-request", "himalaya-jmap-query"] {
-            insert!(key, crate::jmap::request::JmapRequestOutput);
-        }
+        insert!(
+            "himalaya-jmap-request",
+            crate::shared::raw_json::RawJsonOutput
+        );
+        // The former form keeps its schema under its former name.
+        insert!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
         insert!(
             "himalaya-jmap-mailbox-get",
             crate::jmap::mailbox::query::JmapMailboxQueryOutput
@@ -270,6 +272,10 @@ pub fn registry() -> JsonSchemaRegistry {
     #[cfg(feature = "gmail")]
     {
         insert!(
+            "himalaya-gmail-request",
+            crate::shared::raw_json::RawJsonOutput
+        );
+        insert!(
             "himalaya-gmail-profile-get",
             crate::gmail::profile::get::GmailProfileOutput
         );
@@ -279,7 +285,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-gmail-labels-get",
-            crate::gmail::labels::list::GmailLabelListOutput
+            crate::gmail::labels::get::GmailLabelGetOutput
         );
         insert!(
             "himalaya-gmail-messages-list",
@@ -374,6 +380,10 @@ pub fn registry() -> JsonSchemaRegistry {
     #[cfg(feature = "msgraph")]
     {
         insert!(
+            "himalaya-msgraph-request",
+            crate::shared::raw_json::RawJsonOutput
+        );
+        insert!(
             "himalaya-msgraph-profile-get",
             crate::msgraph::profile::get::MsgraphProfileOutput
         );
@@ -387,7 +397,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-msgraph-mail-folders-get",
-            crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
+            crate::msgraph::mail_folders::get::MsgraphMailFolderGetOutput
         );
         insert!(
             "himalaya-msgraph-messages-list",

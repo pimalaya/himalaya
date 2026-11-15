@@ -1,10 +1,10 @@
-//! # Raw JMAP listings
+//! # Raw JMAP calls
 //!
-//! The `Foo/query` chained into its `Foo/get` in one request, and the
-//! `Foo/get` alone, both answers kept as the server sent them, for the
-//! protocol listings, which print the server's payload rather than
-//! re-serialize it (pimalaya-cli output.md, *Protocol commands are
-//! raw-faithful*).
+//! The `Foo/query` chained into its `Foo/get` in one request, the
+//! `Foo/get` alone and the `Foo/set` creating one object, each answer kept
+//! as the server sent it, for the protocol commands, which print the
+//! server's payload rather than re-serialize it (pimalaya-cli output.md,
+//! *Protocol commands are raw-faithful*).
 
 use anyhow::{Context, Result};
 use io_jmap::{
@@ -61,14 +61,66 @@ pub fn query(
     Ok(list)
 }
 
-/// Runs `<object>/get` on `ids`.
-pub fn get(client: &mut JmapClientStd, object: &str, ids: &[String]) -> Result<JmapRawList> {
+/// Runs `<object>/get` on `ids`, on every object of its type when `None`.
+pub fn get(
+    client: &mut JmapClientStd,
+    object: &str,
+    ids: Option<&[String]>,
+) -> Result<JmapRawList> {
     let account = account_id(client)?;
     let args = json!({"accountId": account, "ids": ids});
     let calls = vec![(format!("{object}/get"), args, String::from("g"))];
 
     let get = send(client, object, calls)?.into_iter().next();
     Ok(listed(get.unwrap_or_default()))
+}
+
+/// The answer of a `Foo/set` creating one object, as the server sent it.
+#[derive(Clone, Debug, Default)]
+pub struct JmapRawCreated {
+    /// The object created, the properties the server set (`id` among
+    /// them), `None` when it was not created.
+    pub created: Option<Value>,
+    /// Why the object was not created (`notCreated`), as the server sent
+    /// it.
+    pub not_created: Option<Value>,
+    /// The other keys of the answer, `accountId` and the maps left out:
+    /// `oldState` and `newState`.
+    pub rest: Map<String, Value>,
+}
+
+/// Runs `<object>/set` creating `create` under the creation id `key`.
+pub fn create(
+    client: &mut JmapClientStd,
+    object: &str,
+    key: &str,
+    create: Value,
+) -> Result<JmapRawCreated> {
+    let account = account_id(client)?;
+    let args = json!({"accountId": account, "create": {key: create}});
+    let calls = vec![(format!("{object}/set"), args, String::from("s"))];
+
+    let mut set = send(client, object, calls)?
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    let mut take = |name: &str| match set.remove(name) {
+        Some(Value::Object(mut map)) => map.remove(key),
+        _ => None,
+    };
+    let created = take("created");
+    let not_created = take("notCreated");
+
+    set.remove("accountId");
+    for name in ["updated", "destroyed", "notUpdated", "notDestroyed"] {
+        set.remove(name);
+    }
+
+    Ok(JmapRawCreated {
+        created,
+        not_created,
+        rest: set,
+    })
 }
 
 /// Splits a `Foo/get` answer into its list, its ids not found and the
@@ -112,7 +164,7 @@ fn send(
         JMAP_CORE_CAPABILITY.to_string(),
         JMAP_MAIL_CAPABILITY.to_string(),
     ];
-    if object == "EmailSubmission" {
+    if matches!(object, "EmailSubmission" | "Identity") {
         using.push(JMAP_SUBMISSION_CAPABILITY.to_string());
     }
 
@@ -162,6 +214,8 @@ pub fn query_args<F: Serialize, S: Serialize>(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use io_jmap::{client::JmapClientStd, rfc8620::session::JmapSession};
     use secrecy::SecretString;
     use serde_json::{Map, json};
@@ -174,6 +228,13 @@ mod tests {
     /// A client over a session naming `a1` as the mail account, its
     /// requests answered by `responses`.
     fn client(responses: Vec<serde_json::Value>) -> JmapClientStd {
+        client_and_requests(responses).0
+    }
+
+    /// A client as [`client`] builds it, beside the requests it sends.
+    fn client_and_requests(
+        responses: Vec<serde_json::Value>,
+    ) -> (JmapClientStd, Arc<Mutex<Vec<String>>>) {
         let session: JmapSession = serde_json::from_value(json!({
             "username": "u",
             "accounts": {},
@@ -190,9 +251,10 @@ mod tests {
             .into_iter()
             .map(|body| ok("application/json", &body.to_string()))
             .collect();
-        let (script, _) = Script::new(responses);
+        let (script, requests) = Script::new(responses);
         let auth = SecretString::from("token");
-        JmapClientStd::from_parts(script, auth, session)
+        let client = JmapClientStd::from_parts(script, auth, session);
+        (client, requests)
     }
 
     /// The objects print as the server sent them, a property no type
@@ -222,10 +284,59 @@ mod tests {
         ], "sessionState": "s"});
         let mut client = client(vec![answer]);
 
-        let err = raw::get(&mut client, "Email", &[String::from("e1")]).unwrap_err();
+        let err = raw::get(&mut client, "Email", Some(&[String::from("e1")])).unwrap_err();
         assert!(
             err.downcast_ref::<io_jmap::rfc8620::error::JmapMethodError>()
                 .is_some()
         );
+    }
+
+    /// A get without ids asks for every object (`ids` null), an identity
+    /// under the submission capability, and keeps each as sent beside the
+    /// get's `state`.
+    #[test]
+    fn a_get_without_ids_asks_for_every_object() {
+        let answer = json!({"methodResponses": [
+            ["Identity/get", {"accountId": "a1", "state": "s1", "list": [{"id": "i1", "email": "a@x.org", "x-vendor": 1}], "notFound": []}, "g"],
+        ], "sessionState": "s"});
+        let (mut client, requests) = client_and_requests(vec![answer]);
+
+        let list = raw::get(&mut client, "Identity", None).unwrap();
+
+        assert_eq!(
+            list.list,
+            [json!({"id": "i1", "email": "a@x.org", "x-vendor": 1})]
+        );
+        assert_eq!(serde_json::Value::Object(list.rest), json!({"state": "s1"}));
+        let request = requests.lock().unwrap().join("");
+        assert!(request.contains(r#""ids":null"#), "{request}");
+        assert!(
+            request.contains("urn:ietf:params:jmap:submission"),
+            "{request}"
+        );
+    }
+
+    /// A create keeps the object as the server set it and the set's states,
+    /// or what the server answered for the object it did not create.
+    #[test]
+    fn a_create_keeps_what_the_server_set() {
+        let created = json!({"methodResponses": [
+            ["EmailSubmission/set", {"accountId": "a1", "oldState": "1", "newState": "2", "created": {"e1": {"id": "s1", "undoStatus": "pending", "x-vendor": 1}}}, "s"],
+        ], "sessionState": "s"});
+        let refused = json!({"methodResponses": [
+            ["EmailSubmission/set", {"accountId": "a1", "newState": "2", "notCreated": {"e1": {"type": "forbiddenFrom"}}}, "s"],
+        ], "sessionState": "s"});
+        let mut client = client(vec![created, refused]);
+
+        let set = raw::create(&mut client, "EmailSubmission", "e1", json!({})).unwrap();
+        let object = json!({"id": "s1", "undoStatus": "pending", "x-vendor": 1});
+        assert_eq!(set.created, Some(object));
+        assert_eq!(set.not_created, None);
+        let states = json!({"oldState": "1", "newState": "2"});
+        assert_eq!(serde_json::Value::Object(set.rest), states);
+
+        let set = raw::create(&mut client, "EmailSubmission", "e1", json!({})).unwrap();
+        assert_eq!(set.created, None);
+        assert_eq!(set.not_created, Some(json!({"type": "forbiddenFrom"})));
     }
 }

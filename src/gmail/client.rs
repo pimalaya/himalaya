@@ -101,14 +101,20 @@ impl GmailClient {
     /// Gmail leaves the key out of an empty page), the rest of the page
     /// beside them and the `nextPageToken` taken out as the cursor.
     pub fn raw_list<P: Serialize>(&mut self, collection: &str, params: &P) -> Result<GmailRawPage> {
-        let mut url = gmail_api_url(&["users", &self.user_id, collection])?;
         let pairs = to_query_pairs(params).map_err(GmailSendError::from)?;
-        if !pairs.is_empty() {
-            url.query_pairs_mut().extend_pairs(pairs);
-        }
+        self.raw_list_at(&[collection], collection, pairs)
+    }
 
-        let send = GmailSend::<Map<String, Value>>::get(&self.auth, url)?;
-        let mut rest = self.run(send)?.response;
+    /// The listing at `users/<user>/<path>`, queried by `pairs`, as Gmail
+    /// sent it, its items under `collection`, as [`Self::raw_list`] reads
+    /// it: the settings listings, whose path and key differ.
+    pub fn raw_list_at(
+        &mut self,
+        path: &[&str],
+        collection: &str,
+        pairs: Vec<(String, String)>,
+    ) -> Result<GmailRawPage> {
+        let mut rest = self.raw_get_with(path, pairs)?;
 
         let next_page = match rest.remove("nextPageToken") {
             Some(Value::String(token)) => Some(token),
@@ -124,6 +130,29 @@ impl GmailClient {
             rest,
             next_page,
         })
+    }
+
+    /// The resource at `users/<user>/<path>`, as Gmail sent it.
+    pub fn raw_get(&mut self, path: &[&str]) -> Result<Map<String, Value>> {
+        self.raw_get_with(path, Vec::new())
+    }
+
+    fn raw_get_with(
+        &mut self,
+        path: &[&str],
+        pairs: Vec<(String, String)>,
+    ) -> Result<Map<String, Value>> {
+        let user = self.user_id.clone();
+        let mut segments = vec!["users", user.as_str()];
+        segments.extend_from_slice(path);
+
+        let mut url = gmail_api_url(&segments)?;
+        if !pairs.is_empty() {
+            url.query_pairs_mut().extend_pairs(pairs);
+        }
+
+        let send = GmailSend::<Map<String, Value>>::get(&self.auth, url)?;
+        Ok(self.run(send)?.response)
     }
 
     fn label_index(&mut self) -> Result<&MailboxIndex> {
@@ -145,6 +174,19 @@ impl GmailClient {
             inner,
             label_index: None,
         }
+    }
+
+    /// A client whose requests are answered by the JSON `bodies`, in
+    /// order, beside the requests it sends.
+    pub(crate) fn scripted(
+        bodies: &[Value],
+    ) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        let bodies = bodies
+            .iter()
+            .map(|body| crate::shared::http_script::ok("application/json", &body.to_string()));
+        let (script, requests) = crate::shared::http_script::Script::new(bodies.collect());
+        let inner = Inner::new(script, "token", Default::default());
+        (Self::over(inner), requests)
     }
 }
 

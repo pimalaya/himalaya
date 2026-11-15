@@ -38,7 +38,7 @@ pub struct AttachmentListCommand {
     pub message_id: String,
     /// Also list the parts carrying `Content-Disposition: inline`,
     /// typically the images an HTML body references through `cid:`.
-    #[arg(long, short)]
+    #[arg(long, short_alias = 'i')]
     pub inline: bool,
 }
 
@@ -196,6 +196,31 @@ mod tests {
             },
         },
     };
+
+    /// `-i` means `--interactive` across the family, so `--inline` is
+    /// long-only, `-i` still taken as a hidden alias of it.
+    #[test]
+    fn inline_keeps_a_hidden_short_alias() {
+        use clap::{CommandFactory, Parser};
+
+        use crate::shared::attachment::{
+            download::AttachmentDownloadCommand, list::AttachmentListCommand,
+        };
+
+        let list = AttachmentListCommand::try_parse_from(["list", "1", "-i"]).unwrap();
+        assert!(list.inline);
+        let download = AttachmentDownloadCommand::try_parse_from(["download", "1", "-i"]).unwrap();
+        assert!(download.inline);
+
+        for mut command in [
+            AttachmentListCommand::command(),
+            AttachmentDownloadCommand::command(),
+        ] {
+            let help = command.render_help().to_string();
+            assert!(help.contains("--inline"), "{help}");
+            assert!(!help.contains("-i,"), "{help}");
+        }
+    }
 
     #[test]
     fn ids_are_those_of_the_read_view() {

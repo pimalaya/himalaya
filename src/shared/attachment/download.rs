@@ -54,7 +54,7 @@ pub struct AttachmentDownloadCommand {
     pub attachment_ids: Vec<String>,
     /// Also write the parts carrying `Content-Disposition: inline` when no
     /// id is given, as `attachment list --inline` lists them.
-    #[arg(long, short)]
+    #[arg(long, short_alias = 'i')]
     pub inline: bool,
     /// Destination directory, overriding the configured `downloads-dir`.
     #[arg(long, short, value_name = "PATH", conflicts_with = "stdout")]

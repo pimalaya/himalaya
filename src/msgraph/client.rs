@@ -13,10 +13,12 @@ use std::ops::{Deref, DerefMut};
 use anyhow::{Result, anyhow, bail};
 use io_msgraph::v1::{
     client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions, MsgraphClientStdError},
-    send::MsgraphSendError,
+    send::{MSGRAPH_API_BASE, MsgraphSend, MsgraphSendError, path_segment, user_path},
 };
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
+use serde_json::Value;
+use url::Url;
 
 use crate::{
     account::context::Account,
@@ -103,6 +105,21 @@ impl MsgraphClient {
         self.folder_index = None;
     }
 
+    /// The resource at `segments` under the mailbox owner (`me` or
+    /// `users/<id>`), each segment percent-encoded, none naming the owner
+    /// itself, as Graph sent it.
+    pub fn raw_get(&mut self, segments: &[&str]) -> Result<Value> {
+        let mut path = user_path(&self.user_id)?;
+        for segment in segments {
+            path.push('/');
+            path.push_str(&path_segment(segment)?);
+        }
+
+        let url = Url::parse(MSGRAPH_API_BASE)?.join(&path)?;
+        let auth = self.auth.clone();
+        Ok(self.run(MsgraphSend::<Value>::get(&auth, url))?.response)
+    }
+
     fn folder_index(&mut self) -> Result<&MailboxIndex> {
         if self.folder_index.is_none() {
             let folders = self.list_mailboxes(false)?.value;
@@ -122,6 +139,19 @@ impl MsgraphClient {
             inner,
             folder_index: None,
         }
+    }
+
+    /// A client whose requests are answered by the JSON `bodies`, in
+    /// order, beside the requests it sends.
+    pub(crate) fn scripted(
+        bodies: &[Value],
+    ) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        let bodies = bodies
+            .iter()
+            .map(|body| crate::shared::http_script::ok("application/json", &body.to_string()));
+        let (script, requests) = crate::shared::http_script::Script::new(bodies.collect());
+        let inner = Inner::new(script, "token", Default::default());
+        (Self::over(inner), requests)
     }
 }
 

@@ -92,7 +92,7 @@ pub struct PimdirQueueRow {
     /// When the row was appended, stamped by the store's own clock.
     pub queued_at: String,
     /// How many times the sync engine tried the row.
-    pub attempts: i64,
+    pub attempts: u64,
     /// Whether the row's outcome is unknown: the engine sent its request
     /// and cannot tell whether it took effect, so it may have.
     pub unconfirmed: bool,
@@ -243,5 +243,15 @@ mod tests {
         assert!(lines[1].ends_with("hi"), "{text}");
         assert!(lines[3].contains("unconfirmed"), "{text}");
         assert!(lines[3].ends_with("unconfirmed: timed out"), "{text}");
+    }
+
+    /// A row's `attempts` is an unsigned count, as the family's queue row
+    /// declares it.
+    #[test]
+    fn a_row_counts_its_attempts_from_zero() {
+        let schema = schemars::schema_for!(PimdirQueueRow);
+        let attempts = &schema.as_value()["properties"]["attempts"];
+        assert_eq!(attempts["format"], "uint64", "{attempts}");
+        assert_eq!(attempts["minimum"], 0, "{attempts}");
     }
 }

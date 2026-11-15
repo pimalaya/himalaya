@@ -13,6 +13,7 @@ pub mod history;
 pub mod labels;
 pub mod messages;
 pub mod profile;
+pub mod request;
 pub mod search;
 pub mod settings;
 pub mod threads;

@@ -1,150 +1,96 @@
 //! # JMAP request
 //!
-//! The `jmap request` command, a raw method-calls array sent as one JMAP
-//! request, as it is written.
+//! The `jmap request` command, sending a caller-supplied JMAP request
+//! object and printing the raw response.
 
 use std::{
-    fmt,
-    io::{BufRead, stdin},
+    fs,
+    io::{Read, stdin},
+    path::Path,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use io_jmap::{
     rfc8620::{JMAP_CORE_CAPABILITY, request::JmapRequest},
     rfc8621::JMAP_MAIL_CAPABILITY,
 };
 use pimalaya_cli::{printer::Printer, session::check_stdin};
-use schemars::JsonSchema;
-use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value, json};
 
-use crate::{error::ErrorCode, jmap::client::JmapClient};
+use crate::{error::ErrorCode, jmap::client::JmapClient, shared::raw_json::RawJsonOutput};
 
-/// Send a raw JMAP request and print the response.
+/// Send a raw JMAP request and print the raw JMAP response.
 ///
-/// The argument is the request's JSON array of method call tuples, as in
-/// `'[["Mailbox/query", {"filter": {"role": "inbox"}}, "c0"]]'`, read
-/// from stdin when it is `-` or absent.
+/// The body is a JMAP request object (`{"using": [...], "methodCalls":
+/// [...]}`), so any method can be driven with custom `using`
+/// capabilities. `using` defaults to the core and mail capabilities when
+/// omitted.
 ///
-/// An `accountId` is injected into each call's arguments when it names
-/// none itself.
+/// JSON output: `{response}`, the raw JMAP response.
 #[derive(Debug, Parser)]
 pub struct JmapRequestCommand {
-    /// Extra capability URNs to declare (core and mail are always included).
-    #[arg(long = "using", value_name = "URN")]
-    pub using: Vec<String>,
-    /// The JMAP methodCalls JSON array (or omit / pass `-` to read stdin).
-    ///
-    /// Options may come before or after it. Put it after `--` when a word
-    /// of it opens on a hyphen.
-    #[arg(name = "method-calls", value_name = "METHOD_CALLS")]
-    pub method_calls: Vec<String>,
+    /// A path to a JSON file, raw JSON, or `-` for stdin.
+    #[arg(value_name = "JSON")]
+    pub body: String,
 }
 
 impl JmapRequestCommand {
-    /// Sends the method calls and prints the raw response.
+    /// Sends the request and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let raw = if self.method_calls.is_empty()
-            || self.method_calls.first().map(|s| s.as_str()) == Some("-")
-        {
-            check_stdin(ErrorCode::StdinTaken)?;
+        let map = read_object(self.body)?;
 
-            stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            self.method_calls.join(" ")
+        let using = match map.get("using") {
+            Some(value) => {
+                serde_json::from_value(value.clone()).context("Invalid `using` array")?
+            }
+            None => vec![
+                JMAP_CORE_CAPABILITY.to_string(),
+                JMAP_MAIL_CAPABILITY.to_string(),
+            ],
         };
-
-        let calls_value: Value =
-            serde_json::from_str(&raw).context("METHOD_CALLS is not valid JSON")?;
-
-        let Value::Array(calls_arr) = calls_value else {
-            bail!("METHOD_CALLS must be a JSON array");
-        };
-
-        let account_id = client
-            .session()
-            .and_then(|s| s.primary_accounts.get(JMAP_MAIL_CAPABILITY).cloned())
-            .unwrap_or_default();
-
-        let mut method_calls = Vec::with_capacity(calls_arr.len());
-        for (i, call) in calls_arr.into_iter().enumerate() {
-            let Value::Array(mut tuple) = call else {
-                bail!("method call #{i} must be a JSON array [name, args, callId]");
-            };
-
-            if tuple.len() != 3 {
-                bail!("method call #{i} must have exactly 3 elements [name, args, callId]");
-            }
-
-            let call_id = match tuple.remove(2) {
-                Value::String(s) => s,
-                v => bail!("method call #{i} callId must be a string, got {v}"),
-            };
-
-            let mut args = tuple.remove(1);
-            let name = match tuple.remove(0) {
-                Value::String(s) => s,
-                v => bail!("method call #{i} name must be a string, got {v}"),
-            };
-
-            if let Value::Object(ref mut map) = args {
-                map.entry("accountId")
-                    .or_insert_with(|| Value::String(account_id.clone()));
-            }
-
-            method_calls.push((name, args, call_id));
-        }
-
-        let mut using = vec![
-            JMAP_CORE_CAPABILITY.to_string(),
-            JMAP_MAIL_CAPABILITY.to_string(),
-        ];
-        for extra in self.using {
-            if !using.contains(&extra) {
-                using.push(extra);
-            }
-        }
+        let method_calls = map
+            .get("methodCalls")
+            .cloned()
+            .ok_or_else(|| anyhow!("JMAP request needs a `methodCalls` array"))?;
+        let method_calls =
+            serde_json::from_value(method_calls).context("Invalid `methodCalls` array")?;
 
         let request = JmapRequest {
             using,
             method_calls,
             created_ids: None,
         };
-
         let response = client.send_raw(request)?;
 
-        let method_responses = response
-            .method_responses
-            .into_iter()
-            .map(|(name, result, call_id)| {
-                let result = serde_json::from_str(result.get())
-                    .with_context(|| format!("Response to call `{call_id}` is not valid JSON"))?;
-                Ok((name, result, call_id))
-            })
-            .collect::<Result<_>>()?;
+        let response = json!({
+            "methodResponses": response.method_responses,
+            "createdIds": response.created_ids,
+            "sessionState": response.session_state,
+        });
 
-        printer.out(JmapRequestOutput { method_responses })
+        printer.out(RawJsonOutput { response })
     }
 }
 
-/// Wraps the raw method_responses for display.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct JmapRequestOutput {
-    method_responses: Vec<(String, Value, String)>,
-}
+/// Reads `body` into a JSON object: `-` reads stdin, an existing file is
+/// read, otherwise the value is the JSON itself.
+fn read_object(body: String) -> Result<Map<String, Value>> {
+    let raw = if body == "-" {
+        check_stdin(ErrorCode::StdinTaken)?;
+        let mut buf = String::new();
+        stdin()
+            .read_to_string(&mut buf)
+            .context("Read JSON from stdin error")?;
+        buf
+    } else if Path::new(&body).is_file() {
+        fs::read_to_string(&body).with_context(|| format!("Read JSON from `{body}` error"))?
+    } else {
+        body
+    };
 
-impl fmt::Display for JmapRequestOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match serde_json::to_string_pretty(&self.method_responses) {
-            Ok(s) => writeln!(f, "{s}"),
-            Err(e) => writeln!(f, "<serialization error: {e}>"),
-        }
+    match serde_json::from_str(&raw).context("Parse JSON error")? {
+        Value::Object(map) => Ok(map),
+        _ => bail!("The JSON body must be an object"),
     }
 }

@@ -6,16 +6,16 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
     backend::Backend,
     error::{ErrorCode, ItemError, partial_when},
-    jmap::{backend::not_found_errors, client::JmapClient},
+    jmap::{backend::not_found_errors, client::JmapClient, raw},
 };
 
 /// Get JMAP identities (Identity/get).
@@ -23,6 +23,9 @@ use crate::{
 /// Lists sender identities available for sending email. Pass no IDs to
 /// list all identities. An id the server does not find is an entry of
 /// `errors`, coded `identity-not-found`, and exits 3.
+///
+/// JSON output: `{"identities": [<JMAP identity>...], "state", "errors"}`,
+/// each identity and the get's `state` as the server sent them.
 #[derive(Debug, Parser)]
 pub struct JmapIdentityGetCommand {
     /// Identity ID(s) to retrieve (omit to get all).
@@ -39,11 +42,12 @@ impl JmapIdentityGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.identity_get(JmapIdentityGetOptions { ids: self.ids })?;
+        let output = raw::get(client, "Identity", self.ids.as_deref())?;
 
         let identities = JmapIdentityGetOutput {
             account: account.name().to_string(),
-            identities: output.identities,
+            identities: output.list,
+            rest: output.rest,
             errors: not_found_errors(output.not_found, ErrorCode::IdentityNotFound),
         };
 
@@ -59,8 +63,12 @@ pub struct JmapIdentityGetOutput {
     /// The name of the account listed.
     #[serde(skip)]
     pub account: String,
-    /// The identities, in the order the server returned them.
-    pub identities: Vec<JmapIdentity>,
+    /// The identities, each as the server sent it, in its order.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub identities: Vec<Value>,
+    /// The rest of the server's answer: the get's `state`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The error of each identity the server did not find, in the order
     /// met.
     pub errors: Vec<ItemError>,
@@ -71,11 +79,17 @@ impl fmt::Display for JmapIdentityGetOutput {
         let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for identity in &self.identities {
-            listing.items.push([
-                sanitize::text(&identity.id),
-                sanitize::text(&identity.email),
-                sanitize::text(&identity.name),
-            ]);
+            let text = |key| {
+                sanitize::text(
+                    identity
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                )
+            };
+            listing
+                .items
+                .push([text("id"), text("email"), text("name")]);
         }
 
         for error in &self.errors {

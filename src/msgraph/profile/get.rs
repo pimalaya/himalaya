@@ -9,53 +9,75 @@ use clap::Parser;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::msgraph::client::MsgraphClient;
 
-/// Get the Microsoft Graph user profile: id, display name, mail and user
-/// principal name.
+/// Get the Microsoft Graph user profile (`GET /me`).
+///
+/// JSON output: the Graph user object as Graph sent it.
 #[derive(Debug, Parser)]
 pub struct MsgraphProfileGetCommand;
 
 impl MsgraphProfileGetCommand {
     /// Fetches the signed-in user and prints the profile.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
-        let user = client.me()?.response;
-
-        printer.out(MsgraphProfileOutput {
-            id: user.id,
-            display_name: user.display_name,
-            mail: user.mail,
-            user_principal_name: user.user_principal_name,
-        })
+        let user = client.raw_get(&[])?;
+        printer.out(MsgraphProfileOutput(user))
     }
 }
 
-/// Microsoft Graph user profile, rendered as aligned text or, under
-/// `--json`, as a structured object (`{id, displayName, mail,
-/// userPrincipalName}`) instead of a wrapped human string.
+/// The signed-in user as Graph sent it, every property kept, rendered as
+/// aligned text or, under `--json`, verbatim.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MsgraphProfileOutput {
-    id: String,
-    display_name: Option<String>,
-    mail: Option<String>,
-    user_principal_name: Option<String>,
-}
+#[serde(transparent)]
+pub(crate) struct MsgraphProfileOutput(#[schemars(with = "Map<String, Value>")] pub Value);
 
 impl fmt::Display for MsgraphProfileOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fields = Fields::default();
-        fields.push("Id", sanitize::text(&self.id));
-        if let Some(display_name) = &self.display_name {
-            fields.push("Display name", sanitize::text(display_name));
+
+        for (label, key) in [
+            ("Id", "id"),
+            ("Display name", "displayName"),
+            ("Mail", "mail"),
+            ("User principal name", "userPrincipalName"),
+        ] {
+            if let Some(value) = self.0.get(key).and_then(Value::as_str) {
+                fields.push(label, sanitize::text(value));
+            }
         }
-        if let Some(mail) = &self.mail {
-            fields.push("Mail", sanitize::text(mail));
-        }
-        if let Some(upn) = &self.user_principal_name {
-            fields.push("User principal name", sanitize::text(upn));
-        }
+
         write!(f, "{fields}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pimalaya_cli::printer::CapturePrinter;
+    use serde_json::json;
+
+    use crate::msgraph::{client::MsgraphClient, profile::get::MsgraphProfileGetCommand};
+
+    /// The signed-in user prints as Graph sent it, every property kept.
+    #[test]
+    fn the_user_prints_as_graph_sent_it() {
+        let user = json!({
+            "id": "u1",
+            "displayName": "Alice",
+            "mail": "a@x.org",
+            "userPrincipalName": "a@x.org",
+            "jobTitle": "Engineer",
+        });
+        let (mut client, requests) = MsgraphClient::scripted(std::slice::from_ref(&user));
+        let mut printer = CapturePrinter::default();
+
+        MsgraphProfileGetCommand
+            .execute(&mut printer, &mut client)
+            .unwrap();
+
+        assert_eq!(printer.into_single().unwrap(), user);
+        let requests = requests.lock().unwrap();
+        assert!(requests[0].starts_with("GET /v1.0/me "));
     }
 }
