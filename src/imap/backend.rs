@@ -49,7 +49,7 @@ use crate::{
     capability,
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::{Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level},
         outcome::Outcome,
@@ -159,7 +159,7 @@ impl ImapClient {
         with_attachment: bool,
     ) -> Result<Outcome<Vec<Envelope>>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(envelopes, _)| envelopes)
+            .map(|(listed, _)| listed.map(|page| page.envelopes))
     }
 
     /// Sends `NOOP`, keeping an idle connection from the server's
@@ -178,15 +178,16 @@ impl ImapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
+    ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
         let exists = output_data("SELECT", select).exists;
         let total = exists.map(u64::from);
 
         let Some(window) = compute_window(exists.unwrap_or(0), page, page_size) else {
-            return Ok((Outcome::from(Vec::new()), total));
+            return Ok((Outcome::from(EnvelopePage::default()), total));
         };
+        let more = page_follows(total.unwrap_or(0), page, page_size);
         let sequence_set: SequenceSet = window
             .as_str()
             .try_into()
@@ -208,12 +209,12 @@ impl ImapClient {
         let ids: Vec<&str> = envelopes.iter().map(|e| e.id.as_str()).collect();
         let errors = Outcome { value: (), errors }.sorted_by(&ids).errors;
 
-        let envelopes = Outcome {
-            value: envelopes,
+        let listed = Outcome {
+            value: EnvelopePage { envelopes, more },
             errors,
         };
 
-        Ok((envelopes, total))
+        Ok((listed, total))
     }
 
     /// Searches a mailbox with the shared query.
@@ -228,11 +229,11 @@ impl ImapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let mbox = parse_mailbox(mailbox)?;
         let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
         if output_data("SELECT", select).exists.unwrap_or(0) == 0 {
-            return Ok(Outcome::from(Vec::new()));
+            return Ok(Outcome::from(EnvelopePage::default()));
         }
 
         let search_criteria = search_keys(query.and_then(|q| q.filter.as_ref()))?;
@@ -248,13 +249,9 @@ impl ImapClient {
             },
         )?;
         let uids = output_data("SORT", uids);
-        if uids.is_empty() {
-            return Ok(Outcome::from(Vec::new()));
-        }
-
-        let page_uids = paginate_uids(&uids, page, page_size);
+        let (page_uids, more) = paginate_uids(&uids, page, page_size);
         if page_uids.is_empty() {
-            return Ok(Outcome::from(Vec::new()));
+            return Ok(Outcome::from(EnvelopePage::default()));
         }
         let uid_str = page_uids
             .iter()
@@ -291,7 +288,7 @@ impl ImapClient {
         let errors = Outcome { value: (), errors }.sorted_by(&order).errors;
 
         Ok(Outcome {
-            value: envelopes,
+            value: EnvelopePage { envelopes, more },
             errors,
         })
     }
@@ -1487,11 +1484,16 @@ fn imap_date(date: chrono::NaiveDate) -> Result<ImapNaiveDate> {
     ImapNaiveDate::try_from(date).map_err(|_| anyhow!("Invalid IMAP date `{date}`"))
 }
 
-/// Slices one page out of the sorted UIDs, keeping their order.
+/// Slices one page out of the sorted UIDs, keeping their order, beside
+/// whether a page follows it.
 ///
 /// A UID listed twice is kept at its first place: Fastmail can answer a
 /// `SORT` under `OR` and `NOT` with one UID twice.
-fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>) -> Vec<u32> {
+fn paginate_uids(
+    uids: &[NonZeroU32],
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> (Vec<u32>, bool) {
     let mut seen = BTreeSet::new();
     let uids: Vec<u32> = uids
         .iter()
@@ -1499,11 +1501,12 @@ fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>)
         .filter(|uid| seen.insert(*uid))
         .collect();
     let total = uids.len();
+    let more = page_follows(total as u64, page, page_size);
     let size = page_size.map(|n| n as usize);
     let start = ((page.unwrap_or(1).max(1) - 1) as usize).saturating_mul(size.unwrap_or(0));
 
     if start >= total {
-        return Vec::new();
+        return (Vec::new(), more);
     }
 
     let end = match size {
@@ -1511,7 +1514,7 @@ fn paginate_uids(uids: &[NonZeroU32], page: Option<u32>, page_size: Option<u32>)
         None => total,
     };
 
-    uids[start..end].to_vec()
+    (uids[start..end].to_vec(), more)
 }
 
 /// Reorders a `FETCH` response into the requested UID order, dropping the
@@ -1656,8 +1659,12 @@ mod tests {
     fn a_uid_the_server_sorts_twice_is_listed_once() {
         let uids = [1, 1, 7, 3, 1].map(|uid| NonZeroU32::new(uid).unwrap());
 
-        assert_eq!(paginate_uids(&uids, Some(1), Some(2)), [1, 7]);
-        assert_eq!(paginate_uids(&uids, Some(2), Some(2)), [3]);
+        assert_eq!(paginate_uids(&uids, Some(1), Some(2)), (vec![1, 7], true));
+        assert_eq!(paginate_uids(&uids, Some(2), Some(2)), (vec![3], false));
+        assert_eq!(
+            paginate_uids(&uids, Some(1), Some(3)),
+            (vec![1, 7, 3], false)
+        );
     }
 
     #[test]
@@ -2135,6 +2142,25 @@ mod tests {
             handle.join().unwrap();
 
             assert_eq!(total, Some(3));
+        }
+
+        #[test]
+        fn a_page_reaching_the_last_message_has_no_next() {
+            let (server, handle) = serve(PLAIN, vec![1, 2, 3, 4], none);
+            let mut client = client(&server);
+            let mut more = |page, size| {
+                let (listed, _) = client
+                    .list_envelopes_counted("INBOX", Some(page), Some(size), false)
+                    .unwrap();
+                listed.value.more
+            };
+
+            assert!(more(1, 2));
+            assert!(!more(2, 2));
+            assert!(!more(1, 4));
+            assert!(!more(3, 2));
+            drop(client);
+            handle.join().unwrap();
         }
 
         #[test]

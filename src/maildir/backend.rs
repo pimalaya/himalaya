@@ -10,7 +10,7 @@ use std::{collections::HashSet, fs, path::Path};
 
 use crate::{
     email::{
-        envelope::{self, Envelope},
+        envelope::{self, Envelope, EnvelopePage, page_follows},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         outcome::Outcome,
@@ -79,7 +79,7 @@ impl MaildirClient {
         with_attachment: bool,
     ) -> Result<Outcome<Vec<Envelope>>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(envelopes, _)| envelopes)
+            .map(|(listed, _)| listed.map(|page| page.envelopes))
     }
 
     /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
@@ -90,7 +90,7 @@ impl MaildirClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
+    ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
         let total = u64::try_from(entries.len()).ok();
@@ -99,12 +99,15 @@ impl MaildirClient {
         let mut envelopes: Vec<Envelope> = read.entries.iter().map(envelope_from_entry).collect();
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
 
-        let envelopes = Outcome {
-            value: paginate(envelopes, page, page_size),
+        let more = page_follows(envelopes.len() as u64, page, page_size);
+        let envelopes = paginate(envelopes, page, page_size);
+
+        let listed = Outcome {
+            value: EnvelopePage { envelopes, more },
             errors: unreadable_entries(read.unreadable, page),
         };
 
-        Ok((envelopes, total))
+        Ok((listed, total))
     }
 
     /// Searches envelopes in `mailbox`: lists them, then applies the
@@ -117,7 +120,7 @@ impl MaildirClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
         let read = self.read_readable_entries(&maildir, &entries);
@@ -137,8 +140,11 @@ impl MaildirClient {
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
 
+        let more = page_follows(hits.len() as u64, page, page_size);
+        let envelopes = paginate(hits, page, page_size);
+
         Ok(Outcome {
-            value: paginate(hits, page, page_size),
+            value: EnvelopePage { envelopes, more },
             errors: unreadable_entries(read.unreadable, page),
         })
     }
@@ -680,8 +686,16 @@ mod tests {
             .list_envelopes_counted("A", Some(1), Some(1), false)
             .unwrap();
 
-        assert_eq!(page.value.len(), 1);
+        assert_eq!(page.value.envelopes.len(), 1);
+        assert!(page.value.more);
         assert_eq!(total, Some(2));
+
+        let (page, _) = client
+            .list_envelopes_counted("A", Some(2), Some(1), false)
+            .unwrap();
+
+        assert_eq!(page.value.envelopes.len(), 1);
+        assert!(!page.value.more);
     }
 
     #[test]
@@ -743,7 +757,8 @@ mod tests {
         let second = client.list_envelopes("A", Some(2), Some(1), false);
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
 
-        for outcome in [listed.unwrap(), searched.unwrap()] {
+        let searched = searched.unwrap().map(|page| page.envelopes);
+        for outcome in [listed.unwrap(), searched] {
             assert_eq!(outcome.value.len(), 1);
             let [error] = outcome.errors.as_slice() else {
                 panic!("{:?}", outcome.errors);

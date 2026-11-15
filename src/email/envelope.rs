@@ -58,6 +58,33 @@ pub struct Envelope {
     pub has_attachment: Option<bool>,
 }
 
+/// One page of a mailbox's envelopes, and whether a page follows it.
+#[derive(Clone, Debug, Default)]
+pub struct EnvelopePage {
+    /// The envelopes of the page, in the listing's order.
+    pub envelopes: Vec<Envelope>,
+    /// Whether a page follows this one, never for an unpaged listing.
+    pub more: bool,
+}
+
+/// Whether a page follows page `page` of `page_size` items in a listing
+/// holding `count`, never for an unpaged listing.
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "pimdir"
+))]
+pub fn page_follows(count: u64, page: Option<u32>, page_size: Option<u32>) -> bool {
+    let Some(size) = page_size.filter(|size| *size > 0) else {
+        return false;
+    };
+
+    let page = page.unwrap_or(1).max(1);
+    u64::from(page) * u64::from(size) < count
+}
+
 /// Splits a raw `In-Reply-To:` value into its bare message ids.
 ///
 /// A backend hands the whole `1*msg-id` value over as one string, so the

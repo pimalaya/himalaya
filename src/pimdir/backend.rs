@@ -51,7 +51,7 @@ use crate::{
     capability::{Capability, StoreSupport},
     email::{
         address::Address,
-        envelope::Envelope,
+        envelope::{Envelope, EnvelopePage, page_follows},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxIndex, MailboxRole},
         outcome::Outcome,
@@ -356,19 +356,20 @@ impl PimdirClient {
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(envelopes, _)| envelopes)
+            .map(|(page, _)| page.envelopes)
     }
 
     /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
     /// messages the collection holds: the store's live item count, a local
-    /// query rather than a walk of every item.
+    /// query rather than a walk of every item, which also says whether a
+    /// page follows.
     pub fn list_envelopes_counted(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<(Vec<Envelope>, Option<u64>)> {
+    ) -> Result<(EnvelopePage, Option<u64>)> {
         let collection = self.hub_id(mailbox)?;
         let total = self
             .store
@@ -377,7 +378,9 @@ impl PimdirClient {
             .with_context(|| format!("Count items in `{collection}`"))?;
         let envelopes =
             self.list_collection_envelopes(&collection, page, page_size, with_attachment)?;
-        Ok((envelopes, Some(total)))
+        let more = page_follows(total, page, page_size);
+
+        Ok((EnvelopePage { envelopes, more }, Some(total)))
     }
 
     /// The envelopes of `collection`, as [`Self::list_envelopes`] lists
@@ -419,8 +422,8 @@ impl PimdirClient {
     ///
     /// The store is read newest first, within the date bounds the query
     /// states and through the unread chip where it applies, and the read
-    /// stops at the end of the page when the order is the store's own
-    /// (`PimdirPushdown`). Every clause is still matched in memory.
+    /// stops one hit past the end of the page when the order is the store's
+    /// own (`PimdirPushdown`). Every clause is still matched in memory.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -428,7 +431,7 @@ impl PimdirClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<EnvelopePage> {
         let collection = self.hub_id(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
         let sort = query.and_then(|q| q.sort.as_deref());
@@ -450,17 +453,17 @@ impl PimdirClient {
         sort: Option<&[SearchEmailsSorter]>,
         page: Option<u32>,
         page_size: Option<u32>,
-    ) -> Result<Option<Vec<Envelope>>> {
+    ) -> Result<Option<EnvelopePage>> {
         if page_size == Some(0) {
-            return Ok(Some(Vec::new()));
+            return Ok(Some(EnvelopePage::default()));
         }
 
         let pushdown = filter.map(PimdirPushdown::of).unwrap_or_default();
         let unread = pushdown.unread && self.overlay_quiet(collection);
-        // NOTE: a page of a search in another order sits anywhere in the
-        // range, so the whole range is read then sorted.
+        // NOTE: one hit past the page says whether another follows; a page
+        // in another order sits anywhere in the range, so it is read whole.
         let wanted = match is_store_order(sort) {
-            true => page_end(page, page_size),
+            true => page_end(page, page_size).map(|end| end.saturating_add(1)),
             false => None,
         };
         let batch =
@@ -504,7 +507,11 @@ impl PimdirClient {
             return Ok(None);
         }
         sort_envelopes(&mut hits, sort);
-        Ok(Some(paginate(hits, page, page_size)))
+
+        let more = page_follows(hits.len() as u64, page, page_size);
+        let envelopes = paginate(hits, page, page_size);
+
+        Ok(Some(EnvelopePage { envelopes, more }))
     }
 
     /// [`Self::search_envelopes`] over every item of the mailbox, matched,
@@ -516,7 +523,7 @@ impl PimdirClient {
         sort: Option<&[SearchEmailsSorter]>,
         page: Option<u32>,
         page_size: Option<u32>,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<EnvelopePage> {
         let mut hits: Vec<Envelope> = Vec::new();
         for item in self.scan_items(collection)? {
             let envelope = envelope_from_item(&item);
@@ -525,7 +532,11 @@ impl PimdirClient {
             }
         }
         sort_envelopes(&mut hits, sort);
-        Ok(paginate(hits, page, page_size))
+
+        let more = page_follows(hits.len() as u64, page, page_size);
+        let envelopes = paginate(hits, page, page_size);
+
+        Ok(EnvelopePage { envelopes, more })
     }
 
     /// Whether `item`, read as `envelope`, matches `filter`, its local body
@@ -3237,6 +3248,8 @@ mod tests {
         (Some(1), Some(10)),
         (Some(2), Some(10)),
         (Some(3), Some(7)),
+        (Some(3), Some(100)),
+        (Some(1), Some(300)),
         (Some(1), Some(1)),
         (None, Some(64)),
         (Some(2), Some(65)),
@@ -3257,9 +3270,16 @@ mod tests {
                 .iter()
                 .map(envelope_from_item)
                 .collect();
-            let listed = client.list_envelopes(mailbox, *page, *size, false).unwrap();
+            let (listed, _) = client
+                .list_envelopes_counted(mailbox, *page, *size, false)
+                .unwrap();
             assert_eq!(
-                serde_json::to_string(&listed).unwrap(),
+                listed.more,
+                page_follows(scanned.len() as u64, *page, *size),
+                "list page {page:?} size {size:?}",
+            );
+            assert_eq!(
+                serde_json::to_string(&listed.envelopes).unwrap(),
                 serde_json::to_string(&paginate(scanned, *page, *size)).unwrap(),
                 "list page {page:?} size {size:?}",
             );
@@ -3279,13 +3299,18 @@ mod tests {
                 let searched = client
                     .search_envelopes(mailbox, parsed.as_ref(), *page, *size, false)
                     .unwrap();
-                let scanned = serde_json::to_string(&scanned).unwrap();
                 assert_eq!(
-                    serde_json::to_string(&pushed).unwrap(),
+                    (pushed.more, searched.more),
+                    (scanned.more, scanned.more),
+                    "search `{query}` page {page:?} size {size:?}",
+                );
+                let scanned = serde_json::to_string(&scanned.envelopes).unwrap();
+                assert_eq!(
+                    serde_json::to_string(&pushed.envelopes).unwrap(),
                     scanned,
                     "search `{query}` page {page:?} size {size:?}",
                 );
-                assert_eq!(serde_json::to_string(&searched).unwrap(), scanned);
+                assert_eq!(serde_json::to_string(&searched.envelopes).unwrap(), scanned);
             }
         }
     }
@@ -3300,7 +3325,8 @@ mod tests {
         let unread = "not flag seen".parse::<SearchEmailsQuery>().unwrap();
         let hits = client
             .search_envelopes("imap/INBOX", Some(&unread), None, None, false)
-            .unwrap();
+            .unwrap()
+            .envelopes;
         assert!(hits.len() > 50 && hits.len() < 250, "{}", hits.len());
         let undated = client
             .list_envelopes("imap/INBOX", None, None, false)
@@ -3427,11 +3453,11 @@ mod tests {
             let parsed = (!query.is_empty()).then(|| query.parse::<SearchEmailsQuery>().unwrap());
             let filter = parsed.as_ref().and_then(|q| q.filter.as_ref());
             let sort = parsed.as_ref().and_then(|q| q.sort.as_deref());
-            assert_eq!(
+            assert!(
                 client
                     .search_pushed("imap/INBOX", filter, sort, None, None)
-                    .unwrap(),
-                None,
+                    .unwrap()
+                    .is_none(),
                 "`{query}`",
             );
             let scanned = client
@@ -3440,9 +3466,10 @@ mod tests {
             let searched = client
                 .search_envelopes("imap/INBOX", parsed.as_ref(), Some(1), Some(10), false)
                 .unwrap();
+            assert_eq!(searched.more, scanned.more);
             assert_eq!(
-                serde_json::to_string(&searched).unwrap(),
-                serde_json::to_string(&scanned).unwrap(),
+                serde_json::to_string(&searched.envelopes).unwrap(),
+                serde_json::to_string(&scanned.envelopes).unwrap(),
             );
         }
     }
@@ -3528,10 +3555,11 @@ mod tests {
             let mut subjects: Vec<String> = client
                 .search_envelopes("imap/Sent", Some(&query), None, None, false)
                 .unwrap()
+                .envelopes
                 .into_iter()
                 .map(|envelope| envelope.subject)
                 .collect();
-            let mut other: Vec<String> = scanned.into_iter().map(|e| e.subject).collect();
+            let mut other: Vec<String> = scanned.envelopes.into_iter().map(|e| e.subject).collect();
             subjects.sort();
             other.sort();
             assert_eq!(subjects, other, "the two search paths disagree");
@@ -3633,12 +3661,14 @@ mod tests {
                 client
                     .search_scanned("imap/INBOX", filter, sort, Some(1), Some(50))
                     .unwrap()
+                    .envelopes
                     .len()
             });
             let pushed = median(|| {
                 client
                     .search_envelopes("imap/INBOX", Some(&parsed), Some(1), Some(50), false)
                     .unwrap()
+                    .envelopes
                     .len()
             });
             eprintln!("envelope search -s 50 `{query}`: whole {scanned:?}, paged {pushed:?}");

@@ -30,7 +30,7 @@ use serde::de::{DeserializeOwned, IgnoredAny};
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::{Envelope, EnvelopePage, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
         outcome::Outcome,
@@ -103,14 +103,15 @@ impl GmailClient {
 
     /// Lists envelopes from the `mailbox` label: `messages.list` (walking
     /// the opaque page token to the requested 1-indexed page) then the
-    /// metadata of the ids, through batched `messages.get`.
+    /// metadata of the ids, through batched `messages.get`. A page follows
+    /// while Gmail gives a next page token.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let label_ids = vec![mailbox.to_string()];
         let spam_trash = include_spam_trash(mailbox);
         let skip = page.unwrap_or(1).max(1) - 1;
@@ -126,7 +127,7 @@ impl GmailClient {
             };
             match self.messages_list(&params)?.response.next_page_token {
                 Some(token) => page_token = Some(token),
-                None => return Ok(Outcome::from(Vec::new())),
+                None => return Ok(Outcome::from(EnvelopePage::default())),
             }
         }
 
@@ -137,9 +138,9 @@ impl GmailClient {
             include_spam_trash: spam_trash,
             ..Default::default()
         };
-        let ids: Vec<String> = self
-            .messages_list(&params)?
-            .response
+        let response = self.messages_list(&params)?.response;
+        let more = page_size.is_some() && response.next_page_token.is_some();
+        let ids: Vec<String> = response
             .messages
             .into_iter()
             .map(|message| message.id)
@@ -147,7 +148,7 @@ impl GmailClient {
 
         let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
         let answers = self.messages_get_batch(&ids, GmailMessageFormat::Metadata)?;
-        Ok(listed(&ids, answers))
+        Ok(listed(&ids, answers).map(|envelopes| EnvelopePage { envelopes, more }))
     }
 
     /// Searches the `mailbox` label with the shared query: the filter
@@ -161,7 +162,7 @@ impl GmailClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let q = match query.and_then(|query| query.filter.as_ref()) {
             Some(filter) => Some(search::filter_to_q(filter)?),
             None => None,
@@ -182,7 +183,7 @@ impl GmailClient {
             };
             match self.messages_list(&params)?.response.next_page_token {
                 Some(token) => page_token = Some(token),
-                None => return Ok(Outcome::from(Vec::new())),
+                None => return Ok(Outcome::from(EnvelopePage::default())),
             }
         }
 
@@ -193,9 +194,9 @@ impl GmailClient {
             page_token: page_token.as_deref(),
             include_spam_trash: spam_trash,
         };
-        let ids: Vec<String> = self
-            .messages_list(&params)?
-            .response
+        let response = self.messages_list(&params)?.response;
+        let more = page_size.is_some() && response.next_page_token.is_some();
+        let ids: Vec<String> = response
             .messages
             .into_iter()
             .map(|message| message.id)
@@ -209,7 +210,7 @@ impl GmailClient {
             sort_envelopes(&mut outcome.value, Some(sort));
         }
 
-        Ok(outcome)
+        Ok(outcome.map(|envelopes| EnvelopePage { envelopes, more }))
     }
 
     /// Adds, sets, or removes `flags` via `messages.modify` on the ids

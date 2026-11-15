@@ -38,7 +38,7 @@ use log::warn;
 
 use crate::{
     email::{
-        envelope::{self, Envelope},
+        envelope::{self, Envelope, EnvelopePage, page_follows},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         outcome::Outcome,
@@ -128,7 +128,7 @@ impl MboxClient {
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(envelopes, _)| envelopes)
+            .map(|(page, _)| page.envelopes)
     }
 
     /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
@@ -139,7 +139,7 @@ impl MboxClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<(Vec<Envelope>, Option<u64>)> {
+    ) -> Result<(EnvelopePage, Option<u64>)> {
         let path = self.open_mbox(mailbox)?;
         let mut envelopes: Vec<Envelope> = self
             .envelopes(&path, false)?
@@ -149,7 +149,10 @@ impl MboxClient {
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
         let total = u64::try_from(envelopes.len()).ok();
 
-        Ok((paginate(envelopes, page, page_size), total))
+        let more = page_follows(envelopes.len() as u64, page, page_size);
+        let envelopes = paginate(envelopes, page, page_size);
+
+        Ok((EnvelopePage { envelopes, more }, total))
     }
 
     /// Searches envelopes in `mailbox`: reads every message, then applies
@@ -161,7 +164,7 @@ impl MboxClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<EnvelopePage> {
         let path = self.open_mbox(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
 
@@ -179,7 +182,11 @@ impl MboxClient {
         }
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
-        Ok(paginate(hits, page, page_size))
+
+        let more = page_follows(hits.len() as u64, page, page_size);
+        let envelopes = paginate(hits, page, page_size);
+
+        Ok(EnvelopePage { envelopes, more })
     }
 
     /// Adds, sets or removes `flags` on the messages of `mailbox` among
@@ -1179,7 +1186,7 @@ mod tests {
 
         let query = "body body".parse::<SearchEmailsQuery>().unwrap();
         let hits = client.search_envelopes("A", Some(&query), None, None, false);
-        assert_eq!(hits.unwrap().len(), 2);
+        assert_eq!(hits.unwrap().envelopes.len(), 2);
     }
 
     #[test]

@@ -301,3 +301,52 @@ fn a_flag_set_keeps_the_thunderbird_keys_in_step() {
     assert!(!contents.contains("$label1"), "{contents}");
     assert!(contents.contains("X-Mozilla-Keys:\n"), "{contents}");
 }
+
+#[test]
+fn a_page_reaching_the_last_message_names_no_next_page() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir.join("A"));
+    fs::write(maildir.join("A/cur/one:2,S"), "Subject: one\n\nbody\n").unwrap();
+    fs::write(maildir.join("A/cur/two:2,S"), "Subject: two\n\nbody\n").unwrap();
+
+    let mbox = dir.path().join("mbox");
+    fs::create_dir_all(&mbox).unwrap();
+    let two = "From a@b Tue Jan  2 00:00:00 2024\nSubject: two\n\nbody\n";
+    fs::write(mbox.join("A"), format!("{MESSAGE}\n{two}")).unwrap();
+
+    for lines in [maildir_lines(&maildir, ""), mbox_lines(&mbox, "")] {
+        for verb in ["list", "search"] {
+            let page = |size: &str, page: &str| {
+                let args = ["envelope", verb, "-m", "A", "-s", size, "-p", page];
+                let (ok, out) = himalaya(dir.path(), &lines, &args);
+                assert!(ok, "{out}");
+                (
+                    out["envelopes"].as_array().unwrap().len(),
+                    out["nextPage"].clone(),
+                )
+            };
+
+            assert_eq!(page("2", "1"), (2, Value::Null), "{verb} {lines}");
+            assert_eq!(page("1", "1"), (1, Value::from("2")), "{verb} {lines}");
+            assert_eq!(page("1", "2"), (1, Value::Null), "{verb} {lines}");
+            assert_eq!(page("3", "1"), (2, Value::Null), "{verb} {lines}");
+        }
+    }
+
+    let config = dir.path().join("config.toml");
+    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .args(["-c", config.to_str().unwrap()])
+        .args(["envelope", "list", "-m", "A", "-s", "2"])
+        .env("HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("XDG_CACHE_HOME", dir.path().join("cache"))
+        .env_remove("XDG_CONFIG_DIRS")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{text}");
+    assert!(text.contains("1, envelopes 1 to 2, the last"), "{text}");
+    assert!(!text.contains("Next page:"), "{text}");
+}

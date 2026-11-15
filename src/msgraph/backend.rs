@@ -40,7 +40,7 @@ use url::Url;
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, EnvelopePage, normalize_message_id},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
         outcome::Outcome,
@@ -283,15 +283,16 @@ impl MsgraphClient {
 
     /// Lists envelopes from the `mailbox` folder (id or well-known name
     /// such as `inbox`). Page 1 is the most recent window; the offset is
-    /// `(page - 1) * page_size` via OData `$skip`. Without a page size,
-    /// every page is read and `page` is moot.
+    /// `(page - 1) * page_size` via OData `$skip`, and a page follows while
+    /// Graph gives a next link. Without a page size, every page is read and
+    /// `page` is moot.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<EnvelopePage> {
         let page = page.unwrap_or(1).max(1);
         let (top, skip) = match page_size {
             Some(size) => (size, Some((page - 1) * size)),
@@ -306,12 +307,13 @@ impl MsgraphClient {
         };
         let response = self.messages_list(Some(mailbox), &params)?.response;
 
-        let messages = match page_size {
-            Some(_) => response.value,
-            None => self.messages_to_the_end(response)?,
+        let (messages, more) = match page_size {
+            Some(_) => (response.value, response.next_link.is_some()),
+            None => (self.messages_to_the_end(response)?, false),
         };
 
-        Ok(messages.into_iter().map(envelope_from).collect())
+        let envelopes = messages.into_iter().map(envelope_from).collect();
+        Ok(EnvelopePage { envelopes, more })
     }
 
     /// Searches the `mailbox` folder with the shared query, its filter
@@ -329,13 +331,13 @@ impl MsgraphClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Vec<Envelope>> {
+    ) -> Result<EnvelopePage> {
         let sort = query.and_then(|query| query.sort.as_deref());
 
         let Some(filter) = query.and_then(|query| query.filter.as_ref()) else {
-            let mut envelopes = self.list_envelopes(mailbox, page, page_size, with_attachment)?;
-            sort_envelopes(&mut envelopes, sort);
-            return Ok(envelopes);
+            let mut listed = self.list_envelopes(mailbox, page, page_size, with_attachment)?;
+            sort_envelopes(&mut listed.envelopes, sort);
+            return Ok(listed);
         };
 
         let (search, odata_filter) = match search::message_id_filter(filter) {
@@ -351,23 +353,23 @@ impl MsgraphClient {
         };
         let mut response = self.messages_list(Some(mailbox), &params)?.response;
 
-        let messages = match page_size {
+        let (messages, more) = match page_size {
             Some(_) => {
                 for _ in 1..page.unwrap_or(1).max(1) {
                     let Some(next) = response.next_link else {
-                        return Ok(Vec::new());
+                        return Ok(EnvelopePage::default());
                     };
                     response = self.messages_next_page(&next)?;
                 }
-                response.value
+                (response.value, response.next_link.is_some())
             }
-            None => self.messages_to_the_end(response)?,
+            None => (self.messages_to_the_end(response)?, false),
         };
 
         let mut envelopes: Vec<Envelope> = messages.into_iter().map(envelope_from).collect();
         sort_envelopes(&mut envelopes, sort);
 
-        Ok(envelopes)
+        Ok(EnvelopePage { envelopes, more })
     }
 
     /// The messages of `response` and of every page its next links lead
@@ -685,6 +687,7 @@ fn unanswered(id: &str) -> ItemError {
 ///
 /// A 404, or a 400 Graph codes `ErrorInvalidIdMalformed`, is a message not
 /// found; any other 400 is a request Graph refused, no missing message.
+/// `ErrorQuotaExceeded` or a 507 is a quota refusal, whatever the status.
 fn part_error(id: &str, response: MsgraphBatchResponse) -> ItemError {
     let status = response.status;
     let (code, message) = match response.parse::<Value>() {
@@ -694,9 +697,9 @@ fn part_error(id: &str, response: MsgraphBatchResponse) -> ItemError {
 
     let item_code = match (status, code.as_str()) {
         (404, _) | (400, "ErrorInvalidIdMalformed") => Some(ErrorCode::MessageNotFound),
-        (403, _) => Some(ErrorCode::PermissionDenied),
+        (_, "ErrorQuotaExceeded") | (507, _) => Some(ErrorCode::QuotaExceeded),
         (429, _) => Some(ErrorCode::RateLimited),
-        (_, "ErrorQuotaExceeded") => Some(ErrorCode::QuotaExceeded),
+        (403, _) => Some(ErrorCode::PermissionDenied),
         _ => None,
     };
 
@@ -897,7 +900,7 @@ fn parse_rfc3339(raw: &str) -> Option<DateTime<FixedOffset>> {
 
 #[cfg(test)]
 mod tests {
-    use io_msgraph::v1::rest::batch::MsgraphBatchResponse;
+    use io_msgraph::v1::rest::batch::{MsgraphBatchResponse, MsgraphBatchResponses};
     use serde_json::json;
 
     use crate::{
@@ -1027,6 +1030,43 @@ mod tests {
                 (Some("c"), Some(ErrorCode::RateLimited)),
                 (Some("d"), Some(ErrorCode::QuotaExceeded)),
                 (Some("e"), None),
+            ]
+        );
+    }
+
+    /// A quota refusal is read before the status: `ErrorQuotaExceeded` sent
+    /// as 403, and a 507 with any other code.
+    #[test]
+    fn a_quota_refusal_is_coded_whatever_its_status() {
+        let ids = ["a", "b", "c"];
+        let answer = json!({"responses": [
+            {
+                "id": "0",
+                "status": 403,
+                "headers": {"Content-Type": "application/json"},
+                "body": {"error": {"code": "ErrorQuotaExceeded", "message": "Full"}},
+            },
+            {
+                "id": "1",
+                "status": 507,
+                "body": {"error": {"code": "ErrorStorageFull", "message": "Full"}},
+            },
+            {
+                "id": "2",
+                "status": 403,
+                "body": {"error": {"code": "ErrorAccessDenied", "message": "No"}},
+            },
+        ]});
+        let answer: MsgraphBatchResponses = serde_json::from_value(answer).unwrap();
+
+        let outcome = written(&ids, answer.responses);
+
+        assert_eq!(
+            codes(&outcome.errors),
+            [
+                (Some("a"), Some(ErrorCode::QuotaExceeded)),
+                (Some("b"), Some(ErrorCode::QuotaExceeded)),
+                (Some("c"), Some(ErrorCode::PermissionDenied)),
             ]
         );
     }

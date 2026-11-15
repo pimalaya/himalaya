@@ -20,7 +20,8 @@ use io_jmap::{
             get::JmapEmailGetOptions,
             import::{JmapEmailImportArgs, JmapEmailImportItemError, JmapEmailImportOutput},
             query::{
-                JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
+                JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailQueryOutput,
+                JmapEmailSortProperty,
             },
             set::{JmapEmailPatch, JmapEmailSetArgs, JmapEmailSetOutput},
         },
@@ -45,7 +46,7 @@ use crate::{
     capability,
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, EnvelopePage, normalize_message_id, page_follows},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole},
         outcome::Outcome,
@@ -96,7 +97,7 @@ impl JmapClient {
         with_attachment: bool,
     ) -> Result<Outcome<Vec<Envelope>>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(envelopes, _)| envelopes)
+            .map(|(listed, _)| listed.map(|page| page.envelopes))
     }
 
     /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
@@ -108,7 +109,7 @@ impl JmapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
+    ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let (position, limit) = compute_position_limit(page, page_size);
         let filter = JmapEmailFilter {
             in_mailbox: Some(mailbox.to_string()),
@@ -124,12 +125,16 @@ impl JmapClient {
             ..Default::default()
         })?;
 
-        let envelopes = Outcome {
-            value: output.emails.into_iter().map(envelope_from).collect(),
+        let total = output.total;
+        let more = query_follows(&output, page, page_size);
+        let envelopes = output.emails.into_iter().map(envelope_from).collect();
+
+        let listed = Outcome {
+            value: EnvelopePage { envelopes, more },
             errors: unparsed(output.unparsed, ErrorCode::MessageUnreadable),
         };
 
-        Ok((envelopes, output.total))
+        Ok((listed, total))
     }
 
     /// Searches a mailbox with an `Email/query` chained into an
@@ -145,7 +150,7 @@ impl JmapClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let Converted {
             filter,
             sort,
@@ -164,14 +169,17 @@ impl JmapClient {
             sort: Some(sort),
             position,
             limit,
+            calculate_total: !paginate_client_side,
             properties: Some(envelope_properties()),
             ..Default::default()
         })?;
 
+        let mut more = query_follows(&output, page, page_size);
         let mut envelopes: Vec<Envelope> = output.emails.into_iter().map(envelope_from).collect();
         let mut errors = unparsed(output.unparsed, ErrorCode::MessageUnreadable);
         if paginate_client_side {
             envelopes.retain(|envelope| post_match(envelope, &post_filters));
+            more = page_follows(envelopes.len() as u64, page, page_size);
             envelopes = paginate(envelopes, page, page_size);
 
             // NOTE: the whole query was read, so its errors go on page 1.
@@ -181,7 +189,7 @@ impl JmapClient {
         }
 
         Ok(Outcome {
-            value: envelopes,
+            value: EnvelopePage { envelopes, more },
             errors,
         })
     }
@@ -992,6 +1000,17 @@ fn compute_position_limit(page: Option<u32>, page_size: Option<u32>) -> (Option<
     (Some(position), Some(u64::from(size)))
 }
 
+/// Whether a page follows the one an `Email/query` answered: below its
+/// `total`, else while the page came back full.
+fn query_follows(output: &JmapEmailQueryOutput, page: Option<u32>, page_size: Option<u32>) -> bool {
+    if let Some(total) = output.total {
+        return page_follows(total, page, page_size);
+    }
+
+    let listed = output.emails.len() + output.unparsed.len() + output.not_found.len();
+    page_size.is_some_and(|size| size > 0 && listed as u64 >= u64::from(size))
+}
+
 /// Folds a JMAP email object into the shared [`Envelope`] shape.
 pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
     let id = email.id.unwrap_or_default();
@@ -1349,6 +1368,30 @@ mod tests {
     fn email(id: &str, mailboxes: &[&str]) -> JmapEmail {
         let mailbox_ids: BTreeMap<&str, bool> = mailboxes.iter().map(|m| (*m, true)).collect();
         serde_json::from_value(serde_json::json!({ "id": id, "mailboxIds": mailbox_ids })).unwrap()
+    }
+
+    /// A page follows below the query's total, else after a full page.
+    #[test]
+    fn a_page_reaching_the_query_total_has_no_next() {
+        let follows = |ids: &[&str], total, page, size| {
+            let output = JmapEmailQueryOutput {
+                emails: ids.iter().map(|id| email(id, &["inbox"])).collect(),
+                unparsed: Vec::new(),
+                not_found: Vec::new(),
+                total,
+                position: 0,
+                query_state: String::new(),
+                keep_alive: true,
+            };
+            query_follows(&output, page, size)
+        };
+
+        assert!(follows(&["1", "2"], Some(3), Some(1), Some(2)));
+        assert!(!follows(&["1", "2"], Some(2), Some(1), Some(2)));
+        assert!(!follows(&["3", "4"], Some(4), Some(2), Some(2)));
+        assert!(follows(&["1", "2"], None, Some(1), Some(2)));
+        assert!(!follows(&["1"], None, Some(1), Some(2)));
+        assert!(!follows(&["1", "2"], None, None, None));
     }
 
     fn set_output(updated: &[&str], not_updated: &[(&str, &str)]) -> JmapEmailSetOutput {

@@ -15,6 +15,7 @@ use crate::{
     account::context::Account,
     capability::Capability,
     email::{
+        envelope::EnvelopePage,
         outcome::Outcome,
         search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
     },
@@ -125,7 +126,6 @@ impl EnvelopeSearchCommand {
                 .with_context(|| format!("Invalid page token {token}"))?,
             None => self.page,
         };
-        let page = Some(page);
         let page_size = self
             .page_size
             .or(Some(account.envelopes_list_page_size()))
@@ -135,25 +135,17 @@ impl EnvelopeSearchCommand {
         let query = parse_query(text.as_deref())?;
 
         let Outcome {
-            value: envelopes,
+            value: EnvelopePage { envelopes, more },
             errors,
         } = client.search_envelopes(
             &mailbox,
             query.as_ref(),
-            page,
+            Some(page),
             page_size,
             self.has_attachment,
         )?;
 
-        // NOTE: the token is the next page number, given while a page comes
-        // back full; the page after a full last one comes back empty.
-        let next_page = match (page, page_size) {
-            (Some(page), Some(size)) if envelopes.len() + errors.len() >= size as usize => {
-                Some((page + 1).to_string())
-            }
-            _ => None,
-        };
-
+        let next_page = more.then(|| (page + 1).to_string());
         let resolution = client.resolution();
 
         let output = EnvelopeListOutput {
@@ -163,7 +155,7 @@ impl EnvelopeSearchCommand {
             backend: resolution.storage,
             mailbox,
             query: text,
-            page,
+            page: Some(page),
             page_size,
             recipient: self.recipient,
             envelopes,

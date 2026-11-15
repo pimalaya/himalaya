@@ -19,7 +19,12 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    email::{address::Address, envelope::Envelope, flag::Flag, outcome::Outcome},
+    email::{
+        address::Address,
+        envelope::{Envelope, EnvelopePage},
+        flag::Flag,
+        outcome::Outcome,
+    },
     error::{ItemError, partial_when},
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
@@ -72,7 +77,6 @@ impl EnvelopeListCommand {
                 .with_context(|| format!("Invalid page token {token}"))?,
             None => self.page,
         };
-        let page = Some(page);
         let page_size = self
             .page_size
             .or(Some(account.envelopes_list_page_size()))
@@ -81,21 +85,13 @@ impl EnvelopeListCommand {
 
         let (
             Outcome {
-                value: envelopes,
+                value: EnvelopePage { envelopes, more },
                 errors,
             },
             total,
-        ) = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
+        ) = client.list_envelopes(&mailbox, Some(page), page_size, self.has_attachment)?;
 
-        // NOTE: the token is the next page number, given while a page comes
-        // back full; the page after a full last one comes back empty.
-        let next_page = match (page, page_size) {
-            (Some(page), Some(size)) if envelopes.len() + errors.len() >= size as usize => {
-                Some((page + 1).to_string())
-            }
-            _ => None,
-        };
-
+        let next_page = more.then(|| (page + 1).to_string());
         let resolution = client.resolution();
 
         let output = EnvelopeListOutput {
@@ -105,7 +101,7 @@ impl EnvelopeListCommand {
             backend: resolution.storage,
             mailbox,
             query: None,
-            page,
+            page: Some(page),
             page_size,
             recipient: self.recipient,
             envelopes,

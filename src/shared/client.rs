@@ -41,7 +41,7 @@ use crate::{
     capability::{Capability, Resolution},
     config::{AccountConfig, Config},
     email::{
-        envelope::Envelope,
+        envelope::EnvelopePage,
         flag::{Flag, FlagOp},
         mailbox::{self, Mailbox, MailboxRole},
         outcome::Outcome,
@@ -311,17 +311,17 @@ impl EmailClient {
         }
     }
 
-    /// Lists envelopes from `mailbox`, beside how many messages it holds
-    /// when the backend answers it within the listing's own exchanges,
-    /// `None` otherwise (Gmail's count being an estimate, Graph's a
-    /// request of its own).
+    /// Lists one page of envelopes from `mailbox`, beside how many messages
+    /// it holds when the backend answers it within the listing's own
+    /// exchanges, `None` otherwise (Gmail's count being an estimate, Graph's
+    /// a request of its own).
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<(Outcome<Vec<Envelope>>, Option<u64>)> {
+    ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
@@ -358,7 +358,7 @@ impl EmailClient {
         }
     }
 
-    /// Searches a mailbox with the shared query.
+    /// Searches a mailbox with the shared query, one page of it.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -366,7 +366,7 @@ impl EmailClient {
         page: Option<u32>,
         page_size: Option<u32>,
         with_attachment: bool,
-    ) -> Result<Outcome<Vec<Envelope>>> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         match self.storage_mut()? {
