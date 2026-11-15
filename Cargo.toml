@@ -57,8 +57,8 @@ io-gmail = { version = "0.9", default-features = false, optional = true }
 io-imap = { version = "0.11", default-features = false, optional = true }
 io-jmap = { version = "0.10", default-features = false, optional = true }
 io-maildir = { version = "0.5", default-features = false, optional = true }
-io-mbox = { version = "0.2", default-features = false, optional = true }
 io-managesieve = { version = "0.4", default-features = false, optional = true }
+io-mbox = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.9", default-features = false, optional = true }
 io-pimdir = { version = "0.12", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.2", default-features = false, features = ["scram"] }

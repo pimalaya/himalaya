@@ -7,7 +7,7 @@ change: a-result-carries-its-errors
 
 ## The contract
 
-- [ ] Take pimalaya-cli's `ItemError` once released (still a git pin, 0be1b1f, in Cargo.toml [patch.crates-io])
+- [x] Take pimalaya-cli's `ItemError` once released (pimalaya-cli 0.5, from crates.io since 2026-11-15)
 - [x] src/error.rs: `message-unreadable`, `mailbox-unreadable`, `permission-denied`, `quota-exceeded`, `rate-limited`, `recipient-refused`; `message-not-found` documented for an item
 - [x] `errors` on `EnvelopeListOutput` (list and search), `MailboxListOutput`, the flag outputs, `MessageCopyOutput`, `MessageMoveOutput`, `MessageDeleteOutput`; `count` counting what was acted on; exit 3 through `PartialOutcome` when not empty
 - [x] Text: `Error:` fields in the listing block after the paging fields; one `Error:` line after a write's sentence
