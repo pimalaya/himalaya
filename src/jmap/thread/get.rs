@@ -7,16 +7,22 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::thread::JmapThread;
-use log::warn;
 use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, jmap::client::JmapClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    error::{ErrorCode, ItemError, partial_when},
+    jmap::{backend::not_found_errors, client::JmapClient},
+};
 
 /// Get JMAP threads by ID (Thread/get).
 ///
-/// Each thread contains an ordered list of email IDs in the thread.
+/// Each thread contains an ordered list of email IDs in the thread. An id
+/// the server does not find is an entry of `errors`, coded
+/// `thread-not-found`, and exits 3.
 #[derive(Debug, Parser)]
 pub struct JmapThreadGetCommand {
     /// Thread ID(s) to retrieve.
@@ -25,7 +31,8 @@ pub struct JmapThreadGetCommand {
 }
 
 impl JmapThreadGetCommand {
-    /// Fetches the threads and lists the emails they hold.
+    /// Fetches the threads and lists the emails they hold, then the error
+    /// of each id not found.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -34,14 +41,14 @@ impl JmapThreadGetCommand {
     ) -> Result<()> {
         let output = client.thread_get(self.ids.clone())?;
 
-        for id in output.not_found {
-            warn!("thread `{id}` not found, ignoring it");
-        }
-
-        printer.out(JmapThreadGetOutput {
+        let threads = JmapThreadGetOutput {
             account: account.name().to_string(),
             threads: output.threads,
-        })
+            errors: not_found_errors(output.not_found, ErrorCode::ThreadNotFound),
+        };
+
+        printer.out(&threads)?;
+        partial_when(&threads.errors)
     }
 }
 
@@ -54,6 +61,9 @@ pub struct JmapThreadGetOutput {
     pub account: String,
     /// The threads, in the order the server returned them.
     pub threads: Vec<JmapThread>,
+    /// The error of each thread the server did not find, in the order
+    /// met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for JmapThreadGetOutput {
@@ -72,6 +82,10 @@ impl fmt::Display for JmapThreadGetOutput {
             for email_id in &thread.email_ids {
                 listing.items.push([&*id, &*sanitize::text(email_id)]);
             }
+        }
+
+        for error in &self.errors {
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")

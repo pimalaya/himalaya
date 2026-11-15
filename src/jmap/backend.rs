@@ -950,14 +950,21 @@ pub(crate) fn get_errors(
     missing: ErrorCode,
     unreadable: ErrorCode,
 ) -> Vec<ItemError> {
-    let not_found = not_found.into_iter().map(|id| ItemError {
+    let mut errors = not_found_errors(not_found, missing);
+    errors.extend(unparsed(objects, unreadable));
+    errors
+}
+
+/// The item error of each id a get's server did not find, coded `code`.
+pub(crate) fn not_found_errors(ids: Vec<String>, code: ErrorCode) -> Vec<ItemError> {
+    let error = |id| ItemError {
         id: Some(id),
-        code: Some(missing),
+        code: Some(code),
         error: String::from("The JMAP server found no object with this id"),
         sources: Vec::new(),
-    });
+    };
 
-    not_found.chain(unparsed(objects, unreadable)).collect()
+    ids.into_iter().map(error).collect()
 }
 
 /// The item error of each object a get could not deserialize, coded
@@ -1967,6 +1974,95 @@ mod tests {
             assert_eq!(output["mailboxes"], json!([]));
             assert_eq!(output["errors"][0]["id"], "Pbogus");
             assert_eq!(output["errors"][0]["code"], "mailbox-not-found");
+        }
+
+        /// `jmap thread get` lists the threads found, then an entry of
+        /// `errors` per id the server did not find, coded
+        /// `thread-not-found`, and ends as a partial outcome.
+        #[test]
+        fn a_thread_get_reports_each_id_not_found() {
+            use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
+
+            use crate::{account::context::Account, jmap::thread::get::JmapThreadGetCommand};
+
+            let thread = json!({ "id": "T1", "emailIds": ["E1"] });
+            let found = json!({ "list": [thread], "notFound": ["Tbogus"], "state": "s" });
+            let (url, server) = serve(vec![("Thread/get", found)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapThreadGetCommand {
+                ids: vec![String::from("T1"), String::from("Tbogus")],
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["threads"][0]["id"], "T1");
+            assert_eq!(output["errors"][0]["id"], "Tbogus");
+            assert_eq!(output["errors"][0]["code"], "thread-not-found");
+        }
+
+        /// `jmap identity get` given ids reports one not found the same
+        /// way, coded `identity-not-found`.
+        #[test]
+        fn an_identity_get_reports_each_id_not_found() {
+            use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
+
+            use crate::{account::context::Account, jmap::identity::get::JmapIdentityGetCommand};
+
+            let identity = json!({ "id": "I1", "name": "Me", "email": "me@example.org" });
+            let found = json!({ "list": [identity], "notFound": ["Ibogus"], "state": "s" });
+            let (url, server) = serve(vec![("Identity/get", found)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapIdentityGetCommand {
+                ids: Some(vec![String::from("I1"), String::from("Ibogus")]),
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["identities"][0]["id"], "I1");
+            assert_eq!(output["errors"][0]["id"], "Ibogus");
+            assert_eq!(output["errors"][0]["code"], "identity-not-found");
+        }
+
+        /// `jmap submission get` reports an id not found the same way,
+        /// coded `submission-not-found`.
+        #[test]
+        fn a_submission_get_reports_each_id_not_found() {
+            use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
+
+            use crate::{
+                account::context::Account, jmap::submission::get::JmapSubmissionGetCommand,
+            };
+
+            let found = json!({ "list": [], "notFound": ["Sbogus"], "state": "s" });
+            let (url, server) = serve(vec![("EmailSubmission/get", found)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapSubmissionGetCommand {
+                ids: vec![String::from("Sbogus")],
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["submissions"], json!([]));
+            assert_eq!(output["errors"][0]["id"], "Sbogus");
+            assert_eq!(output["errors"][0]["code"], "submission-not-found");
         }
 
         #[test]

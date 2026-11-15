@@ -77,6 +77,15 @@ pub enum ErrorCode {
     MessageUnreadable,
     /// A mailbox was listed but could not be read, its counts included.
     MailboxUnreadable,
+    /// A JMAP thread id given is not one the server holds: an item error
+    /// of `jmap thread get`.
+    ThreadNotFound,
+    /// A JMAP identity id given is not one the server holds: an item
+    /// error of `jmap identity get`.
+    IdentityNotFound,
+    /// A JMAP email submission id given is not one the server holds: an
+    /// item error of `jmap submission get` and `query`.
+    SubmissionNotFound,
     /// The server refused the item, or the command, to the account.
     PermissionDenied,
     /// The write would exceed the account's quota.
@@ -249,6 +258,8 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     not(any(
         feature = "imap",
         feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
         feature = "maildir",
         feature = "mbox",
         feature = "pimdir"

@@ -48,7 +48,7 @@ use crate::{
         outcome::Outcome,
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, missing_message, unknown_message},
+    error::{ErrorCode, ItemError, message_not_found, missing_message, unknown_message},
     msgraph::{
         client::{MsgraphClient, names_no_message, refusal_of},
         search,
@@ -480,19 +480,30 @@ impl MsgraphClient {
     }
 
     /// Fetches one message's raw RFC 5322 bytes via
-    /// `GET /messages/{id}/$value`. `mailbox` is unused.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
-        let raw = match self.message_get_raw(id) {
-            Ok(output) => output.response,
-            Err(MsgraphClientStdError::Send(err))
-                if err
-                    .api()
-                    .is_some_and(|api| names_no_message(api.status, &api.code)) =>
-            {
-                return Err(unknown_message(id, err));
-            }
-            Err(err) => return Err(err.into()),
-        };
+    /// `GET /messages/{id}/$value`, once `GET /messages/{id}` found it in
+    /// the folder `mailbox`.
+    ///
+    /// The id names the message account-wide, so a message of another
+    /// folder is not found, as on the backends whose ids are the
+    /// mailbox's. `$value` carries no property, so its `parentFolderId`
+    /// costs a request of its own. The mailbox is resolved through the
+    /// folder listing only when it is not that folder id already.
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+        let message = self
+            .message_get(id, Some("id,parentFolderId"), None)
+            .map_err(|err| read_error(id, err))?
+            .response;
+        let folder = message.parent_folder_id.as_deref();
+        if folder != Some(mailbox) && folder != Some(&*self.resolve_mailbox_id(mailbox)?) {
+            return Err(message_not_found(format!(
+                "Message `{id}` not found in `{mailbox}`"
+            )));
+        }
+
+        let raw = self
+            .message_get_raw(id)
+            .map_err(|err| read_error(id, err))?
+            .response;
 
         // NOTE: fetching `$value` never changes read state, so `--seen`
         // costs a separate PATCH setting `isRead`.
@@ -616,6 +627,21 @@ pub(super) fn well_known_role(name: &str) -> Option<MailboxRole> {
         .iter()
         .find(|(known, _)| known.eq_ignore_ascii_case(name))
         .map(|(_, role)| role.clone())
+}
+
+/// The failure of a request reading the message `id`: `message-not-found`
+/// when Graph knows no such message, Graph's answer kept in `sources`.
+fn read_error(id: &str, err: MsgraphClientStdError) -> anyhow::Error {
+    match err {
+        MsgraphClientStdError::Send(err)
+            if err
+                .api()
+                .is_some_and(|api| names_no_message(api.status, &api.code)) =>
+        {
+            unknown_message(id, err)
+        }
+        err => err.into(),
+    }
 }
 
 /// Converts one Graph mail folder named `name` into the shared
@@ -1444,5 +1470,109 @@ mod page_tests {
         let ids: Vec<&str> = found.envelopes.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(ids, ["3", "4"]);
         assert!(found.more);
+    }
+}
+
+#[cfg(test)]
+mod read_tests {
+    use std::sync::{Arc, Mutex};
+
+    use io_msgraph::v1::client::MsgraphClientStd;
+    use serde_json::{Value, json};
+
+    use crate::{
+        error::ErrorCode,
+        msgraph::client::MsgraphClient,
+        shared::http_script::{Script, ok},
+    };
+
+    /// The raw message `m1`.
+    const RAW: &str = "Subject: hi\r\n\r\nbody\r\n";
+
+    /// A client over a Graph server answering `responses` in order, and
+    /// the requests it reads.
+    fn graph(responses: Vec<Vec<u8>>) -> (MsgraphClient, Arc<Mutex<Vec<String>>>) {
+        let (script, requests) = Script::new(responses);
+        let inner = MsgraphClientStd::new(script, "token", Default::default());
+        (MsgraphClient::over(inner), requests)
+    }
+
+    /// A 200 carrying `body` as JSON.
+    fn reply(body: Value) -> Vec<u8> {
+        ok("application/json", &body.to_string())
+    }
+
+    /// The answers listing the folders: the well-known lookups, the Inbox
+    /// `I` and the Sent Items `S` found, then the two folders.
+    fn folders() -> [Vec<u8>; 3] {
+        let found = |name: &str, id: &str| json!({"id": name, "status": 200, "body": {"id": id}});
+        let missing = |name: &str| {
+            let body = json!({"error": {"code": "ErrorItemNotFound"}});
+            json!({"id": name, "status": 404, "body": body})
+        };
+        let first = [
+            found("inbox", "I"),
+            found("sentitems", "S"),
+            missing("drafts"),
+            missing("deleteditems"),
+        ];
+        let second = [missing("junkemail"), missing("archive")];
+        let folders = json!({"value": [
+            {"id": "I", "displayName": "Inbox"},
+            {"id": "S", "displayName": "Sent Items"},
+        ]});
+
+        [
+            reply(json!({"responses": first})),
+            reply(json!({"responses": second})),
+            reply(folders),
+        ]
+    }
+
+    /// A read names the mailbox it reads in, as IMAP and JMAP do: a
+    /// message of another folder is `message-not-found`, though Graph ids
+    /// name messages account-wide, its bytes not fetched, and one of the
+    /// folder is read, the listing asked only when the mailbox is not the
+    /// message's folder id.
+    #[test]
+    fn a_read_of_a_message_another_folder_holds_is_not_found() {
+        let message = || reply(json!({"id": "m1", "parentFolderId": "I"}));
+
+        let [first, second, listing] = folders();
+        let (mut client, requests) = graph(vec![message(), first, second, listing]);
+        let err = client.get_message("sentitems", "m1", false).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+        assert!(err.to_string().contains("`sentitems`"), "{err}");
+
+        let requests = requests.lock().unwrap();
+        let select = "/me/messages/m1?%24select=id%2CparentFolderId";
+        assert!(requests[0].contains(select), "{}", requests[0]);
+        assert!(
+            !requests.iter().any(|r| r.contains("$value")),
+            "{requests:#?}"
+        );
+
+        let (mut client, requests) = graph(vec![message(), ok("text/plain", RAW)]);
+        let raw = client.get_message("I", "m1", false).unwrap();
+        assert_eq!(raw, RAW.as_bytes());
+        assert_eq!(requests.lock().unwrap().len(), 2);
+    }
+
+    /// An id Graph knows no message by is `message-not-found` from the
+    /// folder lookup already, nothing more asked.
+    #[test]
+    fn a_read_of_an_unknown_id_is_not_found() {
+        let body = json!({"error": {"code": "ErrorItemNotFound", "message": "Not found"}});
+        let body = body.to_string();
+        let len = body.len();
+        let head = "HTTP/1.1 404 Not Found\r\nContent-Type: application/json";
+        let missing = format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}");
+
+        let (mut client, requests) = graph(vec![missing.into_bytes()]);
+        let err = client.get_message("I", "m9", false).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+        assert_eq!(requests.lock().unwrap().len(), 1);
     }
 }

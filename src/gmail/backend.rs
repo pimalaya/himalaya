@@ -39,7 +39,7 @@ use crate::{
         search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
         vacation::{Vacation, VacationPatch, date_from_millis},
     },
-    error::{ErrorCode, ItemError, missing_message, unknown_message},
+    error::{ErrorCode, ItemError, message_not_found, missing_message, unknown_message},
     gmail::{
         client::{GmailClient, refusal_of},
         search,
@@ -308,8 +308,13 @@ impl GmailClient {
     }
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
-    /// (format=RAW), base64url-decoded.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    /// (format=RAW), base64url-decoded, with the labels it carries.
+    ///
+    /// The id names the message account-wide, so a message not carrying
+    /// the `mailbox` label is not found, as on the backends whose ids are
+    /// the mailbox's. The mailbox is resolved through the label listing
+    /// only when it is not one of the message's labels already.
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let message = match self.message_get(id, GmailMessageFormat::Raw, &[]) {
             Ok(output) => output.response,
             Err(GmailClientStdError::Send(err)) if err.api().is_some_and(is_unknown_id) => {
@@ -317,6 +322,12 @@ impl GmailClient {
             }
             Err(err) => return Err(err.into()),
         };
+        let labelled = |label: &str| message.label_ids.iter().any(|held| held == label);
+        if !labelled(mailbox) && !labelled(&self.resolve_mailbox_id(mailbox)?) {
+            return Err(message_not_found(format!(
+                "Message `{id}` not found in `{mailbox}`"
+            )));
+        }
         let raw = message
             .raw
             .ok_or_else(|| anyhow!("Gmail message has no raw payload"))?;
@@ -1251,10 +1262,11 @@ mod tests {
 mod script_tests {
     use std::sync::{Arc, Mutex};
 
-    use io_gmail::v1::client::GmailClientStd;
+    use io_gmail::v1::{client::GmailClientStd, rest::messages::encode_raw};
     use serde_json::{Value, json};
 
     use crate::{
+        error::ErrorCode,
         gmail::{backend::list_ids, client::GmailClient},
         shared::http_script::{Script, ok},
     };
@@ -1391,5 +1403,38 @@ mod script_tests {
         let listed = client.list_envelopes("L", Some(1), Some(2), false).unwrap();
         let date = listed.value.envelopes[0].date.unwrap();
         assert_eq!(date.to_rfc3339(), "2026-11-15T11:00:00+00:00");
+    }
+
+    /// The `messages.get` answer of the message `m1`, raw, carrying the
+    /// `INBOX` label alone.
+    fn inbox_message() -> Vec<u8> {
+        let raw = encode_raw(b"Subject: hi\r\n\r\nbody\r\n");
+        let message = json!({"id": "m1", "labelIds": ["INBOX"], "raw": raw});
+        ok("application/json", &message.to_string())
+    }
+
+    /// A read names the mailbox it reads in, as IMAP and JMAP do: a
+    /// message not carrying its label is `message-not-found`, though Gmail
+    /// ids name messages account-wide, and one carrying it is read without
+    /// listing the labels.
+    #[test]
+    fn a_read_of_a_message_another_label_holds_is_not_found() {
+        let labels = json!({"labels": [
+            {"id": "INBOX", "name": "INBOX", "type": "system"},
+            {"id": "SENT", "name": "SENT", "type": "system"},
+        ]});
+        let labels = ok("application/json", &labels.to_string());
+        let (mut client, requests) = gmail(vec![inbox_message(), labels]);
+
+        let err = client.get_message("sent", "m1", false).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
+        assert!(err.to_string().contains("`sent`"), "{err}");
+        assert!(requests.lock().unwrap()[0].contains("format=RAW"));
+
+        let (mut client, requests) = gmail(vec![inbox_message()]);
+        let raw = client.get_message("INBOX", "m1", false).unwrap();
+        assert_eq!(raw, b"Subject: hi\r\n\r\nbody\r\n");
+        assert_eq!(requests.lock().unwrap().len(), 1);
     }
 }

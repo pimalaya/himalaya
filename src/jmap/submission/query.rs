@@ -23,7 +23,11 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    jmap::{backend::query_page_follows, client::JmapClient},
+    error::{ErrorCode, ItemError, partial_when},
+    jmap::{
+        backend::{not_found_errors, query_page_follows},
+        client::JmapClient,
+    },
 };
 
 /// How far along a submission is, and whether it can still be canceled.
@@ -109,16 +113,21 @@ impl JmapSubmissionQueryCommand {
         let listed = output.submissions.len() + output.not_found.len();
         let follows = query_page_follows(output.total, listed, page, self.page_size);
 
-        printer.out(JmapSubmissionQueryOutput {
+        let submissions = JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: Some((page, self.page_size)),
             submissions: output.submissions,
             next_page: follows.then(|| (page + 1).to_string()),
-        })
+            errors: not_found_errors(output.not_found, ErrorCode::SubmissionNotFound),
+        };
+
+        printer.out(&submissions)?;
+        partial_when(&submissions.errors)
     }
 }
 
-/// The `jmap submission query` output, the submissions of one page.
+/// The `jmap submission query`, `get` and `create` output, the
+/// submissions of one page, of the ids given or created.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JmapSubmissionQueryOutput {
@@ -133,6 +142,9 @@ pub struct JmapSubmissionQueryOutput {
     /// The number of the next page, `null` once the query is complete and
     /// for a get or a create, given back through `--page-token`.
     pub next_page: Option<String>,
+    /// The error of each submission the server did not find, in the order
+    /// met, none for a create.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for JmapSubmissionQueryOutput {
@@ -159,6 +171,10 @@ impl fmt::Display for JmapSubmissionQueryOutput {
             let page = ListingPage::Numbered { page, size };
             let nouns = ["submission", "submissions"];
             listing.page(page, count, nouns, self.next_page.as_deref());
+        }
+
+        for error in &self.errors {
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")

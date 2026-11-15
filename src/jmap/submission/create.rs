@@ -96,6 +96,7 @@ impl JmapSubmissionCreateCommand {
             page: None,
             submissions: output.created.into_values().collect(),
             next_page: None,
+            errors: Vec::new(),
         })
     }
 }

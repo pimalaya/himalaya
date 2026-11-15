@@ -5,15 +5,20 @@
 use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::get::JmapEmailSubmissionGetOptions;
-use log::warn;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    jmap::{client::JmapClient, submission::query::JmapSubmissionQueryOutput},
+    error::{ErrorCode, partial_when},
+    jmap::{
+        backend::not_found_errors, client::JmapClient, submission::query::JmapSubmissionQueryOutput,
+    },
 };
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
+///
+/// An id the server does not find is an entry of `errors`, coded
+/// `submission-not-found`, and exits 3.
 #[derive(Debug, Parser)]
 pub struct JmapSubmissionGetCommand {
     /// Submission ID(s) to retrieve.
@@ -22,7 +27,8 @@ pub struct JmapSubmissionGetCommand {
 }
 
 impl JmapSubmissionGetCommand {
-    /// Fetches the submissions and lists them.
+    /// Fetches the submissions and lists them, then the error of each id
+    /// not found.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -33,15 +39,15 @@ impl JmapSubmissionGetCommand {
             ids: Some(self.ids.clone()),
         })?;
 
-        for id in output.not_found {
-            warn!("submission `{id}` not found, ignoring it");
-        }
-
-        printer.out(JmapSubmissionQueryOutput {
+        let submissions = JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: None,
             submissions: output.submissions,
             next_page: None,
-        })
+            errors: not_found_errors(output.not_found, ErrorCode::SubmissionNotFound),
+        };
+
+        printer.out(&submissions)?;
+        partial_when(&submissions.errors)
     }
 }

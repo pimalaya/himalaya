@@ -481,6 +481,14 @@ A JMAP server forbidding duplicates refuses an import of bytes the account holds
 ### Requirement: A Gmail answer joins its parent's thread
 A message Gmail adds or sends answering another (`In-Reply-To:`) SHALL carry the `threadId` of the first parent the account holds, found by `rfc822msgid:`.
 
+### Requirement: A Gmail read is scoped to the mailbox given
+The Gmail backend SHALL read one message (`message read`, and the source of `message reply|forward` and `attachment list|download`) only when it carries the label of the mailbox given, reading its `labelIds` in the one `messages.get` (format RAW) bringing its bytes: a message not carrying the label SHALL fail `message-not-found`, naming the mailbox, as on IMAP and JMAP, though a Gmail id names a message account-wide, and `--seen` SHALL change nothing. The mailbox SHALL be resolved through the label listing only when it is not among the message's label ids.
+
+#### Scenario: An inbox message read under the sent mailbox
+- GIVEN a Gmail account whose message `m1` carries the `INBOX` label alone
+- WHEN `himalaya message read -m sent m1` runs
+- THEN the command fails with the code `message-not-found`, naming `sent`, where it printed the message
+
 ### Requirement: Graph batches four requests at a time
 Graph SHALL send its `$batch` requests (the well-known folder lookup, the folder check of message ids, the `PATCH`, copy, move and `DELETE` of a write) at most four sub-requests to a batch, Graph serving at most four concurrent requests per mailbox and throttling the others. A sub-request answered 429, 500, 502, 503 or 504 SHALL be sent again, up to three times, after the longest `Retry-After` its round asked for (1 second without one, 10 at most); one still failing SHALL keep its last status.
 
@@ -494,6 +502,14 @@ Graph SHALL list every mail folder but the hidden ones, walking the child folder
 
 ### Requirement: Graph writes are scoped to the mailbox given
 Graph message ids being account-wide and its message endpoints taking no folder, `flag add|set|remove`, `message copy`, `message move` and `message delete` SHALL first read the `parentFolderId` of each id (`GET /messages/{id}`, through `$batch`) and act only on the ids of the mailbox given. An id of another folder, one Graph answers 404 (unknown) or 400 `ErrorInvalidIdMalformed` (malformed) for, or one no path segment can carry SHALL count as not found; any other failed part of the lookup SHALL be an `errors` entry, as "Each backend names the items it could not serve" codes it. A move into its own source mailbox SHALL change nothing. `flag set` SHALL replace the categories of a message with the keyword flags it names, clearing them when it names none.
+
+### Requirement: A Graph read is scoped to the mailbox given
+The Graph backend SHALL read one message (`message read`, and the source of `message reply|forward` and `attachment list|download`) only when its `parentFolderId` is the folder the mailbox given resolves to, a well-known name included, read through `GET /messages/{id}?$select=id,parentFolderId` before `GET /messages/{id}/$value`, which carries no property: a message of another folder SHALL fail `message-not-found`, naming the mailbox, as on IMAP and JMAP, though a Graph id names a message account-wide, its bytes not fetched and `--seen` changing nothing. The mailbox SHALL be resolved through the folder listing only when it is not the message's folder id. An id Graph answers 404 or 400 `ErrorInvalidIdMalformed` for, at either request, SHALL fail `message-not-found`.
+
+#### Scenario: An inbox message read under the sent mailbox
+- GIVEN a Graph account whose message `m1` the Inbox holds
+- WHEN `himalaya message read -m sentitems m1` runs
+- THEN the command fails with the code `message-not-found`, naming `sentitems`, where it printed the message
 
 ### Requirement: Graph envelopes
 An unpaged Graph `envelope list` or `envelope search` (`--page-size 0`) SHALL follow every paging link, asking 1000 messages a page, Graph's largest `$top`. A Graph envelope's date SHALL be its `sentDateTime`, the `Date:` header, else its `receivedDateTime`. Its `size` SHALL be `null`, Graph's message carrying no size of the raw message, as a JMAP or pimdir envelope whose size the server or the store does not give.
