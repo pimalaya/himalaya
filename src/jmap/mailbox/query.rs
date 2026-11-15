@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_jmap::rfc8621::mailbox::{
     JmapMailbox, JmapMailboxRole,
@@ -15,6 +15,7 @@ use io_jmap::rfc8621::mailbox::{
     },
 };
 use pimalaya_cli::{
+    clap::args::PageTokenArg,
     listing::{Listing, ListingPage},
     printer::Printer,
     sanitize,
@@ -22,7 +23,12 @@ use pimalaya_cli::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, jmap::client::JmapClient, listing};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    jmap::{backend::query_page_follows, client::JmapClient},
+    listing,
+};
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
 ///
@@ -60,6 +66,8 @@ pub struct JmapMailboxQueryCommand {
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
 }
 
 impl JmapMailboxQueryCommand {
@@ -70,6 +78,15 @@ impl JmapMailboxQueryCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .ok()
+                .filter(|page: &u64| *page > 0)
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page.max(1),
+        };
+
         let filter = {
             let f = JmapMailboxFilter {
                 parent_id: self.parent_id,
@@ -96,15 +113,19 @@ impl JmapMailboxQueryCommand {
         let output = client.mailbox_query(JmapMailboxQueryOptions {
             filter,
             sort,
-            position: Some(self.page.saturating_sub(1) * self.page_size),
+            position: Some((page - 1).saturating_mul(self.page_size)),
             limit: Some(self.page_size),
             properties: None,
         })?;
 
+        let listed = output.mailboxes.len() + output.unparsed.len() + output.not_found.len();
+        let follows = query_page_follows(output.total, listed, page, self.page_size);
+
         printer.out(JmapMailboxQueryOutput {
             account: account.name().to_string(),
-            page: Some((self.page.max(1), self.page_size)),
+            page: Some((page, self.page_size)),
             mailboxes: output.mailboxes,
+            next_page: follows.then(|| (page + 1).to_string()),
         })
     }
 }
@@ -122,6 +143,9 @@ pub struct JmapMailboxQueryOutput {
     pub page: Option<(u64, u64)>,
     /// The mailboxes, in the order the server returned them.
     pub mailboxes: Vec<JmapMailbox>,
+    /// The number of the next page, `null` once the query is complete and
+    /// for a get, given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl fmt::Display for JmapMailboxQueryOutput {
@@ -152,9 +176,9 @@ impl fmt::Display for JmapMailboxQueryOutput {
 
         if let Some((page, size)) = self.page {
             let count = self.mailboxes.len();
-            let next = (count as u64 >= size).then(|| (page + 1).to_string());
             let page = ListingPage::Numbered { page, size };
-            listing.page(page, count, ["mailbox", "mailboxes"], next.as_deref());
+            let next = self.next_page.as_deref();
+            listing.page(page, count, ["mailbox", "mailboxes"], next);
         }
 
         write!(f, "{listing}")
@@ -245,5 +269,41 @@ impl From<SortArg> for JmapMailboxSortProperty {
             SortArg::SortOrder => JmapMailboxSortProperty::SortOrder,
             SortArg::ParentId => JmapMailboxSortProperty::ParentId,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use io_jmap::rfc8621::mailbox::JmapMailbox;
+
+    use crate::jmap::mailbox::query::JmapMailboxQueryOutput;
+
+    /// A page names the next one only when the query says one follows,
+    /// never because it came back full: `nextPage` in JSON, `Next page:`
+    /// in text.
+    #[test]
+    fn a_full_page_names_the_next_only_when_one_follows() {
+        let mailbox = |id: &str| JmapMailbox {
+            id: Some(id.to_owned()),
+            name: Some(id.to_owned()),
+            ..Default::default()
+        };
+        let mut output = JmapMailboxQueryOutput {
+            account: String::from("work"),
+            page: Some((1, 2)),
+            mailboxes: vec![mailbox("M1"), mailbox("M2")],
+            next_page: None,
+        };
+
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["nextPage"], serde_json::Value::Null);
+        let text = output.to_string();
+        assert!(text.contains("1, mailboxes 1 to 2, the last"), "{text}");
+        assert!(!text.contains("Next page:"), "{text}");
+
+        output.next_page = Some(String::from("2"));
+        assert_eq!(serde_json::to_value(&output).unwrap()["nextPage"], "2");
+        let text = output.to_string();
+        assert!(text.contains("Next page:  --page 2"), "{text}");
     }
 }

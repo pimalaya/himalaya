@@ -346,9 +346,9 @@ impl EmailClient {
                 client.list_envelopes_counted(mailbox, page, page_size, with_attachment)
             }
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client
-                .list_envelopes_counted(mailbox, page, page_size, with_attachment)
-                .map(|(envelopes, total)| (Outcome::from(envelopes), total)),
+            BackendClient::Mbox(client) => {
+                client.list_envelopes_counted(mailbox, page, page_size, with_attachment)
+            }
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client
                 .list_envelopes_counted(mailbox, page, page_size, with_attachment)
@@ -383,9 +383,9 @@ impl EmailClient {
                 client.search_envelopes(mailbox, query, page, page_size, with_attachment)
             }
             #[cfg(feature = "mbox")]
-            BackendClient::Mbox(client) => client
-                .search_envelopes(mailbox, query, page, page_size, with_attachment)
-                .map(Outcome::from),
+            BackendClient::Mbox(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
+            }
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client
                 .search_envelopes(mailbox, query, page, page_size, with_attachment)

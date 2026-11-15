@@ -824,7 +824,7 @@ mod attachment_rows {
     const PNG_WITH_CONTENT_ID: &[u8] = b"Content-Type: multipart/related; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/html\r\n\r\n<img src=\"cid:i\">\r\n--b\r\nContent-Type: image/png\r\nContent-ID: <i>\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n--b--\r\n";
 
     fn row(raw: &[u8]) -> Option<bool> {
-        envelope::from_raw(raw, true).has_attachment
+        envelope::from_raw(raw, true).unwrap().has_attachment
     }
 
     #[test]

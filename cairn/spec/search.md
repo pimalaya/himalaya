@@ -44,7 +44,7 @@ Graph SHALL refuse a filter holding a flag clause with the code `search-unsuppor
 ### Requirement: pimdir searches through the store's index
 `himalaya pimdir search <query>...` SHALL answer the pimdir SEARCH query language (search-draft-11 §8) from the store's search index, scoped to the account's mail: the query is read as `(<query>) kind:mail`, with `account:<account>` when the store groups the account under a name. The words of the query are joined by spaces into one query. Himalaya SHALL open the index read-only (io-pimdir `PimdirIndex::open_query`) and SHALL NOT create, rebuild nor refresh it: the store's owner, its sync engine, builds and refreshes it. The answer SHALL be the store as of the owner's last refresh: a queued write is not listed nor folded in.
 
-Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page carries `more`, whether hits or threads follow it.
+Each hit SHALL carry the shared envelope's keys (its `id` the public `seq`, which `message read` takes with one of its mailboxes), the account's `mailboxes` holding it, what a text term matched (`body`, `summary`, or `null` when only field terms did) and a `snippet` of its body. `--sort date|name|relevance` orders the hits (date by default), `--page` and `--page-size` page them, and `--threads` collapses them to their threads (SEARCH §9), each with its id, the number of messages it holds in the account, its first and last date, and its hits. Under `--json` the page SHALL print `{hits, nextPage, coverage, errors}`, `{threads, nextPage, coverage, errors}` with `--threads`: `nextPage` the number of the next page, as a string, while hits or threads follow the page, `null` once the answer is complete, which `--page-token` SHALL take back, winning over `--page`, a token that is no page number from 1 being refused. A hit whose message the store cannot read SHALL be an `errors` entry carrying its id, coded `message-unreadable` unless the store names its own code, the other hits listed (a thread without that hit) and the exit status 3; in text the entries print after the items, as every list prints them.
 
 A `date:` term's years, months and days, `today` and `yesterday` SHALL be read in the local zone (SEARCH §8.1), in `pimdir search`, `count` and `tag` alike: `TZ`, then the system's zone, by its IANA name. A zone with no IANA name, a POSIX `TZ` string or a system zone that cannot be named, or no zone at all, SHALL leave them in UTC with one warning.
 
@@ -57,6 +57,16 @@ A `date:` term's years, months and days, `today` and `yesterday` SHALL be read i
 - GIVEN a message added to a pimdir mailbox and still in the queue
 - WHEN `himalaya pimdir search` runs a query its body matches
 - THEN it is not listed until the owner applies the add and refreshes the index
+
+#### Scenario: A second page of a search
+- GIVEN a pimdir index holding three messages `report` matches
+- WHEN `himalaya --json pimdir search -s 2 report` runs, then `himalaya --json pimdir search -s 2 --page-token 2 report`
+- THEN the first prints two hits and `"nextPage":"2"`, the second the third hit and `"nextPage":null`
+
+#### Scenario: A hit the store cannot read
+- GIVEN a pimdir index holding three messages `report` matches, the store failing to read the row of one
+- WHEN `himalaya --json pimdir search report` runs
+- THEN it prints the two other hits and `"errors":[{"id":"<its id>","code":"message-unreadable",…}]`, and the exit status is 3
 
 #### Scenario: A day is the local day
 - GIVEN `TZ=Europe/Paris` and an indexed message received at 00:30 on 2026-11-07 in that zone

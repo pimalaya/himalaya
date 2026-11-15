@@ -71,6 +71,7 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 
 - **An unserved verb fails up front with `capability-missing`.** Each backend declares what it serves of the unified API, which `account capability` lists and the `Backends:` footer of `--help` shows. On Gmail and Microsoft Graph, `flag add|set|remove answered|draft` reported the messages flagged and changed nothing: it now fails. `message add` on Graph, and `--save` there without `--send`, fail before connecting; a send on Graph ignores `--save` and `--no-save`, Graph filing every sent message in Sent Items itself.
 - **A command given ids none of which exists fails** (exit 1): `flag add|set|remove`, `message move`, `message copy` and `message delete`.
+- **A Maildir file or an mbox message holding no header field is an error, not a row.** `envelope list|search` print it under `errors`, coded `message-unreadable` with its id, and exit 3, where v2 listed it with empty cells and exited 0. `message read` still reads its bytes as the body.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
 - **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
 - **`-f/--flag` takes one value per occurrence** on `message add`, `imap append`, `imap store`, `maildir message save` and `mbox message save`: `-f seen flagged msg.eml` read the path as a flag. Repeat the flag, `-f seen -f flagged msg.eml`.
@@ -106,6 +107,7 @@ What a build of the v3 branch did before the release and the release does not:
 
 - **The MCP message tools take `message-id`.** `message_read`, `message_reply` and `message_forward` took the message as `id`; they take `message-id`, as `attachment_list` and `attachment_download` do, and refuse `id` as an unknown argument coded `usage-invalid`: `{"id": "42"}` becomes `{"message-id": "42"}`.
 - **`pimdir attachment list|search` page with `--page-token` alone.** `-t` is `--to` everywhere else, so it is gone here: `-t <TOKEN>` becomes `--page-token <TOKEN>`.
+- **`pimdir search` pages with `nextPage`.** It printed `more`; it prints `nextPage`, the next page number while hits or threads follow and `null` on the last page, which `--page-token` takes back (`--page` still works): `"more":true` on page 1 becomes `"nextPage":"2"`, `"more":false` `"nextPage":null`. A hit the store cannot read is an entry of `errors` and exits 3, where the whole search failed.
 
 ## From v1 to v2
 

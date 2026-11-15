@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_jmap::{
     rfc8620::filter::JmapFilter,
@@ -17,6 +17,7 @@ use io_jmap::{
     },
 };
 use pimalaya_cli::{
+    clap::args::PageTokenArg,
     listing::{Listing, ListingPage},
     printer::Printer,
 };
@@ -27,7 +28,7 @@ use crate::{
     account::context::Account,
     backend::Backend,
     jmap::{
-        backend::{envelope_from, parse_rfc3339},
+        backend::{envelope_from, parse_rfc3339, query_page_follows},
         client::JmapClient,
     },
     shared::envelope::list::envelope_cells,
@@ -89,6 +90,8 @@ pub struct JmapEmailQueryCommand {
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
 }
 
 impl JmapEmailQueryCommand {
@@ -100,6 +103,14 @@ impl JmapEmailQueryCommand {
         client: &mut JmapClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.clone();
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .ok()
+                .filter(|page: &u64| *page > 0)
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page.max(1),
+        };
 
         let filter = {
             let f = JmapEmailFilter {
@@ -154,15 +165,20 @@ impl JmapEmailQueryCommand {
         let output = client.email_query(JmapEmailQueryOptions {
             filter,
             sort,
-            position: Some(self.page.saturating_sub(1) * self.page_size),
+            position: Some((page - 1).saturating_mul(self.page_size)),
             limit: Some(self.page_size),
+            calculate_total: true,
             properties: None,
             ..Default::default()
         })?;
 
+        let listed = output.emails.len() + output.unparsed.len() + output.not_found.len();
+        let follows = query_page_follows(output.total, listed, page, self.page_size);
+
         let mut emails = JmapEmailQueryOutput::new(account, output.emails);
         emails.mailbox = mailbox;
-        emails.page = Some((self.page.max(1), self.page_size));
+        emails.page = Some((page, self.page_size));
+        emails.next_page = follows.then(|| (page + 1).to_string());
 
         printer.out(emails)
     }
@@ -189,6 +205,9 @@ pub struct JmapEmailQueryOutput {
     pub page: Option<(u64, u64)>,
     /// The emails, in the order the server returned them.
     pub emails: Vec<JmapEmail>,
+    /// The number of the next page, `null` once the query is complete and
+    /// for a get, given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl JmapEmailQueryOutput {
@@ -201,6 +220,7 @@ impl JmapEmailQueryOutput {
             mailbox: None,
             page: None,
             emails,
+            next_page: None,
         }
     }
 }
@@ -224,9 +244,9 @@ impl fmt::Display for JmapEmailQueryOutput {
 
         if let Some((page, size)) = self.page {
             let count = self.emails.len();
-            let next = (count as u64 >= size).then(|| (page + 1).to_string());
             let page = ListingPage::Numbered { page, size };
-            listing.page(page, count, ["email", "emails"], next.as_deref());
+            let next = self.next_page.as_deref();
+            listing.page(page, count, ["email", "emails"], next);
         }
 
         write!(f, "{listing}")
@@ -279,5 +299,36 @@ impl From<SortArg> for JmapEmailSortProperty {
             SortArg::Subject => JmapEmailSortProperty::Subject,
             SortArg::HasAttachment => JmapEmailSortProperty::HasAttachment,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use io_jmap::rfc8621::email::JmapEmail;
+
+    use crate::jmap::email::query::JmapEmailQueryOutput;
+
+    /// An exactly full last page names no next page, in JSON as in text.
+    #[test]
+    fn a_full_last_page_names_no_next_page() {
+        let email = |id: &str| JmapEmail {
+            id: Some(id.to_owned()),
+            ..Default::default()
+        };
+        let output = JmapEmailQueryOutput {
+            account: String::from("work"),
+            datetime_fmt: String::from("%F"),
+            datetime_local_tz: false,
+            mailbox: None,
+            page: Some((2, 2)),
+            emails: vec![email("E3"), email("E4")],
+            next_page: None,
+        };
+
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["nextPage"], serde_json::Value::Null);
+        let text = output.to_string();
+        assert!(text.contains("2, emails 3 to 4, the last"), "{text}");
+        assert!(!text.contains("Next page:"), "{text}");
     }
 }

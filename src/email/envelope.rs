@@ -134,14 +134,17 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
 }
 
 /// The envelope of a raw message, read from its header block, its id and
-/// flags left empty for the backend to fill.
+/// flags left empty for the backend to fill; `None` when the bytes hold no
+/// header field named as RFC 5322 names one, which no message lacks.
+///
+/// Refs: <https://datatracker.ietf.org/doc/html/rfc5322#section-2.2>
 ///
 /// `with_attachment` also splits the body, to say whether it holds an
 /// attachment ([`crate::shared::message::part::has_attachment`]); left
 /// `None` otherwise. The subject is read as the read view reads it, raw
 /// 8-bit bytes included.
 #[cfg(any(feature = "maildir", feature = "mbox"))]
-pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
+pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
     use chrono::TimeZone;
     use mime::{
         header::marker::{DATE, FROM, IN_REPLY_TO, MESSAGE_ID, TO},
@@ -158,6 +161,16 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
         false => header::parse_headers(raw),
     };
     let root = &message.root;
+
+    // NOTE: mime-rs takes any bytes before a colon for a field name.
+    let ftext = |name: &[u8]| {
+        let printable = |byte: &u8| matches!(byte, 33..=57 | 59..=126);
+        !name.is_empty() && name.iter().all(printable)
+    };
+
+    if !root.header.fields().any(|field| ftext(field.name())) {
+        return None;
+    }
 
     let addresses = |list: Option<mime::value::address::MimeAddressList>| {
         list.map(|list| address::from_mime(&list))
@@ -179,7 +192,7 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
             .collect()
     };
 
-    Envelope {
+    Some(Envelope {
         id: String::new(),
         message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
         in_reply_to: ids(root.header::<IN_REPLY_TO>()),
@@ -190,7 +203,7 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Envelope {
         date,
         size: raw.len() as u64,
         has_attachment: with_attachment.then(|| part::has_attachment(&message)),
-    }
+    })
 }
 
 #[cfg(all(test, any(feature = "imap", feature = "gmail")))]

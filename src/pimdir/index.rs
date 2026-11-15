@@ -40,7 +40,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::envelope::Envelope,
-    error::{ErrorCode, pimdir_error},
+    error::{ErrorCode, ItemError, pimdir_error},
     pimdir::{
         backend::{envelope, envelope_from_item},
         client::PimdirClient,
@@ -62,14 +62,14 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .context("Search the pimdir index")?;
 
-        let mut hits = Vec::with_capacity(answer.hits.len());
-        for hit in answer.hits {
-            hits.push(self.mail_hit(&index, hit)?);
-        }
+        let mut errors = Vec::new();
+        let hits = self.mail_hits(&index, answer.hits, &mut errors);
+
         Ok(PimdirMailPage {
             hits,
             more: answer.more,
             coverage: PimdirMailCoverage::from(&answer.coverage),
+            errors,
         })
     }
 
@@ -86,14 +86,24 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .context("Search the pimdir index by thread")?;
 
+        let mut errors = Vec::new();
         let mut threads = Vec::with_capacity(answer.threads.len());
+
         for thread in answer.threads {
-            threads.push(self.mail_thread_of(&index, thread)?);
+            threads.push(PimdirMailThread {
+                hits: self.mail_hits(&index, thread.hits, &mut errors),
+                thread: thread.thread,
+                count: thread.count,
+                first: thread.first,
+                last: thread.last,
+            });
         }
+
         Ok(PimdirMailThreads {
             threads,
             more: answer.more,
             coverage: PimdirMailCoverage::from(&answer.coverage),
+            errors,
         })
     }
 
@@ -252,6 +262,33 @@ impl PimdirClient {
         PimdirQuery::And(conjuncts)
     }
 
+    /// The hits as Himalaya lists them, the item error of each one the
+    /// store cannot read pushed to `errors`, coded `message-unreadable`
+    /// unless the store names its own code.
+    fn mail_hits(
+        &self,
+        index: &PimdirIndex,
+        hits: Vec<PimdirSearchHit>,
+        errors: &mut Vec<ItemError>,
+    ) -> Vec<PimdirMailHit> {
+        let mut read = Vec::with_capacity(hits.len());
+
+        for hit in hits {
+            let id = hit.seq.to_string();
+
+            match self.mail_hit(index, hit) {
+                Ok(hit) => read.push(hit),
+                Err(err) => {
+                    let mut error = ItemError::new(Some(&id), &err);
+                    error.code.get_or_insert(ErrorCode::MessageUnreadable);
+                    errors.push(error);
+                }
+            }
+        }
+
+        read
+    }
+
     /// A hit as Himalaya lists it: the envelope of its first placement,
     /// read from the store as it stands, and the mailboxes holding it.
     fn mail_hit(&self, index: &PimdirIndex, hit: PimdirSearchHit) -> Result<PimdirMailHit> {
@@ -389,6 +426,8 @@ pub struct PimdirMailPage {
     pub more: bool,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
+    /// The error of each hit the store could not read.
+    pub errors: Vec<ItemError>,
 }
 
 /// One page of threads.
@@ -399,6 +438,8 @@ pub struct PimdirMailThreads {
     pub more: bool,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
+    /// The error of each hit the store could not read.
+    pub errors: Vec<ItemError>,
 }
 
 /// What a tag planned or staged, and what it could not see.
@@ -933,6 +974,47 @@ mod tests {
                 .0,
             4
         );
+    }
+
+    /// A hit whose message the store cannot read is an item error coded
+    /// `message-unreadable`, the other hits listed, by message as by
+    /// thread, where the whole search failed.
+    #[test]
+    fn a_hit_the_store_cannot_read_is_an_item_error() {
+        let (dir, client) = indexed_store();
+        let lunch = id_of(&client, "Lunch");
+
+        let conn = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        conn.execute_batch("PRAGMA ignore_check_constraints = ON")
+            .unwrap();
+        let seq: i64 = lunch.parse().unwrap();
+        let sql = "UPDATE mail_summary SET size = 'x' \
+                   WHERE item = (SELECT id FROM items WHERE seq = ?1)";
+        assert_eq!(conn.execute(sql, [seq]).unwrap(), 1);
+        drop(conn);
+
+        let found = page(&client, "date:2026-05-01..");
+        let subjects: Vec<&str> = found
+            .hits
+            .iter()
+            .map(|hit| hit.envelope.subject.as_str())
+            .collect();
+        assert_eq!(
+            subjects,
+            ["Invoice", "Re: Quarterly report", "Quarterly report"]
+        );
+        let [error] = found.errors.as_slice() else {
+            panic!("{:?}", found.errors);
+        };
+        assert_eq!(error.id.as_deref(), Some(lunch.as_str()));
+        assert_eq!(error.code, Some(ErrorCode::MessageUnreadable));
+
+        let threads = client
+            .search_mail_threads(query("lunch"), &PimdirSearchOptions::default())
+            .unwrap();
+        assert_eq!(threads.threads.len(), 1);
+        assert!(threads.threads[0].hits.is_empty());
+        assert_eq!(threads.errors.len(), 1, "{:?}", threads.errors);
     }
 
     #[test]

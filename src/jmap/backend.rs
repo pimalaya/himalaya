@@ -1014,12 +1014,27 @@ fn compute_position_limit(page: Option<u32>, page_size: Option<u32>) -> (Option<
 /// Whether a page follows the one an `Email/query` answered: below its
 /// `total`, else while the page came back full.
 fn query_follows(output: &JmapEmailQueryOutput, page: Option<u32>, page_size: Option<u32>) -> bool {
-    if let Some(total) = output.total {
-        return page_follows(total, page, page_size);
+    let listed = output.emails.len() + output.unparsed.len() + output.not_found.len();
+    let Some(size) = page_size else {
+        return false;
+    };
+
+    let page = page.unwrap_or(1);
+    query_page_follows(output.total, listed, page.into(), size.into())
+}
+
+/// Whether a page follows page `page` of `size` items a JMAP query
+/// answered with `listed` ids: below its `total`, else while the page came
+/// back full; never for a page size of 0.
+pub(crate) fn query_page_follows(total: Option<u64>, listed: usize, page: u64, size: u64) -> bool {
+    if size == 0 {
+        return false;
     }
 
-    let listed = output.emails.len() + output.unparsed.len() + output.not_found.len();
-    page_size.is_some_and(|size| size > 0 && listed as u64 >= u64::from(size))
+    match total {
+        Some(total) => page.max(1).saturating_mul(size) < total,
+        None => listed as u64 >= size,
+    }
 }
 
 /// Folds a JMAP email object into the shared [`Envelope`] shape.
@@ -1403,6 +1418,18 @@ mod tests {
         assert!(follows(&["1", "2"], None, Some(1), Some(2)));
         assert!(!follows(&["1"], None, Some(1), Some(2)));
         assert!(!follows(&["1", "2"], None, None, None));
+    }
+
+    /// The `jmap` queries page the same way: below the query's total, else
+    /// after a full page, never at a page size of 0.
+    #[test]
+    fn a_query_page_follows_below_its_total() {
+        assert!(query_page_follows(Some(3), 2, 1, 2));
+        assert!(!query_page_follows(Some(2), 2, 1, 2));
+        assert!(!query_page_follows(Some(4), 2, 2, 2));
+        assert!(query_page_follows(None, 2, 1, 2));
+        assert!(!query_page_follows(None, 1, 1, 2));
+        assert!(!query_page_follows(Some(5), 0, 1, 0));
     }
 
     fn set_output(updated: &[&str], not_updated: &[(&str, &str)]) -> JmapEmailSetOutput {

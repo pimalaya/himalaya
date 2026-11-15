@@ -27,7 +27,7 @@ use crate::email::envelope::Envelope;
 /// The version of what a cached envelope or index holds, raised when a
 /// message would now read or scan differently, so an older cache is
 /// rebuilt.
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
 
 /// The cached state of one mbox file.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -38,8 +38,9 @@ pub struct MboxCache {
     /// The scan index, `None` until the file was scanned once.
     pub index: Option<MboxIndex>,
     /// Envelopes keyed by content id, their flags left empty since the
-    /// index carries the current ones.
-    pub envelopes: BTreeMap<String, Envelope>,
+    /// index carries the current ones; `None` for a message holding no
+    /// header field.
+    pub envelopes: BTreeMap<String, Option<Envelope>>,
 }
 
 impl MboxCache {
@@ -143,7 +144,7 @@ mod tests {
         let path = MboxFsPath::new("/nowhere/mbox");
 
         let mut cache = MboxCache {
-            envelopes: BTreeMap::from([("kept".to_string(), envelope("kept"))]),
+            envelopes: BTreeMap::from([("kept".to_string(), Some(envelope("kept")))]),
             ..Default::default()
         };
         cache.save(Some(&dir), &path);
@@ -171,8 +172,8 @@ mod tests {
                 ..Default::default()
             }),
             envelopes: BTreeMap::from([
-                ("kept".into(), envelope("kept")),
-                ("gone".into(), envelope("gone")),
+                ("kept".into(), Some(envelope("kept"))),
+                ("gone".into(), Some(envelope("gone"))),
             ]),
             ..Default::default()
         };

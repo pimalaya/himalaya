@@ -5,13 +5,14 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_jmap::rfc8621::email_submission::{
     JmapEmailSubmission, JmapUndoStatus,
     query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
 use pimalaya_cli::{
+    clap::args::PageTokenArg,
     listing::{Listing, ListingPage},
     printer::Printer,
     sanitize,
@@ -19,7 +20,11 @@ use pimalaya_cli::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, jmap::client::JmapClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    jmap::{backend::query_page_follows, client::JmapClient},
+};
 
 /// How far along a submission is, and whether it can still be canceled.
 #[derive(Clone, Debug, ValueEnum)]
@@ -60,6 +65,8 @@ pub struct JmapSubmissionQueryCommand {
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
     pub page: u64,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
 }
 
 impl JmapSubmissionQueryCommand {
@@ -70,6 +77,15 @@ impl JmapSubmissionQueryCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .ok()
+                .filter(|page: &u64| *page > 0)
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page.max(1),
+        };
+
         let filter = {
             let f = JmapEmailSubmissionFilter {
                 undo_status: self.undo_status.map(Into::into),
@@ -86,14 +102,18 @@ impl JmapSubmissionQueryCommand {
         let output = client.email_submission_query(JmapEmailSubmissionQueryOptions {
             filter,
             sort: None,
-            position: Some(self.page.saturating_sub(1) * self.page_size),
+            position: Some((page - 1).saturating_mul(self.page_size)),
             limit: Some(self.page_size),
         })?;
 
+        let listed = output.submissions.len() + output.not_found.len();
+        let follows = query_page_follows(output.total, listed, page, self.page_size);
+
         printer.out(JmapSubmissionQueryOutput {
             account: account.name().to_string(),
-            page: Some((self.page.max(1), self.page_size)),
+            page: Some((page, self.page_size)),
             submissions: output.submissions,
+            next_page: follows.then(|| (page + 1).to_string()),
         })
     }
 }
@@ -110,6 +130,9 @@ pub struct JmapSubmissionQueryOutput {
     pub page: Option<(u64, u64)>,
     /// The submissions, in the order the server returned them.
     pub submissions: Vec<JmapEmailSubmission>,
+    /// The number of the next page, `null` once the query is complete and
+    /// for a get or a create, given back through `--page-token`.
+    pub next_page: Option<String>,
 }
 
 impl fmt::Display for JmapSubmissionQueryOutput {
@@ -133,10 +156,9 @@ impl fmt::Display for JmapSubmissionQueryOutput {
 
         if let Some((page, size)) = self.page {
             let count = self.submissions.len();
-            let next = (count as u64 >= size).then(|| (page + 1).to_string());
             let page = ListingPage::Numbered { page, size };
             let nouns = ["submission", "submissions"];
-            listing.page(page, count, nouns, next.as_deref());
+            listing.page(page, count, nouns, self.next_page.as_deref());
         }
 
         write!(f, "{listing}")

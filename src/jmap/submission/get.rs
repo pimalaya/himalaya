@@ -41,6 +41,7 @@ impl JmapSubmissionGetCommand {
             account: account.name().to_string(),
             page: None,
             submissions: output.submissions,
+            next_page: None,
         })
     }
 }

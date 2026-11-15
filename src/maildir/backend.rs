@@ -16,7 +16,7 @@ use crate::{
         outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, message_not_found, missing_message},
+    error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
     maildir::client::{MaildirClient, validate_maildir_name},
 };
 use anyhow::{Result, bail};
@@ -69,8 +69,8 @@ impl MaildirClient {
 
     /// Lists envelopes from `mailbox`, sorted by `Date:` descending
     /// then paginated. `with_attachment` is always honoured (the body
-    /// is parsed regardless). A file that cannot be read is an item error
-    /// of the first page.
+    /// is parsed regardless). A file that cannot be read, or holding no
+    /// header field, is an item error of the first page.
     pub fn list_envelopes(
         &self,
         mailbox: &str,
@@ -96,7 +96,16 @@ impl MaildirClient {
         let total = u64::try_from(entries.len()).ok();
         let read = self.read_readable_entries(&maildir, &entries);
 
-        let mut envelopes: Vec<Envelope> = read.entries.iter().map(envelope_from_entry).collect();
+        let mut envelopes = Vec::new();
+        let mut headerless = Vec::new();
+
+        for entry in &read.entries {
+            match envelope_from_entry(entry) {
+                Some(envelope) => envelopes.push(envelope),
+                None => headerless.push(entry.id().unwrap_or_default()),
+            }
+        }
+
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
 
         let more = page_follows(envelopes.len() as u64, page, page_size);
@@ -104,7 +113,7 @@ impl MaildirClient {
 
         let listed = Outcome {
             value: EnvelopePage { envelopes, more },
-            errors: unreadable_entries(read.unreadable, page),
+            errors: entry_errors(read.unreadable, headerless, page),
         };
 
         Ok((listed, total))
@@ -127,8 +136,13 @@ impl MaildirClient {
 
         let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = Vec::new();
+        let mut headerless = Vec::new();
+
         for full in &read.entries {
-            let envelope = envelope_from_entry(full);
+            let Some(envelope) = envelope_from_entry(full) else {
+                headerless.push(full.id().unwrap_or_default());
+                continue;
+            };
             let keep = match filter {
                 Some(filter) => eval::matches_filter(&envelope, None, full.contents(), filter),
                 None => true,
@@ -145,7 +159,7 @@ impl MaildirClient {
 
         Ok(Outcome {
             value: EnvelopePage { envelopes, more },
-            errors: unreadable_entries(read.unreadable, page),
+            errors: entry_errors(read.unreadable, headerless, page),
         })
     }
 
@@ -454,13 +468,14 @@ fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
 }
 
 /// Folds a fully-read Maildir entry into a shared [`Envelope`], reading
-/// the RFC 5322 headers and mapping the flags io-maildir resolved.
-fn envelope_from_entry(entry: &MaildirFullEntry) -> Envelope {
-    Envelope {
+/// the RFC 5322 headers and mapping the flags io-maildir resolved; `None`
+/// for a file holding no header field.
+fn envelope_from_entry(entry: &MaildirFullEntry) -> Option<Envelope> {
+    Some(Envelope {
         id: entry.id().unwrap_or_default().to_string(),
         flags: entry.flags().iter().map(flag_from_maildir).collect(),
-        ..envelope::from_raw(entry.contents(), true)
-    }
+        ..envelope::from_raw(entry.contents(), true)?
+    })
 }
 
 /// Maps a shared [`Flag`] to a [`MaildirFlag`]; non-IANA keywords go
@@ -496,26 +511,32 @@ fn flag_from_maildir(flag: &MaildirFlag) -> Flag {
     }
 }
 
-/// 1-indexed in-memory pagination; `page_size = None` returns the full
-/// slice; size 0 or a page past the end returns empty.
-/// The item error of each entry a listing could not read, on its first
-/// page only, so a later page does not repeat them.
-fn unreadable_entries(entries: Vec<MaildirUnreadableEntry>, page: Option<u32>) -> Vec<ItemError> {
+/// The item error of each entry a listing could not read, then of each
+/// holding no header field, on its first page only, so a later page does
+/// not repeat them.
+fn entry_errors(
+    unreadable: Vec<MaildirUnreadableEntry>,
+    headerless: Vec<&str>,
+    page: Option<u32>,
+) -> Vec<ItemError> {
     if page.unwrap_or(1) > 1 {
         return Vec::new();
     }
 
-    entries
-        .into_iter()
-        .map(|unreadable| ItemError {
-            id: unreadable.entry.id().map(String::from),
-            code: Some(ErrorCode::MessageUnreadable),
-            error: String::from("Cannot read the message file"),
-            sources: vec![unreadable.error.to_string()],
-        })
+    let unreadable = unreadable.into_iter().map(|unreadable| ItemError {
+        id: unreadable.entry.id().map(String::from),
+        code: Some(ErrorCode::MessageUnreadable),
+        error: String::from("Cannot read the message file"),
+        sources: vec![unreadable.error.to_string()],
+    });
+
+    unreadable
+        .chain(headerless.into_iter().map(headerless_message))
         .collect()
 }
 
+/// 1-indexed in-memory pagination; `page_size = None` returns the full
+/// slice; size 0 or a page past the end returns empty.
 fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<T> {
     let Some(size) = page_size else {
         return items;
@@ -852,10 +873,50 @@ mod tests {
             "/m/cur/1614632942.M1P2.host:2,RS",
             b"Subject: Hi\r\nFrom: a@x.org\r\n\r\nbody",
         );
-        let envelope = envelope_from_entry(&entry);
+        let envelope = envelope_from_entry(&entry).unwrap();
         let raws: Vec<&str> = envelope.flags.iter().map(Flag::raw).collect();
 
         assert_eq!(envelope.subject, "Hi");
         assert_eq!(raws, ["\\Seen", "\\Answered"]);
+    }
+
+    /// A file holding no header field (empty, bytes, a line of text, bytes
+    /// before a colon) is a `message-unreadable` error of the first page,
+    /// out of the rows, as a file that cannot be read is.
+    #[test]
+    fn a_file_holding_no_header_field_is_an_item_error_of_the_first_page() {
+        let (dir, client, _) = fixture();
+        let files: [(&str, &[u8]); 4] = [
+            ("1.empty", b""),
+            ("2.bytes", b"\x00\x01\xff\xfe"),
+            ("3.text", b"no header here\nsecond line\n"),
+            ("4.colon", b"\x01\xfe a: b\n\x7f\n"),
+        ];
+        for (name, contents) in files {
+            fs::write(dir.path().join("A/cur").join(name), contents).unwrap();
+        }
+
+        let listed = client.list_envelopes("A", None, None, false).unwrap();
+        let searched = client.search_envelopes("A", None, None, None, false);
+        let searched = searched.unwrap().map(|page| page.envelopes);
+        let second = client.list_envelopes("A", Some(2), Some(1), false);
+
+        for outcome in [listed, searched] {
+            let subjects: Vec<&str> = outcome.value.iter().map(|e| &*e.subject).collect();
+            assert_eq!(subjects, ["Hi"]);
+
+            let mut ids: Vec<&str> = outcome
+                .errors
+                .iter()
+                .map(|error| error.id.as_deref().unwrap())
+                .collect();
+            ids.sort();
+            assert_eq!(ids, ["1.empty", "2.bytes", "3.text", "4.colon"]);
+            for error in &outcome.errors {
+                assert_eq!(error.code, Some(ErrorCode::MessageUnreadable));
+            }
+        }
+
+        assert!(second.unwrap().errors.is_empty());
     }
 }

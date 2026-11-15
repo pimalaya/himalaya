@@ -42,6 +42,7 @@ impl JmapMailboxGetCommand {
             account: account.name().to_string(),
             page: None,
             mailboxes: output.mailboxes,
+            next_page: None,
         })
     }
 }

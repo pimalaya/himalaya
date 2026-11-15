@@ -95,6 +95,7 @@ impl JmapSubmissionCreateCommand {
             account: account.name().to_string(),
             page: None,
             submissions: output.created.into_values().collect(),
+            next_page: None,
         })
     }
 }

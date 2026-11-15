@@ -44,7 +44,7 @@ use crate::{
         outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, message_not_found, missing_message},
+    error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
     mbox::{
         cache::MboxCache,
         client::{MboxClient, validate_mbox_name},
@@ -66,6 +66,10 @@ const STORE_FIELDS: [&str; 6] = [
 /// The edits a write makes, by entry id, beside the error of each id it
 /// leaves out.
 type UpdatePlan = (BTreeMap<String, MboxEntryUpdateEdit>, Vec<ItemError>);
+
+/// The envelopes a read gave, each with its bytes when asked, beside the
+/// error of each message holding no header field.
+type ReadEnvelopes = (Vec<(Envelope, Option<Vec<u8>>)>, Vec<ItemError>);
 
 impl MboxClient {
     /// Lists the mbox files of the store, the spool as `INBOX`.
@@ -128,31 +132,34 @@ impl MboxClient {
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
         self.list_envelopes_counted(mailbox, page, page_size, with_attachment)
-            .map(|(page, _)| page.envelopes)
+            .map(|(listed, _)| listed.value.envelopes)
     }
 
     /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
-    /// messages the mailbox holds: every one the listing read.
+    /// messages the mailbox holds, every one the listing read. A message
+    /// holding no header field is an item error of the first page.
     pub fn list_envelopes_counted(
         &self,
         mailbox: &str,
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<(EnvelopePage, Option<u64>)> {
+    ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let path = self.open_mbox(mailbox)?;
-        let mut envelopes: Vec<Envelope> = self
-            .envelopes(&path, false)?
-            .into_iter()
-            .map(|(envelope, _)| envelope)
-            .collect();
+        let (read, errors) = self.envelopes(&path, false)?;
+        let mut envelopes: Vec<Envelope> = read.into_iter().map(|(envelope, _)| envelope).collect();
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
-        let total = u64::try_from(envelopes.len()).ok();
+        let total = u64::try_from(envelopes.len() + errors.len()).ok();
 
         let more = page_follows(envelopes.len() as u64, page, page_size);
         let envelopes = paginate(envelopes, page, page_size);
 
-        Ok((EnvelopePage { envelopes, more }, total))
+        let listed = Outcome {
+            value: EnvelopePage { envelopes, more },
+            errors: first_page(errors, page),
+        };
+
+        Ok((listed, total))
     }
 
     /// Searches envelopes in `mailbox`: reads every message, then applies
@@ -164,12 +171,13 @@ impl MboxClient {
         page: Option<u32>,
         page_size: Option<u32>,
         _with_attachment: bool,
-    ) -> Result<EnvelopePage> {
+    ) -> Result<Outcome<EnvelopePage>> {
         let path = self.open_mbox(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
+        let (read, errors) = self.envelopes(&path, filter.is_some())?;
 
         let mut hits: Vec<Envelope> = Vec::new();
-        for (envelope, contents) in self.envelopes(&path, filter.is_some())? {
+        for (envelope, contents) in read {
             let keep = match (filter, contents) {
                 (Some(filter), Some(contents)) => {
                     eval::matches_filter(&envelope, None, &contents, filter)
@@ -186,7 +194,10 @@ impl MboxClient {
         let more = page_follows(hits.len() as u64, page, page_size);
         let envelopes = paginate(hits, page, page_size);
 
-        Ok(EnvelopePage { envelopes, more })
+        Ok(Outcome {
+            value: EnvelopePage { envelopes, more },
+            errors: first_page(errors, page),
+        })
     }
 
     /// Adds, sets or removes `flags` on the messages of `mailbox` among
@@ -667,7 +678,8 @@ impl MboxClient {
     }
 
     /// The envelope of every message of `path`, pseudo message aside, in
-    /// file order, with its bytes when `contents` is set.
+    /// file order, with its bytes when `contents` is set, beside the error
+    /// of each message holding no header field.
     ///
     /// Envelopes come from the cache when it has them, the flags always
     /// from the fresh index. A message the cache lacks is read and parsed
@@ -675,11 +687,7 @@ impl MboxClient {
     ///
     /// A read finding the index stale, another client having rewritten the
     /// file meanwhile, rebuilds it and starts over once.
-    fn envelopes(
-        &self,
-        path: &MboxFsPath,
-        contents: bool,
-    ) -> Result<Vec<(Envelope, Option<Vec<u8>>)>> {
+    fn envelopes(&self, path: &MboxFsPath, contents: bool) -> Result<ReadEnvelopes> {
         match self.envelopes_once(path, contents, false) {
             Err(err) if err.downcast_ref().is_some_and(is_stale) => {
                 self.envelopes_once(path, contents, true)
@@ -695,9 +703,10 @@ impl MboxClient {
         path: &MboxFsPath,
         contents: bool,
         rebuild: bool,
-    ) -> Result<Vec<(Envelope, Option<Vec<u8>>)>> {
+    ) -> Result<ReadEnvelopes> {
         let (index, mut cache) = self.index(path, rebuild)?;
         let mut envelopes = Vec::new();
+        let mut errors = Vec::new();
         let mut parsed = false;
 
         for entry in index.messages() {
@@ -707,7 +716,7 @@ impl MboxClient {
                 _ => Some(self.read(path, entry)?),
             };
 
-            let mut envelope = match cached {
+            let envelope = match cached {
                 Some(envelope) => envelope,
                 None => {
                     let envelope = envelope_from(bytes.as_deref().unwrap_or_default());
@@ -715,6 +724,11 @@ impl MboxClient {
                     parsed = true;
                     envelope
                 }
+            };
+
+            let Some(mut envelope) = envelope else {
+                errors.push(headerless_message(&entry.id));
+                continue;
             };
 
             envelope.id = entry.id.clone();
@@ -727,7 +741,7 @@ impl MboxClient {
             cache.save(self.cache_dir.as_deref(), path);
         }
 
-        Ok(envelopes)
+        Ok((envelopes, errors))
     }
 }
 
@@ -832,8 +846,9 @@ fn strip_store_fields(contents: &[u8], content_length: bool) -> Vec<u8> {
 }
 
 /// Parses a message into a shared [`Envelope`], its id and flags left
-/// empty for the caller to fill from the index.
-fn envelope_from(contents: &[u8]) -> Envelope {
+/// empty for the caller to fill from the index; `None` for one holding no
+/// header field.
+fn envelope_from(contents: &[u8]) -> Option<Envelope> {
     envelope::from_raw(contents, true)
 }
 
@@ -879,6 +894,15 @@ fn flag_from_mbox(flag: &MboxFlag) -> Option<Flag> {
         MboxFlag::Old => return None,
     };
     Some(flag)
+}
+
+/// `errors` on a listing's first page only, so a later page does not
+/// repeat them.
+fn first_page(errors: Vec<ItemError>, page: Option<u32>) -> Vec<ItemError> {
+    match page.unwrap_or(1) > 1 {
+        true => Vec::new(),
+        false => errors,
+    }
 }
 
 /// 1-indexed in-memory pagination; `page_size = None` returns the full
@@ -1134,7 +1158,8 @@ mod tests {
     fn envelopes_come_from_the_headers() {
         let envelope = envelope_from(
             b"Subject: Hi\r\nFrom: A <a@x.org>\r\nMessage-ID: <1@x>\r\nIn-Reply-To: <0@x>\r\n\r\nbody",
-        );
+        )
+        .unwrap();
 
         assert_eq!(envelope.subject, "Hi");
         assert_eq!(envelope.from[0].email, "a@x.org");
@@ -1186,7 +1211,7 @@ mod tests {
 
         let query = "body body".parse::<SearchEmailsQuery>().unwrap();
         let hits = client.search_envelopes("A", Some(&query), None, None, false);
-        assert_eq!(hits.unwrap().envelopes.len(), 2);
+        assert_eq!(hits.unwrap().value.envelopes.len(), 2);
     }
 
     #[test]

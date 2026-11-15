@@ -283,6 +283,18 @@ pub fn missing_message(id: &str) -> ItemError {
     }
 }
 
+/// The item error of the message `id` a listing read but holding no
+/// header field, so no envelope to list.
+#[cfg(any(feature = "maildir", feature = "mbox"))]
+pub fn headerless_message(id: &str) -> ItemError {
+    ItemError {
+        id: Some(id.to_owned()),
+        code: Some(ErrorCode::MessageUnreadable),
+        error: String::from("Cannot parse the message: it holds no header field"),
+        sources: Vec::new(),
+    }
+}
+
 /// Ends a command that printed its result: exit 3 when an item failed.
 #[cfg(any(backend, feature = "smtp"))]
 pub fn partial_when(errors: &[ItemError]) -> anyhow::Result<()> {

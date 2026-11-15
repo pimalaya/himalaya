@@ -5,10 +5,11 @@
 
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
 use pimalaya_cli::{
+    clap::args::PageTokenArg,
     listing::{Listing, ListingPage},
     printer::Printer,
     sanitize,
@@ -19,6 +20,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
+    error::{ItemError, partial_when},
     pimdir::{
         client::PimdirClient,
         index::{
@@ -44,6 +46,10 @@ use crate::{
 /// `Incomplete:` line above the list says what the answer could not see:
 /// messages whose body is not local, mail outside what the store holds,
 /// the index lagging the store.
+///
+/// A page ends with the number of the next one, which `--page-token`
+/// takes; the last page has none. A message the store cannot read is an
+/// item error, the others listed.
 #[derive(Debug, Parser)]
 pub struct PimdirSearchCommand {
     /// Page number, starting at 1.
@@ -57,6 +63,8 @@ pub struct PimdirSearchCommand {
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<usize>,
+    #[command(flatten)]
+    pub page_token: PageTokenArg,
     /// The order of the messages.
     #[arg(long, value_enum, default_value_t)]
     pub sort: PimdirSearchSortArg,
@@ -83,6 +91,14 @@ impl PimdirSearchCommand {
     ) -> Result<()> {
         let words = self.query.join(" ");
         let query = parse_query(&self.query, printer.is_json())?;
+        let page = match &self.page_token.token {
+            Some(token) => token
+                .parse()
+                .ok()
+                .filter(|page: &usize| *page > 0)
+                .with_context(|| format!("Invalid page token {token}"))?,
+            None => self.page,
+        };
         let limit = self
             .page_size
             .unwrap_or(account.envelopes_list_page_size() as usize)
@@ -90,34 +106,42 @@ impl PimdirSearchCommand {
         let options = PimdirSearchOptions {
             sort: self.sort.into(),
             limit,
-            offset: self.page.saturating_sub(1).saturating_mul(limit),
+            offset: page.saturating_sub(1).saturating_mul(limit),
             clock: local_clock(),
         };
         let place = PimdirSearchPlace {
             account: account.name().to_string(),
             query: words,
-            page: self.page.max(1) as u64,
+            page: page.max(1) as u64,
             size: limit as u64,
         };
 
         if self.threads {
             let page = client.search_mail_threads(query, &options)?;
-            return printer.out(PimdirSearchThreadsOutput {
+            let output = PimdirSearchThreadsOutput {
+                next_page: place.next(page.more),
                 place,
                 threads: page.threads,
-                more: page.more,
                 coverage: page.coverage,
-            });
+                errors: page.errors,
+            };
+
+            printer.out(&output)?;
+            return partial_when(&output.errors);
         }
 
         let page = client.search_mail(query, &options)?;
-        printer.out(PimdirSearchOutput {
+        let output = PimdirSearchOutput {
+            next_page: place.next(page.more),
             place,
             style: PimdirListStyle::new(account),
             hits: page.hits,
-            more: page.more,
             coverage: page.coverage,
-        })
+            errors: page.errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -155,10 +179,14 @@ pub struct PimdirSearchOutput {
     pub style: PimdirListStyle,
     /// The messages of this page.
     pub hits: Vec<PimdirMailHit>,
-    /// Whether messages follow this page.
-    pub more: bool,
+    /// The number of the next page, `null` once the answer is complete,
+    /// given back through `--page-token`.
+    pub next_page: Option<String>,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
+    /// The error of each message the store could not read, in the order
+    /// met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for PimdirSearchOutput {
@@ -187,9 +215,13 @@ impl fmt::Display for PimdirSearchOutput {
         }
 
         let nouns = ["message", "messages"];
-        self.place
-            .end(&mut listing, self.hits.len(), nouns, self.more);
+        let next = self.next_page.as_deref();
+        self.place.end(&mut listing, self.hits.len(), nouns, next);
         self.coverage.note(&mut listing);
+
+        for error in &self.errors {
+            listing.errors.push(error);
+        }
 
         write!(f, "{listing}")
     }
@@ -204,10 +236,14 @@ pub struct PimdirSearchThreadsOutput {
     pub place: PimdirSearchPlace,
     /// The threads of this page, in the order of their first message.
     pub threads: Vec<PimdirMailThread>,
-    /// Whether threads follow this page.
-    pub more: bool,
+    /// The number of the next page, `null` once the answer is complete,
+    /// given back through `--page-token`.
+    pub next_page: Option<String>,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
+    /// The error of each message the store could not read, in the order
+    /// met.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for PimdirSearchThreadsOutput {
@@ -244,9 +280,14 @@ impl fmt::Display for PimdirSearchThreadsOutput {
         }
 
         let nouns = ["thread", "threads"];
+        let next = self.next_page.as_deref();
         self.place
-            .end(&mut listing, self.threads.len(), nouns, self.more);
+            .end(&mut listing, self.threads.len(), nouns, next);
         self.coverage.note(&mut listing);
+
+        for error in &self.errors {
+            listing.errors.push(error);
+        }
 
         write!(f, "{listing}")
     }
@@ -274,16 +315,20 @@ impl PimdirSearchPlace {
         listing
     }
 
+    /// The number of the page after this one, while `more` follow.
+    fn next(&self, more: bool) -> Option<String> {
+        more.then(|| (self.page + 1).to_string())
+    }
+
     /// Adds to `listing` the page the `count` items fill, then the flag
-    /// reaching the next while `more` follow.
-    fn end(&self, listing: &mut Listing, count: usize, nouns: [&str; 2], more: bool) {
+    /// reaching the `next` one.
+    fn end(&self, listing: &mut Listing, count: usize, nouns: [&str; 2], next: Option<&str>) {
         let page = ListingPage::Numbered {
             page: self.page,
             size: self.size,
         };
 
-        let next = more.then(|| (self.page + 1).to_string());
-        listing.page(page, count, nouns, next.as_deref());
+        listing.page(page, count, nouns, next);
     }
 }
 
@@ -291,17 +336,15 @@ impl PimdirSearchPlace {
 mod tests {
     use crate::{
         email::{address::Address, envelope::Envelope},
+        error::{ErrorCode, ItemError},
         pimdir::{
             index::{PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched},
             search::{PimdirSearchOutput, PimdirSearchPlace},
         },
     };
 
-    /// A hit prints on one line, its mailboxes and what matched before the
-    /// sender, under the account, the query, the page and what the answer
-    /// could not see, `Incomplete:` widening the label column.
-    #[test]
-    fn a_hit_prints_on_one_line() {
+    /// One hit, on the last page of an incomplete answer.
+    fn output() -> PimdirSearchOutput {
         let envelope = Envelope {
             id: String::from("7"),
             message_id: None,
@@ -317,7 +360,7 @@ mod tests {
             size: 0,
             has_attachment: Some(true),
         };
-        let output = PimdirSearchOutput {
+        PimdirSearchOutput {
             place: PimdirSearchPlace {
                 account: String::from("work"),
                 query: String::from("report"),
@@ -334,14 +377,21 @@ mod tests {
                 matched: Some(PimdirMailMatched::Body),
                 snippet: Some(String::from("the  figures\nare in")),
             }],
-            more: false,
+            next_page: None,
             coverage: PimdirMailCoverage {
                 bodiless: 1,
                 reads: true,
                 ..Default::default()
             },
-        };
+            errors: Vec::new(),
+        }
+    }
 
+    /// A hit prints on one line, its mailboxes and what matched before the
+    /// sender, under the account, the query, the page and what the answer
+    /// could not see, `Incomplete:` widening the label column.
+    #[test]
+    fn a_hit_prints_on_one_line() {
         let expected = "\
 Account:     work (pimdir)
 Query:       report
@@ -349,6 +399,42 @@ Page:        1, message 1, the last
 Incomplete:  1 message(s) have no local body and matched on their headers alone
 
 7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
+";
+        assert_eq!(output().to_string(), expected);
+    }
+
+    /// A page pages as every listing does: `nextPage`, which `--page-token`
+    /// takes, `--page` in text, and no `more`; a message the store could not
+    /// read is an `errors` entry, printed after the items.
+    #[test]
+    fn a_page_names_the_next_and_its_errors() {
+        let mut output = output();
+        output.next_page = output.place.next(true);
+        output.errors = vec![ItemError {
+            id: Some(String::from("9")),
+            code: Some(ErrorCode::MessageUnreadable),
+            error: String::from("Read message `9`"),
+            sources: vec![String::from("Invalid column type")],
+        }];
+
+        let json = serde_json::to_value(&output).unwrap();
+        let mut keys: Vec<&str> = json.as_object().unwrap().keys().map(|k| &**k).collect();
+        keys.sort();
+        assert_eq!(keys, ["coverage", "errors", "hits", "nextPage"]);
+        assert_eq!(json["nextPage"], "2");
+        assert_eq!(json["errors"][0]["id"], "9");
+        assert_eq!(json["errors"][0]["code"], "message-unreadable");
+
+        let expected = "\
+Account:     work (pimdir)
+Query:       report
+Page:        1, message 1
+Next page:   --page 2
+Incomplete:  1 message(s) have no local body and matched on their headers alone
+
+7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
+
+Error:  9  message-unreadable  Read message `9`
 ";
         assert_eq!(output.to_string(), expected);
     }

@@ -9,21 +9,20 @@
 use std::{
     fs,
     path::Path,
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-/// Runs `--json <args>` against the configuration `lines` written in
-/// `dir`, returning whether it succeeded and the JSON printed.
-fn himalaya(dir: &Path, lines: &str, args: &[&str]) -> (bool, Value) {
+/// Runs `<args>` against the configuration `lines` written in `dir`.
+fn run(dir: &Path, lines: &str, args: &[&str]) -> Output {
     let config = dir.join("config.toml");
     let account = format!("[accounts.a]\ndefault = true\nemail = \"a@example.org\"\n{lines}\n");
     fs::write(&config, account).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
-        .args(["-c", config.to_str().unwrap(), "--json"])
+    Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .args(["-c", config.to_str().unwrap()])
         .args(args)
         .env("HOME", dir)
         .env("XDG_CONFIG_HOME", dir)
@@ -31,7 +30,13 @@ fn himalaya(dir: &Path, lines: &str, args: &[&str]) -> (bool, Value) {
         .env_remove("XDG_CONFIG_DIRS")
         .stdin(Stdio::null())
         .output()
-        .unwrap();
+        .unwrap()
+}
+
+/// Runs `--json <args>` against the configuration `lines` written in
+/// `dir`, returning whether it succeeded and the JSON printed.
+fn himalaya(dir: &Path, lines: &str, args: &[&str]) -> (bool, Value) {
+    let output = run(dir, lines, &[&["--json"], args].concat());
 
     let json = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
         panic!(
@@ -349,6 +354,54 @@ fn a_page_reaching_the_last_message_names_no_next_page() {
     assert!(output.status.success(), "{text}");
     assert!(text.contains("1, envelopes 1 to 2, the last"), "{text}");
     assert!(!text.contains("Next page:"), "{text}");
+}
+
+/// A Maildir file or an mbox message holding no header field is a
+/// `message-unreadable` entry of `errors`, never a row, and the listing
+/// exits 3, its readable messages listed.
+#[test]
+fn a_message_holding_no_header_field_is_an_item_error() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir.join("A"));
+    fs::write(maildir.join("A/cur/one:2,S"), "Subject: one\n\nbody\n").unwrap();
+    fs::write(maildir.join("A/cur/empty:2,"), "").unwrap();
+    fs::write(maildir.join("A/cur/text:2,"), "no header\nhere\n").unwrap();
+
+    let mbox = dir.path().join("mbox");
+    fs::create_dir_all(&mbox).unwrap();
+    let text = "From a@b Tue Jan  2 00:00:00 2024\nno header\nhere\n";
+    fs::write(mbox.join("A"), format!("{MESSAGE}\n{text}")).unwrap();
+
+    let stores = [(maildir_lines(&maildir, ""), 2), (mbox_lines(&mbox, ""), 1)];
+    for (lines, headerless) in stores {
+        for verb in ["list", "search"] {
+            let output = run(dir.path(), &lines, &["--json", "envelope", verb, "-m", "A"]);
+            let out: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(output.status.code(), Some(3), "{verb} {lines}: {out}");
+
+            let subjects: Vec<&str> = out["envelopes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|envelope| envelope["subject"].as_str().unwrap())
+                .collect();
+            assert_eq!(subjects, ["one"], "{verb} {lines}: {out}");
+
+            let errors = out["errors"].as_array().unwrap();
+            assert_eq!(errors.len(), headerless, "{verb} {lines}: {out}");
+            for error in errors {
+                assert_eq!(error["code"], "message-unreadable", "{out}");
+                assert!(error["id"].is_string(), "{out}");
+            }
+        }
+
+        let output = run(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
+        let text = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(output.status.code(), Some(3), "{text}");
+        assert!(text.contains("message-unreadable"), "{text}");
+        assert!(text.contains("1, envelope 1, the last"), "{text}");
+    }
 }
 
 /// A read carries the id it was given and an `etag`, `null` on a local
