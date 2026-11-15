@@ -34,3 +34,13 @@ cargo test --no-default-features --features sieve,rustls-ring
 ## Dependencies
 
 Cargo.toml patches the Pimalaya crates still ahead of their crates.io release to git. To build against a local checkout, swap the matching `.git` entry for `.path = "../<repo>"`. If cargo reports two versions of a crate, patch every Pimalaya crate that pulls it transitively so the graph converges on the local copies.
+
+## Continuous integration
+
+Every push runs the offline jobs of .github/workflows/tests.yml: the tests, and clippy over every feature set a packager may pick (the `features` job). The live suites (tests/google.rs, tests/microsoft.rs, tests/fastmail.rs, the `live` job), which reach the real providers and spend their quotas, run weekly on Mondays at 01:00 UTC and by hand, never on a push:
+
+```sh
+gh workflow run tests.yml
+```
+
+A release runs them by hand on the commit it tags, and tags it once they pass.

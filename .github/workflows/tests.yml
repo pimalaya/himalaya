@@ -2,6 +2,11 @@ name: Tests
 
 on:
   push:
+  workflow_dispatch:
+  # The suites against real accounts run weekly and by hand, never on push:
+  # a push storm burns the provider quotas and collides with live testing.
+  schedule:
+    - cron: "0 1 * * 1"
 
 jobs:
   tests:
@@ -10,6 +15,7 @@ jobs:
   live:
     # The binary against the real providers, whose APIs drift without
     # notice. RUST_LOG stays at debug: trace logs carry secrets and tokens.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     strategy:
       fail-fast: false
       matrix:
