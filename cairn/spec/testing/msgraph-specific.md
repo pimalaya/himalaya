@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Microsoft Graph *specific* API on Outlook: test report
 
 Companion to [msgraph.md](msgraph.md) (unified commands). Exercises

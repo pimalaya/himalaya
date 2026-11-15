@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # compose / reply / forward: test report
 
 Unlike the per-provider reports, the built-in `compose`, `reply` and

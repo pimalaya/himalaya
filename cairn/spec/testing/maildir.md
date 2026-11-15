@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Maildir (local): unified-command test report
 
 Unified commands on the Maildir backend. Companion:

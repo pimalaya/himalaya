@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Maildir *specific* API: test report
 
 Companion to [maildir.md](maildir.md) (unified commands). Exercises

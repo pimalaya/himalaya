@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # JMAP *specific* API on Fastmail: test report
 
 Companion to [jmap-fastmail.md](jmap-fastmail.md) (unified commands). This

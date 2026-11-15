@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # IMAP on iCloud: test report
 
 Unified commands (and IMAP-specific spot-checks) on the

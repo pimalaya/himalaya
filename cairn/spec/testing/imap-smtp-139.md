@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # IMAP + SMTP on 139 Mail: test report
 
 Unified commands on the IMAP/SMTP backend against **139 Mail**

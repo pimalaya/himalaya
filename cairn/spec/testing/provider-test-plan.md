@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Manually testing a provider
 
 A followable checklist to deeply exercise every **unified** command

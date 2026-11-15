@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # IMAP + SMTP on QQ Mail: test report
 
 Unified commands on the IMAP/SMTP backend against **QQ Mail**

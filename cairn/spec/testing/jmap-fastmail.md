@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # JMAP on Fastmail: unified-command test report
 
 Unified commands on the JMAP backend. Companion:

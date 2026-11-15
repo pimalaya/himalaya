@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Gmail *specific* API on Google: test report
 
 Companion to [gmail.md](gmail.md) (unified commands). Exercises

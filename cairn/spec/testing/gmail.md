@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Gmail REST on Google: unified-command test report
 
 Unified commands on the Gmail REST backend. Companion:

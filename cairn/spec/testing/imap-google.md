@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Gmail over IMAP on Google: test report
 
 Unified commands (and IMAP-specific spot-checks) on the

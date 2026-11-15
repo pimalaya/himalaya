@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # IMAP + SMTP on Fastmail: unified-command test report
 
 - himalaya: `v2.0.0-alpha.1 +imap +smtp +rustls-ring` (rev `1dddbe8`,

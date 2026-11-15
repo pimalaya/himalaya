@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # IMAP + SMTP *specific* API on Fastmail: test report
 
 Companion to [imap-smtp-fastmail.md](imap-smtp-fastmail.md) (which covers

@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Microsoft Graph on Outlook: unified-command test report
 
 Unified commands on the Microsoft Graph backend.
