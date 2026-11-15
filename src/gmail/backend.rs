@@ -499,8 +499,8 @@ impl GmailClient {
 
         Ok(Vacation {
             enabled: settings.enable_auto_reply,
-            from: settings.start_time.map(date_from_millis),
-            to: settings.end_time.map(date_from_millis),
+            start: settings.start_time.map(date_from_millis),
+            end: settings.end_time.map(date_from_millis),
             subject: settings.response_subject,
             text: settings.response_body_plain_text,
             html: settings.response_body_html,
@@ -858,7 +858,7 @@ fn envelope_from(message: GmailMessage) -> Envelope {
     let flags = flags_from_labels(&message.label_ids);
     let size = message.size_estimate;
 
-    let mut subject = String::new();
+    let mut subject = None;
     let mut from = Vec::new();
     let mut to = Vec::new();
     let mut date = None;
@@ -866,7 +866,7 @@ fn envelope_from(message: GmailMessage) -> Envelope {
     let mut in_reply_to = Vec::new();
 
     if let Some(payload) = &message.payload {
-        subject = payload.header("Subject").unwrap_or_default().to_string();
+        subject = payload.header("Subject").map(String::from);
         from = parse_addresses(payload.header("From").unwrap_or_default());
         to = parse_addresses(payload.header("To").unwrap_or_default());
         date = payload.header("Date").and_then(parse_rfc2822_date);

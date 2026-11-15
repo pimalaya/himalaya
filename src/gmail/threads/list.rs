@@ -6,10 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::threads::{
-    GmailThreadSummary,
-    list::{GmailThreadsList, GmailThreadsListParams},
-};
+use io_gmail::v1::rest::threads::list::GmailThreadsListParams;
 use pimalaya_cli::{
     listing::{Listing, ListingPage},
     printer::Printer,
@@ -17,15 +14,23 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
     backend::Backend,
-    gmail::{client::GmailClient, format::snippet_text},
+    gmail::{
+        client::GmailClient,
+        format::{snippet_text, str_of},
+    },
 };
 
 /// List Gmail threads matching the given query and labels
 /// (users.threads.list).
+///
+/// JSON output: Gmail's page as Gmail sent it, `{"threads": [{"id",
+/// "snippet", "historyId"}...], "resultSizeEstimate", "nextPage"}`,
+/// `nextPage` Gmail's `nextPageToken`, `null` on the last page.
 #[derive(Debug, Parser)]
 pub struct GmailThreadsListCommand {
     /// Gmail search query, using the same syntax as the Gmail search
@@ -56,25 +61,22 @@ impl GmailThreadsListCommand {
         account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
-        let out = {
-            let params = GmailThreadsListParams {
-                q: self.query.as_deref(),
-                label_ids: &self.labels,
-                max_results: self.max_results,
-                page_token: self.page_token.as_deref(),
-                include_spam_trash: self.include_spam_trash,
-            };
-            let c = GmailThreadsList::new(&client.auth, &client.user_id, &params)?;
-            client.run(c)?
+        let params = GmailThreadsListParams {
+            q: self.query.as_deref(),
+            label_ids: &self.labels,
+            max_results: self.max_results,
+            page_token: self.page_token.as_deref(),
+            include_spam_trash: self.include_spam_trash,
         };
-        let response = out.response;
+        let page = client.raw_list("threads", &params)?;
 
         printer.out(GmailThreadListOutput {
             account: account.name().to_string(),
             query: self.query,
             labels: self.labels,
-            threads: response.threads,
-            next_page: response.next_page_token,
+            threads: page.items,
+            rest: page.rest,
+            next_page: page.next_page,
         })
     }
 }
@@ -92,8 +94,14 @@ pub struct GmailThreadListOutput {
     /// The label ids every thread carries.
     #[serde(skip)]
     pub labels: Vec<String>,
-    /// The threads of this page.
-    pub threads: Vec<GmailThreadSummary>,
+    /// The threads of this page, each as Gmail sent it, `{id, snippet,
+    /// historyId}`.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub threads: Vec<Value>,
+    /// The rest of the page as Gmail sent it, such as
+    /// `resultSizeEstimate`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     pub next_page: Option<String>,
@@ -113,9 +121,9 @@ impl fmt::Display for GmailThreadListOutput {
 
         for thread in &self.threads {
             listing.items.push([
-                sanitize::text(&thread.id),
-                sanitize::text(thread.history_id.as_deref().unwrap_or_default()),
-                sanitize::text(&snippet_text(thread.snippet.as_deref().unwrap_or_default()))
+                sanitize::text(str_of(thread, "id")),
+                sanitize::text(str_of(thread, "historyId")),
+                sanitize::text(&snippet_text(str_of(thread, "snippet")))
                     .into_owned()
                     .into(),
             ]);

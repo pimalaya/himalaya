@@ -31,7 +31,10 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     capability::Capability,
-    email::flag::{Flag, IanaFlag},
+    email::{
+        address::Address,
+        flag::{Flag, IanaFlag},
+    },
     shared::{
         attachment::list::attachments,
         client::{EmailClient, SentCopy},
@@ -218,10 +221,15 @@ impl fmt::Display for MessageRouteOutput {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageTemplateOutput {
-    pub from: Option<String>,
-    pub to: Vec<String>,
-    pub cc: Vec<String>,
-    pub bcc: Vec<String>,
+    /// The first `From:` mailbox, `null` without one.
+    pub from: Option<Address>,
+    /// The `To:` mailboxes, groups flattened.
+    pub to: Vec<Address>,
+    /// The `Cc:` mailboxes.
+    pub cc: Vec<Address>,
+    /// The `Bcc:` mailboxes.
+    pub bcc: Vec<Address>,
+    /// The decoded `Subject:`, `null` without one.
     pub subject: Option<String>,
     /// The text body, its line breaks LF, as an editor shows them.
     pub body: String,
@@ -249,7 +257,7 @@ impl MessageTemplateOutput {
         let message = MimeCst::parse(raw);
         let root = &message.root;
 
-        let mailboxes = |address: Option<MimeAddressList>| -> Vec<String> {
+        let mailboxes = |address: Option<MimeAddressList>| -> Vec<Address> {
             address
                 .map(|address| address.mailboxes().map(mailbox).collect())
                 .unwrap_or_default()
@@ -281,11 +289,20 @@ impl MessageTemplateOutput {
     }
 }
 
+/// One mailbox of a decoded address list, its display name `None` when
+/// empty.
+fn mailbox(addr: &MimeMailbox) -> Address {
+    Address {
+        name: addr.name.clone().filter(|name| !name.is_empty()),
+        email: addr.address.clone().unwrap_or_default(),
+    }
+}
+
 /// Formats one mailbox as the composer flags parse it back, quoting a
 /// display name that holds an RFC 5322 special such as a comma.
-fn mailbox(addr: &MimeMailbox) -> String {
-    let email = addr.address.as_deref().unwrap_or_default();
-    let Some(name) = addr.name.as_deref().filter(|name| !name.is_empty()) else {
+fn template_mailbox(addr: &Address) -> String {
+    let email = addr.email.as_str();
+    let Some(name) = addr.name.as_deref() else {
         return email.to_owned();
     };
 
@@ -300,10 +317,11 @@ fn mailbox(addr: &MimeMailbox) -> String {
 impl fmt::Display for MessageTemplateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(from) = &self.from {
-            writeln!(f, "From: {from}")?;
+            writeln!(f, "From: {}", template_mailbox(from))?;
         }
         for (name, list) in [("To", &self.to), ("Cc", &self.cc), ("Bcc", &self.bcc)] {
             if !list.is_empty() {
+                let list: Vec<_> = list.iter().map(template_mailbox).collect();
                 writeln!(f, "{name}: {}", list.join(", "))?;
             }
         }
@@ -333,19 +351,42 @@ mod tests {
 
         let template = MessageTemplateOutput::parse(raw.as_bytes()).unwrap();
 
-        assert_eq!(template.from.as_deref(), Some("Clément <c@example.org>"));
+        let json = serde_json::to_value(&template).unwrap();
         assert_eq!(
-            template.to,
-            [
-                "a@example.org",
-                "Bob <b@example.org>",
-                "\"Doe, J.\" <j@example.org>",
-            ]
+            json["from"],
+            serde_json::json!({"name": "Clément", "email": "c@example.org"})
         );
-        assert!(template.cc.is_empty());
-        assert_eq!(template.subject.as_deref(), Some("Réunion"));
+        assert_eq!(
+            json["to"],
+            serde_json::json!([
+                {"name": null, "email": "a@example.org"},
+                {"name": "Bob", "email": "b@example.org"},
+                {"name": "Doe, J.", "email": "j@example.org"},
+            ])
+        );
+        assert_eq!(json["cc"], serde_json::json!([]));
+        assert_eq!(json["subject"], "Réunion");
         assert_eq!(template.body, "à demain\n");
         assert!(template.attachments.is_empty());
+
+        let text = template.to_string();
+        assert!(
+            text.starts_with("From: Clément <c@example.org>\n"),
+            "{text}"
+        );
+        let to = "To: a@example.org, Bob <b@example.org>, \"Doe, J.\" <j@example.org>\n";
+        assert!(text.contains(to), "{text}");
+    }
+
+    /// A template without a sender prints `from` as `null`.
+    #[test]
+    fn a_template_without_a_sender_prints_null() {
+        let raw = "To: a@example.org\r\n\r\nhi\r\n";
+        let template = MessageTemplateOutput::parse(raw.as_bytes()).unwrap();
+
+        let json = serde_json::to_value(&template).unwrap();
+        assert_eq!(json["from"], serde_json::Value::Null);
+        assert_eq!(json["subject"], serde_json::Value::Null);
     }
 
     #[test]

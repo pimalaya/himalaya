@@ -4,13 +4,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::mailbox::get::JmapMailboxGetOptions;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
     error::{ErrorCode, partial_when},
-    jmap::{backend::get_errors, client::JmapClient, mailbox::query::JmapMailboxQueryOutput},
+    jmap::{
+        backend::not_found_errors, client::JmapClient, mailbox::query::JmapMailboxQueryOutput, raw,
+    },
 };
 
 /// Get JMAP mailboxes by ID (Mailbox/get).
@@ -33,22 +34,15 @@ impl JmapMailboxGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.mailbox_get(JmapMailboxGetOptions {
-            ids: Some(self.ids.clone()),
-            properties: None,
-        })?;
+        let output = raw::get(client, "Mailbox", &self.ids)?;
 
         let mailboxes = JmapMailboxQueryOutput {
             account: account.name().to_string(),
             page: None,
-            mailboxes: output.mailboxes,
+            mailboxes: output.list,
+            rest: output.rest,
             next_page: None,
-            errors: get_errors(
-                output.not_found,
-                output.unparsed,
-                ErrorCode::MailboxNotFound,
-                ErrorCode::MailboxUnreadable,
-            ),
+            errors: not_found_errors(output.not_found, ErrorCode::MailboxNotFound),
         };
 
         printer.out(&mailboxes)?;

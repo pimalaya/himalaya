@@ -62,12 +62,7 @@ impl MessageAddCommand {
         let Outcome::Saved { id, sent } = outcome else {
             unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
         };
-        printer.out(MessageAddOutput {
-            id,
-            saved: true,
-            sent,
-            queued,
-        })
+        printer.out(MessageAddOutput { id, sent, queued })
     }
 }
 
@@ -75,9 +70,9 @@ impl MessageAddCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MessageAddOutput {
+    /// The id of the message added, `null` when the backend gives none.
     id: Option<String>,
-    /// Always true, the receipt sharing the shape of `message send`.
-    saved: bool,
+    /// Whether the message was sent too (`--send`).
     sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
@@ -109,7 +104,6 @@ mod tests {
     fn a_queued_add_says_it_is_queued() {
         let output = |queued| MessageAddOutput {
             id: Some("d1@x.org".into()),
-            saved: true,
             sent: true,
             queued,
         };
@@ -124,7 +118,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output(true)).unwrap(),
-            r#"{"id":"d1@x.org","saved":true,"sent":true,"queued":true}"#
+            r#"{"id":"d1@x.org","sent":true,"queued":true}"#
         );
     }
 }

@@ -257,7 +257,7 @@ fn names(page: &Value) -> Vec<&str> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|file| file["name"].as_str().unwrap())
+        .map(|file| file["filename"].as_str().unwrap())
         .collect()
 }
 
@@ -279,25 +279,24 @@ fn every_file_lists_newest_message_first_with_its_message() {
 
     let first = &page["attachments"][0];
     let id = first["id"].as_str().unwrap();
-    let message_id = first["messageId"].as_str().unwrap();
+    let message_id = first["message"].as_str().unwrap();
     assert!(id.parse::<i64>().unwrap() > 0, "{id}");
     assert_eq!(
         *first,
         json!({
             "id": id,
-            "name": "Facture-Octobre.pdf",
-            "mediaType": "application/pdf",
+            "filename": "Facture-Octobre.pdf",
+            "mime": "application/pdf",
             "size": 9,
             "part": "5",
             "section": "2",
-            "messageId": message_id,
+            "message": message_id,
             "mailbox": "imap/INBOX",
-            "sender": "billing@shop.test",
-            "senderName": "Shop",
+            "from": {"name": "Shop", "email": "billing@shop.test"},
             "date": "2026-10-05T09:00:00Z",
         })
     );
-    assert_eq!(page["attachments"][1]["senderName"], "\u{c9}lise Martin");
+    assert_eq!(page["attachments"][1]["from"]["name"], "\u{c9}lise Martin");
     assert_eq!(page["attachments"][1]["section"], "3");
     assert_eq!(page["attachments"][1]["part"], "6");
     assert_eq!(page["attachments"][2]["section"], "2");
@@ -320,9 +319,12 @@ fn a_file_s_message_is_the_one_envelope_list_shows() {
             .as_array()
             .unwrap()
             .iter()
-            .find(|envelope| envelope["id"] == file["messageId"])
+            .find(|envelope| envelope["id"] == file["message"])
             .unwrap_or_else(|| panic!("{file} not in {envelopes}"));
-        assert_eq!(envelope["from"][0]["email"], file["sender"], "{envelope}");
+        assert_eq!(
+            envelope["from"][0]["email"], file["from"]["email"],
+            "{envelope}"
+        );
     }
 }
 
@@ -331,7 +333,7 @@ fn a_file_s_bytes_are_its_message_s_section() {
     let himalaya = Himalaya::new(store);
     let page = himalaya.json(&["pimdir", "attachment", "list"]);
     let file = &page["attachments"][1];
-    assert_eq!(file["name"], "dune.png");
+    assert_eq!(file["filename"], "dune.png");
 
     let raw = ok(himalaya.run(&[
         "message",
@@ -339,7 +341,7 @@ fn a_file_s_bytes_are_its_message_s_section() {
         "--raw",
         "-m",
         file["mailbox"].as_str().unwrap(),
-        file["messageId"].as_str().unwrap(),
+        file["message"].as_str().unwrap(),
     ]));
 
     let mut parse = himalaya
@@ -373,7 +375,7 @@ fn a_file_s_part_is_the_one_attachment_download_takes() {
 
     for file in page["attachments"].as_array().unwrap() {
         let mailbox = file["mailbox"].as_str().unwrap();
-        let message_id = file["messageId"].as_str().unwrap();
+        let message_id = file["message"].as_str().unwrap();
         let part = file["part"].as_str().unwrap();
         assert_ne!(Some(part), file["section"].as_str(), "{file}");
 
@@ -386,12 +388,12 @@ fn a_file_s_part_is_the_one_attachment_download_takes() {
             message_id,
             part,
         ]);
-        assert_eq!(downloaded["filename"], file["name"], "{file}");
+        assert_eq!(downloaded["filename"], file["filename"], "{file}");
         assert_eq!(downloaded["size"], file["size"], "{file}");
     }
 
     let newest = &page["attachments"][0];
-    let message_id = newest["messageId"].as_str().unwrap();
+    let message_id = newest["message"].as_str().unwrap();
     let listed = himalaya.json(&["attachment", "list", "-m", "imap/INBOX", message_id]);
     assert_eq!(listed["attachments"][0]["id"], newest["part"]);
 }
@@ -414,7 +416,7 @@ fn a_file_whose_body_is_gone_lists_no_part() {
 
     let page = himalaya.json(&["pimdir", "attachment", "list"]);
     let file = &page["attachments"][3];
-    assert_eq!(file["name"], "Facture-Septembre.pdf");
+    assert_eq!(file["filename"], "Facture-Septembre.pdf");
     assert_eq!(file["part"], Value::Null);
     assert_eq!(file["section"], "2");
 }

@@ -1199,7 +1199,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(envelope.subject, "Hi");
+        assert_eq!(envelope.subject.as_deref(), Some("Hi"));
         assert_eq!(envelope.from[0].email, "a@x.org");
         assert_eq!(envelope.message_id.as_deref(), Some("1@x"));
         assert_eq!(envelope.in_reply_to, ["0@x"]);

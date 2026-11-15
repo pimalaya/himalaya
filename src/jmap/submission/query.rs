@@ -8,8 +8,7 @@ use std::fmt;
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_jmap::rfc8621::email_submission::{
-    JmapEmailSubmission, JmapUndoStatus,
-    query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
+    JmapEmailSubmission, JmapUndoStatus, query::JmapEmailSubmissionFilter,
 };
 use pimalaya_cli::{
     clap::args::PageTokenArg,
@@ -19,6 +18,7 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
@@ -27,6 +27,7 @@ use crate::{
     jmap::{
         backend::{not_found_errors, query_page_follows},
         client::JmapClient,
+        raw,
     },
 };
 
@@ -103,20 +104,20 @@ impl JmapSubmissionQueryCommand {
             if has_one { Some(f) } else { None }
         };
 
-        let output = client.email_submission_query(JmapEmailSubmissionQueryOptions {
-            filter,
-            sort: None,
-            position: Some((page - 1).saturating_mul(self.page_size)),
-            limit: Some(self.page_size),
-        })?;
+        let position = (page - 1).saturating_mul(self.page_size);
+        let sort: Option<Value> = None;
+        let args = raw::query_args(filter, sort, position, self.page_size)?;
+        let output = raw::query(client, "EmailSubmission", args)?;
 
-        let listed = output.submissions.len() + output.not_found.len();
-        let follows = query_page_follows(output.total, listed, page, self.page_size);
+        let total = output.rest.get("total").and_then(Value::as_u64);
+        let listed = output.list.len() + output.not_found.len();
+        let follows = query_page_follows(total, listed, page, self.page_size);
 
         let submissions = JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: Some((page, self.page_size)),
-            submissions: output.submissions,
+            submissions: output.list,
+            rest: output.rest,
             next_page: follows.then(|| (page + 1).to_string()),
             errors: not_found_errors(output.not_found, ErrorCode::SubmissionNotFound),
         };
@@ -137,8 +138,14 @@ pub struct JmapSubmissionQueryOutput {
     /// The page listed and its size, `None` for a get or a create.
     #[serde(skip)]
     pub page: Option<(u64, u64)>,
-    /// The submissions, in the order the server returned them.
-    pub submissions: Vec<JmapEmailSubmission>,
+    /// The submissions, each as the server sent it, in its order.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub submissions: Vec<Value>,
+    /// The rest of the server's answers: the query's `queryState`,
+    /// `canCalculateChanges`, `position` and `total`, the get's `state`;
+    /// nothing for a create.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The number of the next page, `null` once the query is complete and
     /// for a get or a create, given back through `--page-token`.
     pub next_page: Option<String>,
@@ -152,6 +159,14 @@ impl fmt::Display for JmapSubmissionQueryOutput {
         let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for submission in &self.submissions {
+            let submission: JmapEmailSubmission = serde_json::from_value(submission.clone())
+                .unwrap_or_else(|_| JmapEmailSubmission {
+                    id: submission
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .map(String::from),
+                    ..Default::default()
+                });
             let text = |value: &Option<String>| {
                 sanitize::text(value.as_deref().unwrap_or_default()).into_owned()
             };

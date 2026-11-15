@@ -9,7 +9,9 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     error::{ErrorCode, partial_when},
-    jmap::{backend::get_errors, client::JmapClient, email::query::JmapEmailQueryOutput},
+    jmap::{
+        backend::not_found_errors, client::JmapClient, email::query::JmapEmailQueryOutput, raw,
+    },
 };
 
 /// Get JMAP emails by ID (Email/get).
@@ -32,15 +34,10 @@ impl JmapEmailGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.email_get(self.ids.clone(), Default::default())?;
+        let output = raw::get(client, "Email", &self.ids)?;
 
-        let mut emails = JmapEmailQueryOutput::new(account, output.emails);
-        emails.errors = get_errors(
-            output.not_found,
-            output.unparsed,
-            ErrorCode::MessageNotFound,
-            ErrorCode::MessageUnreadable,
-        );
+        let mut emails = JmapEmailQueryOutput::new(account, output.list, output.rest);
+        emails.errors = not_found_errors(output.not_found, ErrorCode::MessageNotFound);
 
         printer.out(&emails)?;
         partial_when(&emails.errors)

@@ -5,7 +5,10 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_msgraph::v1::rest::users::mail_folders::list::MsgraphMailFoldersListParams;
+use io_msgraph::v1::{
+    query::to_query_pairs, rest::users::mail_folders::list::MsgraphMailFoldersListParams,
+    send::path_segment,
+};
 use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer};
 
 use crate::{
@@ -13,7 +16,7 @@ use crate::{
     msgraph::{
         client::MsgraphClient,
         mail_folders::list::MsgraphMailFolderListOutput,
-        messages::list::{next_page, resume, skip_of},
+        messages::list::{next_page, raw_page, resume, skip_of},
     },
 };
 
@@ -21,26 +24,31 @@ use crate::{
 /// /me/mailFolders/{id}/childFolders`).
 ///
 /// `nextPage` is Graph's next link as Graph gives it: `--page-token`
-/// follows it as is, the query it carries replacing the other options.
+/// follows it as is, carrying the query, so no other option goes beside
+/// it.
+///
+/// JSON output: `{"folders": [<raw Graph mail folder>...], "nextPage"}`.
 #[derive(Debug, Parser)]
 pub struct MsgraphChildFoldersListCommand {
-    /// The id or well-known name of the parent folder.
-    #[arg(value_name = "ID")]
-    pub id: String,
+    /// The id or well-known name of the parent folder, which a page token
+    /// carries.
+    #[arg(value_name = "ID", required_unless_present = "page_token")]
+    #[arg(conflicts_with = "page_token")]
+    pub id: Option<String>,
     /// Maximum number of folders to return (OData `$top`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub top: Option<u32>,
     /// Number of folders to skip (OData `$skip`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub skip: Option<u32>,
     #[command(flatten)]
     pub page_token: PageTokenArg,
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
-    #[arg(long, value_name = "FIELDS")]
+    #[arg(long, value_name = "FIELDS", conflicts_with = "page_token")]
     pub select: Option<String>,
     /// Also include hidden folders.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "page_token")]
     pub hidden: bool,
 }
 
@@ -62,7 +70,12 @@ impl MsgraphChildFoldersListCommand {
         let token = self.page_token.token.as_deref();
         let response = match token {
             Some(link) => resume(client, link)?,
-            None => client.mail_child_folders_list(&self.id, &params)?.response,
+            None => {
+                // NOTE: clap requires the id when no page token is given.
+                let id = self.id.as_deref().unwrap_or_default();
+                let path = format!("mailFolders/{}/childFolders", path_segment(id)?);
+                raw_page(client, &path, &to_query_pairs(&params))?
+            }
         };
         let next = next_page(response.next_link, token.map_or(self.skip, skip_of));
 

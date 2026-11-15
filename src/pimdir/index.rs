@@ -39,7 +39,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::envelope::Envelope,
+    email::{envelope::Envelope, flag::Flag},
     error::{ErrorCode, ItemError, pimdir_error},
     pimdir::{
         backend::{envelope, envelope_from_item},
@@ -209,13 +209,14 @@ impl PimdirClient {
                     _ => PimdirTagStatus::Planned,
                 };
                 let flags = match &placement.next {
-                    Some(next) => next.iter().cloned().collect(),
+                    Some(next) => next.iter().map(Flag::from_raw).collect(),
                     None => Vec::new(),
                 };
+                let subject = Some(hit.title.clone()).filter(|title| !title.is_empty());
                 tagged.push(PimdirTagged {
                     id: hit.seq.to_string(),
                     mailbox: placement.collection.clone(),
-                    subject: hit.title.clone(),
+                    subject,
                     flags,
                     status,
                     queue_id: row,
@@ -307,7 +308,7 @@ impl PimdirClient {
             Some(item) => envelope_from_item(&item),
             None => {
                 let mut envelope = envelope(hit.seq.to_string(), &first.flags, None);
-                envelope.subject = hit.title;
+                envelope.subject = Some(hit.title).filter(|title| !title.is_empty());
                 envelope
             }
         };
@@ -512,11 +513,11 @@ pub struct PimdirTagged {
     pub id: String,
     /// The mailbox of the placement.
     pub mailbox: String,
-    /// The subject.
-    pub subject: String,
+    /// The subject, `null` when the message has none.
+    pub subject: Option<String>,
     /// The flags the placement carries once the tag applies, empty when
     /// its flags were never read.
-    pub flags: Vec<String>,
+    pub flags: Vec<Flag>,
     /// What the tag does there.
     pub status: PimdirTagStatus,
     /// The queue row the change waits in, `null` when none was staged.
@@ -894,7 +895,7 @@ mod tests {
         page(client, text)
             .hits
             .into_iter()
-            .map(|hit| hit.envelope.subject)
+            .map(|hit| hit.envelope.subject.unwrap_or_default())
             .collect()
     }
 
@@ -902,7 +903,7 @@ mod tests {
         page(client, &format!("subject:\"{subject}\""))
             .hits
             .into_iter()
-            .find(|hit| hit.envelope.subject == subject)
+            .find(|hit| hit.envelope.subject.as_deref() == Some(subject))
             .unwrap()
             .envelope
             .id
@@ -915,7 +916,7 @@ mod tests {
         let numbers = page(&client, "body:numbers");
         assert_eq!(numbers.hits.len(), 1);
         let hit = &numbers.hits[0];
-        assert_eq!(hit.envelope.subject, "Quarterly report");
+        assert_eq!(hit.envelope.subject.as_deref(), Some("Quarterly report"));
         assert_eq!(hit.mailboxes, [INBOX]);
         assert_eq!(hit.matched, Some(PimdirMailMatched::Body));
         assert!(hit.snippet.as_deref().unwrap().contains("numbers"));
@@ -997,7 +998,7 @@ mod tests {
         let subjects: Vec<&str> = found
             .hits
             .iter()
-            .map(|hit| hit.envelope.subject.as_str())
+            .map(|hit| hit.envelope.subject.as_deref().unwrap_or_default())
             .collect();
         assert_eq!(
             subjects,
@@ -1051,7 +1052,7 @@ mod tests {
                 .unwrap()
                 .hits
                 .into_iter()
-                .map(|hit| hit.envelope.subject)
+                .map(|hit| hit.envelope.subject.unwrap_or_default())
                 .collect::<Vec<_>>()
         };
 
@@ -1110,7 +1111,7 @@ mod tests {
         let subjects: Vec<&str> = thread
             .hits
             .iter()
-            .map(|hit| hit.envelope.subject.as_str())
+            .map(|hit| hit.envelope.subject.as_deref().unwrap_or_default())
             .collect();
         assert_eq!(subjects, ["Quarterly report", "Re: Quarterly report"]);
 
@@ -1153,7 +1154,7 @@ mod tests {
         let statuses: BTreeMap<&str, PimdirTagStatus> = tag
             .tagged
             .iter()
-            .map(|tagged| (tagged.subject.as_str(), tagged.status))
+            .map(|tagged| (tagged.subject.as_deref().unwrap_or_default(), tagged.status))
             .collect();
         assert_eq!(statuses["Lunch"], PimdirTagStatus::Unchanged);
         assert_eq!(statuses["Quarterly report"], PimdirTagStatus::Queued);

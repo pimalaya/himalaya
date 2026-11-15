@@ -6,7 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::messages::{GmailMessageId, list::GmailMessagesListParams};
+use io_gmail::v1::rest::messages::list::GmailMessagesListParams;
 use pimalaya_cli::{
     listing::{Listing, ListingPage},
     printer::Printer,
@@ -14,11 +14,20 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
-use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::{client::GmailClient, format::str_of},
+};
 
 /// List Gmail message ids matching the given query and labels
 /// (users.messages.list).
+///
+/// JSON output: Gmail's page as Gmail sent it, `{"messages": [{"id",
+/// "threadId"}...], "resultSizeEstimate", "nextPage"}`, `nextPage`
+/// Gmail's `nextPageToken`, `null` on the last page.
 #[derive(Debug, Parser)]
 pub struct GmailMessagesListCommand {
     /// Gmail search query, using the same syntax as the Gmail search
@@ -56,14 +65,15 @@ impl GmailMessagesListCommand {
             page_token: self.page_token.as_deref(),
             include_spam_trash: self.include_spam_trash,
         };
-        let response = client.messages_list(&params)?.response;
+        let page = client.raw_list("messages", &params)?;
 
         printer.out(GmailMessageListOutput {
             account: account.name().to_string(),
             query: self.query,
             labels: self.labels,
-            messages: response.messages,
-            next_page: response.next_page_token,
+            messages: page.items,
+            rest: page.rest,
+            next_page: page.next_page,
         })
     }
 }
@@ -81,8 +91,13 @@ pub struct GmailMessageListOutput {
     /// The label ids every message carries.
     #[serde(skip)]
     pub labels: Vec<String>,
-    /// The messages of this page, each named by its id and thread id.
-    pub messages: Vec<GmailMessageId>,
+    /// The messages of this page, each as Gmail sent it, `{id, threadId}`.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub messages: Vec<Value>,
+    /// The rest of the page as Gmail sent it, such as
+    /// `resultSizeEstimate`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     pub next_page: Option<String>,
@@ -102,8 +117,8 @@ impl fmt::Display for GmailMessageListOutput {
 
         for message in &self.messages {
             listing.items.push([
-                sanitize::text(&message.id),
-                sanitize::text(message.thread_id.as_deref().unwrap_or_default()),
+                sanitize::text(str_of(message, "id")),
+                sanitize::text(str_of(message, "threadId")),
             ]);
         }
 
@@ -112,5 +127,50 @@ impl fmt::Display for GmailMessageListOutput {
         listing.page(ListingPage::Token, count, ["message", "messages"], next);
 
         write!(f, "{listing}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use io_gmail::v1::client::GmailClientStd;
+    use pimalaya_cli::printer::CapturePrinter;
+    use serde_json::json;
+
+    use crate::{
+        account::context::Account,
+        gmail::{client::GmailClient, messages::list::GmailMessagesListCommand},
+        shared::http_script::{Script, ok},
+    };
+
+    /// The page prints as Gmail sent it, `resultSizeEstimate` included, its
+    /// `nextPageToken` lifted into `nextPage`; an empty page, which Gmail
+    /// sends without `messages`, prints `[]`.
+    #[test]
+    fn a_page_prints_as_gmail_sent_it() {
+        let list = |page: serde_json::Value| {
+            let (script, _) = Script::new(vec![ok("application/json", &page.to_string())]);
+            let inner = GmailClientStd::new(script, "token", Default::default());
+            let command = GmailMessagesListCommand {
+                query: None,
+                labels: Vec::new(),
+                max_results: Some(1),
+                page_token: None,
+                include_spam_trash: false,
+            };
+            let mut printer = CapturePrinter::default();
+            let mut client = GmailClient::over(inner);
+            command
+                .execute(&mut printer, &mut Account::default(), &mut client)
+                .unwrap();
+            printer.into_single().unwrap()
+        };
+
+        let message = json!({"id": "m1", "threadId": "t1"});
+        let page = json!({"messages": [message], "nextPageToken": "p2", "resultSizeEstimate": 3});
+        let expected = json!({"messages": [message], "resultSizeEstimate": 3, "nextPage": "p2"});
+        assert_eq!(list(page), expected);
+
+        let empty = json!({"messages": [], "resultSizeEstimate": 0, "nextPage": null});
+        assert_eq!(list(json!({"resultSizeEstimate": 0})), empty);
     }
 }

@@ -52,6 +52,13 @@ pub fn snippet_text(snippet: &str) -> String {
         .replace("&amp;", "&")
 }
 
+/// The string at `key` of an item Gmail sent, empty when it has none.
+pub fn str_of<'a>(item: &'a serde_json::Value, key: &str) -> &'a str {
+    item.get(key)
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::gmail::format::snippet_text;

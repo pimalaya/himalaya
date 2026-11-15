@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, backend::Backend, pimdir::client::PimdirClient,
+    account::context::Account, backend::Backend, email::flag::Flag, pimdir::client::PimdirClient,
     shared::mailbox::arg::MailboxArg,
 };
 
@@ -51,7 +51,7 @@ impl PimdirFlagListCommand {
             account: account.name().to_string(),
             mailbox,
             message: self.id,
-            flags,
+            flags: flags.map(|flags| flags.into_iter().map(Flag::from_raw).collect()),
         })
     }
 }
@@ -69,9 +69,9 @@ pub struct PimdirFlagListOutput {
     /// The id of the message.
     #[serde(skip)]
     message: String,
-    /// The raw spellings, sorted, or `null` when the sync engine never
-    /// read the message's flags.
-    flags: Option<Vec<String>>,
+    /// The flags, sorted by their raw spelling, or `null` when the sync
+    /// engine never read the message's flags.
+    flags: Option<Vec<Flag>>,
 }
 
 impl fmt::Display for PimdirFlagListOutput {
@@ -81,7 +81,7 @@ impl fmt::Display for PimdirFlagListOutput {
         listing.head("Message", &self.message);
 
         for flag in self.flags.iter().flatten() {
-            listing.items.push([sanitize::text(flag)]);
+            listing.items.push([sanitize::text(flag.raw())]);
         }
 
         write!(f, "{listing}")
@@ -90,23 +90,23 @@ impl fmt::Display for PimdirFlagListOutput {
 
 #[cfg(test)]
 mod tests {
-    use crate::pimdir::flag::list::PimdirFlagListOutput;
+    use crate::{email::flag::Flag, pimdir::flag::list::PimdirFlagListOutput};
 
-    fn list(flags: Option<Vec<String>>) -> PimdirFlagListOutput {
+    fn list(flags: Option<Vec<&str>>) -> PimdirFlagListOutput {
         PimdirFlagListOutput {
             account: String::from("work"),
             mailbox: String::from("INBOX"),
             message: String::from("7"),
-            flags,
+            flags: flags.map(|flags| flags.into_iter().map(Flag::from_raw).collect()),
         }
     }
 
     #[test]
     fn flags_serialize_as_a_list_and_unread_ones_as_null() {
-        let known = list(Some(vec!["\\Seen".into(), "act".into()]));
+        let known = list(Some(vec!["\\Seen", "act"]));
         assert_eq!(
             serde_json::to_string(&known).unwrap(),
-            r#"{"flags":["\\Seen","act"]}"#
+            r#"{"flags":[{"raw":"\\Seen","iana":"seen"},{"raw":"act","iana":null}]}"#
         );
         assert_eq!(
             serde_json::to_string(&list(None)).unwrap(),
@@ -118,7 +118,7 @@ mod tests {
     fn the_list_names_one_flag_per_line() {
         let head = "Account:    work (pimdir)\nMailbox:    INBOX\nMessage:    7\n";
 
-        let known = list(Some(vec!["\\Seen".into(), "act".into()]));
+        let known = list(Some(vec!["\\Seen", "act"]));
         assert_eq!(known.to_string(), format!("{head}\n\\Seen\nact\n"));
         assert_eq!(list(None).to_string(), head);
     }

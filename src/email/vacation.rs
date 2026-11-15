@@ -20,9 +20,9 @@ pub struct Vacation {
     /// Whether the auto-reply is sent.
     pub enabled: bool,
     /// When it starts answering, RFC 3339 in UTC, `null` for no start.
-    pub from: Option<String>,
+    pub start: Option<String>,
     /// When it stops answering, RFC 3339 in UTC, `null` for no end.
-    pub to: Option<String>,
+    pub end: Option<String>,
     /// The subject of the reply, `null` for the backend's default.
     pub subject: Option<String>,
     /// The plain text body of the reply.
@@ -97,6 +97,22 @@ mod tests {
         assert_eq!(format_date(day), "2026-12-24T00:00:00Z");
 
         assert!(parse_date("24/12/2026").is_err());
+    }
+
+    /// The window prints as `start` and `end`, `from` and `to` naming
+    /// addresses everywhere else.
+    #[test]
+    fn the_window_prints_as_start_and_end() {
+        let vacation = Vacation {
+            enabled: true,
+            start: Some(String::from("2026-12-24T00:00:00Z")),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_value(&vacation).unwrap();
+        assert_eq!(json["start"], "2026-12-24T00:00:00Z");
+        assert_eq!(json["end"], serde_json::Value::Null);
+        assert!(json.get("from").is_none() && json.get("to").is_none());
     }
 
     #[cfg(feature = "gmail")]

@@ -1,7 +1,7 @@
 //! # HTTP script
 //!
 //! A server answering each request with the next scripted response, for
-//! the tests driving the HTTP clients of the Gmail and Graph backends
+//! the tests driving the HTTP clients of the Gmail, Graph and JMAP backends
 //! without a network.
 
 use std::{

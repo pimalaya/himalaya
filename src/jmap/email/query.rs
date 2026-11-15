@@ -11,9 +11,7 @@ use io_jmap::{
     rfc8620::filter::JmapFilter,
     rfc8621::email::{
         JmapEmail,
-        query::{
-            JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
-        },
+        query::{JmapEmailComparator, JmapEmailFilter, JmapEmailSortProperty},
     },
 };
 use pimalaya_cli::{
@@ -23,14 +21,16 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
     backend::Backend,
     error::{ErrorCode, ItemError, partial_when},
     jmap::{
-        backend::{envelope_from, get_errors, parse_rfc3339, query_page_follows},
+        backend::{envelope_from, not_found_errors, parse_rfc3339, query_page_follows},
         client::JmapClient,
+        raw,
     },
     shared::envelope::list::envelope_cells,
 };
@@ -156,36 +156,26 @@ impl JmapEmailQueryCommand {
             }
         };
 
-        let sort = Some(vec![JmapEmailComparator {
+        let sort = vec![JmapEmailComparator {
             property: self.sort.into(),
             is_ascending: Some(!self.desc),
             collation: None,
             keyword: None,
-        }]);
+        }];
 
-        let output = client.email_query(JmapEmailQueryOptions {
-            filter,
-            sort,
-            position: Some((page - 1).saturating_mul(self.page_size)),
-            limit: Some(self.page_size),
-            calculate_total: true,
-            properties: None,
-            ..Default::default()
-        })?;
+        let position = (page - 1).saturating_mul(self.page_size);
+        let args = raw::query_args(filter, Some(sort), position, self.page_size)?;
+        let output = raw::query(client, "Email", args)?;
 
-        let listed = output.emails.len() + output.unparsed.len() + output.not_found.len();
-        let follows = query_page_follows(output.total, listed, page, self.page_size);
+        let total = output.rest.get("total").and_then(Value::as_u64);
+        let listed = output.list.len() + output.not_found.len();
+        let follows = query_page_follows(total, listed, page, self.page_size);
 
-        let mut emails = JmapEmailQueryOutput::new(account, output.emails);
+        let mut emails = JmapEmailQueryOutput::new(account, output.list, output.rest);
         emails.mailbox = mailbox;
         emails.page = Some((page, self.page_size));
         emails.next_page = follows.then(|| (page + 1).to_string());
-        emails.errors = get_errors(
-            output.not_found,
-            output.unparsed,
-            ErrorCode::MessageNotFound,
-            ErrorCode::MessageUnreadable,
-        );
+        emails.errors = not_found_errors(output.not_found, ErrorCode::MessageNotFound);
 
         printer.out(&emails)?;
         partial_when(&emails.errors)
@@ -211,19 +201,24 @@ pub struct JmapEmailQueryOutput {
     /// The page listed and its size, `None` for a get.
     #[serde(skip)]
     pub page: Option<(u64, u64)>,
-    /// The emails, in the order the server returned them.
-    pub emails: Vec<JmapEmail>,
+    /// The emails, each as the server sent it, in its order.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub emails: Vec<Value>,
+    /// The rest of the server's answers: the query's `queryState`,
+    /// `canCalculateChanges`, `position` and `total`, the get's `state`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The number of the next page, `null` once the query is complete and
     /// for a get, given back through `--page-token`.
     pub next_page: Option<String>,
-    /// The error of each email the server did not find or that did not
-    /// deserialize, in the order met.
+    /// The error of each email the server did not find (`notFound`).
     pub errors: Vec<ItemError>,
 }
 
 impl JmapEmailQueryOutput {
-    /// The emails of `account`, neither filtered nor paged.
-    pub fn new(account: &Account, emails: Vec<JmapEmail>) -> Self {
+    /// The emails of `account`, neither filtered nor paged, beside the
+    /// rest of the answers.
+    pub fn new(account: &Account, emails: Vec<Value>, rest: Map<String, Value>) -> Self {
         Self {
             account: account.name().to_string(),
             datetime_fmt: account.datetime_fmt().to_string(),
@@ -231,6 +226,7 @@ impl JmapEmailQueryOutput {
             mailbox: None,
             page: None,
             emails,
+            rest,
             next_page: None,
             errors: Vec::new(),
         }
@@ -246,6 +242,7 @@ impl fmt::Display for JmapEmailQueryOutput {
         }
 
         for email in &self.emails {
+            let email = email_of(email);
             let mut envelope = envelope_from(email.clone());
             envelope.date = email.received_at.as_deref().and_then(parse_rfc3339);
 
@@ -267,6 +264,15 @@ impl fmt::Display for JmapEmailQueryOutput {
 
         write!(f, "{listing}")
     }
+}
+
+/// The email a server sent, read for the text; one that does not read
+/// keeps its id alone.
+pub(crate) fn email_of(email: &Value) -> JmapEmail {
+    serde_json::from_value(email.clone()).unwrap_or_else(|_| JmapEmail {
+        id: email.get("id").and_then(Value::as_str).map(String::from),
+        ..Default::default()
+    })
 }
 
 /// The property an email query sorts on.
@@ -320,17 +326,12 @@ impl From<SortArg> for JmapEmailSortProperty {
 
 #[cfg(test)]
 mod tests {
-    use io_jmap::rfc8621::email::JmapEmail;
-
     use crate::jmap::email::query::JmapEmailQueryOutput;
 
     /// An exactly full last page names no next page, in JSON as in text.
     #[test]
     fn a_full_last_page_names_no_next_page() {
-        let email = |id: &str| JmapEmail {
-            id: Some(id.to_owned()),
-            ..Default::default()
-        };
+        let email = |id: &str| serde_json::json!({"id": id});
         let output = JmapEmailQueryOutput {
             account: String::from("work"),
             datetime_fmt: String::from("%F"),
@@ -338,6 +339,7 @@ mod tests {
             mailbox: None,
             page: Some((2, 2)),
             emails: vec![email("E3"), email("E4")],
+            rest: Default::default(),
             next_page: None,
             errors: Vec::new(),
         };

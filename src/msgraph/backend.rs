@@ -1009,7 +1009,7 @@ pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
         // empty rather than cost one request per row.
         in_reply_to: Vec::new(),
         flags,
-        subject: message.subject.unwrap_or_default(),
+        subject: message.subject,
         from,
         to,
         date,

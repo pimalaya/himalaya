@@ -953,7 +953,7 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
     let mut message_id: Option<String> = None;
     let mut in_reply_to = Vec::new();
     let mut flags = BTreeSet::new();
-    let mut subject = String::new();
+    let mut subject = None;
     let mut from = Vec::new();
     let mut to = Vec::new();
     let mut date: Option<DateTime<FixedOffset>> = None;
@@ -968,7 +968,7 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
             }
             MessageDataItem::Envelope(env) => {
                 if let Some(s) = env.subject.into_option() {
-                    subject = header::decode_bytes(s.as_ref());
+                    subject = Some(header::decode_bytes(s.as_ref()));
                 }
                 if let Some(d) = env.date.into_option() {
                     date = parse_rfc2822_date(&bytes_to_string(d.as_ref()));
@@ -1736,7 +1736,7 @@ mod tests {
         };
         let envelope = envelope_from(1, items.into_inner());
 
-        assert_eq!(envelope.subject, "\u{1f602}");
+        assert_eq!(envelope.subject.as_deref(), Some("\u{1f602}"));
         assert_eq!(
             envelope.from[0].name.as_deref(),
             Some("\u{201c}Ann\u{201d} \u{e9}")

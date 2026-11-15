@@ -94,7 +94,12 @@ impl JmapSubmissionCreateCommand {
         printer.out(JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: None,
-            submissions: output.created.into_values().collect(),
+            submissions: output
+                .created
+                .into_values()
+                .filter_map(|submission| serde_json::to_value(submission).ok())
+                .collect(),
+            rest: Default::default(),
             next_page: None,
             errors: Vec::new(),
         })

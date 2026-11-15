@@ -127,7 +127,8 @@ pub fn assert_envelopes(list: &Value, size: usize) {
 
         assert!(envelope["id"].is_string(), "{envelope}");
         assert!(envelope["flags"].is_array(), "{envelope}");
-        assert!(envelope["subject"].is_string(), "{envelope}");
+        let subject = &envelope["subject"];
+        assert!(subject.is_string() || subject.is_null(), "{envelope}");
         assert!(date.is_string() || date.is_null(), "{envelope}");
         let size = &envelope["size"];
         assert!(size.is_u64() || size.is_null(), "{envelope}");

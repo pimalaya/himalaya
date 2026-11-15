@@ -11,7 +11,10 @@ use pimalaya_cli::{columns::Columns, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, email::flag::IanaFlag};
+use crate::{
+    account::context::Account,
+    email::flag::{Flag, IanaFlag},
+};
 
 /// List the mbox flags.
 ///
@@ -23,9 +26,8 @@ pub struct MboxFlagListCommand;
 impl MboxFlagListCommand {
     /// Lists the six flags, their letters and headers.
     pub fn execute(self, printer: &mut impl Printer, _account: &mut Account) -> Result<()> {
-        let flag = |raw: &str, header: &str, name: &str, iana| FlagRow {
-            raw: raw.into(),
-            iana,
+        let flag = |raw: &str, header: &str, name: &str, iana| MboxFlagRow {
+            flag: Flag::spelled(raw, iana),
             header: header.into(),
             name: name.into(),
         };
@@ -47,19 +49,17 @@ impl MboxFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxFlagListOutput {
-    flags: Vec<FlagRow>,
+    flags: Vec<MboxFlagRow>,
 }
 
 /// One mbox flag: the flag, as the shared flags print it, its letter as
-/// `raw`, and the header carrying the letter.
+/// `raw` and `iana` `null` for `O`, which has none, and the header
+/// carrying the letter.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct FlagRow {
-    /// The letter.
-    raw: String,
-    /// The IANA keyword the letter stands for, `null` for `O`, which
-    /// has none.
-    iana: Option<IanaFlag>,
+pub struct MboxFlagRow {
+    #[serde(flatten)]
+    flag: Flag,
     /// The header carrying the letter.
     header: String,
     /// The name of the flag, for the text form.
@@ -72,9 +72,33 @@ impl fmt::Display for MboxFlagListOutput {
         let mut columns = Columns::default();
 
         for flag in &self.flags {
-            columns.push([&flag.raw, &flag.header, &flag.name]);
+            columns.push([flag.flag.raw(), &flag.header, &flag.name]);
         }
 
         write!(f, "{columns}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pimalaya_cli::printer::CapturePrinter;
+    use serde_json::json;
+
+    use crate::{account::context::Account, mbox::flag::list::MboxFlagListCommand};
+
+    /// An mbox flag prints as every flag does, `{raw, iana}`, beside the
+    /// header carrying its letter.
+    #[test]
+    fn a_letter_prints_as_the_shared_flag_with_its_header() {
+        let mut printer = CapturePrinter::default();
+        MboxFlagListCommand
+            .execute(&mut printer, &mut Account::default())
+            .unwrap();
+        let json = printer.into_single().unwrap();
+
+        let old = json!({"raw": "O", "iana": null, "header": "Status"});
+        assert_eq!(json["flags"][1], old);
+        let seen = json!({"raw": "R", "iana": "seen", "header": "Status"});
+        assert_eq!(json["flags"][0], seen);
     }
 }

@@ -14,7 +14,6 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    email::flag::Flag,
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
@@ -118,7 +117,7 @@ impl fmt::Display for PimdirTagOutput {
             let flags = match tagged.status {
                 PimdirTagStatus::UnknownFlags => String::from("    "),
                 _ => {
-                    let flags = tagged.flags.iter().map(Flag::from_raw).collect();
+                    let flags = tagged.flags.iter().cloned().collect();
                     format_flags(&flags, None)
                 }
             };
@@ -131,12 +130,41 @@ impl fmt::Display for PimdirTagOutput {
                 tagged.status.to_string(),
                 sanitize::text(&tagged.mailbox).into_owned(),
                 row.unwrap_or_default(),
-                sanitize::text(&tagged.subject).into_owned(),
+                sanitize::text(tagged.subject.as_deref().unwrap_or_default()).into_owned(),
             ]);
         }
 
         self.coverage.note(&mut listing);
 
         write!(f, "{listing}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::{
+        email::flag::Flag,
+        pimdir::index::{PimdirTagStatus, PimdirTagged},
+    };
+
+    /// A tagged placement prints its flags as every flag prints, and a
+    /// message without a subject `null`.
+    #[test]
+    fn a_tagged_placement_prints_shared_flags() {
+        let tagged = PimdirTagged {
+            id: String::from("7"),
+            mailbox: String::from("imap/INBOX"),
+            subject: None,
+            flags: vec![Flag::from_raw("\\Seen"), Flag::from_raw("act")],
+            status: PimdirTagStatus::Planned,
+            queue_id: None,
+        };
+
+        let json = serde_json::to_value(&tagged).unwrap();
+        let flags = json!([{"raw": "\\Seen", "iana": "seen"}, {"raw": "act", "iana": null}]);
+        assert_eq!(json["flags"], flags);
+        assert_eq!(json["subject"], serde_json::Value::Null);
     }
 }

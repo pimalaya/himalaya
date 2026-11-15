@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_gmail::v1::rest::history::{
     GmailHistory, GmailHistoryLabel, GmailHistoryMessage, GmailHistoryType,
-    list::{GmailHistoryList, GmailHistoryListParams},
+    list::GmailHistoryListParams,
 };
 use pimalaya_cli::{
     listing::{Listing, ListingPage},
@@ -17,15 +17,16 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
 
 /// List the changes applied to the mailbox since a given history id.
 ///
-/// JSON includes `historyId`, `history`, and an optional `nextPage` cursor.
-/// Each record retains its message-id arrays and adds `messagesAddedDetails`
-/// with each arrival's `id`, nullable `threadId`, and `labelIds` supplied by
-/// Gmail. Missing labels become an empty array; text output lists the ids.
+/// JSON output: Gmail's page as Gmail sent it, `{"history": [<raw Gmail
+/// history record>...], "historyId", "nextPage"}`, `nextPage` Gmail's
+/// `nextPageToken`, `null` on the last page. The text lists one line per
+/// message change.
 #[derive(Debug, Parser)]
 pub struct GmailHistoryListCommand {
     /// History id to start listing changes from.
@@ -56,33 +57,22 @@ impl GmailHistoryListCommand {
         let types: Vec<GmailHistoryType> =
             self.history_types.iter().copied().map(Into::into).collect();
 
-        let out = {
-            let params = GmailHistoryListParams {
-                start_history_id: &self.start_history_id,
-                label_id: self.label_id.as_deref(),
-                history_types: &types,
-                max_results: self.max_results,
-                page_token: self.page_token.as_deref(),
-            };
-            let c = GmailHistoryList::new(&client.auth, &client.user_id, &params)?;
-            client.run(c)?
+        let params = GmailHistoryListParams {
+            start_history_id: &self.start_history_id,
+            label_id: self.label_id.as_deref(),
+            history_types: &types,
+            max_results: self.max_results,
+            page_token: self.page_token.as_deref(),
         };
-
-        let resp = out.response;
-
-        let history = resp
-            .history
-            .into_iter()
-            .map(GmailHistoryRecordOutput::from)
-            .collect();
+        let page = client.raw_list("history", &params)?;
 
         printer.out(GmailHistoryListOutput {
             account: account.name().to_string(),
             since: self.start_history_id,
             label: self.label_id,
-            history_id: resp.history_id,
-            history,
-            next_page: resp.next_page_token,
+            history: page.items,
+            rest: page.rest,
+            next_page: page.next_page,
         })
     }
 }
@@ -112,8 +102,7 @@ impl From<HistoryTypeArg> for GmailHistoryType {
     }
 }
 
-/// The `gmail history list` output: the new history id, then each record
-/// with the ids of the messages it added, deleted, labeled and unlabeled.
+/// The `gmail history list` output, Gmail's page as Gmail sent it.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GmailHistoryListOutput {
@@ -123,8 +112,15 @@ pub(crate) struct GmailHistoryListOutput {
     since: String,
     #[serde(skip)]
     label: Option<String>,
-    history_id: Option<String>,
-    history: Vec<GmailHistoryRecordOutput>,
+    /// The history records of this page, each as Gmail sent it.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    history: Vec<Value>,
+    /// The rest of the page as Gmail sent it: `historyId`, the mailbox's
+    /// current history id.
+    #[serde(flatten)]
+    rest: Map<String, Value>,
+    /// Gmail's `nextPageToken`, `null` on the last page, given back
+    /// through `--page-token`.
     next_page: Option<String>,
 }
 
@@ -138,6 +134,12 @@ impl fmt::Display for GmailHistoryListOutput {
         }
 
         for record in &self.history {
+            // NOTE: a record Gmail sent in a shape io-gmail does not read
+            // prints no line; the JSON keeps it whole.
+            let Ok(record) = serde_json::from_value::<GmailHistory>(record.clone()) else {
+                continue;
+            };
+            let record = GmailHistoryRecordOutput::from(record);
             let id = sanitize::text(&record.id).into_owned();
             let line = |change: &str, message: &str, labels: &[String]| {
                 [
@@ -176,7 +178,8 @@ impl fmt::Display for GmailHistoryListOutput {
         let next = self.next_page.as_deref();
         listing.page(ListingPage::Token, count, ["record", "records"], next);
 
-        let history_id = self.history_id.as_deref().unwrap_or_default();
+        let history_id = self.rest.get("historyId").and_then(Value::as_str);
+        let history_id = history_id.unwrap_or_default();
         let history_id = sanitize::text(history_id).into_owned();
         listing.header.push(("History id", history_id));
 
@@ -255,41 +258,37 @@ fn label_changes(labels: Vec<GmailHistoryLabel>) -> Vec<GmailHistoryLabelOutput>
 
 #[cfg(test)]
 mod tests {
-    use io_gmail::v1::rest::{
-        history::{GmailHistory, GmailHistoryMessage},
-        messages::GmailMessage,
-    };
+    use serde_json::{Map, json};
 
-    use crate::gmail::history::list::{GmailHistoryListOutput, GmailHistoryRecordOutput};
+    use crate::gmail::history::list::GmailHistoryListOutput;
 
+    /// The page prints as Gmail sent it, its cursor lifted into `nextPage`,
+    /// and the text shows each added message with its labels.
     #[test]
-    fn an_added_message_shows_its_labels() {
-        let added = GmailHistoryMessage {
-            message: GmailMessage {
-                id: "m1".into(),
-                label_ids: vec!["Label_1".into(), "INBOX".into()],
-                ..Default::default()
-            },
-        };
-        let record = GmailHistory {
-            id: "42".into(),
-            messages: Vec::new(),
-            messages_added: vec![added],
-            messages_deleted: Vec::new(),
-            labels_added: Vec::new(),
-            labels_removed: Vec::new(),
-        };
+    fn a_page_prints_as_gmail_sent_it() {
+        let record = json!({
+            "id": "42",
+            "messages": [{"id": "m1", "threadId": "t1"}],
+            "messagesAdded": [{"message": {"id": "m1", "threadId": "t1", "labelIds": ["Label_1", "INBOX"]}}],
+        });
+        let mut rest = Map::new();
+        rest.insert(String::from("historyId"), json!("43"));
         let output = GmailHistoryListOutput {
             account: "a".into(),
             since: "1".into(),
             label: None,
-            history_id: Some("42".into()),
-            history: vec![GmailHistoryRecordOutput::from(record)],
-            next_page: None,
+            history: vec![record.clone()],
+            rest,
+            next_page: Some(String::from("p2")),
         };
+
+        let json = serde_json::to_value(&output).unwrap();
+        let page = json!({"history": [record], "historyId": "43", "nextPage": "p2"});
+        assert_eq!(json, page);
 
         let text = output.to_string();
         let line = text.lines().find(|line| line.contains("m1")).unwrap();
         assert!(line.contains("Label_1,INBOX"), "{text}");
+        assert!(text.contains("History id:  43"), "{text}");
     }
 }

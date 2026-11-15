@@ -79,7 +79,7 @@ impl fmt::Display for PimdirThreadOutput {
             let hit = &self.thread.hits[i];
             let envelope = &hit.envelope;
             let indent = "  ".repeat(depth);
-            let subject = sanitize::text(&envelope.subject);
+            let subject = sanitize::text(envelope.subject.as_deref().unwrap_or_default());
 
             listing.items.push([
                 sanitize::text(&envelope.id).into_owned(),
@@ -178,7 +178,7 @@ mod tests {
                     .into_iter()
                     .collect(),
                 flags,
-                subject: String::from(subject),
+                subject: Some(String::from(subject)),
                 from: vec![Address {
                     name: Some(String::from(name)),
                     email: format!("{}@example.org", name.to_lowercase()),

@@ -71,7 +71,13 @@ fn reply(config: &Path, home: &Path, flags: &[&str]) -> (Vec<String>, Vec<String
             .as_array()
             .unwrap()
             .iter()
-            .map(|v| v.as_str().unwrap().to_owned())
+            .map(|address| {
+                let email = address["email"].as_str().unwrap();
+                match address["name"].as_str() {
+                    Some(name) => format!("{name} <{email}>"),
+                    None => email.to_owned(),
+                }
+            })
             .collect()
     };
 
@@ -94,7 +100,7 @@ fn reply_all_copies_the_other_recipients() {
             cc,
             [
                 "Bob <bob@example.org>",
-                "\"Carol, C\" <carol@example.org>",
+                "Carol, C <carol@example.org>",
                 "Dave <dave@example.org>",
             ],
             "{flag}",
@@ -111,10 +117,7 @@ fn explicit_to_and_cc_win_over_the_derived_lists() {
     assert_eq!(to, ["bob@example.org"]);
     assert_eq!(
         cc,
-        [
-            "\"Carol, C\" <carol@example.org>",
-            "Dave <dave@example.org>"
-        ]
+        ["Carol, C <carol@example.org>", "Dave <dave@example.org>"]
     );
 
     let (to, cc) = reply(&config, dir.path(), &["--all", "--cc", "erin@example.org"]);

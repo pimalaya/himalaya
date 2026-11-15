@@ -9,7 +9,9 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use io_msgraph::v1::{
     page::MsgraphPage,
+    query::to_query_pairs,
     rest::users::messages::{MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams},
+    send::{MSGRAPH_API_BASE, path_segment, user_path},
 };
 use pimalaya_cli::{
     clap::args::PageTokenArg,
@@ -18,6 +20,8 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json::{Map, Value};
+use url::Url;
 
 use crate::{
     account::context::Account,
@@ -30,23 +34,27 @@ use crate::{
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
 ///
 /// `nextPage` is Graph's next link as Graph gives it: `--page-token`
-/// follows it as is, the query it carries replacing the other options.
+/// follows it as is, carrying the query, so no other option goes beside
+/// it.
+///
+/// JSON output: `{"messages": [<raw Graph message>...], "@odata.count",
+/// "nextPage"}`, `@odata.count` only with `--count`.
 #[derive(Debug, Parser)]
 pub struct MsgraphMessageListCommand {
     /// Restrict the listing to a folder id or well-known name (e.g.
     /// `inbox`). Lists the whole mailbox when omitted.
-    #[arg(short = 'f', long, value_name = "ID")]
+    #[arg(short = 'f', long, value_name = "ID", conflicts_with = "page_token")]
     pub folder: Option<String>,
     /// Maximum number of messages to return (OData `$top`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub top: Option<u32>,
     /// Number of messages to skip (OData `$skip`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub skip: Option<u32>,
     #[command(flatten)]
     pub page_token: PageTokenArg,
     /// OData `$filter` expression (e.g. `isRead eq false`).
-    #[arg(long, value_name = "EXPR")]
+    #[arg(long, value_name = "EXPR", conflicts_with = "page_token")]
     pub filter: Option<String>,
     /// OData `$search` query, `subject:report` or a bare term, quoted for
     /// Graph unless it opens on a double quote.
@@ -54,17 +62,17 @@ pub struct MsgraphMessageListCommand {
     /// Graph forbids `$search` beside `$orderby` and ignores `$count`, so
     /// both are dropped here and the results come back in relevance
     /// order.
-    #[arg(long, value_name = "QUERY")]
+    #[arg(long, value_name = "QUERY", conflicts_with = "page_token")]
     pub search: Option<String>,
     /// OData `$orderby` expression. Defaults to `receivedDateTime desc`.
-    #[arg(long, value_name = "EXPR")]
+    #[arg(long, value_name = "EXPR", conflicts_with = "page_token")]
     pub orderby: Option<String>,
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `subject,from,receivedDateTime`).
-    #[arg(long, value_name = "FIELDS")]
+    #[arg(long, value_name = "FIELDS", conflicts_with = "page_token")]
     pub select: Option<String>,
     /// Request the total count of matching messages (OData `$count`).
-    #[arg(long)]
+    #[arg(long, conflicts_with = "page_token")]
     pub count: bool,
 }
 
@@ -106,8 +114,11 @@ impl MsgraphMessageListCommand {
         let response = match token {
             Some(link) => resume(client, link)?,
             None => {
-                let folder = self.folder.as_deref();
-                client.messages_list(folder, &params)?.response
+                let path = match self.folder.as_deref() {
+                    Some(folder) => format!("mailFolders/{}/messages", path_segment(folder)?),
+                    None => String::from("messages"),
+                };
+                raw_page(client, &path, &to_query_pairs(&params))?
             }
         };
 
@@ -153,8 +164,13 @@ pub struct MsgraphMessageListOutput {
     search: Option<String>,
     #[serde(skip)]
     filter: Option<String>,
-    messages: Vec<MsgraphMessage>,
-    /// How many messages match, with `--count`, `null` otherwise.
+    /// The messages of the page, each as Graph sent it, every property it
+    /// carries kept.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    messages: Vec<Value>,
+    /// How many messages match, Graph's own key, sent with `--count` and
+    /// absent otherwise.
+    #[serde(rename = "@odata.count", skip_serializing_if = "Option::is_none")]
     count: Option<u64>,
     /// Graph's next link, `null` once the listing is complete, given back
     /// through `--page-token`.
@@ -182,7 +198,9 @@ impl fmt::Display for MsgraphMessageListOutput {
         }
 
         for message in &self.messages {
-            let envelope = envelope_from(message.clone());
+            let message: MsgraphMessage =
+                serde_json::from_value(message.clone()).unwrap_or_default();
+            let envelope = envelope_from(message);
             let fmt = &self.datetime_fmt;
             let cells = envelope_cells(&envelope, fmt, self.datetime_local_tz);
             listing.items.push(cells);
@@ -194,6 +212,23 @@ impl fmt::Display for MsgraphMessageListOutput {
 
         write!(f, "{listing}")
     }
+}
+
+/// One page of the collection at `path` under the mailbox owner, queried
+/// by the OData `params` (`to_query_pairs`), its items kept as Graph sent
+/// them.
+pub(crate) fn raw_page(
+    client: &mut MsgraphClient,
+    path: &str,
+    params: &[(String, String)],
+) -> Result<MsgraphPage<Value>> {
+    let user = user_path(&client.user_id)?;
+    let mut url = Url::parse(MSGRAPH_API_BASE)?.join(&format!("{user}/{path}"))?;
+    if !params.is_empty() {
+        url.query_pairs_mut().extend_pairs(params);
+    }
+
+    Ok(client.page_get(url.as_str(), None)?.response)
 }
 
 /// The page behind `link`, the next link a Graph listing printed, sent as
@@ -321,12 +356,12 @@ mod tests {
     fn a_listing_resumes_from_the_next_link_it_printed() {
         let first = "https://graph.microsoft.com/v1.0/me/messages?%24search=%22report%22&%24top=1&%24skiptoken=a";
         let second = "https://graph.microsoft.com/v1.0/me/messages?%24search=%22report%22&%24top=1&%24skiptoken=b";
-        let page =
-            |id: &str, next: Option<&str>| json!({"value": [{"id": id}], "@odata.nextLink": next});
+        let page = |id: &str, next: Option<&str>| json!({"value": [{"id": id, "importance": "high"}], "@odata.nextLink": next});
 
         let (printed, requests) = list(None, &[page("m1", Some(first))]);
         let printed = printed.unwrap();
         assert_eq!(printed["nextPage"], first);
+        assert_eq!(printed["messages"][0]["importance"], "high");
         assert!(printed.get("@odata.nextLink").is_none(), "{printed}");
         assert!(requests[0].contains("%24search"), "{}", requests[0]);
 
@@ -347,6 +382,55 @@ mod tests {
         let err = format!("{:#}", refused.unwrap_err());
         assert!(err.contains("page token"), "{err}");
         assert!(requests.is_empty(), "{requests:#?}");
+    }
+
+    /// The query a next link carries is not given again beside it.
+    #[test]
+    fn a_query_flag_beside_a_page_token_is_refused() {
+        use clap::{Parser, error::ErrorKind};
+
+        use crate::cli::Cli;
+
+        let list = [
+            "himalaya",
+            "msgraph",
+            "messages",
+            "list",
+            "--page-token",
+            "x",
+        ];
+        for flag in [
+            &["--top", "1"][..],
+            &["--select", "id"],
+            &["--filter", "isRead eq false"],
+            &["-f", "inbox"],
+            &["--count"],
+        ] {
+            let err = Cli::try_parse_from([&list[..], flag].concat()).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::ArgumentConflict, "{flag:?}");
+        }
+
+        assert!(Cli::try_parse_from(list).is_ok());
+
+        let folders = ["himalaya", "msgraph", "mail-folders"];
+        let token = ["--page-token", "x"];
+        let refused = [
+            &["list", "--top", "1"][..],
+            &["list", "--select", "id"],
+            &["child-folders", "inbox"],
+            &["child-folders", "--hidden"],
+        ];
+        for args in refused {
+            let args = [&folders[..], args, &token].concat();
+            let err = Cli::try_parse_from(&args).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::ArgumentConflict, "{args:?}");
+        }
+
+        let child = [&folders[..], &["child-folders"], &token].concat();
+        assert!(Cli::try_parse_from(child).is_ok());
+        let bare = [&folders[..], &["child-folders"]].concat();
+        let err = Cli::try_parse_from(bare).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::MissingRequiredArgument);
     }
 
     #[test]

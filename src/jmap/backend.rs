@@ -588,8 +588,8 @@ impl JmapClient {
 
         Ok(Vacation {
             enabled: vacation.is_enabled,
-            from: vacation.from_date.map(normalize_date),
-            to: vacation.to_date.map(normalize_date),
+            start: vacation.from_date.map(normalize_date),
+            end: vacation.to_date.map(normalize_date),
             subject: vacation.subject,
             text: vacation.text_body,
             html: vacation.html_body,
@@ -964,20 +964,6 @@ fn missing_from(
         .collect()
 }
 
-/// The item errors of a get's answer: each id the server did not find,
-/// coded `missing`, then each object that did not deserialize, coded
-/// `unreadable`.
-pub(crate) fn get_errors(
-    not_found: Vec<String>,
-    objects: Vec<JmapUnparsed>,
-    missing: ErrorCode,
-    unreadable: ErrorCode,
-) -> Vec<ItemError> {
-    let mut errors = not_found_errors(not_found, missing);
-    errors.extend(unparsed(objects, unreadable));
-    errors
-}
-
 /// The item error of each id a get's server did not find, coded `code`.
 pub(crate) fn not_found_errors(ids: Vec<String>, code: ErrorCode) -> Vec<ItemError> {
     let error = |id| ItemError {
@@ -1111,7 +1097,7 @@ pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
         .into_iter()
         .filter_map(|(keyword, set)| set.then(|| Flag::from_raw(keyword)))
         .collect();
-    let subject = email.subject.unwrap_or_default();
+    let subject = email.subject;
     let from = email
         .from
         .unwrap_or_default()
@@ -1433,7 +1419,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            subject: String::new(),
+            subject: None,
             from: Vec::new(),
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339(date).ok(),

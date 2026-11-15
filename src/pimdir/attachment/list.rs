@@ -22,6 +22,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
+    email::address::Address,
     pimdir::{
         attachment::{AttachmentQuery, PimdirAttachmentPage, page_token, parse_page_token},
         client::PimdirClient,
@@ -116,11 +117,11 @@ impl PimdirAttachmentListCommand {
 pub struct PimdirAttachmentEntry {
     /// The file's public id in the store.
     pub id: String,
-    /// Its name, decoded; `null` when the part names none.
-    pub name: Option<String>,
-    /// Its media type, lowercased, parameters dropped; `null` when the
+    /// Its file name, decoded; `null` when the part names none.
+    pub filename: Option<String>,
+    /// Its MIME type, lowercased, parameters dropped; `null` when the
     /// part states none.
-    pub media_type: Option<String>,
+    pub mime: Option<String>,
     /// Its size in octets, transfer encoding undone.
     pub size: Option<u64>,
     /// The id of its part in the message, the one `attachment download`
@@ -132,13 +133,11 @@ pub struct PimdirAttachmentEntry {
     pub section: Option<String>,
     /// The id of the message attaching it, which the message commands
     /// take with `mailbox`, as `envelope list` shows it.
-    pub message_id: String,
+    pub message: String,
     /// The mailbox of that message, a collection id.
     pub mailbox: String,
-    /// The message's sender address.
-    pub sender: Option<String>,
-    /// The sender's display name.
-    pub sender_name: Option<String>,
+    /// The message's sender, `null` when the store records no address.
+    pub from: Option<Address>,
     /// The message's date, RFC 3339.
     pub date: Option<String>,
 }
@@ -148,15 +147,20 @@ impl From<PimdirAccountAttachment> for PimdirAttachmentEntry {
         let summary = attachment.summary.unwrap_or_default();
         Self {
             id: attachment.seq.to_string(),
-            name: Some(summary.name).filter(|name| !name.is_empty()),
-            media_type: summary.media_type,
+            filename: Some(summary.name).filter(|name| !name.is_empty()),
+            mime: summary.media_type,
             size: summary.size,
             part: None,
             section: summary.part,
-            message_id: attachment.message_seq.to_string(),
+            message: attachment.message_seq.to_string(),
             mailbox: attachment.message_collection,
-            sender: attachment.sender,
-            sender_name: attachment.sender_name,
+            from: attachment
+                .sender
+                .filter(|email| !email.is_empty())
+                .map(|email| Address {
+                    name: attachment.sender_name.filter(|name| !name.is_empty()),
+                    email,
+                }),
             date: attachment.date,
         }
     }
@@ -226,21 +230,21 @@ impl fmt::Display for PimdirAttachmentListOutput {
                 .size
                 .map(|size| format_size(size, BINARY.space_after_value(false)));
             let date = file.date.as_deref().map(|date| self.format_date(date));
-            let from = match file.sender_name.as_deref() {
-                Some(name) if !name.is_empty() => Some(name),
-                _ => file.sender.as_deref(),
-            };
+            let from = file
+                .from
+                .as_ref()
+                .map(|from| from.name.as_deref().unwrap_or(&from.email));
 
             listing.items.push([
                 sanitize::text(&file.id).into_owned(),
                 size.unwrap_or_default(),
-                text(file.media_type.as_deref()),
+                text(file.mime.as_deref()),
                 text(file.part.as_deref()),
-                sanitize::text(&file.message_id).into_owned(),
+                sanitize::text(&file.message).into_owned(),
                 sanitize::text(&file.mailbox).into_owned(),
                 date.unwrap_or_default(),
                 text(from),
-                text(file.name.as_deref()),
+                text(file.filename.as_deref()),
             ]);
         }
 

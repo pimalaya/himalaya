@@ -6,10 +6,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::drafts::{
-    GmailDraft,
-    list::{GmailDraftsList, GmailDraftsListParams},
-};
+use io_gmail::v1::rest::drafts::list::GmailDraftsListParams;
 use pimalaya_cli::{
     listing::{Listing, ListingPage},
     printer::Printer,
@@ -17,10 +14,19 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
-use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    gmail::{client::GmailClient, format::str_of},
+};
 
 /// List Gmail drafts (users.drafts.list).
+///
+/// JSON output: Gmail's page as Gmail sent it, `{"drafts": [{"id",
+/// "message": {"id", "threadId"}}...], "resultSizeEstimate", "nextPage"}`,
+/// `nextPage` Gmail's `nextPageToken`, `null` on the last page.
 #[derive(Debug, Parser)]
 pub struct GmailDraftsListCommand {
     /// Gmail search query, using the same syntax as the Gmail search
@@ -47,23 +53,20 @@ impl GmailDraftsListCommand {
         account: &mut Account,
         client: &mut GmailClient,
     ) -> Result<()> {
-        let out = {
-            let params = GmailDraftsListParams {
-                q: self.query.as_deref(),
-                max_results: self.max_results,
-                page_token: self.page_token.as_deref(),
-                include_spam_trash: self.include_spam_trash,
-            };
-            let c = GmailDraftsList::new(&client.auth, &client.user_id, &params)?;
-            client.run(c)?
+        let params = GmailDraftsListParams {
+            q: self.query.as_deref(),
+            max_results: self.max_results,
+            page_token: self.page_token.as_deref(),
+            include_spam_trash: self.include_spam_trash,
         };
-        let response = out.response;
+        let page = client.raw_list("drafts", &params)?;
 
         printer.out(GmailDraftListOutput {
             account: account.name().to_string(),
             query: self.query,
-            drafts: response.drafts,
-            next_page: response.next_page_token,
+            drafts: page.items,
+            rest: page.rest,
+            next_page: page.next_page,
         })
     }
 }
@@ -78,8 +81,14 @@ pub struct GmailDraftListOutput {
     /// The search query, if any.
     #[serde(skip)]
     pub query: Option<String>,
-    /// The drafts of this page.
-    pub drafts: Vec<GmailDraft>,
+    /// The drafts of this page, each as Gmail sent it, `{id, message: {id,
+    /// threadId}}`.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub drafts: Vec<Value>,
+    /// The rest of the page as Gmail sent it, such as
+    /// `resultSizeEstimate`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The cursor of the next page, `null` once the listing is complete,
     /// given back through `--page-token`.
     pub next_page: Option<String>,
@@ -94,14 +103,12 @@ impl fmt::Display for GmailDraftListOutput {
         }
 
         for draft in &self.drafts {
-            let message = draft.message.as_ref();
-            let message_id = message.map(|m| m.id.as_str()).unwrap_or_default();
-            let thread_id = message
-                .and_then(|m| m.thread_id.as_deref())
-                .unwrap_or_default();
+            let message = draft.get("message").unwrap_or(&Value::Null);
+            let message_id = str_of(message, "id");
+            let thread_id = str_of(message, "threadId");
 
             listing.items.push([
-                sanitize::text(&draft.id),
+                sanitize::text(str_of(draft, "id")),
                 sanitize::text(message_id),
                 sanitize::text(thread_id),
             ]);

@@ -20,7 +20,7 @@ pub mod crlf;
 pub mod envelope;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod flag;
-#[cfg(all(test, any(feature = "gmail", feature = "msgraph")))]
+#[cfg(all(test, any(feature = "gmail", feature = "jmap", feature = "msgraph")))]
 pub mod http_script;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod mailbox;

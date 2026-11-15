@@ -1546,7 +1546,7 @@ pub(crate) fn envelope(
         message_id: mail.message_id,
         in_reply_to: mail.in_reply_to,
         flags: known_flags(flags),
-        subject: mail.subject,
+        subject: Some(mail.subject).filter(|subject| !subject.is_empty()),
         from: mail.from.into_iter().map(address).collect(),
         to: mail.to.into_iter().map(address).collect(),
         date: mail
@@ -2105,7 +2105,7 @@ mod tests {
         assert_eq!(envelope.id, "42");
         assert_eq!(envelope.message_id.as_deref(), Some("x@y"));
         assert_eq!(envelope.in_reply_to, ["parent@y"]);
-        assert_eq!(envelope.subject, "Hi");
+        assert_eq!(envelope.subject.as_deref(), Some("Hi"));
         assert_eq!(envelope.from[0].email, "a@x.org");
         assert_eq!(envelope.from[0].name.as_deref(), Some("Alice"));
         assert_eq!(envelope.to[0].email, "b@x.org");
@@ -2161,7 +2161,7 @@ mod tests {
         let envelope = envelope_from_item(&item);
         assert!(envelope.flags.is_empty());
         assert_eq!(envelope.id, "1");
-        assert_eq!(envelope.subject, "");
+        assert_eq!(envelope.subject, None);
     }
 
     #[test]
@@ -3812,9 +3812,13 @@ mod tests {
                 .unwrap()
                 .envelopes
                 .into_iter()
-                .map(|envelope| envelope.subject)
+                .map(|envelope| envelope.subject.unwrap_or_default())
                 .collect();
-            let mut other: Vec<String> = scanned.envelopes.into_iter().map(|e| e.subject).collect();
+            let mut other: Vec<String> = scanned
+                .envelopes
+                .into_iter()
+                .map(|e| e.subject.unwrap_or_default())
+                .collect();
             subjects.sort();
             other.sort();
             assert_eq!(subjects, other, "the two search paths disagree");

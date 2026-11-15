@@ -895,7 +895,7 @@ mod tests {
         let envelope = envelope_from_entry(&entry).unwrap();
         let raws: Vec<&str> = envelope.flags.iter().map(Flag::raw).collect();
 
-        assert_eq!(envelope.subject, "Hi");
+        assert_eq!(envelope.subject.as_deref(), Some("Hi"));
         assert_eq!(raws, ["\\Seen", "\\Answered"]);
     }
 
@@ -921,7 +921,11 @@ mod tests {
         let second = client.list_envelopes("A", Some(2), Some(1), false);
 
         for outcome in [listed, searched] {
-            let subjects: Vec<&str> = outcome.value.iter().map(|e| &*e.subject).collect();
+            let subjects: Vec<&str> = outcome
+                .value
+                .iter()
+                .map(|e| e.subject.as_deref().unwrap_or_default())
+                .collect();
             assert_eq!(subjects, ["Hi"]);
 
             let mut ids: Vec<&str> = outcome

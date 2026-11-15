@@ -264,7 +264,7 @@ impl fmt::Display for PimdirSearchThreadsOutput {
                 .map(|hit| format_names(&hit.envelope.from))
                 .unwrap_or_default();
             let subject = first
-                .map(|hit| hit.envelope.subject.as_str())
+                .and_then(|hit| hit.envelope.subject.as_deref())
                 .unwrap_or_default();
             let ids: Vec<&str> = thread
                 .hits
@@ -353,7 +353,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            subject: String::from("Quarterly report"),
+            subject: Some(String::from("Quarterly report")),
             from: vec![Address {
                 name: Some(String::from("Alice")),
                 email: String::from("alice@example.org"),

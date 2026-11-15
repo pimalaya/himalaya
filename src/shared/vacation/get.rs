@@ -59,8 +59,8 @@ pub fn vacation_fields(vacation: &Vacation) -> Fields<'static> {
     fields.push("Enabled", enabled);
 
     let rows = [
-        ("From", vacation.from.as_deref().map(line)),
-        ("To", vacation.to.as_deref().map(line)),
+        ("Start", vacation.start.as_deref().map(line)),
+        ("End", vacation.end.as_deref().map(line)),
         ("Subject", vacation.subject.as_deref().map(line)),
         ("Text", vacation.text.as_deref().map(sanitize_body)),
         ("HTML", vacation.html.as_deref().map(sanitize_body)),

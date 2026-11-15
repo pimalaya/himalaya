@@ -36,9 +36,9 @@ pub struct Envelope {
     /// nothing and a duplicate is nonsense.
     #[serde(default)]
     pub flags: BTreeSet<Flag>,
-    /// The `Subject:` header.
+    /// The `Subject:` header, decoded; `null` when the message has none.
     #[serde(default)]
-    pub subject: String,
+    pub subject: Option<String>,
     /// The senders.
     #[serde(default)]
     pub from: Vec<Address>,
@@ -224,7 +224,7 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
         message_id: ids(root.header::<MESSAGE_ID>()).into_iter().next(),
         in_reply_to: ids(root.header::<IN_REPLY_TO>()),
         flags: Default::default(),
-        subject: header::unstructured(root, "Subject").unwrap_or_default(),
+        subject: header::unstructured(root, "Subject"),
         from: addresses(root.header::<FROM>()),
         to: addresses(root.header::<TO>()),
         date,
@@ -304,5 +304,22 @@ mod tests {
             parse_message_ids(" <a@x.org> "),
             [normalize_message_id("<a@x.org>").unwrap()]
         );
+    }
+}
+
+#[cfg(all(test, any(feature = "maildir", feature = "mbox")))]
+mod subject_tests {
+    use super::from_raw;
+
+    /// A message without a `Subject:` prints `subject` as `null`, not as
+    /// an empty string.
+    #[test]
+    fn a_missing_subject_prints_null() {
+        let envelope = from_raw(b"From: a@example.org\r\n\r\nhi\r\n", false).unwrap();
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["subject"], serde_json::Value::Null);
+
+        let envelope = from_raw(b"Subject: Hi\r\n\r\nhi\r\n", false).unwrap();
+        assert_eq!(envelope.subject.as_deref(), Some("Hi"));
     }
 }

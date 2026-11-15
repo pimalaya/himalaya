@@ -7,8 +7,9 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_msgraph::v1::rest::users::mail_folders::{
-    MsgraphMailFolder, list::MsgraphMailFoldersListParams,
+use io_msgraph::v1::{
+    query::to_query_pairs,
+    rest::users::mail_folders::{MsgraphMailFolder, list::MsgraphMailFoldersListParams},
 };
 use pimalaya_cli::{
     clap::args::PageTokenArg,
@@ -18,6 +19,7 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
@@ -25,30 +27,33 @@ use crate::{
     listing,
     msgraph::{
         client::MsgraphClient,
-        messages::list::{next_page, resume, skip_of},
+        messages::list::{next_page, raw_page, resume, skip_of},
     },
 };
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).
 ///
 /// `nextPage` is Graph's next link as Graph gives it: `--page-token`
-/// follows it as is, the query it carries replacing the other options.
+/// follows it as is, carrying the query, so no other option goes beside
+/// it.
+///
+/// JSON output: `{"folders": [<raw Graph mail folder>...], "nextPage"}`.
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderListCommand {
     /// Maximum number of folders to return (OData `$top`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub top: Option<u32>,
     /// Number of folders to skip (OData `$skip`).
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", conflicts_with = "page_token")]
     pub skip: Option<u32>,
     #[command(flatten)]
     pub page_token: PageTokenArg,
     /// OData `$select`: comma-separated fields to return (e.g.
     /// `displayName,totalItemCount`).
-    #[arg(long, value_name = "FIELDS")]
+    #[arg(long, value_name = "FIELDS", conflicts_with = "page_token")]
     pub select: Option<String>,
     /// Also include hidden folders.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "page_token")]
     pub hidden: bool,
 }
 
@@ -70,7 +75,7 @@ impl MsgraphMailFolderListCommand {
         let token = self.page_token.token.as_deref();
         let response = match token {
             Some(link) => resume(client, link)?,
-            None => client.mail_folders_list(&params)?.response,
+            None => raw_page(client, "mailFolders", &to_query_pairs(&params))?,
         };
         let next = next_page(response.next_link, token.map_or(self.skip, skip_of));
 
@@ -89,7 +94,10 @@ impl MsgraphMailFolderListCommand {
 pub struct MsgraphMailFolderListOutput {
     #[serde(skip)]
     account: String,
-    folders: Vec<MsgraphMailFolder>,
+    /// The folders, each as Graph sent it, every property it carries
+    /// kept.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    folders: Vec<Value>,
     /// Graph's next link, `null` once the listing is complete and for
     /// `get`, given back through `--page-token`.
     next_page: Option<String>,
@@ -100,9 +108,10 @@ pub struct MsgraphMailFolderListOutput {
 impl MsgraphMailFolderListOutput {
     /// Wraps the folders the server returned for `account`.
     pub fn new(account: &Account, folders: Vec<MsgraphMailFolder>) -> Self {
+        let folders = folders.iter().filter_map(|f| serde_json::to_value(f).ok());
         Self {
             account: account.name().to_string(),
-            folders,
+            folders: folders.collect(),
             next_page: None,
             paged: false,
         }
@@ -110,11 +119,12 @@ impl MsgraphMailFolderListOutput {
 
     /// Wraps one page of the folders the server listed for `account`,
     /// `next` resuming the listing.
-    pub fn page(account: &Account, folders: Vec<MsgraphMailFolder>, next: Option<String>) -> Self {
+    pub fn page(account: &Account, folders: Vec<Value>, next: Option<String>) -> Self {
         Self {
+            account: account.name().to_string(),
+            folders,
             next_page: next,
             paged: true,
-            ..Self::new(account, folders)
         }
     }
 }
@@ -124,6 +134,8 @@ impl fmt::Display for MsgraphMailFolderListOutput {
         let mut listing = Listing::new(&self.account, Some(Backend::Msgraph.as_str()));
 
         for folder in &self.folders {
+            let folder: MsgraphMailFolder =
+                serde_json::from_value(folder.clone()).unwrap_or_default();
             listing.items.push([
                 sanitize::text(&folder.id).into_owned(),
                 listing::counts(folder.unread_item_count, folder.total_item_count),

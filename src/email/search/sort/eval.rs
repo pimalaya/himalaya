@@ -34,7 +34,7 @@ fn compare_with(left: &Envelope, right: &Envelope, sort: &[SearchEmailsSorter]) 
             SearchEmailsSorterKind::From => casemap_cmp(mailbox(&left.from), mailbox(&right.from)),
             SearchEmailsSorterKind::To => casemap_cmp(mailbox(&left.to), mailbox(&right.to)),
             SearchEmailsSorterKind::Subject => {
-                casemap_cmp(&base_subject(&left.subject), &base_subject(&right.subject))
+                casemap_cmp(&base_subject(subject(left)), &base_subject(subject(right)))
             }
         };
         let cmp = match order {
@@ -46,6 +46,11 @@ fn compare_with(left: &Envelope, right: &Envelope, sort: &[SearchEmailsSorter]) 
         }
     }
     Ordering::Equal
+}
+
+/// The subject of an envelope, empty when it has none.
+fn subject(envelope: &Envelope) -> &str {
+    envelope.subject.as_deref().unwrap_or_default()
 }
 
 /// Compares two strings under `i;ascii-casemap` (RFC 4790): ASCII letters
@@ -172,7 +177,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            subject: String::from("Release notes"),
+            subject: Some(String::from("Release notes")),
             from: Vec::new(),
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339(date).ok(),
@@ -190,7 +195,7 @@ mod tests {
     fn with_subject(id: &str, subject: &str) -> Envelope {
         Envelope {
             id: id.into(),
-            subject: subject.into(),
+            subject: Some(subject.into()),
             ..envelope("2026-01-01T00:00:00+00:00")
         }
     }

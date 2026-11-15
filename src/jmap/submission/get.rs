@@ -4,14 +4,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::email_submission::get::JmapEmailSubmissionGetOptions;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
     error::{ErrorCode, partial_when},
     jmap::{
-        backend::not_found_errors, client::JmapClient, submission::query::JmapSubmissionQueryOutput,
+        backend::not_found_errors, client::JmapClient, raw,
+        submission::query::JmapSubmissionQueryOutput,
     },
 };
 
@@ -35,14 +35,13 @@ impl JmapSubmissionGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.email_submission_get(JmapEmailSubmissionGetOptions {
-            ids: Some(self.ids.clone()),
-        })?;
+        let output = raw::get(client, "EmailSubmission", &self.ids)?;
 
         let submissions = JmapSubmissionQueryOutput {
             account: account.name().to_string(),
             page: None,
-            submissions: output.submissions,
+            submissions: output.list,
+            rest: output.rest,
             next_page: None,
             errors: not_found_errors(output.not_found, ErrorCode::SubmissionNotFound),
         };

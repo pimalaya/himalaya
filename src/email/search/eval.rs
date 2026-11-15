@@ -108,7 +108,9 @@ fn matches(
         Q::Address(pattern) => [&envelope.from, &envelope.to, &copies.cc, &copies.bcc]
             .into_iter()
             .any(|addrs| addresses_contain(addrs, pattern)),
-        Q::Subject(pattern) => contains_ci(&envelope.subject, pattern),
+        Q::Subject(pattern) => {
+            contains_ci(envelope.subject.as_deref().unwrap_or_default(), pattern)
+        }
         Q::Body(pattern) => body_contains(raw, pattern),
         Q::Flag(flag) => envelope.flags.contains(flag),
         Q::Attachment => has_attachment(envelope, raw),
@@ -195,7 +197,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            subject: String::from("Release notes"),
+            subject: Some(String::from("Release notes")),
             from: vec![Address {
                 name: Some(String::from("Alice")),
                 email: String::from("alice@example.org"),

@@ -8,14 +8,22 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use humansize::{BINARY, format_size};
-use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
+use io_msgraph::v1::{rest::users::messages::attachments::MsgraphAttachment, send::path_segment};
 use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
-use crate::{account::context::Account, backend::Backend, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    msgraph::{client::MsgraphClient, messages::list::raw_page},
+};
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
+///
+/// JSON output: `{"attachments": [<raw Graph attachment>...]}`, every
+/// page Graph links to read.
 #[derive(Debug, Parser)]
 pub struct MsgraphAttachmentListCommand {
     /// The id of the message whose attachments to list.
@@ -32,7 +40,8 @@ impl MsgraphAttachmentListCommand {
         account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
-        let mut page = client.attachments_list(&self.message_id)?.response;
+        let path = format!("messages/{}/attachments", path_segment(&self.message_id)?);
+        let mut page = raw_page(client, &path, &[])?;
         let mut attachments = Vec::new();
 
         loop {
@@ -60,7 +69,10 @@ pub struct MsgraphAttachmentListOutput {
     account: String,
     #[serde(skip)]
     message: String,
-    attachments: Vec<MsgraphAttachment>,
+    /// The attachments of every page, each as Graph sent it, its
+    /// `contentBytes` included.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    attachments: Vec<Value>,
 }
 
 impl fmt::Display for MsgraphAttachmentListOutput {
@@ -69,6 +81,8 @@ impl fmt::Display for MsgraphAttachmentListOutput {
         listing.head("Message", &self.message);
 
         for attachment in &self.attachments {
+            let attachment: MsgraphAttachment =
+                serde_json::from_value(attachment.clone()).unwrap_or_default();
             let inline = match attachment.is_inline {
                 Some(true) => "inline",
                 _ => "",

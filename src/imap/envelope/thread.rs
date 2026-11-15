@@ -217,8 +217,9 @@ fn fetch_envelopes(
 pub struct ThreadEntry {
     /// The UID, or the message number under `--seq`.
     pub id: u32,
-    /// The `Subject:` header.
-    pub subject: String,
+    /// The `Subject:` header, `null` when the message has none or its
+    /// envelope could not be fetched.
+    pub subject: Option<String>,
     /// How deep in its conversation the message sits.
     pub depth: usize,
     /// The senders.
@@ -287,7 +288,7 @@ impl ImapThreadOutput {
 
         ThreadEntry {
             id,
-            subject: envelope.map(|e| e.subject.clone()).unwrap_or_default(),
+            subject: envelope.and_then(|e| e.subject.clone()),
             depth,
             from: envelope.map(|e| e.from.clone()).unwrap_or_default(),
             date: envelope.and_then(|e| e.date),
@@ -313,7 +314,7 @@ impl fmt::Display for ImapThreadOutput {
 
             let date = format_date(entry.date, &self.datetime_fmt, self.datetime_local_tz);
             let indent = "  ".repeat(entry.depth);
-            let subject = sanitize::text(&entry.subject);
+            let subject = sanitize::text(entry.subject.as_deref().unwrap_or_default());
 
             listing.items.push([
                 entry.id.to_string(),
@@ -394,7 +395,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags,
-            subject: String::from(subject),
+            subject: Some(String::from(subject)),
             from: vec![Address {
                 name: Some(String::from(name)),
                 email: format!("{}@example.org", name.to_lowercase()),

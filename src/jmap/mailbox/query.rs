@@ -9,10 +9,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use io_jmap::rfc8621::mailbox::{
     JmapMailbox, JmapMailboxRole,
-    query::{
-        JmapMailboxFilter, JmapMailboxQueryOptions, JmapMailboxSortComparator,
-        JmapMailboxSortProperty,
-    },
+    query::{JmapMailboxFilter, JmapMailboxSortComparator, JmapMailboxSortProperty},
 };
 use pimalaya_cli::{
     clap::args::PageTokenArg,
@@ -22,14 +19,16 @@ use pimalaya_cli::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
     backend::Backend,
     error::{ErrorCode, ItemError, partial_when},
     jmap::{
-        backend::{get_errors, query_page_follows},
+        backend::{not_found_errors, query_page_follows},
         client::JmapClient,
+        raw,
     },
     listing,
 };
@@ -109,33 +108,26 @@ impl JmapMailboxQueryCommand {
             if has_one_filter { Some(f) } else { None }
         };
 
-        let sort = Some(vec![JmapMailboxSortComparator {
+        let sort = vec![JmapMailboxSortComparator {
             property: self.sort.into(),
             is_ascending: Some(!self.desc),
-        }]);
+        }];
 
-        let output = client.mailbox_query(JmapMailboxQueryOptions {
-            filter,
-            sort,
-            position: Some((page - 1).saturating_mul(self.page_size)),
-            limit: Some(self.page_size),
-            properties: None,
-        })?;
+        let position = (page - 1).saturating_mul(self.page_size);
+        let args = raw::query_args(filter, Some(sort), position, self.page_size)?;
+        let output = raw::query(client, "Mailbox", args)?;
 
-        let listed = output.mailboxes.len() + output.unparsed.len() + output.not_found.len();
-        let follows = query_page_follows(output.total, listed, page, self.page_size);
+        let total = output.rest.get("total").and_then(Value::as_u64);
+        let listed = output.list.len() + output.not_found.len();
+        let follows = query_page_follows(total, listed, page, self.page_size);
 
         let mailboxes = JmapMailboxQueryOutput {
             account: account.name().to_string(),
             page: Some((page, self.page_size)),
-            mailboxes: output.mailboxes,
+            mailboxes: output.list,
+            rest: output.rest,
             next_page: follows.then(|| (page + 1).to_string()),
-            errors: get_errors(
-                output.not_found,
-                output.unparsed,
-                ErrorCode::MailboxNotFound,
-                ErrorCode::MailboxUnreadable,
-            ),
+            errors: not_found_errors(output.not_found, ErrorCode::MailboxNotFound),
         };
 
         printer.out(&mailboxes)?;
@@ -154,13 +146,17 @@ pub struct JmapMailboxQueryOutput {
     /// The page listed and its size, `None` for a get.
     #[serde(skip)]
     pub page: Option<(u64, u64)>,
-    /// The mailboxes, in the order the server returned them.
-    pub mailboxes: Vec<JmapMailbox>,
+    /// The mailboxes, each as the server sent it, in its order.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    pub mailboxes: Vec<Value>,
+    /// The rest of the server's answers: the query's `queryState`,
+    /// `canCalculateChanges`, `position` and `total`, the get's `state`.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
     /// The number of the next page, `null` once the query is complete and
     /// for a get, given back through `--page-token`.
     pub next_page: Option<String>,
-    /// The error of each mailbox the server did not find or that did not
-    /// deserialize, in the order met.
+    /// The error of each mailbox the server did not find (`notFound`).
     pub errors: Vec<ItemError>,
 }
 
@@ -169,6 +165,16 @@ impl fmt::Display for JmapMailboxQueryOutput {
         let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for mailbox in &self.mailboxes {
+            let Ok(mailbox) = serde_json::from_value::<JmapMailbox>(mailbox.clone()) else {
+                let id = mailbox.get("id").and_then(Value::as_str);
+                listing.items.push(
+                    [sanitize::text(id.unwrap_or("Unknown")).into_owned()]
+                        .into_iter()
+                        .chain(std::iter::repeat_n(String::new(), 4))
+                        .collect::<Vec<_>>(),
+                );
+                continue;
+            };
             let text = |value: &Option<String>| {
                 sanitize::text(value.as_deref().unwrap_or("Unknown")).into_owned()
             };
@@ -303,15 +309,19 @@ mod tests {
     /// in text.
     #[test]
     fn a_full_page_names_the_next_only_when_one_follows() {
-        let mailbox = |id: &str| JmapMailbox {
-            id: Some(id.to_owned()),
-            name: Some(id.to_owned()),
-            ..Default::default()
+        let mailbox = |id: &str| {
+            let mailbox = JmapMailbox {
+                id: Some(id.to_owned()),
+                name: Some(id.to_owned()),
+                ..Default::default()
+            };
+            serde_json::to_value(mailbox).unwrap()
         };
         let mut output = JmapMailboxQueryOutput {
             account: String::from("work"),
             page: Some((1, 2)),
             mailboxes: vec![mailbox("M1"), mailbox("M2")],
+            rest: Default::default(),
             next_page: None,
             errors: Vec::new(),
         };

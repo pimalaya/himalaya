@@ -216,7 +216,7 @@ pub fn envelope_cells(env: &Envelope, datetime_fmt: &str, local_tz: bool) -> [St
         format_flags(&env.flags, env.has_attachment),
         format_date(env.date, datetime_fmt, local_tz),
         sanitize::text(&format_names(&env.from)).into_owned(),
-        sanitize::text(&env.subject).into_owned(),
+        sanitize::text(env.subject.as_deref().unwrap_or_default()).into_owned(),
     ]
 }
 
@@ -315,7 +315,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: flags.iter().copied().map(Flag::from_iana).collect(),
-            subject: String::from(subject),
+            subject: Some(String::from(subject)),
             from: vec![from],
             to: Vec::new(),
             date: DateTime::parse_from_rfc3339("2026-11-11T10:00:00+01:00").ok(),
@@ -509,7 +509,7 @@ Page:       1, envelopes 1 to 2, the last
             in_reply_to: Vec::new(),
             flags: Default::default(),
             // Writes the clipboard (OSC 52), then clears the screen.
-            subject: String::from("Hi\x1b]52;c;ZWNobyBoaQ==\x07\x1b[2J"),
+            subject: Some(String::from("Hi\x1b]52;c;ZWNobyBoaQ==\x07\x1b[2J")),
             from: vec![Address {
                 name: Some(String::from("Eve\x1b[8m")),
                 email: String::from("eve@example.org"),

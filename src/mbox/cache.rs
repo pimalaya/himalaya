@@ -129,7 +129,7 @@ mod tests {
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            subject: format!("subject {id}"),
+            subject: Some(format!("subject {id}")),
             from: Vec::new(),
             to: Vec::new(),
             date: None,

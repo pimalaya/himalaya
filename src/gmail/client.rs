@@ -13,10 +13,13 @@ use std::ops::{Deref, DerefMut};
 use anyhow::{Result, anyhow, bail};
 use io_gmail::v1::{
     client::{GmailClientStd as Inner, GmailClientStdConnectOptions, GmailClientStdError},
-    send::{GmailApiError, GmailSendError},
+    query::to_query_pairs,
+    send::{GmailApiError, GmailSend, GmailSendError, gmail_api_url},
 };
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
+use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
@@ -28,6 +31,17 @@ use crate::{
     email::mailbox::{MailboxIndex, MailboxRole},
     error::ErrorCode,
 };
+
+/// One page of a Gmail listing as Gmail sent it, its cursor lifted out.
+pub struct GmailRawPage {
+    /// The items of the page, each as Gmail sent it.
+    pub items: Vec<Value>,
+    /// The other keys of the page, such as `resultSizeEstimate` or
+    /// `historyId`.
+    pub rest: Map<String, Value>,
+    /// Gmail's `nextPageToken`, `None` on the last page.
+    pub next_page: Option<String>,
+}
 
 /// A live Gmail client and the label index it caches.
 pub struct GmailClient {
@@ -80,6 +94,36 @@ impl GmailClient {
     /// renamed or deleted since.
     pub fn forget_mailboxes(&mut self) {
         self.label_index = None;
+    }
+
+    /// One page of the listing at `users/<user>/<collection>`, queried by
+    /// `params`, as Gmail sent it: the items under `collection` (`[]` when
+    /// Gmail leaves the key out of an empty page), the rest of the page
+    /// beside them and the `nextPageToken` taken out as the cursor.
+    pub fn raw_list<P: Serialize>(&mut self, collection: &str, params: &P) -> Result<GmailRawPage> {
+        let mut url = gmail_api_url(&["users", &self.user_id, collection])?;
+        let pairs = to_query_pairs(params).map_err(GmailSendError::from)?;
+        if !pairs.is_empty() {
+            url.query_pairs_mut().extend_pairs(pairs);
+        }
+
+        let send = GmailSend::<Map<String, Value>>::get(&self.auth, url)?;
+        let mut rest = self.run(send)?.response;
+
+        let next_page = match rest.remove("nextPageToken") {
+            Some(Value::String(token)) => Some(token),
+            _ => None,
+        };
+        let items = match rest.remove(collection) {
+            Some(Value::Array(items)) => items,
+            _ => Vec::new(),
+        };
+
+        Ok(GmailRawPage {
+            items,
+            rest,
+            next_page,
+        })
     }
 
     fn label_index(&mut self) -> Result<&MailboxIndex> {

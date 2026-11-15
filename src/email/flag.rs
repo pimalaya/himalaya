@@ -23,7 +23,11 @@ use crate::capability::Capability;
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Flag {
+    /// The spelling the backend stores: an IMAP flag or keyword, a JMAP
+    /// keyword, a Gmail label, a Maildir or mbox letter.
     raw: String,
+    /// The IANA keyword it stands for, `null` for a keyword none
+    /// registers.
     iana: Option<IanaFlag>,
 }
 
@@ -94,6 +98,17 @@ impl Flag {
         Self {
             raw: canonical_raw(iana).to_string(),
             iana: Some(iana),
+        }
+    }
+
+    /// Builds a [`Flag`] from a store's own spelling and the IANA keyword
+    /// it stands for, which the spelling alone does not tell (a Maildir
+    /// info letter, an mbox status letter).
+    #[cfg(any(feature = "maildir", feature = "mbox"))]
+    pub fn spelled(raw: impl Into<String>, iana: Option<IanaFlag>) -> Self {
+        Self {
+            raw: raw.into(),
+            iana,
         }
     }
 
