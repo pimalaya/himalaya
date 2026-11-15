@@ -55,7 +55,7 @@ use crate::{
     account::cli::AccountCommand,
     backend::Backend,
     config::{AccountConfig, Config},
-    error::ErrorCode,
+    error::{self, ErrorCode},
     json_schema,
     mcp::McpCommand,
     repl::ReplCommand,
@@ -413,7 +413,7 @@ impl Command {
                 match cmd.execute(session) {
                     Err(err) if err.is::<ConfigMissingError>() && is_wanted(&*printer) => Err(err),
                     result => {
-                        exit_on_failure::<ErrorCode, _>(result);
+                        exit_on_failure::<ErrorCode, _>(result.map_err(error::coded));
                         Ok(())
                     }
                 }

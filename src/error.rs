@@ -17,7 +17,8 @@
 
 #[cfg(feature = "pimdir")]
 use io_pimdir::client::PimdirError;
-use pimalaya_cli::error::CodedError;
+use pimalaya_cli::error::{CodedError, with_code};
+use pimalaya_config::toml::AccountError;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -156,6 +157,37 @@ pub enum ErrorCode {
     /// The pimdir tag names no flag, or adds and removes one flag:
     /// nothing was staged.
     TagRefused,
+    /// No account has the name `-a` gives (`default` among them, a name
+    /// like any other).
+    AccountMissing,
+    /// No account is marked default, and `-a` names none.
+    AccountDefaultMissing,
+    /// Several accounts are marked default, and `-a` names none.
+    AccountDefaultSeveral,
+    /// The account's backend is one this build leaves out: rebuild with
+    /// the cargo feature the message names.
+    BackendNotBuilt,
+}
+
+impl ErrorCode {
+    /// The code of an account the configuration could not give.
+    pub fn of_account(err: &AccountError) -> Self {
+        match err {
+            AccountError::Missing { .. } => Self::AccountMissing,
+            AccountError::NoDefault => Self::AccountDefaultMissing,
+            AccountError::SeveralDefaults(_) => Self::AccountDefaultSeveral,
+        }
+    }
+}
+
+/// Gives a failure the code of the account refusal its chain carries,
+/// its messages kept, as the report reads it (see [`with_code`]).
+pub fn coded(err: anyhow::Error) -> anyhow::Error {
+    with_code(err, |err| {
+        err.chain()
+            .find_map(|cause| cause.downcast_ref::<AccountError>())
+            .map(ErrorCode::of_account)
+    })
 }
 
 /// A refusal under `mailbox-not-found`: the mailbox named does not

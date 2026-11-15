@@ -34,7 +34,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     capability::{self, Capability, Resolution, Support},
     cli::{Cli, Command, resolve_account},
-    error::ErrorCode,
+    error::{self, ErrorCode},
     json_schema,
     session::Session,
 };
@@ -574,7 +574,7 @@ fn tool_result(
     printer: CapturePrinter,
     result: Result<()>,
 ) -> ToolResult {
-    let mut result = ToolResult::printed::<ErrorCode>(printer, result);
+    let mut result = ToolResult::printed::<ErrorCode>(printer, result.map_err(error::coded));
 
     if !tool.part || result.is_error {
         return result;

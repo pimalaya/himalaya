@@ -262,6 +262,7 @@ fn refuse_account<'de, D: Deserializer<'de>>(_: D) -> Result<Option<IgnoredAny>,
 mod tests {
     use std::{env::var, fs, io::Write};
 
+    use pimalaya_config::toml::AccountError;
     use tempfile::NamedTempFile;
 
     use crate::{backend::Backend, config::*};
@@ -278,9 +279,11 @@ mod tests {
         let err = config.take_account(None).unwrap_err().to_string();
         assert!(err.contains("(perso, work)"), "{err}");
 
+        // NOTE: `default` is a name like any other, which no account has.
         let mut config: Config = toml::from_str(toml).unwrap();
         let err = config.take_account(Some("default")).unwrap_err();
-        assert!(err.to_string().starts_with("Several accounts"), "{err}");
+        assert!(matches!(&err, AccountError::Missing { name, .. } if name == "default"));
+        assert!(err.to_string().contains("omit `-a`"), "{err}");
 
         let mut config: Config = toml::from_str(toml).unwrap();
         let (name, _) = config.take_account(Some("spare")).unwrap();
@@ -300,6 +303,23 @@ mod tests {
         let err = err.to_string();
         assert!(err.contains("`m2dir` block is ignored"), "{err}");
         assert!(err.contains("MIGRATION.md"), "{err}");
+    }
+
+    /// A block of a backend the build leaves out loads, and using it
+    /// fails coded `backend-not-built`, naming the cargo feature.
+    #[cfg(not(feature = "mbox"))]
+    #[test]
+    fn a_backend_left_out_of_the_build_names_its_feature() {
+        let toml = "[accounts.example]\ndefault = true\nmbox.root = \"~/mbox\"\n";
+        let mut config: Config = toml::from_str(toml).unwrap();
+        let (name, account) = config.take_account(None).unwrap();
+
+        for backend in [Backend::Auto, Backend::Mbox] {
+            let err = account.no_backend_error(&name, backend, Backend::COMPILED);
+            let code = pimalaya_cli::error::code_of(&err);
+            assert_eq!(code, Some(crate::error::ErrorCode::BackendNotBuilt));
+            assert!(err.to_string().contains("--features mbox"), "{err}");
+        }
     }
 
     #[test]

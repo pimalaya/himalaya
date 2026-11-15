@@ -9,7 +9,7 @@ use std::process;
 use anyhow::Result;
 use himalaya::{
     cli::{self, Cli, Command},
-    error::ErrorCode,
+    error::{self, ErrorCode},
     session::{Session, SessionAccount},
 };
 use pimalaya_cli::{
@@ -36,7 +36,7 @@ fn main() {
         backend: cli.backend,
     };
 
-    let result = execute(cli.cmd, &cli.log, account, &mut printer);
+    let result = execute(cli.cmd, &cli.log, account, &mut printer).map_err(error::coded);
 
     // A person missing a configuration meets the welcome, a script or a
     // JSON caller the error.

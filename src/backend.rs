@@ -7,8 +7,9 @@ use std::fmt;
 
 use anyhow::{Error, anyhow};
 use clap::ValueEnum;
+use pimalaya_cli::error::CodedError;
 
-use crate::{capability, config::AccountConfig};
+use crate::{capability, config::AccountConfig, error::ErrorCode};
 
 /// Selects which backend a cross-protocol command targets.
 ///
@@ -155,6 +156,25 @@ impl AccountConfig {
     /// account lacks is refused under `capability-missing`, as the resolver
     /// refuses a verb the filter leaves unserved.
     pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
+        // NOTE: a block of a backend this build leaves out loads, so one
+        // file serves every build; using it names the cargo feature.
+        let unbuilt: Vec<Backend> = match backend {
+            Backend::Auto => {
+                let configured = self.configured();
+                let usable = configured.iter().any(|b| supported.contains(b));
+                configured
+                    .into_iter()
+                    .filter(|b| !usable && !Backend::COMPILED.contains(b))
+                    .collect()
+            }
+            backend if !Backend::COMPILED.contains(&backend) => vec![backend],
+            _ => Vec::new(),
+        };
+
+        if !unbuilt.is_empty() {
+            return backend_not_built(&unbuilt);
+        }
+
         let (reason, missing) = match backend {
             Backend::Auto => {
                 let supported: Vec<String> = supported.iter().map(|b| format!("`{b}`")).collect();
@@ -164,8 +184,7 @@ impl AccountConfig {
                 (reason, false)
             }
             backend if !supported.contains(&backend) => {
-                let reason =
-                    format!("Backend `{backend}` is not supported by this command or build");
+                let reason = format!("Backend `{backend}` is not supported by this command");
                 (reason, false)
             }
             backend => (format!("Account `{name}` has no `{backend}` block"), true),
@@ -187,4 +206,38 @@ impl AccountConfig {
             anyhow!(reason)
         }
     }
+
+    /// The backends whose block the account holds, compiled in or not.
+    fn configured(&self) -> Vec<Backend> {
+        let blocks = [
+            (Backend::Imap, self.imap.is_some()),
+            (Backend::Jmap, self.jmap.is_some()),
+            (Backend::Gmail, self.gmail.is_some()),
+            (Backend::Msgraph, self.msgraph.is_some()),
+            (Backend::Maildir, self.maildir.is_some()),
+            (Backend::Mbox, self.mbox.is_some()),
+            (Backend::Pimdir, self.pimdir.is_some()),
+            (Backend::Smtp, self.smtp.is_some()),
+            (Backend::Sieve, self.sieve.is_some()),
+        ];
+
+        blocks
+            .into_iter()
+            .filter_map(|(backend, present)| present.then_some(backend))
+            .collect()
+    }
+}
+
+/// The failure of a command needing `backends`, which this build leaves
+/// out, coded `backend-not-built` and naming their cargo features.
+fn backend_not_built(backends: &[Backend]) -> Error {
+    let names: Vec<String> = backends.iter().map(|b| format!("`{b}`")).collect();
+    let features: Vec<&str> = backends.iter().map(|b| b.as_str()).collect();
+    let message = format!(
+        "This build leaves out the {} backend, rebuild with `--features {}`",
+        names.join(", "),
+        features.join(","),
+    );
+
+    CodedError::new(ErrorCode::BackendNotBuilt, message).into()
 }
