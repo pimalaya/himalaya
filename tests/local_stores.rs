@@ -228,7 +228,7 @@ fn a_file_that_is_no_mbox_is_refused_and_a_missing_one_coded() {
         "{out}"
     );
 
-    let args = ["mbox", "message", "save", "-m", "link", message];
+    let args = ["mbox", "message", "add", "-m", "link", message];
     let (ok, out) = himalaya(dir.path(), &lines, &args);
     assert!(!ok);
     assert!(

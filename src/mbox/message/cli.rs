@@ -9,7 +9,7 @@ use pimalaya_cli::printer::Printer;
 use crate::mbox::{
     client::MboxClient,
     message::{
-        copy::MboxMessageCopyCommand, r#move::MboxMessageMoveCommand, save::MboxMessageSaveCommand,
+        add::MboxMessageAddCommand, copy::MboxMessageCopyCommand, r#move::MboxMessageMoveCommand,
     },
 };
 
@@ -20,7 +20,8 @@ use crate::mbox::{
 /// unified `message` and `envelope` commands.
 #[derive(Debug, Subcommand)]
 pub enum MboxMessageCommand {
-    Save(MboxMessageSaveCommand),
+    #[command(alias = "save")]
+    Add(MboxMessageAddCommand),
     Copy(MboxMessageCopyCommand),
     Move(MboxMessageMoveCommand),
 }
@@ -29,7 +30,7 @@ impl MboxMessageCommand {
     /// Runs the subcommand against the account's mbox files.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
         match self {
-            Self::Save(cmd) => cmd.execute(printer, client),
+            Self::Add(cmd) => cmd.execute(printer, client),
             Self::Copy(cmd) => cmd.execute(printer, client),
             Self::Move(cmd) => cmd.execute(printer, client),
         }

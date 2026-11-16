@@ -80,10 +80,10 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **A Maildir file or an mbox message holding no header field is an error, not a row.** `envelope list|search` print it under `errors`, coded `message-unreadable` with its id, and exit 3, where v2 listed it with empty cells and exited 0. `message read` still reads its bytes as the body.
 - **A search clause a backend cannot answer fails** with `search-unsupported`, quoting the clause, rather than being dropped; a query that does not parse fails with `search-invalid`.
 - **An IMAP keyword a mailbox would not keep fails** with `capability-missing` when the mailbox's `PERMANENTFLAGS` lists neither it nor `\*`, rather than being stored for the session and lost on the next one. `message forward --send` still only warns when its `$Forwarded` is refused.
-- **`-f/--flag` takes one value per occurrence** on `message add`, `imap append`, `imap store`, `maildir message save` and `mbox message save`: `-f seen flagged msg.eml` read the path as a flag. Repeat the flag, `-f seen -f flagged msg.eml`.
+- **`-f/--flag` takes one value per occurrence** on `message add`, `imap append`, `imap store`, `maildir message add` and `mbox message add`: `-f seen flagged msg.eml` read the path as a flag. Repeat the flag, `-f seen -f flagged msg.eml`.
 - **A message argument naming no file must be a message.** `message add`, `message send` and the protocol saves refuse a positional that is neither a file nor a message opening on a header field, where they stored a mistyped path as a message.
-- **`maildir message save -f` needs `--subdir cur`**: a message saved to `new`, the default, carries no flags, and the flags are now refused there rather than written.
-- **`maildir flag set` and `mbox flag set` need `-f`**, where they cleared every flag without one: drop the flags with `maildir flag remove` or `mbox flag remove`, naming them. **`--subdir tmp` is gone** from `maildir message save|copy|move`: pass `cur` or `new`.
+- **`maildir message add -f` needs `--subdir cur`**: a message saved to `new`, the default, carries no flags, and the flags are now refused there rather than written.
+- **`maildir flag set` and `mbox flag set` need `-f`**, where they cleared every flag without one: drop the flags with `maildir flag remove` or `mbox flag remove`, naming them. **`--subdir tmp` is gone** from `maildir message add|copy|move`: pass `cur` or `new`.
 - **mbox `INBOX` needs `mbox.inbox`** unless the root holds a file of that name: set the spool, or pass the mailbox by name.
 - **`--page 0` is refused** by `envelope list` and `envelope search`, where it listed every envelope: pass `--page-size 0` for the whole mailbox.
 - **`--no-save` needs `--send`** on `message compose`, `reply` and `forward`.
@@ -104,6 +104,18 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **A pimdir `flag add` or `flag remove` no longer overwrites a flag a sync changed meanwhile**: the queued change is applied to the flags the message holds when the sync engine reaches it. `flag set` still replaces them all. A `message delete` or a `message move` queued on a message a sync left in conflict is parked rather than applied: the message stays listed where it was, and `pimdir queue list` on its mailbox shows the row with why.
 - **`attachment download` without an id skips the inline parts**, as `attachment list` does: pass `--inline` (`-i`) to write them too.
 - **The root Maildir is named `INBOX`**, or `.` when a top-level `Inbox` folder is a Maildir, in `mailbox list` and `maildir list`, where it listed under its folder's basename: a script matching that name matches `INBOX` or the id (its path), which is unchanged.
+- **`maildir message save` and `mbox message save` are `maildir message add` and `mbox message add`**, `add` creating an item across the family. **The old names still work**, hidden from the help, and print the same JSON (the text confirmation reads `successfully added`); only a JSON schema read by its name moves:
+
+  ```sh
+  # before (v2)
+  himalaya maildir message save -m INBOX msg.eml
+  himalaya json-schema himalaya-maildir-message-save
+  # after (v3)
+  himalaya maildir message add -m INBOX msg.eml
+  himalaya json-schema himalaya-maildir-message-add
+  ```
+
+  `himalaya-mbox-message-save` is `himalaya-mbox-message-add` likewise.
 - **The raw local-store copies and moves print the target ids.** `maildir message copy|move` and `mbox message copy|move` print `{ids}` the messages got in the target, each once, where they echoed the source ids: read a moved message by the printed id.
 
 ### New

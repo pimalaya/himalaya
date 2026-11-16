@@ -1,6 +1,6 @@
-//! # mbox message save
+//! # mbox message add
 //!
-//! The `mbox message save` command, appending a raw message to an mbox.
+//! The `mbox message add` command, appending a raw message to an mbox.
 
 use std::fmt;
 
@@ -22,7 +22,7 @@ use crate::{
 /// input, and lands at the end of the file under lock, quoted in the
 /// configured format.
 #[derive(Debug, Parser)]
-pub struct MboxMessageSaveCommand {
+pub struct MboxMessageAddCommand {
     #[command(flatten)]
     pub mbox: MboxPathFlag,
     /// The flags to store with the message.
@@ -32,7 +32,7 @@ pub struct MboxMessageSaveCommand {
     pub message: MessageArg,
 }
 
-impl MboxMessageSaveCommand {
+impl MboxMessageAddCommand {
     /// Appends the raw message to the mbox.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MboxClient) -> Result<()> {
         let path = client.open_mbox(&self.mbox.inner)?;
@@ -41,19 +41,19 @@ impl MboxMessageSaveCommand {
 
         let id = client.append(&path, flags, msg)?;
 
-        printer.out(MboxMessageSaveOutput { id })
+        printer.out(MboxMessageAddOutput { id })
     }
 }
 
-/// Output of a saved mbox message: its id.
+/// Output of an mbox message added: its id.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MboxMessageSaveOutput {
+pub struct MboxMessageAddOutput {
     id: String,
 }
 
-impl fmt::Display for MboxMessageSaveOutput {
+impl fmt::Display for MboxMessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Message `{}` successfully saved", self.id)
+        writeln!(f, "Message `{}` successfully added", self.id)
     }
 }

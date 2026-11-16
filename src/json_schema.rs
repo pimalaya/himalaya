@@ -424,8 +424,8 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::maildir::flag::list::MaildirFlagListOutput
         );
         insert!(
-            "himalaya-maildir-message-save",
-            crate::maildir::message::save::MaildirMessageSaveOutput
+            "himalaya-maildir-message-add",
+            crate::maildir::message::add::MaildirMessageAddOutput
         );
     }
 
@@ -437,8 +437,8 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::mbox::flag::list::MboxFlagListOutput
         );
         insert!(
-            "himalaya-mbox-message-save",
-            crate::mbox::message::save::MboxMessageSaveOutput
+            "himalaya-mbox-message-add",
+            crate::mbox::message::add::MboxMessageAddOutput
         );
     }
 

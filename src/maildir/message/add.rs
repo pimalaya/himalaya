@@ -1,6 +1,6 @@
-//! # Maildir message save
+//! # Maildir message add
 //!
-//! The `maildir message save` command, delivering a raw message into a
+//! The `maildir message add` command, delivering a raw message into a
 //! Maildir.
 
 use std::{fmt, path::PathBuf};
@@ -26,7 +26,7 @@ use crate::{
 /// The message comes from a file path, an inline string or piped standard
 /// input, and lands under the chosen subdirectory, `new` by default.
 #[derive(Debug, Parser)]
-pub struct MaildirMessageSaveCommand {
+pub struct MaildirMessageAddCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     /// The subdirectory of the Maildir
@@ -41,11 +41,11 @@ pub struct MaildirMessageSaveCommand {
     pub message: MessageArg,
 }
 
-impl MaildirMessageSaveCommand {
+impl MaildirMessageAddCommand {
     /// Delivers the raw message into the Maildir.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         if !self.flags.is_empty() && matches!(self.subdir, MaildirSubdirArg::New) {
-            bail!("A message saved to `new` carries no flags; pass `--subdir cur` to keep them");
+            bail!("A message added to `new` carries no flags; pass `--subdir cur` to keep them");
         }
 
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
@@ -55,22 +55,22 @@ impl MaildirMessageSaveCommand {
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg)?;
         let path = PathBuf::from(path.into_string());
 
-        printer.out(MaildirMessageSaveOutput { id, path })
+        printer.out(MaildirMessageAddOutput { id, path })
     }
 }
 
-/// Output of a saved Maildir message: its id and file path.
+/// Output of a Maildir message added: its id and file path.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MaildirMessageSaveOutput {
+pub struct MaildirMessageAddOutput {
     id: String,
     path: PathBuf,
 }
 
-impl fmt::Display for MaildirMessageSaveOutput {
+impl fmt::Display for MaildirMessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = &self.id;
         let path = self.path.display();
-        writeln!(f, "Message `{id}` successfully saved to {path}")
+        writeln!(f, "Message `{id}` successfully added to {path}")
     }
 }

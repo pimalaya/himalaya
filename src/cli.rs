@@ -637,4 +637,65 @@ mod tests {
         assert_eq!(request.method_calls, ["[]"]);
         assert_eq!(request.using, ["urn:x"]);
     }
+
+    /// Renders the help of the `message` group of a raw namespace.
+    #[cfg(any(feature = "maildir", feature = "mbox"))]
+    fn message_help(namespace: &str) -> String {
+        use clap::CommandFactory;
+
+        Cli::command()
+            .find_subcommand_mut(namespace)
+            .unwrap()
+            .find_subcommand_mut("message")
+            .unwrap()
+            .render_help()
+            .to_string()
+    }
+
+    /// `add` creates an item across the family (pimalaya-cli
+    /// commands.md), `save` staying a hidden alias.
+    #[cfg(feature = "maildir")]
+    #[test]
+    fn a_maildir_message_is_added() {
+        use crate::{
+            cli::Command,
+            maildir::{cli::MaildirCommand, message::cli::MaildirMessageCommand},
+        };
+
+        for verb in ["add", "save"] {
+            let cli = parse(&["maildir", "message", verb, "-m", "INBOX", "m.eml"]);
+            let Some(Command::Maildir(MaildirCommand::Message(MaildirMessageCommand::Add(_)))) =
+                cli.cmd
+            else {
+                panic!("{verb}: {:?}", cli.cmd);
+            };
+        }
+
+        let help = message_help("maildir");
+        assert!(help.contains("  add "), "{help}");
+        assert!(!help.contains("save"), "{help}");
+    }
+
+    /// `add` creates an item across the family (pimalaya-cli
+    /// commands.md), `save` staying a hidden alias.
+    #[cfg(feature = "mbox")]
+    #[test]
+    fn an_mbox_message_is_added() {
+        use crate::{
+            cli::Command,
+            mbox::{cli::MboxCommand, message::cli::MboxMessageCommand},
+        };
+
+        for verb in ["add", "save"] {
+            let cli = parse(&["mbox", "message", verb, "-m", "INBOX", "m.eml"]);
+            let Some(Command::Mbox(MboxCommand::Message(MboxMessageCommand::Add(_)))) = cli.cmd
+            else {
+                panic!("{verb}: {:?}", cli.cmd);
+            };
+        }
+
+        let help = message_help("mbox");
+        assert!(help.contains("  add "), "{help}");
+        assert!(!help.contains("save"), "{help}");
+    }
 }
