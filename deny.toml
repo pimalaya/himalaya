@@ -28,3 +28,11 @@ allow = [
   "Unicode-3.0",
   "Zlib",
 ]
+
+[advisories]
+# chrono is unmaintained, not vulnerable, with no maintained release to
+# move to. imap-types exposes it in its API (duesee/imap-codec#752), and
+# the family moves its own code to jiff.
+ignore = [
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, see duesee/imap-codec#752" },
+]
