@@ -14,7 +14,7 @@ The observations of the live provider run of 2026-11-18 (cairn/spec/testing/imap
 - src/tls.rs: a certificate or key file that cannot be opened fails before the connection, naming its path.
 - src/shared/envelope/search.rs: `envelope search --help` names the received-date exceptions (Gmail, JMAP under `or` or `not`).
 - cairn/spec/testing/provider-test-plan.md: `imap raw -- …`, `smtp raw -- …`, the Maildir surface with `--maildir`.
-- Tests, each failing on 3b9f9127: `a_two_digit_year_is_refused` (the diagnostic), tests/tls_cert.rs.
+- Tests, each failing on dd9c6b12: `a_two_digit_year_is_refused` (the diagnostic), tests/tls_cert.rs.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

@@ -8,7 +8,7 @@ status: current
 
 Companion to [jmap-fastmail.md](jmap-fastmail.md) (unified commands). This exercises `himalaya jmap …`: the raw JMAP method surface.
 
-- himalaya: release build of master c66b8629, default features (io-jmap 0.10.0)
+- himalaya: release build of master 6dd75523, default features (io-jmap 0.10.0)
 - account: `fastmail-jmap`
 - date: 2026-11-18
 - method: every `jmap` subcommand inside the run's mailboxes (`J1` `PBh-`, `J2` `PBhV`, `J3` `PBnw`), per [provider-test-plan.md](provider-test-plan.md). The throwaway identity, mailboxes and emails were deleted.

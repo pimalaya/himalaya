@@ -11,7 +11,7 @@ Finding HIM-12 of the family's cli-family-analysis-2026-11-15 plan.
 ## What landed
 
 - src/email/address.rs `parse`; src/gmail/backend.rs and src/shared/message/read.rs read through mime-rs.
-- Tests `an_address_header_reads_as_the_other_backends_read_it` and `a_quoted_name_holding_an_address_is_a_name`, failing on 002bf012.
+- Tests `an_address_header_reads_as_the_other_backends_read_it` and `a_quoted_name_holding_an_address_is_a_name`, failing on e440b4e4.
 - CHANGELOG (Fixed). Left: the read view's comment and validity rules, for mime-rs.
 
 ## Capabilities moved

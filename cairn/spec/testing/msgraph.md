@@ -8,7 +8,7 @@ status: current
 
 Unified commands on the Microsoft Graph backend. Companion: [msgraph-specific.md](msgraph-specific.md) (the `msgraph …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside throwaway mail folders.
 
-- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features
+- himalaya: release build of master 6dd75523 (the three v3 batches of 2026-11-18), default features
 - account: `microsoft` (Microsoft Graph, `msgraph.auth.token.command`), the Exchange Online test tenant, which holds a fake corpus kept untouched; its folders list under their English names (`Inbox`, `Sent Items`, `Deleted Items`) although the user's preferred language is French
 - date: 2026-11-18
 - fixtures: folders `himalaya-v3-live-A` and `himalaya-v3-live-B`; Graph has no MIME append, so six drafts were made with `msgraph messages create` (the same relative dates as the other reports) and moved into `A` with `message move -f drafts`. Both folders were deleted at the end, after the run's Inbox and Sent Items copies were moved into `A`; Inbox, Sent Items, Drafts and Deleted Items hold no run message.

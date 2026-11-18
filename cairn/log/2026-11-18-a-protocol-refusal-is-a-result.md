@@ -15,7 +15,7 @@ Findings COH-5, HIM-21 and the `request` half of D26 of the family's cli-family-
 - src/smtp/send.rs: a refused `smtp send` prints `{refusals}`, exit 3.
 - src/jmap/set.rs: the six JMAP sets print `{ids, errors}`, exit 3 when an object was refused.
 - src/json_schema.rs: each schema of those namespaces admits the refusal.
-- Tests, each failing on 72c1c0ca: `gmail::cli::tests::a_refused_request_is_the_result`, `msgraph::cli::tests::a_refused_request_is_the_result`, `a_method_error_is_the_result`, `a_refused_create_is_the_result`, `a_destroy_applied_in_part_names_both_halves`, tests/send_outcome.rs `a_refused_smtp_send_is_the_result`; unit tests `a_refusal_is_the_result` and `a_refused_command_prints_its_completion`.
+- Tests, each failing on a04ff103: `gmail::cli::tests::a_refused_request_is_the_result`, `msgraph::cli::tests::a_refused_request_is_the_result`, `a_method_error_is_the_result`, `a_refused_create_is_the_result`, `a_destroy_applied_in_part_names_both_halves`, tests/send_outcome.rs `a_refused_smtp_send_is_the_result`; unit tests `a_refusal_is_the_result` and `a_refused_command_prints_its_completion`.
 - CHANGELOG (Changed, breaking), MIGRATION (v2 to v3).
 
 ## Capabilities moved

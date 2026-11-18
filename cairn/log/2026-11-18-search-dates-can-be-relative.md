@@ -14,7 +14,7 @@ The proposal of 2026-11-14 ([#528]), with the two-digit year the first batch of 
 - src/email/search/filter/query.rs: `AfterInstant`, `BeforeInstant`, rendered back as RFC 3339.
 - src/email/search/eval.rs, src/gmail/search.rs, src/jmap/backend.rs, src/imap/backend.rs (`InstantBand`, `outside_instants`), src/msgraph/search.rs (refused): each backend's instants.
 - src/shared/envelope/search.rs: the `QUERY` help.
-- Ten tests, `a_two_digit_year_is_refused` failing on 002bf012.
+- Ten tests, `a_two_digit_year_is_refused` failing on e440b4e4.
 - CHANGELOG (Added; Fixed for the year).
 
 The Graph task ran no live check (no network in this batch): Graph refuses an instant until one shows KQL's `sent` takes a time of day.

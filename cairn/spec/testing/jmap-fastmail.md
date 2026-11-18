@@ -8,7 +8,7 @@ status: current
 
 Unified commands on the JMAP backend. Companion: [jmap-specific-fastmail.md](jmap-specific-fastmail.md) (the `jmap …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside two throwaway JMAP mailboxes (`himalaya-v3-live-J1`/`-J2`).
 
-- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features
+- himalaya: release build of master 6dd75523 (the three v3 batches of 2026-11-18), default features
 - account: `fastmail-jmap` (`jmap.server = https://api.fastmail.com/jmap/session`, bearer token; no identity or drafts id configured)
 - date: 2026-11-18
 - fixtures: the six messages of the IMAP run (dated 3 hours to 10 days before it, one `multipart/mixed` with `note.txt`), imported with `message add`. Fastmail deduplicated them against the identical bytes the IMAP run had appended: each import returned the existing Email, now in both run mailboxes (J2). Everything was deleted at the end with the run mailboxes; a whole-account `jmap email query --subject v3live` finds nothing.

@@ -8,7 +8,7 @@ status: current
 
 Companion to [gmail.md](gmail.md) (unified commands). Exercises `himalaya gmail …`: the raw Gmail REST v1 surface.
 
-- himalaya: release build of master c66b8629, default features
+- himalaya: release build of master 6dd75523, default features
 - account: `google` (Gmail REST, the pimalaya.org Workspace test mailbox)
 - date: 2026-11-18
 - method: the `gmail` subcommands inside the run's labels, per [provider-test-plan.md](provider-test-plan.md). Account-wide setting writes were not exercised (reads only). Everything created was deleted (`messages batch-delete` of the 133 run messages, then the labels).

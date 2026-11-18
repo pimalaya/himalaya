@@ -6,7 +6,7 @@ status: current
 
 # IMAP + SMTP on Fastmail: unified-command test report
 
-- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
+- himalaya: release build of master 6dd75523 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
 - account: `fastmail` (`imaps://imap.fastmail.com`, `smtps://smtp.fastmail.com`, SASL PLAIN), plus two scratch copies of it: `fastmail-tls` (an account-level `tls.cert`) and the same with `imap.tls.provider` overriding it
 - date: 2026-11-18
 - method: every unified command and flag variant, inside throwaway mailboxes `himalaya-v3-live-A`, `-B` and `-T` (260 threaded messages for the chunked thread fetch), per [provider-test-plan.md](provider-test-plan.md). Fixtures: six messages dated 3 hours, 8 hours, yesterday, 3 days and 10 days before the run, one `multipart/mixed` with `note.txt` and a `To:` group. Every delivered copy was moved into `A`, and the mailboxes were deleted at the end; Inbox, Sent, Drafts and Trash came back to their starting counts.

@@ -8,7 +8,7 @@ status: current
 
 Companion to [msgraph.md](msgraph.md) (unified commands). Exercises `himalaya msgraph …`: the raw Microsoft Graph mail surface.
 
-- himalaya: release build of master c66b8629, default features
+- himalaya: release build of master 6dd75523, default features
 - account: `microsoft` (Microsoft Graph, the test tenant)
 - date: 2026-11-18
 - method: the `msgraph` subcommands inside the run's folders, per [provider-test-plan.md](provider-test-plan.md). Every folder and message created was deleted.

@@ -12,7 +12,7 @@ Findings TRI-4, TRI-7 and TRI-8 of the family's cli-family-analysis-2026-11-15 p
 
 - src/error.rs: `store-account-ambiguous`, `store-account-unknown`, `row-not-found`, `confirmation-required`, `page-token-invalid`.
 - src/pimdir/client.rs, backend.rs, queue/cancel.rs, search.rs, attachment/mod.rs: the refusals coded; the account derived from the accounts holding mail; a cancel refused before its prompt.
-- Tests tests/pimdir_refusals.rs, failing on 72c1c0ca.
+- Tests tests/pimdir_refusals.rs, failing on a04ff103.
 - CHANGELOG (Changed, breaking), MIGRATION (development build).
 
 ## Capabilities moved

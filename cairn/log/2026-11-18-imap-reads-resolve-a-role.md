@@ -11,7 +11,7 @@ Finding HIM-7 of the family's cli-family-analysis-2026-11-15 plan.
 ## What landed
 
 - src/imap/backend.rs `get_message`: `resolve_mailbox_id` first.
-- Test `reading_resolves_a_mailbox_role`, failing on 002bf012.
+- Test `reading_resolves_a_mailbox_role`, failing on e440b4e4.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

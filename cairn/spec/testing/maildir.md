@@ -8,7 +8,7 @@ status: current
 
 Unified commands on the Maildir backend. Companion: [maildir-specific.md](maildir-specific.md) (the `maildir …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), against a throwaway Maildir tree.
 
-- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features (`maildir` is one)
+- himalaya: release build of master 6dd75523 (the three v3 batches of 2026-11-18), default features (`maildir` is one)
 - backend: local filesystem, io-maildir fs layout (the root is INBOX, subfolders are nested directories with their own `cur`/`new`/`tmp`)
 - date: 2026-11-18
 - fixture: an empty store in the session's scratchpad, config:

@@ -11,7 +11,7 @@ Finding HIM-15 of the family's cli-family-analysis-2026-11-15 plan.
 ## What landed
 
 - src/shared/attachment/download.rs: ids checked first, names fitted to 255 bytes.
-- Test `an_attachment_download_checks_its_ids_first_and_cuts_long_names`, failing on 002bf012.
+- Test `an_attachment_download_checks_its_ids_first_and_cuts_long_names`, failing on e440b4e4.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

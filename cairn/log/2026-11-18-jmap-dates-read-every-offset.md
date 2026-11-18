@@ -11,7 +11,7 @@ Finding HIM-6 of the family's cli-family-analysis-2026-11-15 plan.
 ## What landed
 
 - src/jmap/backend.rs: `earliest_start`, the residual-checked `date` and `after` bounds.
-- Test `a_date_east_of_utc_is_found_on_its_own_day` (a +0900 and a +1400 message), failing on 002bf012.
+- Test `a_date_east_of_utc_is_found_on_its_own_day` (a +0900 and a +1400 message), failing on e440b4e4.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

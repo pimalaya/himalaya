@@ -8,7 +8,7 @@ status: current
 
 Unified commands on the Gmail REST backend. Companion: [gmail-specific.md](gmail-specific.md) (the `gmail …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside throwaway labels.
 
-- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
+- himalaya: release build of master 6dd75523 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
 - account: `google` (Gmail REST API, `gmail.auth.token.command`), the pimalaya.org Workspace test mailbox, which holds a fake corpus kept untouched
 - date: 2026-11-18
 - fixtures: labels `himalaya-v3-live-A` (`Label_532`), `himalaya-v3-live-B` (`Label_533`) and `himalaya-v3-live-T` (`Label_534`, 120 messages for the unpaged listing), six messages added with `message add` dated relative to the run (3 hours, 8 hours, yesterday, 3 days, 10 days ago, and a `multipart/mixed` with `note.txt`). Every message and label the run made was deleted at the end; the profile counts came back to 487 messages and 419 threads.

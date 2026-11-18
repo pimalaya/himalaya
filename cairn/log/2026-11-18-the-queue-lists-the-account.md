@@ -11,7 +11,7 @@ Finding TRI-5 of the family's cli-family-analysis-2026-11-15 plan, ruled by the 
 ## What landed
 
 - src/pimdir/queue/list.rs: `pimdir queue list` lists the whole account, `-m/--mailbox` narrowing it; src/pimdir/backend.rs `mail_collection_ids`.
-- Test `the_queue_list_covers_the_account_unless_narrowed`, failing on 72c1c0ca.
+- Test `the_queue_list_covers_the_account_unless_narrowed`, failing on a04ff103.
 - CHANGELOG (Changed, breaking), MIGRATION (development build).
 
 ## Capabilities moved

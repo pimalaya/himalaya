@@ -13,7 +13,7 @@ The draft of 2026-10-18, implemented as proposed. Its open questions are settled
 - src/config.rs, src/config/tls.rs: `AccountConfig::tls`, inherited field by field by every network backend as the account `proxy` is; unknown keys refused by serde as everywhere.
 - src/account/check.rs, src/json_schema.rs: `account check` prints its own report, each row pimalaya-cli's `BackendCheck` beside `tls`; `himalaya-account-check` describes it.
 - config.sample.toml: the `tls.*` keys at account level, `imap.tls.cert` as the override.
-- Tests `backends_inherit_the_account_tls_field_by_field` and `an_account_check_names_the_trust_of_each_transport`, failing on 002bf012.
+- Tests `backends_inherit_the_account_tls_field_by_field` and `an_account_check_names_the_trust_of_each_transport`, failing on e440b4e4.
 - CHANGELOG (Added).
 
 ## Capabilities moved

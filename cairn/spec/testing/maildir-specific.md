@@ -8,7 +8,7 @@ status: current
 
 Companion to [maildir.md](maildir.md) (unified commands). Exercises `himalaya maildir …`: the raw Maildir API (folder lifecycle, message store/copy/move, filename flags).
 
-- himalaya: release build of master c66b8629, default features
+- himalaya: release build of master 6dd75523, default features
 - backend: the throwaway store of [maildir.md](maildir.md), io-maildir fs layout
 - date: 2026-11-18
 - method: every `maildir` subcommand against the throwaway tree, per [provider-test-plan.md](provider-test-plan.md).

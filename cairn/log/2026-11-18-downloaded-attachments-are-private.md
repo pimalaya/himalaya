@@ -11,7 +11,7 @@ Finding HIM-10 of the family's cli-family-analysis-2026-11-15 plan, the attachme
 ## What landed
 
 - src/shared/attachment/download.rs: files created 0600 by a local `private_options`; it moves to pimalaya-cli's `file::private_options` once pimalaya-cli releases it (unreleased at /home/soywod/code/pimalaya/cli, not depended on).
-- Test `an_attachment_is_private_to_its_owner`, failing on 002bf012.
+- Test `an_attachment_is_private_to_its_owner`, failing on e440b4e4.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

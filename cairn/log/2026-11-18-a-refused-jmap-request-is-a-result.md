@@ -11,7 +11,7 @@ Finding K4 of the live provider run of 2026-11-18 (cairn/spec/testing/jmap-speci
 ## What landed
 
 - src/jmap/error.rs: `unwrapped` reads the send, session and blob errors io-jmap's `JmapClientStdError` wraps transparently, so `jmap request` refused whole prints the refusal object, exit 3.
-- Test `jmap::backend::tests::send::a_request_refused_whole_is_the_result`, failing on 3b9f9127.
+- Test `jmap::backend::tests::send::a_request_refused_whole_is_the_result`, failing on dd9c6b12.
 - CHANGELOG (Fixed).
 
 ## Capabilities moved

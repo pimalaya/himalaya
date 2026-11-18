@@ -8,7 +8,7 @@ status: current
 
 Companion to [imap-smtp-fastmail.md](imap-smtp-fastmail.md) (the unified commands). This one exercises the raw protocol commands under `himalaya imap …` and `himalaya smtp …`.
 
-- himalaya: release build of master c66b8629, default features
+- himalaya: release build of master 6dd75523, default features
 - account: `fastmail` (Cyrus IMAP 3.13, Fastmail build of 2026-11-11)
 - date: 2026-11-18
 - method: every `imap`/`smtp` subcommand by hand, inside the run's mailboxes (`himalaya-v3-live-A`, `-B`, `-C`/`-C2`, `-T`), per [provider-test-plan.md](provider-test-plan.md). All deleted at the end.
