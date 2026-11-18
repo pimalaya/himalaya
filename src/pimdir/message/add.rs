@@ -49,7 +49,7 @@ impl PimdirMessageAddCommand {
         let staged = client.add_message(mailbox, &flags, raw)?;
 
         printer.out(PimdirMessageAddOutput {
-            queue_id: staged.queue_id,
+            queue_id: staged.queue_id.to_string(),
             message_id: staged.message_id,
         })
     }
@@ -61,7 +61,7 @@ impl PimdirMessageAddCommand {
 pub struct PimdirMessageAddOutput {
     /// The queue row the message waits in.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// The bare `Message-ID` it is filed under once applied.
     pub message_id: String,
 }

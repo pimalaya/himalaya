@@ -1005,9 +1005,9 @@ dependencies = [
 
 [[package]]
 name = "io-jmap"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0590fe7ab8e2bac4b3bcb219dc4f9a300505ad1bbf544163b9a05c36a2f6be8d"
+checksum = "aee41358457abdfedef4ad23f8b0c09447e4034db9d695b9e71439292b33a610"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ddd7e4532b9cd78df189f07bd15dbfc580e4fa76fd7893c58f11f4c7b4bb98"
+checksum = "63fc488dcec28fa1165a5f41c0e439994d6de4e4ddc4ed2ff0e78f0a9b4a811f"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1580,9 +1580,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pimalaya-cli"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9d766697c997fe3ef5b1abc96d15967848a67f1c225a4f95e26782426ed1c94"
+checksum = "056e26afbb62acc7398ee2750e62c917e4c3552d92088fab4d4de941ae973dc9"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1592,6 +1592,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "inquire",
+ "libc",
  "log",
  "schemars",
  "serde",
@@ -1605,9 +1606,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-config"
-version = "0.5.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91904656c030d5802b95c2bd853d802810f8442d5577f7524f4cb2a0d6710e86"
+checksum = "ea8b9f87d962153c8bad8433f22444a8bbcddd8d2a3881a12be7789e90114956"
 dependencies = [
  "anyhow",
  "dirs",

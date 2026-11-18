@@ -191,15 +191,15 @@ impl PimdirClient {
                 .map_err(pimdir_error)
                 .context("Stage the pimdir tag")?
             {
-                rows.insert((action.collection, action.seq), action.action.id);
+                rows.insert((action.collection, action.seq), action.action.to_string());
             }
         }
 
         let mut tagged = Vec::new();
         for hit in &plan.hits {
             for placement in &hit.placements {
-                let row = rows.get(&(placement.collection.clone(), hit.seq)).copied();
-                let status = match (&placement.next, &placement.source, row) {
+                let row = rows.get(&(placement.collection.clone(), hit.seq)).cloned();
+                let status = match (&placement.next, &placement.source, &row) {
                     (_, _, Some(_)) => PimdirTagStatus::Queued,
                     (None, _, _) => PimdirTagStatus::UnknownFlags,
                     (Some(_), _, _) if !placement.changes() => PimdirTagStatus::Unchanged,
@@ -522,7 +522,7 @@ pub struct PimdirTagged {
     pub status: PimdirTagStatus,
     /// The queue row the change waits in, `null` when none was staged.
     #[serde(rename = "row")]
-    pub queue_id: Option<i64>,
+    pub queue_id: Option<String>,
 }
 
 /// What a tag does to one placement.
@@ -1162,9 +1162,17 @@ mod tests {
 
         let pending = client.store.pending_actions(INBOX).unwrap();
         assert_eq!(pending.len(), 2);
-        let queued: Vec<i64> = tag.tagged.iter().filter_map(|t| t.queue_id).collect();
+        let queued: Vec<&str> = tag
+            .tagged
+            .iter()
+            .filter_map(|t| t.queue_id.as_deref())
+            .collect();
         for action in pending {
-            assert!(queued.contains(&action.id));
+            assert!(
+                queued
+                    .iter()
+                    .any(|row| row.ends_with(&format!(".{}", action.id)))
+            );
             let PimdirAction::SetFlags { flags, .. } = action.action else {
                 panic!("expected set-flags, got {:?}", action.action);
             };

@@ -43,7 +43,7 @@ impl PimdirMailboxRenameCommand {
         let renamed = client.rename_mailbox(&mailbox, &self.name)?;
 
         printer.out(PimdirMailboxRenameOutput {
-            queue_id: renamed.queue_id,
+            queue_id: renamed.queue_id.to_string(),
             mailbox,
             name: self.name,
             source: renamed.source,
@@ -57,7 +57,7 @@ impl PimdirMailboxRenameCommand {
 pub struct PimdirMailboxRenameOutput {
     /// The `collection-rename` row.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// The mailbox renamed, as given once its alias is resolved.
     pub mailbox: String,
     /// Its new name.

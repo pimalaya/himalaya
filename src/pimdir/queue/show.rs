@@ -6,7 +6,10 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_pimdir::client::producer::{PimdirActionStatus, PimdirReceiptRefusal};
+use io_pimdir::{
+    client::producer::{PimdirActionStatus, PimdirReceiptRefusal},
+    codec::PimdirActionHandle,
+};
 use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -36,16 +39,17 @@ use crate::pimdir::client::PimdirClient;
 /// "reason", "refusedAt"}]}`.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueShowCommand {
-    /// The queue row id.
+    /// The handle of the queue row, as a receipt prints it, or its bare
+    /// id, as `pimdir queue list` prints it.
     #[arg(value_name = "ROW")]
-    pub id: i64,
+    pub id: PimdirActionHandle,
 }
 
 impl PimdirQueueShowCommand {
     /// Looks the row up in the account's queue and receipts.
     pub fn execute(self, printer: &mut impl Printer, client: &mut PimdirClient) -> Result<()> {
-        let status = client.queue_row(self.id)?;
-        printer.out(PimdirQueueShowOutput::new(self.id, status))
+        let status = client.queue_row(&self.id)?;
+        printer.out(PimdirQueueShowOutput::new(self.id.to_string(), status))
     }
 }
 
@@ -76,9 +80,9 @@ pub enum PimdirQueueState {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueShowOutput {
-    /// The queue row id.
+    /// The queue row, as it was given.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// Where it stands.
     pub state: PimdirQueueState,
     /// The collection it is anchored on: `null` when unknown, and for an
@@ -131,7 +135,7 @@ impl From<PimdirReceiptRefusal> for PimdirQueueRefusal {
 
 impl PimdirQueueShowOutput {
     /// Projects io-pimdir's status of row `queue_id`.
-    pub fn new(queue_id: i64, status: PimdirActionStatus) -> Self {
+    pub fn new(queue_id: String, status: PimdirActionStatus) -> Self {
         let row = Self {
             queue_id,
             state: PimdirQueueState::Unknown,
@@ -206,7 +210,7 @@ impl PimdirQueueShowOutput {
 
 impl fmt::Display for PimdirQueueShowOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let id = self.queue_id;
+        let id = &self.queue_id;
         let collection = sanitize::text(self.collection.as_deref().unwrap_or_default());
         let kind = sanitize::text(self.kind.as_deref().unwrap_or_default());
 
@@ -267,7 +271,7 @@ mod tests {
     #[test]
     fn an_applied_add_prints_its_seq() {
         let row = PimdirQueueShowOutput::new(
-            12,
+            "12".into(),
             PimdirActionStatus::Applied {
                 applied_at: "2026-10-04T20:00:00Z".into(),
                 collection: Some("imap/Drafts".into()),
@@ -279,7 +283,7 @@ mod tests {
         assert_eq!(
             json,
             serde_json::json!({
-                "row": 12,
+                "row": "12",
                 "state": "applied",
                 "collection": "imap/Drafts",
                 "kind": null,
@@ -298,7 +302,7 @@ mod tests {
     #[test]
     fn an_applied_row_prints_the_refusals_on_its_message() {
         let row = PimdirQueueShowOutput::new(
-            12,
+            "12".into(),
             PimdirActionStatus::Applied {
                 applied_at: "2026-11-15T20:00:00.000Z".into(),
                 collection: Some("msgraph/Inbox".into()),
@@ -337,7 +341,7 @@ mod tests {
     #[test]
     fn an_unconfirmed_row_says_it_may_have_taken_effect() {
         let row = PimdirQueueShowOutput::new(
-            9,
+            "9".into(),
             PimdirActionStatus::Unconfirmed {
                 collection: "imap/Sent".into(),
                 kind: "submit".into(),
@@ -362,7 +366,7 @@ mod tests {
     #[test]
     fn an_applied_row_of_a_deleted_mailbox_names_no_collection() {
         let row = PimdirQueueShowOutput::new(
-            4,
+            "4".into(),
             PimdirActionStatus::Applied {
                 applied_at: "2026-11-13T09:00:00Z".into(),
                 collection: None,
@@ -379,12 +383,15 @@ mod tests {
 
     #[test]
     fn an_unknown_row_prints_its_id_and_state() {
-        let json = serde_json::to_value(PimdirQueueShowOutput::new(7, PimdirActionStatus::Unknown))
-            .unwrap();
+        let json = serde_json::to_value(PimdirQueueShowOutput::new(
+            "7".into(),
+            PimdirActionStatus::Unknown,
+        ))
+        .unwrap();
         assert_eq!(
             json,
             serde_json::json!({
-                "row": 7,
+                "row": "7",
                 "state": "unknown",
                 "collection": null,
                 "kind": null,

@@ -30,7 +30,7 @@ use io_pimdir::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
     },
-    codec::{PimdirAction, action_from_payload},
+    codec::{PimdirAction, PimdirActionHandle, action_from_payload},
     collection::{PimdirCollectionId, PimdirCoverage},
     intent::{self, PimdirSubmit},
     object::PimdirHash,
@@ -875,7 +875,7 @@ impl PimdirClient {
                 }
                 PimdirFlagged {
                     id: id.to_owned(),
-                    queue_id: row.map(|row| row.handle.id),
+                    queue_id: row.map(|row| row.handle),
                     partial,
                 }
             })
@@ -934,7 +934,7 @@ impl PimdirClient {
         }
 
         Ok(PimdirStaged {
-            queue_id: enqueued.handle.id,
+            queue_id: enqueued.handle,
             message_id: link_id.0,
         })
     }
@@ -1004,30 +1004,31 @@ impl PimdirClient {
         for partial in &enqueued.partial {
             warn!("{partial}");
         }
-        let id = enqueued.handle.id;
-        info!("message queued for sending as action {id}, see `himalaya pimdir queue list`");
+        let handle = enqueued.handle;
+        info!("message queued for sending as action {handle}, see `himalaya pimdir queue list`");
         Ok(PimdirSubmitted {
             staged: PimdirStaged {
-                queue_id: id,
+                queue_id: handle,
                 message_id: mail::derive(&raw).link_id.0,
             },
             carried,
         })
     }
 
-    /// Where queue row `id` stands (pimdir STORAGE §15.4): pending, parked,
-    /// unconfirmed, applied with the item an `add` created, or unknown. A
+    /// Where the queue row `handle` names stands (pimdir STORAGE §15.4):
+    /// pending, parked, unconfirmed, applied with the item an `add`
+    /// created, unknown, or reset when the handle names another store. A
     /// row anchored on a collection that is not one of the account's
     /// mailboxes, another account's or another app's, reads as unknown.
     ///
     /// A row applied on a collection gone since (§15.4) names none, so no
     /// account can be told from it and it reads as applied.
-    pub fn queue_row(&self, id: i64) -> Result<PimdirActionStatus> {
+    pub fn queue_row(&self, handle: &PimdirActionHandle) -> Result<PimdirActionStatus> {
         let status = self
             .store
-            .action_status(id)
+            .action_status(handle)
             .map_err(pimdir_error)
-            .with_context(|| format!("Read queue row {id}"))?;
+            .with_context(|| format!("Read queue row {handle}"))?;
         let collection = match &status {
             PimdirActionStatus::Pending { collection, .. }
             | PimdirActionStatus::Parked { collection, .. }
@@ -1621,7 +1622,7 @@ pub struct PimdirCoveredMailbox {
 #[derive(Clone, Debug)]
 pub struct PimdirStaged {
     /// The queue row id, which `pimdir queue show` and `cancel` take.
-    pub queue_id: i64,
+    pub queue_id: PimdirActionHandle,
     /// The bare `Message-ID` the message is stored under.
     pub message_id: String,
 }
@@ -1640,7 +1641,7 @@ pub struct PimdirSubmitted {
 pub struct PimdirQueuedIntent {
     /// The `collection-create`, `collection-rename` or `collection-delete`
     /// row.
-    pub queue_id: i64,
+    pub queue_id: PimdirActionHandle,
     /// The source that performs it on its server.
     pub source: String,
 }
@@ -1653,7 +1654,7 @@ impl PimdirQueuedIntent {
             warn!("{partial}");
         }
         Self {
-            queue_id: enqueued.handle.id,
+            queue_id: enqueued.handle,
             source,
         }
     }
@@ -1666,7 +1667,7 @@ pub struct PimdirFlagged {
     pub id: String,
     /// The `set-flags` row it waits in, `None` when the change left the
     /// message as it shows and nothing was staged.
-    pub queue_id: Option<i64>,
+    pub queue_id: Option<PimdirActionHandle>,
     /// What a source supports of the change only in part, as its
     /// declaration words it: the row is queued, and the server may keep
     /// less than it asks.
@@ -2233,7 +2234,7 @@ mod tests {
         let rows = client.queued_rows("imap/Sent").unwrap();
 
         assert_eq!(rows.len(), 1, "{rows:?}");
-        assert_eq!(rows[0].row, staged.queue_id);
+        assert_eq!(rows[0].row, staged.queue_id.id);
         assert_eq!(rows[0].kind, "add");
         assert_eq!(rows[0].collection, "imap/Sent");
         assert_eq!(rows[0].link_id.as_deref(), Some("draft@x.org"));
@@ -2514,7 +2515,7 @@ mod tests {
         assert_eq!(staged.message_id, "d1@x.org");
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, staged.queue_id);
+        assert_eq!(pending[0].id, staged.queue_id.id);
     }
 
     #[test]
@@ -2535,7 +2536,7 @@ mod tests {
         );
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, staged.queue_id);
+        assert_eq!(pending[0].id, staged.queue_id.id);
     }
 
     #[test]
@@ -2627,7 +2628,7 @@ mod tests {
 
         assert_eq!(sent.staged.message_id, "d1@x.org");
         let pending = client.store.pending_actions("imap/Sent").unwrap();
-        assert_eq!(pending[0].id, sent.staged.queue_id);
+        assert_eq!(pending[0].id, sent.staged.queue_id.id);
     }
 
     /// Runs `stage` on a client of a store whose staging lock is held
@@ -2674,7 +2675,8 @@ mod tests {
         assert_stages_after_the_collector(|client| {
             Ok(client
                 .add_message("imap/Sent", &[], DRAFT.to_vec())?
-                .queue_id)
+                .queue_id
+                .id)
         });
     }
 
@@ -2684,7 +2686,8 @@ mod tests {
             Ok(client
                 .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)?
                 .staged
-                .queue_id)
+                .queue_id
+                .id)
         });
     }
 
@@ -2697,18 +2700,63 @@ mod tests {
 
         let PimdirActionStatus::Pending {
             collection, kind, ..
-        } = client.queue_row(staged.queue_id).unwrap()
+        } = client.queue_row(&staged.queue_id).unwrap()
         else {
             panic!("expected a pending row");
         };
         assert_eq!(collection, "imap/Sent");
         assert_eq!(kind, "add");
 
-        assert_eq!(client.cancel_queued(staged.queue_id).unwrap(), "add");
+        assert_eq!(client.cancel_queued(&staged.queue_id).unwrap(), "add");
         assert_eq!(
-            client.queue_row(staged.queue_id).unwrap(),
+            client.queue_row(&staged.queue_id).unwrap(),
             PimdirActionStatus::Unknown
         );
+    }
+
+    /// A receipt names its row under the store's identity (pimdir STORAGE
+    /// §4.5), and the bare id `queue list` prints is taken all the same.
+    #[test]
+    fn a_receipt_handle_names_the_store_and_a_bare_id_still_cancels() {
+        let (_dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+
+        let printed = staged.queue_id.to_string();
+        assert!(staged.queue_id.store.is_some(), "{printed}");
+        assert_eq!(
+            printed.parse::<PimdirActionHandle>().unwrap(),
+            staged.queue_id
+        );
+
+        let bare = PimdirActionHandle::from(staged.queue_id.id);
+        assert_eq!(client.cancel_queued(&bare).unwrap(), "add");
+    }
+
+    /// A handle another store answered, a copy restored since, is refused
+    /// `store-reset` and the row its id names is left queued.
+    #[test]
+    fn a_handle_of_another_store_is_refused_as_reset() {
+        let (dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut other = staged.queue_id.clone();
+        if let Some(store) = other.store.as_mut() {
+            store.incarnation += 1;
+        }
+
+        assert_eq!(client.queue_row(&other).unwrap(), PimdirActionStatus::Reset);
+        let err = client.cancel_queued(&other).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::StoreReset),
+            "{err:#}"
+        );
+        let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        assert_eq!(store.pending_actions("imap/Sent").unwrap().len(), 1);
     }
 
     /// A row another app queued on a collection of the same account, an
@@ -2738,8 +2786,11 @@ mod tests {
                 .id
         };
 
-        assert_eq!(client.queue_row(row).unwrap(), PimdirActionStatus::Unknown);
-        let err = client.cancel_queued(row).unwrap_err().to_string();
+        assert_eq!(
+            client.queue_row(&row.into()).unwrap(),
+            PimdirActionStatus::Unknown
+        );
+        let err = client.cancel_queued(&row.into()).unwrap_err().to_string();
         assert!(err.contains("No queued action"), "{err}");
 
         let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
@@ -2757,7 +2808,7 @@ mod tests {
             .unwrap();
         stamp_format(dir.path(), "storage-draft-11");
 
-        let err = client.cancel_queued(staged.queue_id).unwrap_err();
+        let err = client.cancel_queued(&staged.queue_id).unwrap_err();
 
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
@@ -2765,7 +2816,7 @@ mod tests {
             "{err:#}"
         );
         assert!(
-            format!("{err:#}").contains("neverest's MIGRATION.md"),
+            format!("{err:#}").contains("move its directory aside"),
             "{err:#}"
         );
         let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
@@ -2773,7 +2824,7 @@ mod tests {
             .query_row(
                 "SELECT format_version, (SELECT count(*) FROM queue WHERE id = ?1) \
                  FROM store_meta",
-                [staged.queue_id],
+                [staged.queue_id.id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
@@ -2803,7 +2854,7 @@ mod tests {
             .unwrap();
         sync.lock().unwrap();
 
-        let err = client.cancel_queued(staged.queue_id).unwrap_err();
+        let err = client.cancel_queued(&staged.queue_id).unwrap_err();
 
         assert_eq!(
             pimalaya_cli::error::code_of::<ErrorCode>(&err),
@@ -2823,12 +2874,15 @@ mod tests {
         .unwrap();
     }
 
-    /// A store of another draft, a draft-11 one an earlier neverest wrote
-    /// or a later one, is refused `store-version`, pointing at the rebuild
-    /// neverest's MIGRATION.md walks through, never at deleting the store.
+    /// A store of another draft is refused `store-version` in the shared
+    /// wording: an earlier one is synced out and set aside, a later one
+    /// asks for a later himalaya, and neither is ever deleted.
     #[test]
-    fn a_store_of_another_draft_is_refused_saying_to_reinstall_it() {
-        for version in ["storage-draft-11", "storage-draft-14"] {
+    fn a_store_of_another_draft_is_refused_saying_which_is_earlier() {
+        for (version, asks) in [
+            ("storage-draft-11", "move its directory aside"),
+            ("storage-draft-15", "upgrade himalaya"),
+        ] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
 
@@ -2847,9 +2901,7 @@ mod tests {
             let err = format!("{err:#}");
             assert!(err.contains(version), "{err}");
             assert!(err.contains(io_pimdir::sql::FORMAT_VERSION), "{err}");
-            assert!(err.contains("move the store aside"), "{err}");
-            assert!(err.contains("upgrade himalaya"), "{err}");
-            assert!(err.contains("neverest's MIGRATION.md"), "{err}");
+            assert!(err.contains(asks), "{err}");
             assert!(!err.contains("delete"), "{err}");
         }
     }
@@ -2960,12 +3012,12 @@ mod tests {
         let (_dir, mut work, mut home) = shared_store();
         let staged = home.add_message("home/INBOX", &[], DRAFT.to_vec()).unwrap();
 
-        let err = work.cancel_queued(staged.queue_id).unwrap_err();
+        let err = work.cancel_queued(&staged.queue_id).unwrap_err();
 
         assert!(err.to_string().contains("account"), "{err}");
         assert_eq!(home.store.pending_actions("home/INBOX").unwrap().len(), 1);
         let ours = work.add_message("work/INBOX", &[], DRAFT.to_vec()).unwrap();
-        assert_eq!(work.cancel_queued(ours.queue_id).unwrap(), "add");
+        assert_eq!(work.cancel_queued(&ours.queue_id).unwrap(), "add");
     }
 
     #[test]
@@ -2997,14 +3049,14 @@ mod tests {
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
         assert!(
             owner
-                .acknowledge_action(sent.staged.queue_id, None)
+                .acknowledge_action(sent.staged.queue_id.id, None)
                 .unwrap()
         );
         drop(owner);
 
         let PimdirActionStatus::Applied {
             collection, seq, ..
-        } = client.queue_row(sent.staged.queue_id).unwrap()
+        } = client.queue_row(&sent.staged.queue_id).unwrap()
         else {
             panic!("expected a sent row to read applied");
         };
@@ -3027,7 +3079,7 @@ mod tests {
 
         let PimdirActionStatus::Applied {
             collection, seq, ..
-        } = client.queue_row(staged.queue_id).unwrap()
+        } = client.queue_row(&staged.queue_id).unwrap()
         else {
             panic!("expected an applied row");
         };
@@ -3078,7 +3130,7 @@ mod tests {
         assert_eq!(created.source, "imap");
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, created.queue_id);
+        assert_eq!(pending[0].id, created.queue_id.id);
         let PimdirAction::Unknown { kind, payload, .. } = &pending[0].action else {
             panic!("expected an intent, got {:?}", pending[0].action);
         };
@@ -3296,7 +3348,7 @@ mod tests {
             .add_message("msgraph/Drafts", &[], DRAFT.to_vec())
             .unwrap();
         let pending = client.store.pending_actions("msgraph/Drafts").unwrap();
-        assert_eq!(pending[0].id, staged.queue_id);
+        assert_eq!(pending[0].id, staged.queue_id.id);
     }
 
     #[test]
@@ -3328,7 +3380,7 @@ mod tests {
 
         assert_eq!(renamed.source, "imap");
         let (id, kind, payload) = intent(&client);
-        assert_eq!(id, renamed.queue_id);
+        assert_eq!(id, renamed.queue_id.id);
         assert_eq!(kind, "collection-rename");
         assert_eq!(
             payload,
@@ -3345,7 +3397,7 @@ mod tests {
 
         assert_eq!(deleted.source, "imap");
         let (id, kind, payload) = intent(&client);
-        assert_eq!(id, deleted.queue_id);
+        assert_eq!(id, deleted.queue_id.id);
         assert_eq!(kind, "collection-delete");
         assert_eq!(payload, serde_json::json!({ "v": 1, "source": "imap" }));
     }
@@ -3360,7 +3412,7 @@ mod tests {
         let renamed = client.rename_mailbox("imap/Sent", "Envoyés").unwrap();
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
-        assert!(owner.acknowledge_action(renamed.queue_id, None).unwrap());
+        assert!(owner.acknowledge_action(renamed.queue_id.id, None).unwrap());
         owner
             .rename_collection("imap/Sent", "imap/Envoyés")
             .unwrap();
@@ -3368,7 +3420,7 @@ mod tests {
 
         let PimdirActionStatus::Applied {
             collection, seq, ..
-        } = client.queue_row(renamed.queue_id).unwrap()
+        } = client.queue_row(&renamed.queue_id).unwrap()
         else {
             panic!("expected a performed renaming to read applied");
         };
@@ -3386,16 +3438,16 @@ mod tests {
         let deleted = client.delete_mailbox("imap/Sent").unwrap();
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
-        assert!(owner.acknowledge_action(deleted.queue_id, None).unwrap());
+        assert!(owner.acknowledge_action(deleted.queue_id.id, None).unwrap());
         assert!(matches!(
-            client.queue_row(deleted.queue_id).unwrap(),
+            client.queue_row(&deleted.queue_id).unwrap(),
             PimdirActionStatus::Applied { .. }
         ));
         assert!(owner.delete_collection("imap/Sent").unwrap());
         drop(owner);
 
         assert!(matches!(
-            client.queue_row(deleted.queue_id).unwrap(),
+            client.queue_row(&deleted.queue_id).unwrap(),
             PimdirActionStatus::Applied {
                 collection: None,
                 ..
@@ -4155,7 +4207,7 @@ mod tests {
                 FlagOp::Add,
             )
             .unwrap();
-        let row = staged[0].queue_id.unwrap();
+        let row = staged[0].queue_id.clone().unwrap();
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
@@ -4171,7 +4223,7 @@ mod tests {
             .unwrap();
         drop(owner);
 
-        let show = PimdirQueueShowOutput::new(row, client.queue_row(row).unwrap());
+        let show = PimdirQueueShowOutput::new(row.to_string(), client.queue_row(&row).unwrap());
         let json = serde_json::to_value(&show).unwrap();
         assert_eq!(json["state"], "applied", "{json}");
         assert_eq!(json["seq"].to_string(), id, "{json}");
@@ -4209,7 +4261,10 @@ mod tests {
         assert_eq!(staged[0].id, id);
         let pending = client.store.pending_actions("imap/INBOX").unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(Some(pending[0].id), staged[0].queue_id);
+        assert_eq!(
+            Some(pending[0].id),
+            staged[0].queue_id.as_ref().map(|row| row.id)
+        );
         assert_eq!(
             client.read_flags("imap/INBOX", &id).unwrap(),
             Some(vec!["todo".to_string()])
@@ -4800,7 +4855,7 @@ mod tests {
 
         let parked = client.parked_actions("imap/Sent").unwrap();
         assert_eq!(parked.len(), 1, "{parked:?}");
-        assert_eq!(parked[0].id, twin.queue_id);
+        assert_eq!(parked[0].id, twin.queue_id.id);
         assert_eq!(parked[0].action, "add");
         assert!(!parked[0].error.is_empty());
 
@@ -4808,14 +4863,17 @@ mod tests {
         // the subject of the body it pins, in the pending row's shape.
         let rows = client.parked_rows("imap/Sent").unwrap();
         assert_eq!(rows.len(), 1, "{rows:?}");
-        assert_eq!((rows[0].row, rows[0].kind.as_str()), (twin.queue_id, "add"));
+        assert_eq!(
+            (rows[0].row, rows[0].kind.as_str()),
+            (twin.queue_id.id, "add")
+        );
         assert_eq!(rows[0].link_id.as_deref(), Some(twin.message_id.as_str()));
         assert_eq!(rows[0].item_id, None);
         assert_eq!(rows[0].subject.as_deref(), Some("hi"));
         assert_eq!(rows[0].error.as_deref(), Some(parked[0].error.as_str()));
         assert!(!rows[0].unconfirmed);
 
-        assert_eq!(client.cancel_queued(twin.queue_id).unwrap(), "add");
+        assert_eq!(client.cancel_queued(&twin.queue_id).unwrap(), "add");
         assert!(client.parked_actions("imap/Sent").unwrap().is_empty());
     }
 
@@ -4932,7 +4990,8 @@ mod tests {
         assert_eq!(rows[0].link_id, None);
         assert_eq!(rows[0].subject.as_deref(), Some("hi"));
 
-        let shown = PimdirQueueShowOutput::new(row, client.queue_row(row).unwrap());
+        let shown =
+            PimdirQueueShowOutput::new(row.to_string(), client.queue_row(&row.into()).unwrap());
         assert_eq!(shown.state, PimdirQueueState::Parked);
         assert_eq!(shown.kind.as_deref(), Some("move"));
         assert_eq!(shown.error.as_deref(), Some(parked[0].error.as_str()));

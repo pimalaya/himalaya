@@ -25,7 +25,7 @@
 
 use anyhow::Error;
 #[cfg(feature = "pimdir")]
-use io_pimdir::client::PimdirError;
+use io_pimdir::{client::PimdirError, version::PimdirFormatRefusal};
 use pimalaya_cli::error::{CodedError, code_of, with_code};
 use pimalaya_config::toml::AccountError;
 use schemars::JsonSchema;
@@ -98,8 +98,9 @@ pub enum ErrorCode {
     RateLimited,
     /// The server refused a recipient, so the message reached nobody.
     RecipientRefused,
-    /// The pimdir store is of another draft of the format than Himalaya's:
-    /// upgrade Himalaya, or reinstall the store as its sync engine says.
+    /// The pimdir store is of another format version than Himalaya's:
+    /// upgrade Himalaya, or sync the store out with its engine and set it
+    /// aside.
     StoreVersion,
     /// The pimdir store has no schema yet: its sync engine creates it.
     StoreUncreated,
@@ -456,47 +457,24 @@ impl ErrorCode {
 /// A pimdir failure as an error carrying its code, when it has one.
 ///
 /// The message stays io-pimdir's, the caller adding its own context. A
-/// store of another draft says what to do about it instead, as Cardamum
-/// and Calendula do: drafts are exact, so a store opens only under the
-/// draft that wrote it, and moving one aside loses the writes still
-/// queued in it, which the neverest that wrote it syncs out first.
+/// store of another format version is refused in the wording every
+/// pimdir program shows, [`PimdirFormatRefusal`], naming himalaya.
 #[cfg(feature = "pimdir")]
 pub fn pimdir_error(err: PimdirError) -> anyhow::Error {
-    match ErrorCode::of_pimdir(&err) {
-        Some(code @ ErrorCode::StoreVersion) => {
-            let message = match &err {
-                PimdirError::Version { found } => reinstall(found.as_deref()),
-                err => format!(
-                    "{err}; upgrade Himalaya if the store's sync engine is newer, \
-                     else reinstall the store as neverest's MIGRATION.md says"
-                ),
-            };
-            CodedError::new(code, message).into()
+    let message = match &err {
+        PimdirError::Version { found } => PimdirFormatRefusal {
+            found: found.as_deref(),
+            own: io_pimdir::sql::FORMAT_VERSION,
+            program: "himalaya",
         }
-        Some(code) => CodedError::new(code, err.to_string()).into(),
-        None => err.into(),
-    }
-}
-
-/// What a store of another format version than io-pimdir's asks of the
-/// user, `found` the version it records, `None` when it predates the
-/// record: a store an earlier neverest wrote is rebuilt, its queue drained
-/// first, and one a later neverest wrote asks for a newer Himalaya.
-#[cfg(feature = "pimdir")]
-fn reinstall(found: Option<&str>) -> String {
-    let version = io_pimdir::sql::FORMAT_VERSION;
-    let found = match found {
-        Some(found) => format!("is {found}"),
-        None => String::from("names no format version"),
+        .to_string(),
+        err => err.to_string(),
     };
 
-    format!(
-        "Pimdir store {found}, and this himalaya reads {version} alone: \
-         rebuild a store an earlier neverest wrote (run that neverest's sync \
-         until nothing is queued, upgrade neverest, move the store aside, then \
-         run `neverest init` and sync again, as neverest's MIGRATION.md says), \
-         or upgrade himalaya for a store a later neverest wrote"
-    )
+    match ErrorCode::of_pimdir(&err) {
+        Some(code) => CodedError::new(code, message).into(),
+        None => err.into(),
+    }
 }
 
 #[cfg(all(test, feature = "pimdir"))]

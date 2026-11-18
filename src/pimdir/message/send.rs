@@ -69,13 +69,13 @@ impl PimdirMessageSendCommand {
                 let copy = client.add_message(mailbox, &[seen], raw).with_context(|| {
                     format!("Message queued for sending, but queueing its copy to {mailbox} failed")
                 })?;
-                Some(copy.queue_id)
+                Some(copy.queue_id.to_string())
             }
             _ => None,
         };
 
         printer.out(PimdirMessageSendOutput {
-            queue_id: sent.staged.queue_id,
+            queue_id: sent.staged.queue_id.to_string(),
             message_id: sent.staged.message_id,
             copy: sent.carried,
             copy_queue_id,
@@ -89,7 +89,7 @@ impl PimdirMessageSendCommand {
 pub struct PimdirMessageSendOutput {
     /// The `submit` row the message waits in until the owner sends it.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// The message's bare `Message-ID`.
     pub message_id: String,
     /// Whether the `submit` row carries the copy, filed once sent.
@@ -97,7 +97,7 @@ pub struct PimdirMessageSendOutput {
     /// The row of the copy queued beside the send, for an owner that
     /// cannot carry it.
     #[serde(rename = "copyRow")]
-    pub copy_queue_id: Option<i64>,
+    pub copy_queue_id: Option<String>,
 }
 
 impl fmt::Display for PimdirMessageSendOutput {
@@ -108,7 +108,7 @@ impl fmt::Display for PimdirMessageSendOutput {
             sanitize::text(&self.message_id),
             self.queue_id
         )?;
-        if let Some(copy) = self.copy_queue_id {
+        if let Some(copy) = &self.copy_queue_id {
             write!(f, ", its copy as row {copy}")?;
         }
         writeln!(f)

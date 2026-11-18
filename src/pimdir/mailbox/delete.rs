@@ -40,7 +40,7 @@ impl PimdirMailboxDeleteCommand {
         let deleted = client.delete_mailbox(&mailbox)?;
 
         printer.out(PimdirMailboxDeleteOutput {
-            queue_id: deleted.queue_id,
+            queue_id: deleted.queue_id.to_string(),
             mailbox,
             source: deleted.source,
         })
@@ -53,7 +53,7 @@ impl PimdirMailboxDeleteCommand {
 pub struct PimdirMailboxDeleteOutput {
     /// The `collection-delete` row.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// The mailbox deleted, as given once its alias is resolved.
     pub mailbox: String,
     /// The source deleting it.

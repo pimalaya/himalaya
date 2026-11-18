@@ -6,7 +6,7 @@
 use std::{
     collections::BTreeSet,
     fmt,
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{ErrorKind, Write, stdout},
     path::{Path, PathBuf},
 };
@@ -14,7 +14,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::{error::CodedError, printer::Printer};
+use pimalaya_cli::{error::CodedError, file::private_options, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -280,21 +280,6 @@ fn sanitize(name: &str) -> String {
     } else {
         cleaned.to_string()
     }
-}
-
-/// Options creating a file readable by its owner alone (0600 on Unix),
-/// which `create_new` keeps from following a symbolic link.
-///
-/// The minimal form of pimalaya-cli's `file::private_options`, which
-/// replaces it once released.
-fn private_options() -> OpenOptions {
-    #[allow(unused_mut)]
-    let mut options = OpenOptions::new();
-
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-
-    options
 }
 
 /// The longest file name the common file systems take, in bytes.

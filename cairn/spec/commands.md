@@ -211,7 +211,7 @@ A command SHALL exit 0 when it succeeds and 1 when it prints the failure object.
 | `quota-exceeded` | the write would exceed the account's quota: a JMAP `overQuota`, an IMAP `OVERQUOTA`, Graph's `ErrorQuotaExceeded` or 507 whatever the status |
 | `rate-limited` | the server still throttled the item, or the command, after the retries: an HTTP 429, a Gmail 403 `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or `dailyLimitExceeded` (or a message naming a daily limit or a quota per day, the unauthenticated one aside), as the family codes a Google quota, a JMAP `rateLimit` |
 | `recipient-refused` | `message send` reached nobody because the server refused a recipient: an SMTP `RCPT TO` refused, naming the first refused address, or a JMAP `invalidRecipients`, naming the addresses it lists |
-| `store-version` | a pimdir store is of another draft of the format; rebuild it as neverest's MIGRATION.md says, its queue drained first, or upgrade Himalaya |
+| `store-version` | a pimdir store is of another format version; the message says which is the earlier: sync an earlier one out with its engine and move its directory aside, or upgrade Himalaya for a later one |
 | `store-uncreated` | a pimdir store has no schema yet, or its root holds none; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |
 | `store-corrupt` | a pimdir store's version records disagree, or its schema is not its draft's |

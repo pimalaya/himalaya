@@ -122,7 +122,7 @@ impl fmt::Display for PimdirTagOutput {
                 }
             };
 
-            let row = tagged.queue_id.map(|row| row.to_string());
+            let row = tagged.queue_id.clone();
 
             listing.items.push([
                 sanitize::text(&tagged.id).into_owned(),

@@ -146,7 +146,7 @@ pub struct PimdirFlagRow {
     /// `null` when the change left the message as it was and nothing was
     /// staged.
     #[serde(rename = "row")]
-    pub queue_id: Option<i64>,
+    pub queue_id: Option<String>,
 }
 
 impl PimdirFlagStageOutput {
@@ -175,7 +175,7 @@ impl From<Vec<PimdirFlagged>> for PimdirFlagStageOutput {
                 }
                 PimdirFlagRow {
                     id: flagged.id,
-                    queue_id: flagged.queue_id,
+                    queue_id: flagged.queue_id.map(|handle| handle.to_string()),
                 }
             })
             .collect();
@@ -188,7 +188,7 @@ impl fmt::Display for PimdirFlagStageOutput {
         let rows: Vec<String> = self
             .queued
             .iter()
-            .map(|row| match row.queue_id {
+            .map(|row| match &row.queue_id {
                 Some(queue_id) => format!("{} as row {queue_id}", sanitize::text(&row.id)),
                 None => format!("{} unchanged", sanitize::text(&row.id)),
             })
@@ -310,7 +310,7 @@ mod tests {
         let output = PimdirFlagStageOutput::from(vec![
             PimdirFlagged {
                 id: "42".into(),
-                queue_id: Some(7),
+                queue_id: Some(7.into()),
                 partial: Vec::new(),
             },
             PimdirFlagged {
@@ -325,7 +325,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"messages":[{"id":"42","row":7},{"id":"43","row":null}],"warnings":[]}"#
+            r#"{"messages":[{"id":"42","row":"7"},{"id":"43","row":null}],"warnings":[]}"#
         );
     }
 }

@@ -44,7 +44,7 @@ impl PimdirMailboxCreateCommand {
         let created = client.create_mailbox(&self.name, parent.as_deref())?;
 
         printer.out(PimdirMailboxCreateOutput {
-            queue_id: created.queue_id,
+            queue_id: created.queue_id.to_string(),
             name: self.name,
             parent,
             source: created.source,
@@ -58,7 +58,7 @@ impl PimdirMailboxCreateCommand {
 pub struct PimdirMailboxCreateOutput {
     /// The `collection-create` row.
     #[serde(rename = "row")]
-    pub queue_id: i64,
+    pub queue_id: String,
     /// The new mailbox's name.
     pub name: String,
     /// The mailbox it is created in, `null` at the top.
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn a_mailbox_at_the_top_prints_a_null_parent() {
         let output = PimdirMailboxCreateOutput {
-            queue_id: 89,
+            queue_id: "89".into(),
             name: String::from("Projets"),
             parent: None,
             source: String::from("google/gmail"),
@@ -99,7 +99,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(&output).unwrap(),
-            json!({"row": 89, "name": "Projets", "parent": null, "source": "google/gmail"})
+            json!({"row": "89", "name": "Projets", "parent": null, "source": "google/gmail"})
         );
         let schema = output_schema::<PimdirMailboxCreateOutput>();
         let required = schema["required"].as_array().unwrap();

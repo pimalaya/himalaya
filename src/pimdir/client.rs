@@ -19,7 +19,7 @@ use io_pimdir::{
         producer::{PimdirActionStatus, PimdirEnqueue, PimdirEnqueued, PimdirProducer},
         reader::PimdirReader,
     },
-    codec::PimdirAction,
+    codec::{PimdirAction, PimdirActionHandle},
 };
 use pimalaya_cli::error::CodedError;
 
@@ -149,16 +149,14 @@ impl PimdirClient {
     /// A sync in flight owns the store, and that is refused at once rather
     /// than waited out: the action is still queued, and may have been applied
     /// by the time the user reads the message.
-    pub fn cancel_queued(&self, id: i64) -> Result<String> {
-        let kind = match self.queue_row(id)? {
+    pub fn cancel_queued(&self, handle: &PimdirActionHandle) -> Result<String> {
+        let kind = match self.queue_row(handle)? {
             PimdirActionStatus::Pending { kind, .. }
             | PimdirActionStatus::Parked { kind, .. }
             | PimdirActionStatus::Unconfirmed { kind, .. } => kind,
-            status => return Err(uncancellable(id, &status)),
+            status => return Err(uncancellable(handle, &status)),
         };
 
-        // NOTE: a store of another draft is refused saying how to reinstall
-        // it (`pimdir_error`).
         let mut owner = PimdirStore::open_current(&self.root).map_err(|err| match err {
             PimdirError::Owned(_) => CodedError::new(
                 ErrorCode::StoreOwned,
@@ -169,15 +167,15 @@ impl PimdirClient {
                 ),
             )
             .into(),
-            err => pimdir_error(err).context(format!("Cancel queued action {id}")),
+            err => pimdir_error(err).context(format!("Cancel queued action {handle}")),
         })?;
 
         if !owner
-            .drop_action(id)
+            .drop_action(handle)
             .map_err(pimdir_error)
-            .with_context(|| format!("Cancel queued action {id}"))?
+            .with_context(|| format!("Cancel queued action {handle}"))?
         {
-            return Err(row_not_found(id));
+            return Err(row_not_found(handle));
         }
         Ok(kind)
     }
@@ -380,19 +378,31 @@ fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<O
     }
 }
 
-/// Why queue row `id`, standing at `status`, cannot be cancelled: applied
-/// already, or not a row of the account's queue, under `row-not-found`.
-pub fn uncancellable(id: i64, status: &PimdirActionStatus) -> anyhow::Error {
+/// Why the queue row `handle` names, standing at `status`, cannot be
+/// cancelled: applied already, named under another store (`store-reset`),
+/// or not a row of the account's queue (`row-not-found`).
+pub fn uncancellable(handle: &PimdirActionHandle, status: &PimdirActionStatus) -> anyhow::Error {
     match status {
-        PimdirActionStatus::Applied { .. } => anyhow!("Row {id} was applied already"),
-        _ => row_not_found(id),
+        PimdirActionStatus::Applied { .. } => anyhow!("Row {handle} was applied already"),
+        PimdirActionStatus::Reset => store_reset(handle),
+        _ => row_not_found(handle),
     }
 }
 
-/// The refusal of a queue row the account's queue does not hold.
-fn row_not_found(id: i64) -> anyhow::Error {
+/// The refusal of a handle another store answered, a copy restored since,
+/// whose row id may name another row of this one.
+fn store_reset(handle: &PimdirActionHandle) -> anyhow::Error {
     let message = format!(
-        "No queued action with row {id} in this account's queue; it may have been synced already"
+        "Row {handle} was queued in another pimdir store than this one, a copy \
+         restored since: nothing was done with the row"
+    );
+    CodedError::new(ErrorCode::StoreReset, message).into()
+}
+
+/// The refusal of a queue row the account's queue does not hold.
+fn row_not_found(handle: &PimdirActionHandle) -> anyhow::Error {
+    let message = format!(
+        "No queued action with row {handle} in this account's queue; it may have been synced already"
     );
     CodedError::new(ErrorCode::RowNotFound, message).into()
 }

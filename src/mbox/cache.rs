@@ -20,6 +20,7 @@ use std::{
 
 use io_mbox::{index::MboxIndex, path::MboxFsPath};
 use log::debug;
+use pimalaya_cli::file::private_options;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -123,13 +124,11 @@ fn create_private_dir(dir: &Path) -> io::Result<()> {
 /// replacing whatever file was there.
 fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let _ = fs::remove_file(path);
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-
-    options.open(path)?.write_all(bytes)
+    private_options()
+        .write(true)
+        .create_new(true)
+        .open(path)?
+        .write_all(bytes)
 }
 
 /// The cache file of the mbox at `path`, named after a hash of its
