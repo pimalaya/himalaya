@@ -179,6 +179,20 @@ pub enum ErrorCode {
     /// The pimdir tag names no flag, or adds and removes one flag:
     /// nothing was staged.
     TagRefused,
+    /// The pimdir store holds several accounts of mail and
+    /// `pimdir.account` names none: nothing was read.
+    StoreAccountAmbiguous,
+    /// The pimdir store holds no collection of the account
+    /// `pimdir.account` names: nothing was read.
+    StoreAccountUnknown,
+    /// No pimdir queue row of the account has the id given: nothing was
+    /// cancelled.
+    RowNotFound,
+    /// The command asks to confirm, and no terminal can answer: pass
+    /// `--yes`. Nothing was done.
+    ConfirmationRequired,
+    /// The page token is not one the command printed: nothing was listed.
+    PageTokenInvalid,
     /// No account has the name `-a` gives (`default` among them, a name
     /// like any other).
     AccountMissing,
@@ -366,6 +380,14 @@ pub fn write_item_errors(
     }
 
     lines.write_after(f)
+}
+
+/// The refusal of a pimdir page token the command did not print, under
+/// `page-token-invalid`.
+#[cfg(feature = "pimdir")]
+pub fn page_token_invalid(token: &str) -> Error {
+    let message = format!("Invalid page token `{token}`: pass a `nextPage` value as printed");
+    CodedError::new(ErrorCode::PageTokenInvalid, message).into()
 }
 
 /// The pimdir codes Himalaya relays, by io-pimdir's spelling, which

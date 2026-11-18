@@ -30,6 +30,7 @@ use crate::{
     },
     email::mailbox::{MailboxIndex, MailboxRole},
     error::ErrorCode,
+    shared::refusal::Refusal,
 };
 
 /// One page of a Gmail listing as Gmail sent it, its cursor lifted out.
@@ -137,7 +138,9 @@ impl GmailClient {
         self.raw_get_with(path, Vec::new())
     }
 
-    fn raw_get_with(
+    /// The resource at `users/<user>/<path>`, queried by `pairs`, as Gmail
+    /// sent it.
+    pub fn raw_get_with(
         &mut self,
         path: &[&str],
         pairs: Vec<(String, String)>,
@@ -257,6 +260,27 @@ pub(crate) fn refusal_of(err: &GmailApiError) -> Option<ErrorCode> {
     } else {
         None
     }
+}
+
+/// The refusal of a Gmail error in a chain, for the `gmail` commands: the
+/// status, the first reason (else the canonical status) and the message
+/// of what Gmail answered.
+pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
+    let err = match cause.downcast_ref::<GmailClientStdError>() {
+        Some(GmailClientStdError::Send(err)) => err,
+        Some(_) => return None,
+        None => cause.downcast_ref::<GmailSendError>()?,
+    };
+    let err = err.api()?;
+    let reason = err.reasons.first().or(err.google_status.as_ref());
+
+    Some(Refusal {
+        status: Some(err.status),
+        reason: reason.cloned(),
+        message: err.message.clone(),
+        code: None,
+        retry_after: err.retry_after.map(|delay| delay.as_secs()),
+    })
 }
 
 #[cfg(test)]

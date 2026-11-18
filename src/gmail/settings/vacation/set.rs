@@ -5,13 +5,12 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{
-    get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate,
-};
+use io_gmail::v1::rest::settings::get_vacation::GmailVacationGet;
 use pimalaya_cli::printer::Printer;
 
 use crate::gmail::{
     client::GmailClient,
+    settings::raw_put,
     settings::{convert::enabled_flag, vacation::get::GmailSettingsVacationGetOutput},
 };
 
@@ -86,11 +85,7 @@ impl GmailSettingsVacationSetCommand {
             settings.end_time = Some(end);
         }
 
-        let out = {
-            let c = GmailVacationUpdate::new(&client.auth, &client.user_id, settings)?;
-            client.run(c)?
-        };
-
-        printer.out(GmailSettingsVacationGetOutput::from(out.response))
+        let settings = raw_put(client, "vacation", &settings)?;
+        printer.out(GmailSettingsVacationGetOutput(settings))
     }
 }

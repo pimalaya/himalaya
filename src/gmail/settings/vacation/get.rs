@@ -7,10 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{GmailVacationSettings, get_vacation::GmailVacationGet};
+use io_gmail::v1::rest::settings::GmailVacationSettings;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     gmail::{client::GmailClient, settings::convert::yes_no},
@@ -24,15 +25,12 @@ pub struct GmailSettingsVacationGetCommand;
 impl GmailSettingsVacationGetCommand {
     /// Fetches the vacation responder and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let out = {
-            let c = GmailVacationGet::new(&client.auth, &client.user_id)?;
-            client.run(c)?
-        };
-        printer.out(GmailSettingsVacationGetOutput::from(out.response))
+        let settings = client.raw_get(&["settings", "vacation"])?;
+        printer.out(GmailSettingsVacationGetOutput(Value::Object(settings)))
     }
 }
 
-impl From<GmailVacationSettings> for GmailSettingsVacationGetOutput {
+impl From<GmailVacationSettings> for View {
     fn from(settings: GmailVacationSettings) -> Self {
         Self {
             enable_auto_reply: settings.enable_auto_reply,
@@ -47,13 +45,8 @@ impl From<GmailVacationSettings> for GmailSettingsVacationGetOutput {
     }
 }
 
-/// The `gmail settings vacation get` output.
-///
-/// A boolean stays a boolean in JSON, where the text spells it enabled or
-/// disabled, yes or no.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GmailSettingsVacationGetOutput {
+/// The fields the text form prints, read from what Gmail sent.
+struct View {
     enable_auto_reply: bool,
     response_subject: Option<String>,
     response_body_plain_text: Option<String>,
@@ -64,7 +57,7 @@ pub(crate) struct GmailSettingsVacationGetOutput {
     end_time: Option<String>,
 }
 
-impl fmt::Display for GmailSettingsVacationGetOutput {
+impl fmt::Display for View {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let auto_reply = if self.enable_auto_reply {
             "enabled"
@@ -98,5 +91,21 @@ impl fmt::Display for GmailSettingsVacationGetOutput {
         }
 
         write!(f, "{fields}")
+    }
+}
+
+/// The settings as Gmail sent them, every property kept, the text form
+/// reading what it shows out of them.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsVacationGetOutput(
+    #[schemars(with = "Map<String, Value>")] pub(crate) Value,
+);
+
+impl fmt::Display for GmailSettingsVacationGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let settings: GmailVacationSettings =
+            serde_json::from_value(self.0.clone()).unwrap_or_default();
+        View::from(settings).fmt(f)
     }
 }

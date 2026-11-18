@@ -1681,14 +1681,17 @@ mod tests {
             thread::{self, JoinHandle},
         };
 
+        use clap::Parser;
+        use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
         use pimalaya_config::secret::Secret;
         use secrecy::SecretString;
         use serde_json::{Value, json};
 
         use crate::{
+            account::context::Account,
             config::jmap::{JmapAuthConfig, JmapConfig},
             error::ErrorCode,
-            jmap::client::JmapClient,
+            jmap::{cli::JmapCommand, client::JmapClient, email::cli::JmapEmailCommand},
         };
 
         /// The response a scripted server gives a method call: its name
@@ -2119,6 +2122,92 @@ mod tests {
                 recipient_refused(result);
                 assert_eq!(calls[2][1]["destroy"], json!(["E1"]));
             }
+        }
+
+        /// A destroy the server applies in part prints what it destroyed
+        /// beside the item error of what it refused, and exits 3.
+        #[test]
+        fn a_destroy_applied_in_part_names_both_halves() {
+            let set = json!({
+                "destroyed": ["E1", "E2"],
+                "notDestroyed": { "Egone": { "type": "notFound" } },
+            });
+            let (url, server) = serve(vec![("Email/set", set)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = crate::jmap::email::delete::JmapEmailDestroyCommand {
+                ids: vec!["E1".into(), "E2".into(), "Egone".into()],
+            };
+            let result = command.execute(&mut printer, &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["ids"], json!(["E1", "E2"]));
+            assert_eq!(output["errors"][0]["id"], "Egone");
+            assert_eq!(output["errors"][0]["code"], "message-not-found");
+        }
+
+        /// A method error the server answers a `jmap` command with is the
+        /// command's result, under `refusal`, and exits 3.
+        #[test]
+        fn a_method_error_is_the_result() {
+            let error = json!({ "type": "invalidArguments", "description": "Bad id" });
+            let (url, server) = serve(vec![("error", error)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let command = JmapCommand::Email(JmapEmailCommand::Delete(
+                crate::jmap::email::delete::JmapEmailDestroyCommand {
+                    ids: vec!["E1".into()],
+                },
+            ));
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let refusal = json!({
+                "refusal": {
+                    "status": null,
+                    "reason": "invalidArguments",
+                    "message": "Bad id",
+                    "code": null,
+                    "retryAfter": null,
+                }
+            });
+            assert_eq!(printer.into_single().unwrap(), refusal);
+        }
+
+        /// A create the server refuses is the command's result, under
+        /// `refusal`, coded by its type, and exits 3.
+        #[test]
+        fn a_refused_create_is_the_result() {
+            let refused = json!({ "notCreated": { "Archive": { "type": "forbidden" } } });
+            let (url, server) = serve(vec![("Mailbox/set", refused)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let cli = crate::cli::Cli::try_parse_from([
+                "himalaya", "jmap", "mailbox", "create", "Archive",
+            ])
+            .unwrap();
+            let Some(crate::cli::Command::Jmap(command)) = cli.cmd else {
+                unreachable!()
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let output = printer.into_single().unwrap();
+            assert_eq!(output["refusal"]["reason"], "forbidden", "{output}");
+            assert_eq!(output["refusal"]["code"], "permission-denied", "{output}");
         }
     }
 }

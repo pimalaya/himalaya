@@ -10,14 +10,22 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use io_smtp::{
-    message::{SmtpMessageSend, SmtpMessageSendOptions},
+    client::SmtpClientError,
+    message::{SmtpMessageSend, SmtpMessageSendError, SmtpMessageSendOptions},
     rfc3461::{
         capability::DSN,
         parameter::{SmtpDsnNotify, SmtpDsnRet},
     },
-    rfc5321::{SmtpForwardPath, SmtpMailbox, SmtpParameter, SmtpReversePath},
+    rfc5321::{
+        SmtpForwardPath, SmtpMailbox, SmtpParameter, SmtpReversePath, data::SmtpDataError,
+        mail::SmtpMailError, rcpt::SmtpRcptError,
+    },
 };
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{
+    error::{PartialOutcome, usage_error},
+    printer::Printer,
+    sanitize,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -66,6 +74,18 @@ pub struct SmtpSendCommand {
 }
 
 impl SmtpSendCommand {
+    /// Refuses `never` beside another notify condition, as clap would
+    /// refuse two conflicting flags, before the session opens.
+    pub fn check(&self) -> Result<()> {
+        if self.notify.len() > 1 && self.notify.contains(&NotifyArg::Never) {
+            let message = "notify condition `never` cannot be combined with another one";
+            let err = clap::Error::raw(clap::error::ErrorKind::ArgumentConflict, message);
+            return Err(usage_error(&err));
+        }
+
+        Ok(())
+    }
+
     /// Sends the message over the explicit envelope, byte for byte.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         let mut mail_parameters = Vec::new();
@@ -80,10 +100,6 @@ impl SmtpSendCommand {
         }
 
         if !self.notify.is_empty() {
-            if self.notify.len() > 1 && self.notify.contains(&NotifyArg::Never) {
-                bail!("Notify condition `never` cannot be combined with another one");
-            }
-
             let notify = self
                 .notify
                 .into_iter()
@@ -130,8 +146,18 @@ impl SmtpSendCommand {
             rcpt_to: rcpt_to.iter().map(ToString::to_string).collect(),
         };
 
-        client.run(SmtpMessageSend::new(mail_from, rcpt_to, message, options))?;
-        printer.out(output)
+        let send = SmtpMessageSend::new(mail_from, rcpt_to, message, options);
+
+        match client.run(send) {
+            Ok(_) => printer.out(output),
+            Err(err) => match SmtpSendRefusalOutput::of(&err) {
+                Some(refusal) => {
+                    printer.out(refusal)?;
+                    Err(PartialOutcome::default().into())
+                }
+                None => Err(err.into()),
+            },
+        }
     }
 }
 
@@ -154,6 +180,97 @@ impl fmt::Display for SmtpSendOutput {
             self.rcpt_to.join(", ")
         )
     }
+}
+
+/// The result of an `smtp send` the server refused: each refusing reply,
+/// the message reaching nobody.
+#[derive(Debug, Eq, PartialEq, Serialize, JsonSchema)]
+pub(crate) struct SmtpSendRefusalOutput {
+    /// The replies refusing the transaction, in the order received: one
+    /// for a refused `MAIL FROM` or `DATA`, one per recipient when the
+    /// server refused them all.
+    refusals: Vec<SmtpSendRefusal>,
+}
+
+/// One reply refusing an `smtp send`.
+#[derive(Debug, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SmtpSendRefusal {
+    /// The forward path the server refused, `null` for a refused `MAIL
+    /// FROM` or `DATA`.
+    rcpt_to: Option<String>,
+    /// The reply code, 4xx or 5xx.
+    code: u16,
+    /// The text of the reply.
+    text: String,
+}
+
+impl SmtpSendRefusalOutput {
+    /// The replies a send failed on, if the server refused it rather than
+    /// the exchange failing.
+    fn of(err: &SmtpClientError) -> Option<Self> {
+        let SmtpClientError::MessageSend(err) = err else {
+            return None;
+        };
+
+        let refusal = |rcpt_to: Option<String>, code: u16, text: &str| SmtpSendRefusal {
+            rcpt_to,
+            code,
+            text: text.trim_end().to_owned(),
+        };
+
+        let refusals = match err {
+            SmtpMessageSendError::MailFrom(SmtpMailError::Rejected { code, message }) => {
+                vec![refusal(None, *code, message)]
+            }
+            SmtpMessageSendError::RcptTo {
+                forward_path,
+                error: SmtpRcptError::Rejected { code, message },
+            } => vec![refusal(Some(forward_path.to_string()), *code, message)],
+            SmtpMessageSendError::NoRecipient(refused) => refused
+                .iter()
+                .map(|refused| {
+                    let rcpt_to = Some(refused.forward_path.to_string());
+                    refusal(rcpt_to, refused.code, &refused.message)
+                })
+                .collect(),
+            SmtpMessageSendError::Data(
+                SmtpDataError::CommandRejected { code, message }
+                | SmtpDataError::BodyRejected { code, message },
+            ) => vec![refusal(None, *code, message)],
+            _ => return None,
+        };
+
+        Some(Self { refusals })
+    }
+}
+
+impl fmt::Display for SmtpSendRefusalOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "SMTP server refused the message, sent to nobody:")?;
+
+        for refusal in &self.refusals {
+            let text = sanitize::text(&refusal.text);
+            match &refusal.rcpt_to {
+                Some(rcpt) => writeln!(f, "  {}: {} {text}", sanitize::text(rcpt), refusal.code)?,
+                None => writeln!(f, "  {} {text}", refusal.code)?,
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// The schema of `smtp send`: the envelope sent, or the refusals, told
+/// apart by `refusals`.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub(crate) enum SmtpSendOutcome {
+    /// The server accepted the message.
+    Sent(SmtpSendOutput),
+    /// The server refused it.
+    Refused(SmtpSendRefusalOutput),
 }
 
 /// One condition a delivery status notification is sent on (RFC 3461

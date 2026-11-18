@@ -3,14 +3,14 @@
 //! The `jmap identity delete` command, the destroy half of RFC 8621
 //! `Identity/set`.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::identity::set::JmapIdentitySetArgs;
-use pimalaya_cli::{printer::Printer, sanitize};
+use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
-    shared::receipt::IdsReceipt,
+    error::ErrorCode,
+    jmap::{client::JmapClient, set::JmapSetReceipt},
 };
 
 /// Delete a JMAP sender identity (Identity/set).
@@ -32,20 +32,12 @@ impl JmapIdentityDeleteCommand {
 
         let output = client.identity_set(args)?;
 
-        if !output.not_destroyed.is_empty() {
-            let mut msg = String::from("Destroy JMAP identities error");
-
-            for (id, err) in output.not_destroyed {
-                msg.push_str(&format!("\n  `{}`", sanitize::text(&id)));
-                msg.push_str(&format_set_error(&err));
-            }
-
-            bail!(msg)
-        }
-
-        printer.out(IdsReceipt {
-            ids: output.destroyed,
-            done: "JMAP identities successfully deleted",
-        })
+        JmapSetReceipt::new(
+            "JMAP identities successfully deleted",
+            output.destroyed,
+            output.not_destroyed,
+            Some(ErrorCode::IdentityNotFound),
+        )
+        .print(printer)
     }
 }

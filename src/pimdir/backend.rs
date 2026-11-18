@@ -65,7 +65,10 @@ use crate::{
         },
         submission::SubmissionEnvelope,
     },
-    error::{ErrorCode, existing_mailbox, message_not_found, missing_message, pimdir_error},
+    error::{
+        ErrorCode, existing_mailbox, mailbox_not_found, message_not_found, missing_message,
+        pimdir_error,
+    },
     pimdir::{
         client::PimdirClient,
         queue::list::{PimdirQueueRefused, PimdirQueueRow},
@@ -113,10 +116,10 @@ impl PimdirClient {
 
         ids.sort();
 
-        bail!(
+        Err(mailbox_not_found(format!(
             "Mailbox `{mailbox}` not found in the pimdir store, which holds: {}",
             ids.join(", "),
-        )
+        )))
     }
 
     /// Maps a mailbox onto its collection id: an id of the account passes
@@ -160,6 +163,16 @@ impl PimdirClient {
             })
             .collect();
         Ok(MailboxIndex(mailboxes))
+    }
+
+    /// The ids of the account's mail collections, in store order, as
+    /// `mailbox list` prints them.
+    pub fn mail_collection_ids(&self) -> Result<Vec<String>> {
+        let collections = self.mail_collections()?;
+        Ok(collections
+            .into_iter()
+            .map(|collection| collection.id)
+            .collect())
     }
 
     /// The account's mail collections, in store order.
@@ -750,13 +763,10 @@ impl PimdirClient {
             .into());
         };
 
-        // NOTE: a store refusing the staged flag change must not fail the
-        // read, which is non-mutating by default.
         if seen {
             let seen_flag = Flag::from_iana(IanaFlag::Seen);
-            if let Err(err) = self.store_flags(mailbox, &[id], &[seen_flag], FlagOp::Add) {
-                warn!("could not stage \\Seen on `{id}` in `{mailbox}`: {err:#}");
-            }
+            self.store_flags(mailbox, &[id], &[seen_flag], FlagOp::Add)
+                .with_context(|| format!("Cannot stage \\Seen on `{id}` in `{mailbox}`"))?;
         }
 
         Ok(bytes)
@@ -1723,7 +1733,7 @@ fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> Result<Pi
 /// error for a non-numeric one.
 fn parse_id(id: &str) -> Result<i64> {
     id.parse::<i64>()
-        .map_err(|_| anyhow!("Invalid message id `{id}` (expected a number)"))
+        .map_err(|_| message_not_found(format!("Invalid message id `{id}` (expected a number)")))
 }
 
 /// What a search query states that the store's reads express, every
@@ -2258,6 +2268,41 @@ mod tests {
         assert_eq!(addressed.item_id.as_deref(), Some("42"));
         assert_eq!(addressed.link_id, None);
         assert_eq!(addressed.subject, None);
+    }
+
+    /// A bare `pimdir queue list` covers the whole account, so a send
+    /// queued on the sent mailbox shows there; `--mailbox` narrows it to
+    /// one mailbox.
+    #[test]
+    fn the_queue_list_covers_the_account_unless_narrowed() {
+        use clap::Parser;
+        use pimalaya_cli::printer::CapturePrinter;
+
+        use crate::{account::context::Account, pimdir::queue::list::PimdirQueueListCommand};
+
+        let (dir, mut client) = sent_store();
+        let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        store.ensure_collection("imap/INBOX", MAIL_KIND).unwrap();
+        drop(store);
+        syncs(dir.path());
+        client
+            .send_message(Some("imap/Sent"), RAW.to_vec(), false)
+            .unwrap();
+
+        let list = |client: &mut PimdirClient, args: &[&str]| {
+            let command = PimdirQueueListCommand::try_parse_from(args).unwrap();
+            let mut printer = CapturePrinter::default();
+            let mut account = Account::default();
+            command.execute(&mut printer, &mut account, client).unwrap();
+            printer.into_single().unwrap()
+        };
+
+        let all = list(&mut client, &["list"]);
+        assert_eq!(all["messages"][0]["kind"], "submit", "{all}");
+        assert_eq!(all["messages"][0]["collection"], "imap/Sent", "{all}");
+
+        let inbox = list(&mut client, &["list", "-m", "imap/INBOX"]);
+        assert_eq!(inbox["messages"], serde_json::json!([]), "{inbox}");
     }
 
     /// A store holding one mail collection, `imap/Sent`, and the client
@@ -4272,6 +4317,43 @@ mod tests {
         assert_eq!(json["warnings"], serde_json::json!([warning]));
         let text = output.to_string();
         assert!(text.contains(&format!("\nWarning: {warning}\n")), "{text}");
+    }
+
+    /// A read asked to mark the message seen fails, as on Maildir and
+    /// mbox, when the store cannot stage the flag, rather than read it
+    /// unseen and exit 0.
+    #[test]
+    fn a_read_whose_seen_flag_is_refused_fails() {
+        use io_pimdir::capability::{MAIL_FLAGS_SEEN, PimdirSupport};
+
+        let (dir, mut client) = sent_store();
+        client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        let seen = io_pimdir::capability::PimdirCapability {
+            collection: None,
+            name: MAIL_FLAGS_SEEN.to_string(),
+            support: PimdirSupport::None,
+            detail: None,
+        };
+        owner.declare("imap", &[seen]).unwrap();
+        drop(owner);
+        syncs(dir.path());
+        let envelopes = client.list_envelopes("imap/Sent", None, None, false);
+        let id = envelopes.unwrap()[0].id.clone();
+
+        let err = client.get_message("imap/Sent", &id, true).unwrap_err();
+
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::Unsupported),
+            "{err:#}"
+        );
+        assert!(client.get_message("imap/Sent", &id, false).is_ok());
     }
 
     #[test]

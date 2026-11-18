@@ -23,7 +23,7 @@ use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
     outcome,
-    utils::parse_sequence_set,
+    utils::{parse_sequence_set, sequence_set_parser},
 };
 
 /// Copy messages to the given mailbox (COPY, RFC 3501).
@@ -34,7 +34,7 @@ pub struct ImapMessageCopyCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
     /// The messages to copy, as `1`, `1,2,3` or `1:*`.
-    #[arg(name = "sequence_set", value_name = "SEQUENCE")]
+    #[arg(name = "sequence_set", value_name = "SEQUENCE", value_parser = sequence_set_parser)]
     pub sequence_set: String,
     #[command(flatten)]
     pub mailbox_dest_name: TargetMailboxNameArg,

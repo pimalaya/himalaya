@@ -94,8 +94,8 @@ impl PimdirClient {
                 hits: self.mail_hits(&index, thread.hits, &mut errors),
                 thread: thread.thread,
                 count: thread.count,
-                first: thread.first,
-                last: thread.last,
+                first_date: thread.first,
+                last_date: thread.last,
             });
         }
 
@@ -338,8 +338,8 @@ impl PimdirClient {
         Ok(PimdirMailThread {
             thread: thread.thread,
             count: thread.count,
-            first: thread.first,
-            last: thread.last,
+            first_date: thread.first,
+            last_date: thread.last,
             hits,
         })
     }
@@ -498,9 +498,9 @@ pub struct PimdirMailThread {
     /// The messages it holds in the account, matched or not.
     pub count: u64,
     /// The date of its earliest message, `null` without one.
-    pub first: Option<String>,
+    pub first_date: Option<String>,
     /// The date of its latest message.
-    pub last: Option<String>,
+    pub last_date: Option<String>,
     /// Its messages the query matched, or every one of a thread read whole.
     pub hits: Vec<PimdirMailHit>,
 }

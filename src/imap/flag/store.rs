@@ -19,7 +19,7 @@ use crate::imap::{
     fetch::{FetchedMessage, ImapFetchOutput},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
     outcome,
-    utils::{output_data, parse_sequence_set},
+    utils::{output_data, parse_sequence_set, sequence_set_parser},
 };
 
 /// Store flags on messages (STORE, RFC 3501).
@@ -30,7 +30,7 @@ pub struct ImapStoreCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
     /// The messages to store on, as `1`, `1,2,3` or `1:*`.
-    #[arg(value_name = "SEQUENCE")]
+    #[arg(value_name = "SEQUENCE", value_parser = sequence_set_parser)]
     pub sequence_set: String,
     /// How to apply the flags.
     #[arg(long, value_name = "ACTION", default_value = "add")]

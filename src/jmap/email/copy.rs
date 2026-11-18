@@ -4,14 +4,14 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::email::copy::JmapEmailCopyArgs;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
-    shared::receipt::IdsReceipt,
+    error::ErrorCode,
+    jmap::{client::JmapClient, set::JmapSetReceipt},
 };
 
 /// Copy JMAP emails from another account (Email/copy).
@@ -52,24 +52,18 @@ impl JmapEmailCopyCommand {
 
         let output = client.email_copy(self.from_account.clone(), emails)?;
 
-        if !output.not_created.is_empty() {
-            let mut msg = String::from("Copy JMAP email(s) error");
+        let ids = output
+            .created
+            .into_values()
+            .filter_map(|email| email.id)
+            .collect();
 
-            for (id, err) in output.not_created {
-                msg.push_str(&format!("\n  `{id}`"));
-                msg.push_str(&format_set_error(&err));
-            }
-
-            bail!(msg)
-        }
-
-        printer.out(IdsReceipt {
-            ids: output
-                .created
-                .into_values()
-                .filter_map(|email| email.id)
-                .collect(),
-            done: "JMAP emails successfully copied",
-        })
+        JmapSetReceipt::new(
+            "JMAP emails successfully copied",
+            ids,
+            output.not_created,
+            Some(ErrorCode::MessageNotFound),
+        )
+        .print(printer)
     }
 }

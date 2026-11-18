@@ -28,7 +28,7 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
-        utils::{output_data, parse_sequence_set, to_address},
+        utils::{output_data, parse_sequence_set, sequence_set_parser, to_address},
     },
     shared::{base64, envelope::list::format_addresses, message::header},
 };
@@ -44,7 +44,7 @@ pub struct ImapFetchCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
     /// The messages to fetch, as `1`, `1,2,3` or `1:*`.
-    #[arg(value_name = "SEQUENCE")]
+    #[arg(value_name = "SEQUENCE", value_parser = sequence_set_parser)]
     pub sequence_set: String,
     /// Fetch the envelope: date, subject and addresses.
     #[arg(long)]

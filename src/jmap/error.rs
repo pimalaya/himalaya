@@ -1,13 +1,19 @@
 //! # JMAP error
 //!
 //! Renders the `SetError` a JMAP method returns into the message a
-//! command fails with, and codes what the server refused.
+//! command fails with, codes what the server refused, and reads a refusal
+//! into the result a `jmap` command prints.
+
+use std::fmt;
 
 use anyhow::Error;
 use io_jmap::{
     rfc8620::{
-        blob_download::JmapBlobDownloadError, blob_upload::JmapBlobUploadError,
-        error::JmapMethodError, send::JmapSendError, session_get::JmapSessionGetError,
+        blob_download::JmapBlobDownloadError,
+        blob_upload::JmapBlobUploadError,
+        error::{JmapMethodError, JmapRequestError},
+        send::JmapSendError,
+        session_get::JmapSessionGetError,
     },
     rfc8621::{
         email::{
@@ -19,9 +25,13 @@ use io_jmap::{
         mailbox::set::JmapMailboxSetItemError,
     },
 };
-use pimalaya_cli::{error::CodedError, sanitize};
+use pimalaya_cli::sanitize;
+use serde::Serialize;
 
-use crate::error::{ErrorCode, ItemError};
+use crate::{
+    error::{ErrorCode, ItemError},
+    shared::refusal::Refusal,
+};
 
 /// Returns the optional human-readable description carried by a JMAP set error.
 pub trait JmapSetError {
@@ -42,19 +52,43 @@ fn set_error_code(type_name: &str) -> Option<ErrorCode> {
     }
 }
 
+/// The one write of a whole command the server refused, worded by the
+/// command, its SetError kept for the code and the refusal it reads as.
+#[derive(Debug)]
+pub struct JmapSetRefusal {
+    message: String,
+    type_name: String,
+    description: Option<String>,
+}
+
+impl fmt::Display for JmapSetRefusal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for JmapSetRefusal {}
+
 /// The failure of a whole command whose one write the server refused,
 /// worded `message`, coded by the type of `err`.
 pub fn set_error<E: JmapSetError>(message: String, err: &E) -> Error {
-    match set_error_code(err.type_name()) {
-        Some(code) => CodedError::new(code, message).into(),
-        None => Error::msg(message),
+    JmapSetRefusal {
+        message,
+        type_name: err.type_name().to_owned(),
+        description: err.description().map(ToOwned::to_owned),
     }
+    .into()
 }
 
 /// The code of a JMAP refusal in an error chain: an HTTP 429 is
 /// `rate-limited` and a 403 `permission-denied`, whichever request it
-/// answered, as is a method error `forbidden` (RFC 8620 §3.6.2).
+/// answered, as is a method error `forbidden` (RFC 8620 §3.6.2), and a
+/// refused write is coded by its SetError type.
 pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
+        return set_error_code(&err.type_name);
+    }
+
     let status = if let Some(err) = cause.downcast_ref::<JmapSendError>() {
         match err {
             JmapSendError::HttpStatus(status) | JmapSendError::Request { status, .. } => *status,
@@ -77,6 +111,80 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
         429 => Some(ErrorCode::RateLimited),
         403 => Some(ErrorCode::PermissionDenied),
         _ => None,
+    }
+}
+
+/// The refusal of a JMAP error in a chain, for the `jmap` commands: a
+/// non-2xx answer by its status (and its problem type, for a request the
+/// server refused whole), a method error or a refused write by its type
+/// and description.
+pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
+    if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
+        let message = err
+            .description
+            .clone()
+            .unwrap_or_else(|| err.message.clone());
+        return Some(described(None, Some(err.type_name.clone()), message));
+    }
+
+    if let Some(err) = cause.downcast_ref::<JmapMethodError>() {
+        return Some(typed(None, err));
+    }
+
+    let status = if let Some(err) = cause.downcast_ref::<JmapSendError>() {
+        match err {
+            JmapSendError::Request { status, error } => {
+                return Some(request_refusal(*status, error));
+            }
+            JmapSendError::HttpStatus(status) => *status,
+            _ => return None,
+        }
+    } else if let Some(JmapSessionGetError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else if let Some(JmapBlobDownloadError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else if let Some(JmapBlobUploadError::HttpStatus(status)) = cause.downcast_ref() {
+        *status
+    } else {
+        return None;
+    };
+
+    Some(described(Some(status), None, cause.to_string()))
+}
+
+/// The refusal of a request the server refused whole: its problem type,
+/// the URN namespace stripped, and its detail.
+fn request_refusal(status: u16, err: &JmapRequestError) -> Refusal {
+    let (reason, detail) = match err {
+        JmapRequestError::UnknownCapability { detail } => ("unknownCapability", detail),
+        JmapRequestError::NotJson { detail } => ("notJSON", detail),
+        JmapRequestError::NotRequest { detail } => ("notRequest", detail),
+        JmapRequestError::Limit { detail, .. } => ("limit", detail),
+        JmapRequestError::Other { type_name, detail } => (type_name.as_str(), detail),
+    };
+    let reason = reason.trim_start_matches("urn:ietf:params:jmap:error:");
+    let message = detail.clone().unwrap_or_else(|| err.to_string());
+
+    described(Some(status), Some(reason.to_owned()), message)
+}
+
+/// The refusal a method error states: its `type`, then its
+/// `description`, the type standing in for a missing one.
+fn typed(status: Option<u16>, err: &impl Serialize) -> Refusal {
+    let value = serde_json::to_value(err).unwrap_or_default();
+    let field = |key: &str| value.get(key).and_then(|value| value.as_str());
+    let reason = field("type");
+    let message = field("description").or(reason).unwrap_or_default();
+
+    described(status, reason.map(ToOwned::to_owned), message.to_owned())
+}
+
+fn described(status: Option<u16>, reason: Option<String>, message: String) -> Refusal {
+    Refusal {
+        status,
+        reason,
+        message,
+        ..Default::default()
     }
 }
 
@@ -103,9 +211,15 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
 /// The item error of the email `id` a set refused, coded by its type
 /// (RFC 8620 §5.3, RFC 8621 §4.6), the type kept in `sources`.
 pub fn set_item_error(id: &str, err: &JmapEmailSetItemError) -> ItemError {
-    let code = match err {
-        JmapEmailSetItemError::NotFound { .. } => Some(ErrorCode::MessageNotFound),
-        err => set_error_code(err.type_name()),
+    item_error(id, err, Some(ErrorCode::MessageNotFound))
+}
+
+/// The item error of the object `id` a set refused, coded by its type, a
+/// `notFound` by `not_found`, the type kept in `sources`.
+pub fn item_error<E: JmapSetError>(id: &str, err: &E, not_found: Option<ErrorCode>) -> ItemError {
+    let code = match err.type_name() {
+        "notFound" => not_found,
+        type_name => set_error_code(type_name),
     };
 
     ItemError {

@@ -3,13 +3,13 @@
 //! The `jmap submission cancel` command, an RFC 8621
 //! `EmailSubmission/set` update setting the undo status.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
-    shared::receipt::IdsReceipt,
+    error::ErrorCode,
+    jmap::{client::JmapClient, set::JmapSetReceipt},
 };
 
 /// Cancel (undo) a pending JMAP email submission (EmailSubmission/set).
@@ -26,22 +26,14 @@ pub struct JmapSubmissionCancelCommand {
 impl JmapSubmissionCancelCommand {
     /// Sets the undo status of the submission to canceled.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let output = client.email_submission_cancel(self.ids.clone())?;
+        let output = client.email_submission_cancel(self.ids)?;
 
-        if !output.not_updated.is_empty() {
-            let mut msg = String::from("Cancel submission(s) error");
-
-            for (id, err) in &output.not_updated {
-                msg.push_str(&format!("\n  `{id}`"));
-                msg.push_str(&format_set_error(err));
-            }
-
-            bail!(msg);
-        }
-
-        printer.out(IdsReceipt {
-            ids: self.ids,
-            done: "JMAP submissions canceled",
-        })
+        JmapSetReceipt::new(
+            "JMAP submissions canceled",
+            output.updated.into_keys().collect(),
+            output.not_updated,
+            Some(ErrorCode::SubmissionNotFound),
+        )
+        .print(printer)
     }
 }

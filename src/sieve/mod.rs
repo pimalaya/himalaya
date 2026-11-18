@@ -12,6 +12,7 @@ pub mod deactivate;
 pub mod delete;
 pub mod get;
 pub mod list;
+pub mod outcome;
 pub mod put;
 pub mod raw;
 pub mod rename;

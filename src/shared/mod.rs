@@ -41,5 +41,7 @@ pub mod raw_json;
     feature = "sieve"
 ))]
 pub mod receipt;
+#[cfg(any(feature = "gmail", feature = "jmap", feature = "msgraph"))]
+pub mod refusal;
 #[cfg(any(backend, feature = "smtp"))]
 pub mod vacation;

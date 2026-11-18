@@ -1,7 +1,8 @@
 //! # pimdir queue list
 //!
 //! The `pimdir queue list` command, listing the creations and sends staged
-//! in one mailbox and the rows parked there.
+//! in the account, the rows parked there and the refusals standing, or
+//! those of one mailbox.
 
 use std::fmt;
 
@@ -11,19 +12,17 @@ use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account, backend::Backend, pimdir::client::PimdirClient,
-    shared::mailbox::arg::MailboxArg,
-};
+use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirClient};
 
-/// List the messages staged for creation or sending in a mailbox.
+/// List the messages staged for creation or sending in the account.
 ///
 /// A saved message waits in the queue until the sync engine applies it and
 /// has no id until then, so `envelope list` cannot show it. A sent message
 /// waits there until the store's owner sends it, filed under the mailbox it
 /// was saved to or the account's sent alias. This is where both show: the
 /// row id to cancel one by, when it was queued, its kind (`add` or
-/// `submit`) and its subject.
+/// `submit`) and its subject. The whole account is listed, mailbox by
+/// mailbox, unless `--mailbox` names one.
 ///
 /// Staged flags, moves and deletions need no such view, addressing messages
 /// that already exist. A row of any kind the sync engine parked, refusing to
@@ -43,31 +42,42 @@ use crate::{
 /// "subject"}`, as every Pimalaya program prints a queue row.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
-    #[command(flatten)]
-    pub mailbox: MailboxArg,
+    /// The one mailbox to list, a name, alias, role or id; the whole
+    /// account when omitted.
+    #[arg(short = 'm', long = "mailbox", value_name = "NAME")]
+    pub mailbox: Option<String>,
 }
 
 impl PimdirQueueListCommand {
-    /// Lists the creations and sends staged in the mailbox and the rows
-    /// parked there, and prints them.
+    /// Lists the creations and sends staged in the account, or in the one
+    /// mailbox named, the rows parked there and the refusals standing,
+    /// and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account);
-        let messages = client.queued_rows(&mailbox)?;
-        let parked = client.parked_rows(&mailbox)?;
-        let refused = client.refused_rows(&mailbox)?;
+        let mailboxes = match &self.mailbox {
+            Some(mailbox) => vec![account.resolve_mailbox(mailbox).to_string()],
+            None => client.mail_collection_ids()?,
+        };
 
-        printer.out(PimdirQueueListOutput {
+        let mut output = PimdirQueueListOutput {
             account: account.name().to_string(),
-            mailbox,
-            messages,
-            parked,
-            refused,
-        })
+            mailbox: self.mailbox.as_ref().and(mailboxes.first().cloned()),
+            messages: Vec::new(),
+            parked: Vec::new(),
+            refused: Vec::new(),
+        };
+
+        for mailbox in &mailboxes {
+            output.messages.extend(client.queued_rows(mailbox)?);
+            output.parked.extend(client.parked_rows(mailbox)?);
+            output.refused.extend(client.refused_rows(mailbox)?);
+        }
+
+        printer.out(output)
     }
 }
 
@@ -117,14 +127,15 @@ pub struct PimdirQueueListOutput {
     /// The name of the account listed.
     #[serde(skip)]
     pub account: String,
-    /// The mailbox listed, its alias resolved.
+    /// The one mailbox listed, its alias resolved, `None` for the whole
+    /// account.
     #[serde(skip)]
-    pub mailbox: String,
-    /// The creations and sends staged in the mailbox.
+    pub mailbox: Option<String>,
+    /// The creations and sends staged, mailbox by mailbox.
     pub messages: Vec<PimdirQueueRow>,
-    /// The mailbox's parked rows, any kind.
+    /// The parked rows, any kind, mailbox by mailbox.
     pub parked: Vec<PimdirQueueRow>,
-    /// The refusals standing in the mailbox, per message and source.
+    /// The refusals standing, per message and source.
     pub refused: Vec<PimdirQueueRefused>,
 }
 
@@ -149,7 +160,9 @@ pub struct PimdirQueueRefused {
 impl fmt::Display for PimdirQueueListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut listing = Listing::new(&self.account, Some(Backend::Pimdir.as_str()));
-        listing.head("Mailbox", &self.mailbox);
+        if let Some(mailbox) = &self.mailbox {
+            listing.head("Mailbox", mailbox);
+        }
 
         for queued in &self.messages {
             let what = queued.subject.as_deref().or(queued.item_id.as_deref());
@@ -228,7 +241,7 @@ mod tests {
     fn a_pending_and_a_parked_row_keep_one_shape() {
         let output = PimdirQueueListOutput {
             account: "perso".into(),
-            mailbox: "imap/Sent".into(),
+            mailbox: Some("imap/Sent".into()),
             messages: vec![
                 PimdirQueueRow {
                     link_id: Some("d1@x.org".into()),

@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::set::{JmapMailboxSetArgs, JmapMailboxUpdate};
 use pimalaya_cli::printer::Printer;
@@ -13,7 +13,7 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     jmap::{
         client::JmapClient,
-        error::format_set_error,
+        error::{format_set_error, set_error},
         mailbox::query::{RoleArg, role_from_args},
     },
     shared::receipt::IdReceipt,
@@ -80,7 +80,7 @@ impl JmapMailboxUpdateCommand {
         if let Some(err) = output.not_updated.get(&self.id) {
             let mut msg = format!("Update JMAP mailbox `{}` error", self.id);
             msg.push_str(&format_set_error(err));
-            bail!(msg);
+            return Err(set_error(msg, err));
         }
 
         printer.out(IdReceipt {

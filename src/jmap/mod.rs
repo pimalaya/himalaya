@@ -13,6 +13,7 @@ pub mod mailbox;
 pub mod query;
 pub mod raw;
 pub mod request;
+pub mod set;
 pub mod submission;
 pub mod thread;
 pub mod vacation;

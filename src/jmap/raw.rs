@@ -10,7 +10,10 @@ use anyhow::{Context, Result};
 use io_jmap::{
     client::JmapClientStd,
     rfc8620::{JMAP_CORE_CAPABILITY, error::JmapMethodError, request::JmapRequest},
-    rfc8621::{JMAP_MAIL_CAPABILITY, email_submission::JMAP_SUBMISSION_CAPABILITY},
+    rfc8621::{
+        JMAP_MAIL_CAPABILITY, email_submission::JMAP_SUBMISSION_CAPABILITY,
+        vacation_response::JMAP_VACATION_RESPONSE_CAPABILITY,
+    },
 };
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -167,6 +170,9 @@ fn send(
     if matches!(object, "EmailSubmission" | "Identity") {
         using.push(JMAP_SUBMISSION_CAPABILITY.to_string());
     }
+    if object == "VacationResponse" {
+        using.push(JMAP_VACATION_RESPONSE_CAPABILITY.to_string());
+    }
 
     let request = JmapRequest {
         using,
@@ -274,6 +280,23 @@ mod tests {
         assert_eq!(list.not_found, ["e2"]);
         let rest = json!({"queryState": "q1", "canCalculateChanges": false, "position": 0, "total": 5, "state": "s1"});
         assert_eq!(serde_json::Value::Object(list.rest), rest);
+    }
+
+    /// A vacation response is asked for under its own capability, and
+    /// kept as sent.
+    #[test]
+    fn a_vacation_response_get_names_its_capability() {
+        let vacation = json!({"id": "singleton", "isEnabled": false, "x-vendor": 1});
+        let answer = json!({"methodResponses": [
+            ["VacationResponse/get", {"accountId": "a1", "state": "s1", "list": [vacation], "notFound": []}, "g"],
+        ], "sessionState": "s"});
+        let (mut client, requests) = client_and_requests(vec![answer]);
+
+        let list = raw::get(&mut client, "VacationResponse", None).unwrap();
+
+        assert_eq!(list.list, [vacation]);
+        let requests = requests.lock().unwrap();
+        assert!(requests[0].contains("urn:ietf:params:jmap:vacationresponse"));
     }
 
     /// A method answering `error` fails the listing with that error.

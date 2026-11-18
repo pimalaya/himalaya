@@ -5,15 +5,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{
-    get_auto_forwarding::GmailAutoForwardingGet, update_auto_forwarding::GmailAutoForwardingUpdate,
-};
+use io_gmail::v1::rest::settings::get_auto_forwarding::GmailAutoForwardingGet;
 use pimalaya_cli::printer::Printer;
 
 use crate::gmail::{
     client::GmailClient,
     settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput,
     settings::convert::{DispositionArg, enabled_flag},
+    settings::raw_put,
 };
 
 /// Update the Gmail auto-forwarding settings.
@@ -55,11 +54,7 @@ impl GmailSettingsAutoForwardingSetCommand {
             settings.disposition = Some(disposition.into());
         }
 
-        let out = {
-            let c = GmailAutoForwardingUpdate::new(&client.auth, &client.user_id, settings)?;
-            client.run(c)?
-        };
-
-        printer.out(GmailSettingsAutoForwardingGetOutput::from(out.response))
+        let settings = raw_put(client, "autoForwarding", &settings)?;
+        printer.out(GmailSettingsAutoForwardingGetOutput(settings))
     }
 }

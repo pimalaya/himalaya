@@ -30,12 +30,7 @@ impl fmt::Display for IdReceipt {
 }
 
 /// The receipt of a write acting on several items.
-#[cfg(any(
-    feature = "gmail",
-    feature = "jmap",
-    feature = "maildir",
-    feature = "mbox"
-))]
+#[cfg(any(feature = "gmail", feature = "maildir", feature = "mbox"))]
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IdsReceipt {
     /// The ids of the items acted on, in the order acted on.
@@ -45,12 +40,7 @@ pub struct IdsReceipt {
     pub done: &'static str,
 }
 
-#[cfg(any(
-    feature = "gmail",
-    feature = "jmap",
-    feature = "maildir",
-    feature = "mbox"
-))]
+#[cfg(any(feature = "gmail", feature = "maildir", feature = "mbox"))]
 impl fmt::Display for IdsReceipt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}: {}", self.done, self.ids.join(", "))

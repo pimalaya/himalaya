@@ -208,8 +208,8 @@ mod tests {
             thread: PimdirMailThread {
                 thread: Some(String::from("t1")),
                 count: 4,
-                first: None,
-                last: None,
+                first_date: None,
+                last_date: None,
                 hits: vec![
                     hit("1", None, true, "Me", &["INBOX"]),
                     hit("2", Some("1"), false, "Alice", &["INBOX", "Archive"]),

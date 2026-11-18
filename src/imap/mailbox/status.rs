@@ -27,7 +27,7 @@ pub struct ImapMailboxStatusCommand {
 }
 
 impl ImapMailboxStatusCommand {
-    /// Asks for every status item and prints what came back.
+    /// Asks for the RFC 3501 status items and prints what came back.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -67,12 +67,6 @@ pub struct ImapMailboxStatusOutput {
     pub uid_validity: Option<u32>,
     /// Count of messages lacking `\Seen`.
     pub unseen: Option<u32>,
-    /// Count of messages carrying `\Deleted`, per RFC 9208.
-    pub deleted: Option<u32>,
-    /// Bytes an expunge would reclaim, per RFC 9208.
-    pub deleted_storage: Option<u64>,
-    /// The highest modification sequence, per RFC 7162 CONDSTORE.
-    pub highest_mod_seq: Option<u64>,
 }
 
 impl From<Vec<StatusDataItem>> for ImapMailboxStatusOutput {
@@ -83,9 +77,6 @@ impl From<Vec<StatusDataItem>> for ImapMailboxStatusOutput {
             uid_next: None,
             uid_validity: None,
             unseen: None,
-            deleted: None,
-            deleted_storage: None,
-            highest_mod_seq: None,
         };
 
         for item in items {
@@ -95,9 +86,9 @@ impl From<Vec<StatusDataItem>> for ImapMailboxStatusOutput {
                 StatusDataItem::UidNext(n) => status.uid_next = Some(n.get()),
                 StatusDataItem::UidValidity(n) => status.uid_validity = Some(n.get()),
                 StatusDataItem::Unseen(n) => status.unseen = Some(n),
-                StatusDataItem::Deleted(n) => status.deleted = Some(n),
-                StatusDataItem::DeletedStorage(n) => status.deleted_storage = Some(n),
-                StatusDataItem::HighestModSeq(n) => status.highest_mod_seq = Some(n),
+                StatusDataItem::Deleted(_)
+                | StatusDataItem::DeletedStorage(_)
+                | StatusDataItem::HighestModSeq(_) => {}
             }
         }
 
@@ -111,9 +102,6 @@ impl fmt::Display for ImapMailboxStatusOutput {
             ("Messages", self.messages.map(u64::from)),
             ("Recent", self.recent.map(u64::from)),
             ("Unseen", self.unseen.map(u64::from)),
-            ("Deleted", self.deleted.map(u64::from)),
-            ("Deleted storage", self.deleted_storage),
-            ("Highest modified sequence", self.highest_mod_seq),
             ("UID next", self.uid_next.map(u64::from)),
             ("UID validity", self.uid_validity.map(u64::from)),
         ];
@@ -127,5 +115,35 @@ impl fmt::Display for ImapMailboxStatusOutput {
         }
 
         write!(f, "{fields}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use io_imap::types::status::StatusDataItem;
+
+    use crate::imap::mailbox::status::ImapMailboxStatusOutput;
+
+    /// The output prints the items the command asks for, and no key it
+    /// never requests, which would always be `null`.
+    #[test]
+    fn the_status_prints_the_items_it_asks_for() {
+        let output = ImapMailboxStatusOutput::from(vec![
+            StatusDataItem::Messages(3),
+            StatusDataItem::Unseen(1),
+        ]);
+
+        let json = serde_json::to_value(&output).unwrap();
+        let mut keys: Vec<&str> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            ["messages", "recent", "uidNext", "uidValidity", "unseen"]
+        );
     }
 }

@@ -3,14 +3,14 @@
 //! The `jmap email delete` command, the destroy half of RFC 8621
 //! `Email/set`.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::email::set::JmapEmailSetArgs;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
-    shared::receipt::IdsReceipt,
+    error::ErrorCode,
+    jmap::{client::JmapClient, set::JmapSetReceipt},
 };
 
 /// Delete JMAP emails (Email/set destroy).
@@ -32,20 +32,12 @@ impl JmapEmailDestroyCommand {
 
         let output = client.email_set(args)?;
 
-        if !output.not_destroyed.is_empty() {
-            let mut msg = String::from("Destroy JMAP email(s) error");
-
-            for (id, err) in output.not_destroyed {
-                msg.push_str(&format!("\n  `{id}`"));
-                msg.push_str(&format_set_error(&err));
-            }
-
-            bail!(msg)
-        }
-
-        printer.out(IdsReceipt {
-            ids: output.destroyed,
-            done: "JMAP emails successfully deleted",
-        })
+        JmapSetReceipt::new(
+            "JMAP emails successfully deleted",
+            output.destroyed,
+            output.not_destroyed,
+            Some(ErrorCode::MessageNotFound),
+        )
+        .print(printer)
     }
 }

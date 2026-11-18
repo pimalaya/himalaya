@@ -6,10 +6,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{GmailImapSettings, get_imap::GmailImapGet};
+use io_gmail::v1::rest::settings::GmailImapSettings;
 use pimalaya_cli::{fields::Fields, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::gmail::{
     client::GmailClient,
@@ -23,15 +24,12 @@ pub struct GmailSettingsImapGetCommand;
 impl GmailSettingsImapGetCommand {
     /// Fetches the IMAP settings and prints them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let out = {
-            let c = GmailImapGet::new(&client.auth, &client.user_id)?;
-            client.run(c)?
-        };
-        printer.out(GmailSettingsImapGetOutput::from(out.response))
+        let settings = client.raw_get(&["settings", "imap"])?;
+        printer.out(GmailSettingsImapGetOutput(Value::Object(settings)))
     }
 }
 
-impl From<GmailImapSettings> for GmailSettingsImapGetOutput {
+impl From<GmailImapSettings> for View {
     fn from(settings: GmailImapSettings) -> Self {
         Self {
             enabled: settings.enabled,
@@ -44,21 +42,15 @@ impl From<GmailImapSettings> for GmailSettingsImapGetOutput {
     }
 }
 
-/// The `gmail settings imap get` output.
-///
-/// A boolean stays a boolean in JSON where the text spells it yes or no,
-/// and the expunge behaviour keeps its Gmail wire spelling, so a value
-/// `get` reads is a value `set` accepts back.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GmailSettingsImapGetOutput {
+/// The fields the text form prints, read from what Gmail sent.
+struct View {
     enabled: bool,
     auto_expunge: Option<bool>,
     expunge_behavior: Option<String>,
     max_folder_size: Option<u32>,
 }
 
-impl fmt::Display for GmailSettingsImapGetOutput {
+impl fmt::Display for View {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fields = Fields::default();
         fields.push("Enabled", yes_no(self.enabled));
@@ -74,5 +66,21 @@ impl fmt::Display for GmailSettingsImapGetOutput {
         }
 
         write!(f, "{fields}")
+    }
+}
+
+/// The settings as Gmail sent them, every property kept, the text form
+/// reading what it shows out of them.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsImapGetOutput(
+    #[schemars(with = "Map<String, Value>")] pub(crate) Value,
+);
+
+impl fmt::Display for GmailSettingsImapGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let settings: GmailImapSettings =
+            serde_json::from_value(self.0.clone()).unwrap_or_default();
+        View::from(settings).fmt(f)
     }
 }

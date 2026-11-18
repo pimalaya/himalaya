@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
 use pimalaya_cli::{
@@ -20,7 +20,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     backend::Backend,
-    error::{ItemError, partial_when},
+    error::{ItemError, page_token_invalid, partial_when},
     pimdir::{
         client::PimdirClient,
         index::{
@@ -99,7 +99,7 @@ impl PimdirSearchCommand {
                 .parse()
                 .ok()
                 .filter(|page: &usize| *page > 0)
-                .with_context(|| format!("Invalid page token {token}"))?,
+                .ok_or_else(|| page_token_invalid(token))?,
             None => self.page,
         };
         let limit = self
@@ -256,7 +256,7 @@ impl fmt::Display for PimdirSearchThreadsOutput {
         for thread in &self.threads {
             let first = thread.hits.first();
             let last = thread
-                .last
+                .last_date
                 .as_deref()
                 .map(|last| last.get(..10).unwrap_or(last))
                 .unwrap_or_default();

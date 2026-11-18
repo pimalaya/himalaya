@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
@@ -13,6 +13,7 @@ use crate::{
     capability::Capability,
     config::message::PostingStyle,
     email::flag::{Flag, FlagOp, IanaFlag},
+    error::{self, ItemError},
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -180,14 +181,11 @@ impl MessageReplyCommand {
             }),
         )?;
 
-        handler::route(
-            printer,
-            account,
-            client,
-            raw,
-            account.resolve_save(self.save.as_deref(), self.no_save, self.send),
-            self.send,
-        )?;
+        let save = account.resolve_save(self.save.as_deref(), self.no_save, self.send);
+        let routed = handler::route_unprinted(printer, account, client, raw, save, self.send)?;
+        let Some(mut output) = routed else {
+            return Ok(());
+        };
 
         // NOTE: a draft that is only printed or saved answers nothing
         // yet, so the flag follows the send alone (RFC 3501 section
@@ -195,20 +193,31 @@ impl MessageReplyCommand {
         // done never failing for want of the flag.
         let answered = client.resolution().support(Capability::FlagsAnswered);
         if self.send && answered.is_served() {
-            let outcome = client
-                .store_flags(
-                    &mailbox,
-                    &[self.id.as_str()],
-                    &[Flag::from_iana(IanaFlag::Answered)],
-                    FlagOp::Add,
-                )
-                .context("Message sent, but flagging the source as answered failed")?;
-
-            for error in outcome.errors {
-                log::warn!("message sent, but flagging the source as answered failed: {error}");
-            }
+            output
+                .errors
+                .extend(flag_answered(client, &mailbox, &self.id));
         }
 
-        Ok(())
+        output.print(printer)
+    }
+}
+
+/// Flags the source `id` as answered once the reply went out, a failure
+/// being an item error of the receipt rather than of the command.
+fn flag_answered(client: &mut EmailClient, mailbox: &str, id: &str) -> Vec<ItemError> {
+    let flagged = client.store_flags(
+        mailbox,
+        &[id],
+        &[Flag::from_iana(IanaFlag::Answered)],
+        FlagOp::Add,
+    );
+
+    match flagged {
+        Ok(outcome) => outcome.errors,
+        Err(err) => {
+            let err = error::coded(err)
+                .context("Message sent, but flagging the source as answered failed");
+            vec![ItemError::new(Some(id), &err)]
+        }
     }
 }

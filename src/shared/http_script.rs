@@ -72,3 +72,11 @@ pub fn ok(content_type: &str, body: &str) -> Vec<u8> {
     let head = format!("HTTP/1.1 200 OK\r\nContent-Type: {content_type}");
     format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
 }
+
+/// A response of status `code` carrying the JSON `body`, as a provider
+/// refusing a request answers.
+pub fn refused(code: u16, body: &str) -> Vec<u8> {
+    let len = body.len();
+    let head = format!("HTTP/1.1 {code} Refused\r\nContent-Type: application/json");
+    format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
+}

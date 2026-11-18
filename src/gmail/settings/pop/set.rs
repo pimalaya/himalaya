@@ -4,13 +4,14 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{GmailPopSettings, update_pop::GmailPopUpdate};
+use io_gmail::v1::rest::settings::GmailPopSettings;
 use pimalaya_cli::printer::Printer;
 
 use crate::gmail::{
     client::GmailClient,
     settings::convert::{DispositionArg, PopAccessWindowArg},
     settings::pop::get::GmailSettingsPopGetOutput,
+    settings::raw_put,
 };
 
 /// Update the Gmail POP access settings.
@@ -32,11 +33,7 @@ impl GmailSettingsPopSetCommand {
             disposition: self.disposition.map(Into::into),
         };
 
-        let out = {
-            let c = GmailPopUpdate::new(&client.auth, &client.user_id, settings)?;
-            client.run(c)?
-        };
-
-        printer.out(GmailSettingsPopGetOutput::from(out.response))
+        let settings = raw_put(client, "pop", &settings)?;
+        printer.out(GmailSettingsPopGetOutput(settings))
     }
 }

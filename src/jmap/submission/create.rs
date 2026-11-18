@@ -34,10 +34,10 @@ pub struct JmapSubmissionCreateCommand {
     #[arg(long, value_name = "IDENTITY-ID")]
     pub identity_id: String,
     /// Override the MAIL FROM address (uses `From` header if omitted).
-    #[arg(long, value_name = "ADDRESS")]
+    #[arg(long, value_name = "ADDRESS", requires = "rcpt_to")]
     pub mail_from: Option<String>,
     /// Override the RCPT TO addresses (uses `To`, `Cc`, `Bcc` if omitted).
-    #[arg(long, value_name = "ADDRESS")]
+    #[arg(long, value_name = "ADDRESS", requires = "mail_from")]
     pub rcpt_to: Vec<String>,
 }
 

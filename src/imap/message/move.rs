@@ -16,7 +16,7 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
     message::copy::ImapMessageCopyOutput,
     outcome,
-    utils::parse_sequence_set,
+    utils::{parse_sequence_set, sequence_set_parser},
 };
 
 /// Move messages to the given mailbox (MOVE, RFC 6851).
@@ -29,7 +29,7 @@ pub struct ImapMessageMoveCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
     /// The messages to move, as `1`, `1,2,3` or `1:*`.
-    #[arg(name = "sequence_set", value_name = "SEQUENCE")]
+    #[arg(name = "sequence_set", value_name = "SEQUENCE", value_parser = sequence_set_parser)]
     pub sequence_set: String,
     #[command(flatten)]
     pub mailbox_dest_name: TargetMailboxNameArg,

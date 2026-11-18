@@ -71,7 +71,7 @@ pub struct PimdirMailboxCoverage {
     /// The ceiling, exclusive; `null` for none.
     pub until: Option<String>,
     /// When the round that left it closed.
-    pub at: String,
+    pub closed_at: String,
 }
 
 /// A round under way: the scope it lists and when it opened.
@@ -128,7 +128,7 @@ impl From<PimdirCoveredMailbox> for PimdirMailbox {
                 .map(|PimdirCoverage { scope, at }| PimdirMailboxCoverage {
                     since: scope.since,
                     until: scope.until,
-                    at,
+                    closed_at: at,
                 }),
             round: covered.round.map(
                 |PimdirRoundState { scope, started_at }| PimdirMailboxRound {
@@ -240,7 +240,7 @@ mod tests {
                 "coverage": {
                     "since": "2026-09-07T00:00:00Z",
                     "until": null,
-                    "at": "2026-10-07T10:00:00Z",
+                    "closedAt": "2026-10-07T10:00:00Z",
                 },
                 "round": {
                     "since": null,

@@ -14,6 +14,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::flag::Flag,
+    error::{self, ItemError, partial_when, write_item_errors},
     shared::{
         client::EmailClient,
         flag::arg::FlagArg,
@@ -59,10 +60,27 @@ impl MessageAddCommand {
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let queued = client.queues_writes();
         let outcome = handler::apply(account, client, raw, &flags, Some(&self.mailbox), self.send)?;
-        let Outcome::Saved { id, sent } = outcome else {
-            unreachable!("--mailbox is mandatory; handler::apply always reports Saved");
+        let output = match outcome {
+            Outcome::Saved { id, sent } => MessageAddOutput {
+                id,
+                sent,
+                queued,
+                errors: Vec::new(),
+            },
+            Outcome::Unsaved(err) => MessageAddOutput {
+                id: None,
+                sent: true,
+                queued,
+                errors: vec![ItemError::new(None, &error::coded(err))],
+            },
+            Outcome::Stdout | Outcome::Sent => {
+                unreachable!("--mailbox is mandatory: handler::apply saves, or sends and fails")
+            }
         };
-        printer.out(MessageAddOutput { id, sent, queued })
+
+        let partial = partial_when(&output.errors);
+        printer.out(output)?;
+        partial
     }
 }
 
@@ -76,10 +94,19 @@ pub(crate) struct MessageAddOutput {
     sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
+    /// What failed after the message went out with `--send` (its copy),
+    /// `[]` when nothing did: the command then exits 3, and sending
+    /// again would send twice.
+    errors: Vec<ItemError>,
 }
 
 impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !self.errors.is_empty() {
+            writeln!(f, "Message successfully sent, not added")?;
+            return write_item_errors(f, &self.errors);
+        }
+
         if self.queued {
             let suffix = if self.sent { " and sending" } else { "" };
             return match &self.id {
@@ -106,6 +133,7 @@ mod tests {
             id: Some("d1@x.org".into()),
             sent: true,
             queued,
+            errors: Vec::new(),
         };
 
         assert_eq!(
@@ -118,7 +146,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&output(true)).unwrap(),
-            r#"{"id":"d1@x.org","sent":true,"queued":true}"#
+            r#"{"id":"d1@x.org","sent":true,"queued":true,"errors":[]}"#
         );
     }
 }

@@ -17,7 +17,7 @@ use std::{
     io::{Write, stdout},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Error, Result};
 use log::debug;
 use mime::{
     header::marker::{BCC, CC, FROM, SUBJECT, TO},
@@ -35,6 +35,7 @@ use crate::{
         address::Address,
         flag::{Flag, IanaFlag},
     },
+    error::{self, ItemError, partial_when, write_item_errors},
     shared::{
         attachment::list::attachments,
         client::{EmailClient, SentCopy},
@@ -56,6 +57,9 @@ pub enum Outcome {
     },
     /// Sent without being saved, the send path returning no id.
     Sent,
+    /// Sent, but the copy asked for could not be saved: the message went
+    /// out, so the failure is no reason to send it again.
+    Unsaved(Error),
 }
 
 /// Sends the bytes, saves them, or both, printing nothing.
@@ -63,7 +67,9 @@ pub enum Outcome {
 /// Saving resolves the mailbox through the account's aliases and attaches
 /// the given flags. Both asked for, the send goes first, so a failed send
 /// leaves no copy behind, unless the backend files the copy itself as
-/// part of the send. With neither, the bytes go to stdout.
+/// part of the send; a save failing after the send is the
+/// [`Outcome::Unsaved`] of a message that went out. With neither, the
+/// bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -108,12 +114,15 @@ pub fn apply(
     };
 
     let saved_id = match (mailbox, copy) {
+        (_, SentCopy::Unfiled(err)) => return Ok(Outcome::Unsaved(err)),
         (Some(_), SentCopy::Filed(id)) => Some(id),
-        (Some(mailbox), SentCopy::Owed) if send => Some(
-            client
-                .add_message(mailbox, flags, raw)
-                .with_context(|| format!("Message sent, but saving a copy to {mailbox} failed"))?,
-        ),
+        (Some(mailbox), SentCopy::Owed) if send => match client.add_message(mailbox, flags, raw) {
+            Ok(id) => Some(id),
+            Err(err) => {
+                let context = format!("Message sent, but saving a copy to {mailbox} failed");
+                return Ok(Outcome::Unsaved(err.context(context)));
+            }
+        },
         (Some(mailbox), SentCopy::Owed) => Some(client.add_message(mailbox, flags, raw)?),
         (None, _) => None,
     };
@@ -124,8 +133,7 @@ pub fn apply(
     })
 }
 
-/// Runs [`apply`] with `\Seen` as the saved flag and prints its receipt,
-/// or the message itself when neither saving nor sending.
+/// Runs [`route_unprinted`] and prints the receipt it hands back.
 pub fn route(
     printer: &mut impl Printer,
     account: &Account,
@@ -134,15 +142,35 @@ pub fn route(
     save: Option<&str>,
     send: bool,
 ) -> Result<()> {
+    match route_unprinted(printer, account, client, raw, save, send)? {
+        Some(output) => output.print(printer),
+        None => Ok(()),
+    }
+}
+
+/// Runs [`apply`] with `\Seen` as the saved flag and hands back its
+/// receipt, or prints the message itself when neither saving nor sending
+/// and hands back none. A save failing after the send is an item error of
+/// the receipt, beside `sent`.
+pub fn route_unprinted(
+    printer: &mut impl Printer,
+    account: &Account,
+    client: &mut EmailClient,
+    raw: Vec<u8>,
+    save: Option<&str>,
+    send: bool,
+) -> Result<Option<MessageRouteOutput>> {
     if !send && save.is_none() {
         if printer.is_json() {
-            return printer.out(MessageTemplateOutput::parse(&raw)?);
+            printer.out(MessageTemplateOutput::parse(&raw)?)?;
+            return Ok(None);
         }
 
-        return printer.out_bytes(Bytes {
+        printer.out_bytes(Bytes {
             data: raw,
             mime: "message/rfc822".into(),
-        });
+        })?;
+        return Ok(None);
     }
 
     let queued = client.queues_writes();
@@ -155,22 +183,31 @@ pub fn route(
         send,
     )?;
     let output = match outcome {
-        Outcome::Stdout => return Ok(()),
+        Outcome::Stdout => return Ok(None),
         Outcome::Saved { id, sent } => MessageRouteOutput {
             id,
             saved: true,
             sent,
             queued,
+            errors: Vec::new(),
         },
         Outcome::Sent => MessageRouteOutput {
             id: None,
             saved: false,
             sent: true,
             queued,
+            errors: Vec::new(),
+        },
+        Outcome::Unsaved(err) => MessageRouteOutput {
+            id: None,
+            saved: false,
+            sent: true,
+            queued,
+            errors: vec![ItemError::new(None, &error::coded(err))],
         },
     };
 
-    printer.out(output)
+    Ok(Some(output))
 }
 
 /// The receipt of a saved or sent message.
@@ -186,6 +223,20 @@ pub struct MessageRouteOutput {
     pub sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
+    /// What failed after the message went out (its copy, a reply's
+    /// answered flag), `[]` when nothing did: the command then exits 3,
+    /// and sending again would send twice.
+    pub errors: Vec<ItemError>,
+}
+
+impl MessageRouteOutput {
+    /// Prints the receipt, then ends the command with the partial-outcome
+    /// status when something failed after the send.
+    pub fn print(self, printer: &mut impl Printer) -> Result<()> {
+        let partial = partial_when(&self.errors);
+        printer.out(self)?;
+        partial
+    }
 }
 
 impl fmt::Display for MessageRouteOutput {
@@ -197,7 +248,8 @@ impl fmt::Display for MessageRouteOutput {
         };
 
         if self.queued {
-            return writeln!(f, "Message queued for {what}");
+            writeln!(f, "Message queued for {what}")?;
+            return write_item_errors(f, &self.errors);
         }
 
         let done = match (self.saved, self.sent) {
@@ -207,9 +259,11 @@ impl fmt::Display for MessageRouteOutput {
         };
 
         match &self.id {
-            Some(id) => writeln!(f, "Message {id} successfully {done}"),
-            None => writeln!(f, "Message successfully {done}"),
+            Some(id) => writeln!(f, "Message {id} successfully {done}")?,
+            None => writeln!(f, "Message successfully {done}")?,
         }
+
+        write_item_errors(f, &self.errors)
     }
 }
 

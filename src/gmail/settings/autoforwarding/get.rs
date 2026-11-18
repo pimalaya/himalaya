@@ -7,12 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{
-    GmailAutoForwarding, get_auto_forwarding::GmailAutoForwardingGet,
-};
+use io_gmail::v1::rest::settings::GmailAutoForwarding;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::gmail::{
     client::GmailClient,
@@ -26,15 +25,14 @@ pub struct GmailSettingsAutoForwardingGetCommand;
 impl GmailSettingsAutoForwardingGetCommand {
     /// Fetches the auto-forwarding settings and prints them.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let out = {
-            let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;
-            client.run(c)?
-        };
-        printer.out(GmailSettingsAutoForwardingGetOutput::from(out.response))
+        let settings = client.raw_get(&["settings", "autoForwarding"])?;
+        printer.out(GmailSettingsAutoForwardingGetOutput(Value::Object(
+            settings,
+        )))
     }
 }
 
-impl From<GmailAutoForwarding> for GmailSettingsAutoForwardingGetOutput {
+impl From<GmailAutoForwarding> for View {
     fn from(settings: GmailAutoForwarding) -> Self {
         Self {
             enabled: settings.enabled,
@@ -46,19 +44,14 @@ impl From<GmailAutoForwarding> for GmailSettingsAutoForwardingGetOutput {
     }
 }
 
-/// The `gmail settings autoforwarding get` output.
-///
-/// The disposition keeps its Gmail wire spelling, so a value `get` reads
-/// is a value `set` accepts back.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GmailSettingsAutoForwardingGetOutput {
+/// The fields the text form prints, read from what Gmail sent.
+struct View {
     enabled: bool,
     email_address: Option<String>,
     disposition: Option<String>,
 }
 
-impl fmt::Display for GmailSettingsAutoForwardingGetOutput {
+impl fmt::Display for View {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fields = Fields::default();
         fields.push("Enabled", yes_no(self.enabled));
@@ -71,5 +64,21 @@ impl fmt::Display for GmailSettingsAutoForwardingGetOutput {
         }
 
         write!(f, "{fields}")
+    }
+}
+
+/// The settings as Gmail sent them, every property kept, the text form
+/// reading what it shows out of them.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsAutoForwardingGetOutput(
+    #[schemars(with = "Map<String, Value>")] pub(crate) Value,
+);
+
+impl fmt::Display for GmailSettingsAutoForwardingGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let settings: GmailAutoForwarding =
+            serde_json::from_value(self.0.clone()).unwrap_or_default();
+        View::from(settings).fmt(f)
     }
 }

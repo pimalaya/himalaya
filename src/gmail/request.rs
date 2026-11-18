@@ -23,11 +23,12 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct GmailRequestCommand {
     /// HTTP method: get, post, put, patch, delete.
-    #[arg(value_name = "METHOD")]
+    #[arg(value_name = "METHOD", ignore_case = true)]
+    #[arg(value_parser = ["get", "post", "put", "patch", "delete"])]
     pub method: String,
     /// Gmail path (joined onto `gmail/v1/`, as `users/me/labels`) or a
     /// full URL.
-    #[arg(value_name = "PATH")]
+    #[arg(value_name = "PATH", value_parser = path_parser)]
     pub path: String,
     /// Raw JSON body for post, put and patch.
     #[arg(value_name = "JSON")]
@@ -53,6 +54,15 @@ impl GmailRequestCommand {
         printer.out(RawJsonOutput {
             response: client.run(send)?.response,
         })
+    }
+}
+
+/// Checks a path as clap takes it: a URL off the Gmail API is refused
+/// with the command line, before the session opens.
+fn path_parser(path: &str) -> Result<String, String> {
+    match api_url(BASE, path) {
+        Ok(_) => Ok(path.to_owned()),
+        Err(err) => Err(err.to_string()),
     }
 }
 

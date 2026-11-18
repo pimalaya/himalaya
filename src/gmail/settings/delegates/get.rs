@@ -7,10 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::delegates::{GmailDelegate, get::GmailDelegateGet};
+use io_gmail::v1::rest::settings::delegates::GmailDelegate;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::gmail::{client::GmailClient, settings::convert::verification_status_wire};
 
@@ -25,13 +26,8 @@ pub struct GmailSettingsDelegateGetCommand {
 impl GmailSettingsDelegateGetCommand {
     /// Fetches the delegate and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let out = {
-            let c = GmailDelegateGet::new(&client.auth, &client.user_id, &self.email)?;
-            client.run(c)?
-        };
-        let delegate = out.response;
-
-        printer.out(GmailSettingsDelegateGetOutput(delegate))
+        let delegate = client.raw_get(&["settings", "delegates", &self.email])?;
+        printer.out(GmailSettingsDelegateGetOutput(Value::Object(delegate)))
     }
 }
 
@@ -41,14 +37,15 @@ impl GmailSettingsDelegateGetCommand {
 /// shape here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
-pub(crate) struct GmailSettingsDelegateGetOutput(GmailDelegate);
+pub(crate) struct GmailSettingsDelegateGetOutput(#[schemars(with = "Map<String, Value>")] Value);
 
 impl fmt::Display for GmailSettingsDelegateGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let delegate: GmailDelegate = serde_json::from_value(self.0.clone()).unwrap_or_default();
         let mut fields = Fields::default();
-        fields.push("Email", sanitize::text(&self.0.delegate_email));
+        fields.push("Email", sanitize::text(&delegate.delegate_email));
 
-        if let Some(status) = self.0.verification_status {
+        if let Some(status) = delegate.verification_status {
             fields.push("Verification", verification_status_wire(status));
         }
 

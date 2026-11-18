@@ -30,6 +30,7 @@ use crate::{
     email::mailbox::{MailboxIndex, MailboxRole},
     error::ErrorCode,
     msgraph::backend::well_known_role,
+    shared::refusal::Refusal,
 };
 
 /// A live Microsoft Graph client and the folder index it caches.
@@ -261,6 +262,25 @@ pub(crate) fn refusal_of(status: u16, code: &str) -> Option<ErrorCode> {
         (403, _) => Some(ErrorCode::PermissionDenied),
         _ => None,
     }
+}
+
+/// The refusal of a Graph error in a chain, for the `msgraph` commands:
+/// the status, `error.code` and `error.message` of what Graph answered.
+pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
+    let err = match cause.downcast_ref::<MsgraphClientStdError>() {
+        Some(MsgraphClientStdError::Send(err)) => err,
+        Some(_) => return None,
+        None => cause.downcast_ref::<MsgraphSendError>()?,
+    };
+    let err = err.api()?;
+
+    Some(Refusal {
+        status: Some(err.status),
+        reason: Some(err.code.clone()).filter(|code| !code.is_empty()),
+        message: err.message.clone(),
+        code: None,
+        retry_after: err.retry_after.map(|delay| delay.as_secs()),
+    })
 }
 
 /// Resolves a [`MsgraphAuthConfig`] into the bare OAuth 2.0 bearer token;

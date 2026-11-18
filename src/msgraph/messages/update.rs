@@ -3,8 +3,8 @@
 //! The `msgraph messages update` command, patching the mutable fields of
 //! a message.
 
-use anyhow::{Result, bail};
-use clap::{Parser, ValueEnum};
+use anyhow::Result;
+use clap::{ArgGroup, Parser, ValueEnum};
 use io_msgraph::v1::{
     field::MsgraphField,
     rest::users::messages::{MsgraphImportance, MsgraphMessage},
@@ -16,6 +16,12 @@ use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
 /// Update a Microsoft Graph message (`PATCH /me/messages/{id}`): mark
 /// read/unread, set importance or replace categories.
 #[derive(Debug, Parser)]
+#[command(group(
+    ArgGroup::new("change")
+        .required(true)
+        .multiple(true)
+        .args(["read", "unread", "importance", "categories", "no_categories"])
+))]
 pub struct MsgraphMessageUpdateCommand {
     /// The id of the message to update.
     #[arg(value_name = "ID")]
@@ -41,18 +47,6 @@ pub struct MsgraphMessageUpdateCommand {
 impl MsgraphMessageUpdateCommand {
     /// Applies the patches to the message.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
-        if !self.read
-            && !self.unread
-            && self.importance.is_none()
-            && self.categories.is_empty()
-            && !self.no_categories
-        {
-            bail!(
-                "Nothing to update: pass at least one of \
-		 --read, --unread, --importance, --category or --no-categories"
-            );
-        }
-
         let mut patch = MsgraphMessage::default();
 
         if self.read {

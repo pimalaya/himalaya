@@ -412,12 +412,14 @@ impl Command {
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(feature = "smtp")]
-            Self::Smtp(cmd) => account.run(
-                printer,
-                &mut session.smtp,
-                build_smtp_client,
-                |printer, _account, client| cmd.execute(printer, client),
-            ),
+            Self::Smtp(cmd) => cmd.check().and_then(|()| {
+                account.run(
+                    printer,
+                    &mut session.smtp,
+                    build_smtp_client,
+                    |printer, _account, client| cmd.execute(printer, client),
+                )
+            }),
             #[cfg(feature = "sieve")]
             Self::Sieve(cmd) => account.run(
                 printer,

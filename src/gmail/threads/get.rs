@@ -6,27 +6,25 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::{
-    messages::{GmailMessage, GmailMessageFormat, GmailMessagePayload},
-    threads::get::GmailThreadGet,
-};
+use io_gmail::v1::rest::messages::GmailMessage;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::gmail::{
     client::GmailClient,
     format::{FormatArg, snippet_text},
-    messages::get::{GmailMessageHeaderOutput, message_headers},
+    messages::get::message_headers,
 };
 
 /// Get a single Gmail thread with all its messages
 /// (users.threads.get).
 ///
-/// JSON includes each message's MIME payload when Gmail supplies one,
-/// including bodies and attachment metadata under `--format full`.
-/// `--header` filters the summary headers, not the retained MIME payload.
-/// Keys inside `payload` keep Gmail's spelling, camelCase like the rest.
+/// JSON output: the thread as Gmail sent it, each message's MIME payload
+/// included when Gmail supplies one, bodies and attachment metadata under
+/// `--format full`. `--header` filters the headers of the text form, and
+/// narrows the metadata request, never the JSON payload.
 #[derive(Debug, Parser)]
 pub struct GmailThreadGetCommand {
     /// The id of the thread to get.
@@ -45,51 +43,48 @@ pub struct GmailThreadGetCommand {
 }
 
 impl GmailThreadGetCommand {
-    /// Fetches the thread and prints its messages.
+    /// Fetches the thread and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let format = GmailMessageFormat::from(self.format);
-        let hs: Vec<&str> = self.headers.iter().map(String::as_str).collect();
-
-        let out = {
-            let c = GmailThreadGet::new(&client.auth, &client.user_id, &self.id, format, &hs)?;
-            client.run(c)?
-        };
-        let thread = out.response;
-
-        let messages = thread
-            .messages
-            .into_iter()
-            .map(|message| GmailThreadMessageOutput::from_message(message, &hs))
-            .collect();
+        let query = self.format.query(&self.headers);
+        let thread = client.raw_get_with(&["threads", &self.id], query)?;
 
         printer.out(GmailThreadGetOutput {
-            id: thread.id,
-            messages,
+            thread: Value::Object(thread),
+            headers: self.headers,
         })
     }
 }
 
-/// Gmail thread and its messages, rendered as an indented list or,
-/// under `--json`, as a structured object instead of a wrapped human
-/// string.
+/// The `gmail threads get` output: the thread as Gmail sent it, every
+/// property kept.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(transparent)]
 pub(crate) struct GmailThreadGetOutput {
-    id: String,
-    messages: Vec<GmailThreadMessageOutput>,
+    #[schemars(with = "Map<String, Value>")]
+    thread: Value,
+    /// The headers the text form shows, all of them when empty.
+    #[serde(skip)]
+    headers: Vec<String>,
 }
 
 impl fmt::Display for GmailThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let id = self.thread.get("id").and_then(Value::as_str);
+        let names: Vec<&str> = self.headers.iter().map(String::as_str).collect();
+        let messages: Vec<GmailMessage> = self
+            .thread
+            .get("messages")
+            .cloned()
+            .and_then(|messages| serde_json::from_value(messages).ok())
+            .unwrap_or_default();
+
         let mut thread = Fields::default();
-        thread.push("Thread id", sanitize::text(&self.id));
+        thread.push("Thread id", sanitize::text(id.unwrap_or_default()));
         write!(f, "{thread}")?;
 
-        // NOTE: one record per message, a blank line apart, the way the
-        // parts of a read message are.
-        for message in &self.messages {
-            let names: Vec<_> = message
-                .headers
+        for message in &messages {
+            let headers = message_headers(message.payload.clone(), &names);
+            let labels: Vec<_> = headers
                 .iter()
                 .map(|header| sanitize::text(&header.name))
                 .collect();
@@ -101,8 +96,8 @@ impl fmt::Display for GmailThreadGetOutput {
                 fields.push("Snippet", sanitize::text(&snippet_text(snippet)));
             }
 
-            for (name, header) in names.iter().zip(&message.headers) {
-                fields.push(name, sanitize::text(&header.value));
+            for (label, header) in labels.iter().zip(&headers) {
+                fields.push(label, sanitize::text(&header.value));
             }
 
             write!(f, "\n{fields}")?;
@@ -112,28 +107,34 @@ impl fmt::Display for GmailThreadGetOutput {
     }
 }
 
-/// One message of a Gmail thread.
-///
-/// The thread id is left out, since it is the id of the enclosing
-/// [`GmailThreadGetOutput`].
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GmailThreadMessageOutput {
-    id: String,
-    label_ids: Vec<String>,
-    snippet: Option<String>,
-    headers: Vec<GmailMessageHeaderOutput>,
-    payload: Option<GmailMessagePayload>,
-}
+#[cfg(test)]
+mod tests {
+    use pimalaya_cli::printer::CapturePrinter;
+    use serde_json::json;
 
-impl GmailThreadMessageOutput {
-    fn from_message(message: GmailMessage, headers: &[&str]) -> Self {
-        Self {
-            id: message.id,
-            label_ids: message.label_ids,
-            snippet: message.snippet,
-            headers: message_headers(message.payload.clone(), headers),
-            payload: message.payload,
-        }
+    use crate::gmail::{
+        client::GmailClient, format::FormatArg, threads::get::GmailThreadGetCommand,
+    };
+
+    /// The thread prints as Gmail sent it, a property io-gmail does not
+    /// model kept, its messages unreshaped.
+    #[test]
+    fn a_thread_prints_as_gmail_sent_it() {
+        let message = json!({"id": "m1", "threadId": "t1", "x-part": true});
+        let thread = json!({"id": "t1", "historyId": "9", "x-vendor": 1, "messages": [message]});
+        let (mut client, requests) = GmailClient::scripted(std::slice::from_ref(&thread));
+        let mut printer = CapturePrinter::default();
+
+        let command = GmailThreadGetCommand {
+            id: "t1".into(),
+            format: FormatArg::Minimal,
+            headers: Vec::new(),
+        };
+        command.execute(&mut printer, &mut client).unwrap();
+
+        assert_eq!(printer.into_single().unwrap(), thread);
+        let requests = requests.lock().unwrap();
+        let line = "GET /gmail/v1/users/me/threads/t1?format=minimal ";
+        assert!(requests[0].starts_with(line), "{}", requests[0]);
     }
 }

@@ -39,6 +39,29 @@ impl From<FormatArg> for GmailMessageFormat {
     }
 }
 
+impl FormatArg {
+    /// The query of a `get` at this format: `format`, then one
+    /// `metadataHeaders` per header asked for, which Gmail honours under
+    /// the metadata format alone.
+    pub fn query(self, headers: &[String]) -> Vec<(String, String)> {
+        let format = match self {
+            Self::Minimal => "minimal",
+            Self::Full => "full",
+            Self::Raw => "raw",
+            Self::Metadata => "metadata",
+        };
+        let mut pairs = vec![(String::from("format"), String::from(format))];
+
+        if let Self::Metadata = self {
+            for header in headers {
+                pairs.push((String::from("metadataHeaders"), header.clone()));
+            }
+        }
+
+        pairs
+    }
+}
+
 /// A Gmail snippet as plain text: Gmail escapes it as HTML and marks the
 /// words a query matched with `<b>`, which a terminal would show as is.
 pub fn snippet_text(snippet: &str) -> String {

@@ -7,11 +7,12 @@ use std::fmt;
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_gmail::v1::rest::messages::{
-    GmailMessageFormat, GmailMessageHeader, GmailMessagePayload, decode_raw,
+    GmailMessage, GmailMessageHeader, GmailMessagePayload, decode_raw,
 };
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::{
     gmail::{
@@ -23,8 +24,9 @@ use crate::{
 
 /// Get a single Gmail message (users.messages.get).
 ///
-/// Under `--format full`, JSON carries the MIME payload, bodies and
-/// attachment ids included, and the text lists the parts.
+/// JSON output: the message as Gmail sent it. Under `--format full` it
+/// carries the MIME payload, bodies and attachment ids included, and the
+/// text lists the parts.
 #[derive(Debug, Parser)]
 pub struct GmailMessageGetCommand {
     /// The id of the message to get.
@@ -37,7 +39,8 @@ pub struct GmailMessageGetCommand {
     /// case-insensitively.
     ///
     /// Under `--format metadata` it also narrows what Gmail sends back,
-    /// since the API honours the filter for that format alone.
+    /// since the API honours the filter for that format alone. The JSON
+    /// payload stays as Gmail sent it.
     #[arg(long = "header", value_name = "NAME")]
     pub headers: Vec<String>,
 }
@@ -45,13 +48,11 @@ pub struct GmailMessageGetCommand {
 impl GmailMessageGetCommand {
     /// Fetches the message and prints it at the requested detail.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let format = GmailMessageFormat::from(self.format);
-        let hs: Vec<&str> = self.headers.iter().map(String::as_str).collect();
+        let query = self.format.query(&self.headers);
+        let message = client.raw_get_with(&["messages", &self.id], query)?;
 
-        let msg = client.message_get(&self.id, format, &hs)?.response;
-
-        if format == GmailMessageFormat::Raw
-            && let Some(raw) = &msg.raw
+        if let FormatArg::Raw = self.format
+            && let Some(Value::String(raw)) = message.get("raw")
         {
             let bytes =
                 decode_raw(raw).map_err(|err| anyhow!("Decode Gmail message error: {err}"))?;
@@ -59,59 +60,64 @@ impl GmailMessageGetCommand {
         }
 
         printer.out(GmailMessageGetOutput {
-            id: msg.id,
-            thread_id: msg.thread_id,
-            label_ids: msg.label_ids,
-            snippet: msg.snippet,
-            size_estimate: msg.size_estimate,
-            internal_date: msg.internal_date,
-            headers: message_headers(msg.payload.clone(), &hs),
-            payload: msg.payload.filter(|_| format == GmailMessageFormat::Full),
+            message: Value::Object(message),
+            headers: self.headers,
+            full: matches!(self.format, FormatArg::Full),
         })
     }
 }
 
-/// The `gmail messages get` output, the metadata of one message, and its
-/// MIME payload under `--format full`: the parts, their bodies and the
-/// attachment ids `gmail attachments get` takes, keys in Gmail's spelling.
+/// The `gmail messages get` output: the message as Gmail sent it, every
+/// property kept, its MIME payload under `--format full`.
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(transparent)]
 pub(crate) struct GmailMessageGetOutput {
-    id: String,
-    thread_id: Option<String>,
-    label_ids: Vec<String>,
-    snippet: Option<String>,
-    size_estimate: Option<u64>,
-    internal_date: Option<String>,
-    headers: Vec<GmailMessageHeaderOutput>,
-    payload: Option<GmailMessagePayload>,
+    #[schemars(with = "Map<String, Value>")]
+    message: Value,
+    /// The headers the text form shows, all of them when empty.
+    #[serde(skip)]
+    headers: Vec<String>,
+    /// Whether the text form lists the parts (`--format full`).
+    #[serde(skip)]
+    full: bool,
 }
 
 impl fmt::Display for GmailMessageGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let msg: GmailMessage = serde_json::from_value(self.message.clone()).unwrap_or_default();
+        let names: Vec<&str> = self.headers.iter().map(String::as_str).collect();
+        let headers = message_headers(msg.payload.clone(), &names);
+        let labels: Vec<String> = headers
+            .iter()
+            .map(|header| sanitize::text(&header.name).into_owned())
+            .collect();
+
         let mut fields = Fields::default();
-        fields.push("Id", sanitize::text(&self.id));
-        if let Some(thread_id) = &self.thread_id {
+        fields.push("Id", sanitize::text(&msg.id));
+        if let Some(thread_id) = &msg.thread_id {
             fields.push("Thread", sanitize::text(thread_id));
         }
-        if !self.label_ids.is_empty() {
-            fields.push("Labels", sanitize::text(&self.label_ids.join(", ")));
+        if !msg.label_ids.is_empty() {
+            fields.push("Labels", sanitize::text(&msg.label_ids.join(", ")));
         }
-        if let Some(snippet) = &self.snippet {
+        if let Some(snippet) = &msg.snippet {
             fields.push("Snippet", sanitize::text(&snippet_text(snippet)));
         }
-        if let Some(size) = self.size_estimate {
+        if let Some(size) = msg.size_estimate {
             fields.push("Size", size);
         }
-        if let Some(internal_date) = &self.internal_date {
+        if let Some(internal_date) = &msg.internal_date {
             fields.push("Internal date", sanitize::text(internal_date));
         }
 
-        for header in &self.headers {
-            fields.push(&header.name, sanitize::text(&header.value));
+        for (label, header) in labels.iter().zip(&headers) {
+            fields.push(label, sanitize::text(&header.value));
         }
 
-        let parts = self.payload.as_ref().map(leaf_parts).unwrap_or_default();
+        let parts = match (&msg.payload, self.full) {
+            (Some(payload), true) => leaf_parts(payload),
+            _ => Vec::new(),
+        };
         for (label, value) in &parts {
             fields.push(label, value);
         }
@@ -207,7 +213,11 @@ mod tests {
         GmailMessageHeader, GmailMessagePartBody, GmailMessagePayload,
     };
 
-    use super::{GmailMessageGetOutput, message_headers};
+    use pimalaya_cli::printer::CapturePrinter;
+    use serde_json::json;
+
+    use super::{GmailMessageGetCommand, GmailMessageGetOutput, message_headers};
+    use crate::gmail::{client::GmailClient, format::FormatArg};
 
     fn payload(headers: &[(&str, &str)]) -> Option<GmailMessagePayload> {
         Some(GmailMessagePayload {
@@ -279,15 +289,11 @@ mod tests {
             ],
             ..Default::default()
         };
+        let message = json!({"id": "m1", "payload": payload});
         let output = GmailMessageGetOutput {
-            id: "m1".into(),
-            thread_id: None,
-            label_ids: Vec::new(),
-            snippet: None,
-            size_estimate: None,
-            internal_date: None,
+            message,
             headers: Vec::new(),
-            payload: Some(payload),
+            full: true,
         };
 
         let text = output.to_string();
@@ -299,5 +305,28 @@ mod tests {
 
         let json = serde_json::to_value(&output).unwrap();
         assert_eq!(json["payload"]["parts"][1]["body"]["attachmentId"], "ANGj");
+    }
+
+    /// The message prints as Gmail sent it, a property io-gmail does not
+    /// model and the headers `--header` leaves out of the text kept, the
+    /// headers asked for narrowing the metadata request.
+    #[test]
+    fn a_message_prints_as_gmail_sent_it() {
+        let headers = json!([{"name": "Subject", "value": "hi"}, {"name": "To", "value": "b"}]);
+        let message = json!({"id": "m1", "x-vendor": 1, "payload": {"headers": headers}});
+        let (mut client, requests) = GmailClient::scripted(std::slice::from_ref(&message));
+        let mut printer = CapturePrinter::default();
+
+        let command = GmailMessageGetCommand {
+            id: "m1".into(),
+            format: FormatArg::Metadata,
+            headers: vec!["Subject".into()],
+        };
+        command.execute(&mut printer, &mut client).unwrap();
+
+        assert_eq!(printer.into_single().unwrap(), message);
+        let requests = requests.lock().unwrap();
+        let line = "GET /gmail/v1/users/me/messages/m1?format=metadata&metadataHeaders=Subject ";
+        assert!(requests[0].starts_with(line), "{}", requests[0]);
     }
 }

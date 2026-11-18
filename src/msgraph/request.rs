@@ -23,10 +23,11 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MsgraphRequestCommand {
     /// HTTP method: get, post, patch, delete.
-    #[arg(value_name = "METHOD")]
+    #[arg(value_name = "METHOD", ignore_case = true)]
+    #[arg(value_parser = ["get", "post", "patch", "delete"])]
     pub method: String,
     /// Graph path (joined onto `v1.0/`) or a full URL.
-    #[arg(value_name = "PATH")]
+    #[arg(value_name = "PATH", value_parser = path_parser)]
     pub path: String,
     /// Raw JSON body for post and patch.
     #[arg(value_name = "JSON")]
@@ -51,6 +52,15 @@ impl MsgraphRequestCommand {
         printer.out(RawJsonOutput {
             response: client.run(send)?.response,
         })
+    }
+}
+
+/// Checks a path as clap takes it: a URL off the Graph API is refused
+/// with the command line, before the session opens.
+fn path_parser(path: &str) -> Result<String, String> {
+    match api_url(BASE, path) {
+        Ok(_) => Ok(path.to_owned()),
+        Err(err) => Err(err.to_string()),
     }
 }
 

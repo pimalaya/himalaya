@@ -7,7 +7,11 @@ use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::Printer;
 
-use crate::sieve::{check::SieveScriptOutput, client::SieveClient, script::SieveScriptArg};
+use crate::sieve::{
+    check::{SieveScriptOutput, warning_lines},
+    client::SieveClient,
+    script::SieveScriptArg,
+};
 
 /// Validate capacity and upload one server-side Sieve script.
 ///
@@ -33,7 +37,7 @@ impl SieveScriptPutCommand {
 
         printer.out(SieveScriptOutput {
             name: Some(self.name),
-            warnings: warnings.map(|warnings| warnings.to_string()),
+            warnings: warning_lines(warnings),
         })
     }
 }

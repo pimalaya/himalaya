@@ -22,6 +22,15 @@ pub enum SmtpCommand {
 }
 
 impl SmtpCommand {
+    /// Refuses, as clap would, a command line the grammar lets through but
+    /// the command cannot run, before the session opens.
+    pub fn check(&self) -> Result<()> {
+        match self {
+            Self::Send(cmd) => cmd.check(),
+            Self::Raw(_) => Ok(()),
+        }
+    }
+
     /// Runs the subcommand against the account's SMTP session.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         match self {

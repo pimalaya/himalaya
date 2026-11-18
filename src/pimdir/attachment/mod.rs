@@ -17,10 +17,14 @@ pub mod search;
 
 use std::collections::{HashMap, hash_map::Entry};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use io_pimdir::client::reader::{PimdirAccountAttachment, PimdirAccountAttachmentCursor};
 
-use crate::{error::pimdir_error, pimdir::client::PimdirClient, shared::message::part};
+use crate::{
+    error::{page_token_invalid, pimdir_error},
+    pimdir::client::PimdirClient,
+    shared::message::part,
+};
 
 /// How many stand-ins a search reads per keyset page, so a sparse match
 /// does not cost a query per row.
@@ -196,7 +200,7 @@ pub fn page_token(cursor: &PimdirAccountAttachmentCursor) -> String {
 /// The cursor a page token names, refused when it is not one this
 /// command printed.
 pub fn parse_page_token(token: &str) -> Result<PimdirAccountAttachmentCursor> {
-    let invalid = || anyhow!("Invalid page token `{token}`: pass a `nextPage` value as printed");
+    let invalid = || page_token_invalid(token);
     let (seq, key) = token.split_once('.').ok_or_else(invalid)?;
     let seq = seq.parse::<i64>().ok().filter(|seq| *seq > 0);
     let seq = seq.ok_or_else(invalid)?;

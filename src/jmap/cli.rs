@@ -9,11 +9,12 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     jmap::{
-        client::JmapClient, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
+        self, client::JmapClient, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
         mailbox::cli::JmapMailboxCommand, query::JmapQueryCommand, request::JmapRequestCommand,
         submission::cli::JmapSubmissionCommand, thread::cli::JmapThreadCommand,
         vacation::cli::JmapVacationCommand,
     },
+    shared::refusal,
 };
 
 /// JMAP-specific API.
@@ -57,7 +58,7 @@ impl JmapCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        match self {
+        let result = match self {
             Self::Mailbox(cmd) => cmd.execute(printer, account, client),
             Self::Email(cmd) => cmd.execute(printer, account, client),
             Self::Thread(cmd) => cmd.execute(printer, account, client),
@@ -66,7 +67,9 @@ impl JmapCommand {
             Self::VacationResponse(cmd) => cmd.execute(printer, account, client),
             Self::Request(cmd) => cmd.execute(printer, client),
             Self::Query(cmd) => cmd.execute(printer, client),
-        }
+        };
+
+        refusal::print(printer, &[jmap::error::refusal], result)
     }
 }
 

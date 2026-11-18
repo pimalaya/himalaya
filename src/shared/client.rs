@@ -16,8 +16,6 @@
 // use its parameters, the resolver refusing the verb before any runs.
 #![cfg_attr(not(backend), allow(unused_variables))]
 
-#[cfg(feature = "gmail")]
-use anyhow::Context;
 use anyhow::{Result, anyhow, bail};
 use pimalaya_config::secret::SecretResolver;
 
@@ -58,6 +56,10 @@ pub enum SentCopy {
     Owed,
     /// Filed by the backend as part of the send, under the id it reported.
     Filed(Option<String>),
+    /// Not filed, the backend failing to file it after the message went
+    /// out.
+    #[cfg_attr(not(feature = "gmail"), allow(dead_code))]
+    Unfiled(anyhow::Error),
 }
 
 /// The client every unified subcommand runs over.
@@ -745,9 +747,14 @@ impl EmailClient {
                 };
 
                 let context = || format!("Message sent, but saving a copy to {mailbox} failed");
-                let label = client.resolve_mailbox_id(mailbox).with_context(context)?;
-                client.file_sent(&id, &label, flags).with_context(context)?;
-                return Ok(SentCopy::Filed(Some(id)));
+                let filed = client
+                    .resolve_mailbox_id(mailbox)
+                    .and_then(|label| client.file_sent(&id, &label, flags));
+
+                return Ok(match filed {
+                    Ok(()) => SentCopy::Filed(Some(id)),
+                    Err(err) => SentCopy::Unfiled(err.context(context())),
+                });
             }
             #[cfg(feature = "msgraph")]
             // NOTE: Graph files every message it sends in Sent Items itself.

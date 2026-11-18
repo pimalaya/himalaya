@@ -7,12 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::forwarding_addresses::{
-    GmailForwardingAddress, get::GmailForwardingAddressGet,
-};
+use io_gmail::v1::rest::settings::forwarding_addresses::GmailForwardingAddress;
 use pimalaya_cli::{fields::Fields, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 use crate::gmail::{client::GmailClient, settings::convert::verification_status_wire};
 
@@ -28,13 +27,10 @@ pub struct GmailSettingsForwardingAddressGetCommand {
 impl GmailSettingsForwardingAddressGetCommand {
     /// Fetches the forwarding address and prints it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let out = {
-            let c = GmailForwardingAddressGet::new(&client.auth, &client.user_id, &self.email)?;
-            client.run(c)?
-        };
-        let address = out.response;
-
-        printer.out(GmailSettingsForwardingAddressGetOutput(address))
+        let address = client.raw_get(&["settings", "forwardingAddresses", &self.email])?;
+        printer.out(GmailSettingsForwardingAddressGetOutput(Value::Object(
+            address,
+        )))
     }
 }
 
@@ -44,14 +40,18 @@ impl GmailSettingsForwardingAddressGetCommand {
 /// shape here as in a `list` row.
 #[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
-pub(crate) struct GmailSettingsForwardingAddressGetOutput(GmailForwardingAddress);
+pub(crate) struct GmailSettingsForwardingAddressGetOutput(
+    #[schemars(with = "Map<String, Value>")] Value,
+);
 
 impl fmt::Display for GmailSettingsForwardingAddressGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let address: GmailForwardingAddress =
+            serde_json::from_value(self.0.clone()).unwrap_or_default();
         let mut fields = Fields::default();
-        fields.push("Email", sanitize::text(&self.0.forwarding_email));
+        fields.push("Email", sanitize::text(&address.forwarding_email));
 
-        if let Some(status) = self.0.verification_status {
+        if let Some(status) = address.verification_status {
             fields.push("Verification", verification_status_wire(status));
         }
 

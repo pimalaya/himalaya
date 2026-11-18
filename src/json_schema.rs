@@ -25,12 +25,7 @@ use crate::error::ErrorCode;
     feature = "sieve"
 ))]
 use crate::shared::receipt::IdReceipt;
-#[cfg(any(
-    feature = "gmail",
-    feature = "jmap",
-    feature = "maildir",
-    feature = "mbox"
-))]
+#[cfg(any(feature = "gmail", feature = "maildir", feature = "mbox"))]
 use crate::shared::receipt::IdsReceipt;
 
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
@@ -46,6 +41,20 @@ pub fn registry() -> JsonSchemaRegistry {
     macro_rules! insert {
         ($key:expr, $ty:ty) => {
             registry.insert::<$ty>($key);
+        };
+    }
+
+    #[cfg(any(feature = "gmail", feature = "msgraph", feature = "jmap"))]
+    macro_rules! refusable {
+        ($key:expr, $ty:ty) => {
+            registry.insert::<crate::shared::refusal::Refusable<$ty>>($key);
+        };
+    }
+
+    #[cfg(feature = "sieve")]
+    macro_rules! sieve {
+        ($key:expr, $ty:ty) => {
+            registry.insert::<crate::sieve::outcome::SieveOutcome<$ty>>($key);
         };
     }
 
@@ -207,63 +216,63 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "sieve")]
     {
-        insert!(
+        sieve!(
             "himalaya-sieve-capability",
             crate::sieve::capability::SieveCapabilityOutput
         );
-        insert!("himalaya-sieve-list", crate::sieve::list::SieveListOutput);
-        insert!("himalaya-sieve-get", crate::sieve::get::SieveScriptOutput);
+        sieve!("himalaya-sieve-list", crate::sieve::list::SieveListOutput);
+        sieve!("himalaya-sieve-get", crate::sieve::get::SieveScriptOutput);
     }
 
     #[cfg(feature = "jmap")]
     {
-        insert!(
+        refusable!(
             "himalaya-jmap-request",
             crate::shared::raw_json::RawJsonOutput
         );
         // The former form keeps its schema under its former name.
-        insert!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
-        insert!(
+        refusable!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
+        refusable!(
             "himalaya-jmap-mailbox-get",
             crate::jmap::mailbox::query::JmapMailboxQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-mailbox-query",
             crate::jmap::mailbox::query::JmapMailboxQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-email-get",
             crate::jmap::email::query::JmapEmailQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-email-query",
             crate::jmap::email::query::JmapEmailQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-email-parse",
             crate::jmap::email::parse::JmapEmailParseOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-thread-get",
             crate::jmap::thread::get::JmapThreadGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-identity-get",
             crate::jmap::identity::get::JmapIdentityGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-submission-get",
             crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-submission-query",
             crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-submission-create",
             crate::jmap::submission::query::JmapSubmissionQueryOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-vacation-response-get",
             crate::jmap::vacation::get::JmapVacationResponseGetOutput
         );
@@ -271,107 +280,107 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "gmail")]
     {
-        insert!(
+        refusable!(
             "himalaya-gmail-request",
             crate::shared::raw_json::RawJsonOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-profile-get",
             crate::gmail::profile::get::GmailProfileOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-labels-list",
             crate::gmail::labels::list::GmailLabelListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-labels-get",
             crate::gmail::labels::get::GmailLabelGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-messages-list",
             crate::gmail::messages::list::GmailMessageListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-messages-get",
             OneOf<crate::gmail::messages::get::GmailMessageGetOutput, Bytes>
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-drafts-list",
             crate::gmail::drafts::list::GmailDraftListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-drafts-get",
             OneOf<crate::gmail::drafts::get::GmailDraftGetOutput, Bytes>
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-drafts-create",
             crate::gmail::drafts::GmailDraftWriteOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-drafts-update",
             crate::gmail::drafts::GmailDraftWriteOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-threads-list",
             crate::gmail::threads::list::GmailThreadListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-threads-get",
             crate::gmail::threads::get::GmailThreadGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-history-list",
             crate::gmail::history::list::GmailHistoryListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-filters-list",
             crate::gmail::settings::filters::list::GmailSettingsFilterListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-filters-get",
             crate::gmail::settings::filters::get::GmailSettingsFilterGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-forwarding-addresses-list",
             crate::gmail::settings::forwarding_addresses::list::GmailSettingsForwardingAddressListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-forwarding-addresses-get",
             crate::gmail::settings::forwarding_addresses::get::GmailSettingsForwardingAddressGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-delegates-list",
             crate::gmail::settings::delegates::list::GmailSettingsDelegateListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-delegates-get",
             crate::gmail::settings::delegates::get::GmailSettingsDelegateGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-send-as-list",
             crate::gmail::settings::sendas::list::GmailSettingsSendAsListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-send-as-get",
             crate::gmail::settings::sendas::get::GmailSettingsSendAsGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-vacation-get",
             crate::gmail::settings::vacation::get::GmailSettingsVacationGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-auto-forwarding-get",
             crate::gmail::settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-pop-get",
             crate::gmail::settings::pop::get::GmailSettingsPopGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-imap-get",
             crate::gmail::settings::imap::get::GmailSettingsImapGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-language-get",
             crate::gmail::settings::language::get::GmailSettingsLanguageGetOutput
         );
@@ -379,35 +388,35 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "msgraph")]
     {
-        insert!(
+        refusable!(
             "himalaya-msgraph-request",
             crate::shared::raw_json::RawJsonOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-profile-get",
             crate::msgraph::profile::get::MsgraphProfileOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-mail-folders-list",
             crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-mail-folders-child-folders",
             crate::msgraph::mail_folders::list::MsgraphMailFolderListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-mail-folders-get",
             crate::msgraph::mail_folders::get::MsgraphMailFolderGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-messages-list",
             crate::msgraph::messages::list::MsgraphMessageListOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-messages-get",
             OneOf<crate::msgraph::messages::get::MsgraphMessageGetOutput, Bytes>
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-attachments-list",
             crate::msgraph::attachments::list::MsgraphAttachmentListOutput
         );
@@ -574,50 +583,65 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "smtp")]
     {
-        insert!("himalaya-smtp-send", crate::smtp::send::SmtpSendOutput);
+        insert!("himalaya-smtp-send", crate::smtp::send::SmtpSendOutcome);
         insert!("himalaya-smtp-raw", crate::smtp::raw::SmtpRawOutput);
     }
 
     #[cfg(feature = "sieve")]
     {
-        insert!("himalaya-sieve-activate", IdReceipt);
-        insert!("himalaya-sieve-delete", IdReceipt);
-        insert!("himalaya-sieve-rename", IdReceipt);
-        insert!(
+        sieve!("himalaya-sieve-activate", IdReceipt);
+        sieve!("himalaya-sieve-delete", IdReceipt);
+        sieve!("himalaya-sieve-rename", IdReceipt);
+        sieve!(
             "himalaya-sieve-deactivate",
             crate::sieve::deactivate::SieveDeactivateOutput
         );
-        insert!(
+        sieve!(
             "himalaya-sieve-check",
             crate::sieve::check::SieveScriptOutput
         );
-        insert!("himalaya-sieve-put", crate::sieve::check::SieveScriptOutput);
+        sieve!("himalaya-sieve-put", crate::sieve::check::SieveScriptOutput);
         insert!("himalaya-sieve-raw", crate::sieve::raw::SieveRawOutput);
         registry.insert_events::<crate::sieve::raw::SieveRawEvent>("himalaya-sieve-raw");
     }
 
     #[cfg(feature = "jmap")]
     {
-        insert!("himalaya-jmap-email-copy", IdsReceipt);
-        insert!("himalaya-jmap-email-delete", IdsReceipt);
-        insert!("himalaya-jmap-email-update", IdsReceipt);
-        insert!("himalaya-jmap-email-export", Bytes);
-        insert!(
+        refusable!("himalaya-jmap-email-copy", crate::jmap::set::JmapSetReceipt);
+        refusable!(
+            "himalaya-jmap-email-delete",
+            crate::jmap::set::JmapSetReceipt
+        );
+        refusable!(
+            "himalaya-jmap-email-update",
+            crate::jmap::set::JmapSetReceipt
+        );
+        refusable!("himalaya-jmap-email-export", Bytes);
+        refusable!(
             "himalaya-jmap-email-import",
             crate::jmap::email::import::JmapEmailImportOutput
         );
-        insert!(
+        refusable!(
             "himalaya-jmap-email-read",
             crate::jmap::email::read::JmapEmailReadOutput
         );
-        insert!("himalaya-jmap-identity-create", IdReceipt);
-        insert!("himalaya-jmap-identity-update", IdReceipt);
-        insert!("himalaya-jmap-identity-delete", IdsReceipt);
-        insert!("himalaya-jmap-mailbox-create", IdReceipt);
-        insert!("himalaya-jmap-mailbox-update", IdReceipt);
-        insert!("himalaya-jmap-mailbox-destroy", IdsReceipt);
-        insert!("himalaya-jmap-submission-cancel", IdsReceipt);
-        insert!("himalaya-jmap-vacation-response-set", IdReceipt);
+        refusable!("himalaya-jmap-identity-create", IdReceipt);
+        refusable!("himalaya-jmap-identity-update", IdReceipt);
+        refusable!(
+            "himalaya-jmap-identity-delete",
+            crate::jmap::set::JmapSetReceipt
+        );
+        refusable!("himalaya-jmap-mailbox-create", IdReceipt);
+        refusable!("himalaya-jmap-mailbox-update", IdReceipt);
+        refusable!(
+            "himalaya-jmap-mailbox-destroy",
+            crate::jmap::set::JmapSetReceipt
+        );
+        refusable!(
+            "himalaya-jmap-submission-cancel",
+            crate::jmap::set::JmapSetReceipt
+        );
+        refusable!("himalaya-jmap-vacation-response-set", IdReceipt);
     }
 
     #[cfg(feature = "gmail")]
@@ -654,34 +678,34 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-gmail-threads-trash",
             "himalaya-gmail-threads-untrash",
         ] {
-            insert!(key, IdReceipt);
+            refusable!(key, IdReceipt);
         }
 
-        insert!("himalaya-gmail-messages-batch-delete", IdsReceipt);
-        insert!("himalaya-gmail-messages-batch-modify", IdsReceipt);
-        insert!(
+        refusable!("himalaya-gmail-messages-batch-delete", IdsReceipt);
+        refusable!("himalaya-gmail-messages-batch-modify", IdsReceipt);
+        refusable!(
             "himalaya-gmail-attachments-get",
             OneOf<Bytes, SavedOutput>
         );
         // NOTE: a settings write prints the settings the server holds
         // after it, as the matching `get` does.
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-auto-forwarding-set",
             settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-imap-set",
             settings::imap::get::GmailSettingsImapGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-language-set",
             settings::language::get::GmailSettingsLanguageGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-pop-set",
             settings::pop::get::GmailSettingsPopGetOutput
         );
-        insert!(
+        refusable!(
             "himalaya-gmail-settings-vacation-set",
             settings::vacation::get::GmailSettingsVacationGetOutput
         );
@@ -706,14 +730,14 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-msgraph-messages-send-draft",
             "himalaya-msgraph-messages-update",
         ] {
-            insert!(key, IdReceipt);
+            refusable!(key, IdReceipt);
         }
 
-        insert!(
+        refusable!(
             "himalaya-msgraph-messages-send",
             crate::msgraph::messages::send::MsgraphMessageSendOutput
         );
-        insert!(
+        refusable!(
             "himalaya-msgraph-attachments-get",
             OneOf<Bytes, SavedOutput>
         );
@@ -815,6 +839,8 @@ mod tests {
             "himalaya-message-copy",
             "himalaya-message-move",
             "himalaya-message-delete",
+            "himalaya-message-add",
+            "himalaya-message-send",
         ] {
             let schema = &registry.schemas[key];
             let required = schema["required"].as_array().unwrap();

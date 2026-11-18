@@ -12,8 +12,8 @@ use crate::{
         activate::SieveScriptActivateCommand, capability::SieveCapabilityListCommand,
         check::SieveScriptCheckCommand, client::SieveClient,
         deactivate::SieveScriptDeactivateCommand, delete::SieveScriptDeleteCommand,
-        get::SieveScriptGetCommand, list::SieveScriptListCommand, put::SieveScriptPutCommand,
-        raw::SieveRawCommand, rename::SieveScriptRenameCommand,
+        get::SieveScriptGetCommand, list::SieveScriptListCommand, outcome,
+        put::SieveScriptPutCommand, raw::SieveRawCommand, rename::SieveScriptRenameCommand,
     },
 };
 
@@ -55,7 +55,7 @@ impl SieveCommand {
         account: &mut Account,
         client: &mut SieveClient,
     ) -> Result<()> {
-        match self {
+        let result = match self {
             Self::Capability(cmd) => cmd.execute(printer, account, client),
             Self::List(cmd) => cmd.execute(printer, account, client),
             Self::Get(cmd) => cmd.execute(printer, client),
@@ -66,6 +66,8 @@ impl SieveCommand {
             Self::Activate(cmd) => cmd.execute(printer, client),
             Self::Deactivate(cmd) => cmd.execute(printer, client),
             Self::Raw(cmd) => cmd.execute(printer, client),
-        }
+        };
+
+        outcome::print(printer, result)
     }
 }

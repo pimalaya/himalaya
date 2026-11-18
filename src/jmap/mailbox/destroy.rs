@@ -3,14 +3,14 @@
 //! The `jmap mailbox destroy` command, the destroy half of RFC 8621
 //! `Mailbox/set`.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_jmap::rfc8621::mailbox::set::JmapMailboxSetArgs;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    jmap::{client::JmapClient, error::format_set_error},
-    shared::receipt::IdsReceipt,
+    error::ErrorCode,
+    jmap::{client::JmapClient, set::JmapSetReceipt},
 };
 
 /// Delete a JMAP mailbox.
@@ -35,20 +35,12 @@ impl JmapMailboxDestroyCommand {
 
         let output = client.mailbox_set(args)?;
 
-        if !output.not_destroyed.is_empty() {
-            let mut msg = String::from("Destroy JMAP mailbox(es) error");
-
-            for (id, err) in output.not_destroyed {
-                msg.push_str(&format!("\n  `{id}`"));
-                msg.push_str(&format_set_error(&err));
-            }
-
-            bail!(msg)
-        }
-
-        printer.out(IdsReceipt {
-            ids: output.destroyed,
-            done: "JMAP mailboxes successfully deleted",
-        })
+        JmapSetReceipt::new(
+            "JMAP mailboxes successfully deleted",
+            output.destroyed,
+            output.not_destroyed,
+            Some(ErrorCode::MailboxNotFound),
+        )
+        .print(printer)
     }
 }

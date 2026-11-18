@@ -83,3 +83,17 @@ impl GmailSettingsCommand {
         }
     }
 }
+
+/// Replaces the settings at `users/<user>/settings/<path>` with
+/// `settings`, the request io-gmail's update sends, and hands back what
+/// Gmail answered, as it sent it.
+pub(crate) fn raw_put(
+    client: &mut GmailClient,
+    path: &str,
+    settings: &impl serde::Serialize,
+) -> Result<serde_json::Value> {
+    let user = client.user_id.clone();
+    let url = io_gmail::v1::send::gmail_api_url(&["users", &user, "settings", path])?;
+    let send = io_gmail::v1::send::GmailSend::put_json(&client.auth, url, settings)?;
+    Ok(client.run(send)?.response)
+}

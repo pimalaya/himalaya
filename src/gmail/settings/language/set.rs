@@ -5,10 +5,12 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_gmail::v1::rest::settings::{GmailLanguageSettings, update_language::GmailLanguageUpdate};
+use io_gmail::v1::rest::settings::GmailLanguageSettings;
 use pimalaya_cli::printer::Printer;
 
-use crate::gmail::{client::GmailClient, settings::language::get::GmailSettingsLanguageGetOutput};
+use crate::gmail::{
+    client::GmailClient, settings::language::get::GmailSettingsLanguageGetOutput, settings::raw_put,
+};
 
 /// Update the Gmail display language settings.
 #[derive(Debug, Parser)]
@@ -25,11 +27,7 @@ impl GmailSettingsLanguageSetCommand {
             display_language: self.display_language,
         };
 
-        let out = {
-            let c = GmailLanguageUpdate::new(&client.auth, &client.user_id, settings)?;
-            client.run(c)?
-        };
-
-        printer.out(GmailSettingsLanguageGetOutput::from(out.response))
+        let settings = raw_put(client, "language", &settings)?;
+        printer.out(GmailSettingsLanguageGetOutput(settings))
     }
 }

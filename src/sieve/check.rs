@@ -7,7 +7,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
-use pimalaya_cli::printer::Printer;
+use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -27,7 +27,7 @@ impl SieveScriptCheckCommand {
 
         printer.out(SieveScriptOutput {
             name: None,
-            warnings: warnings.map(|warnings| warnings.to_string()),
+            warnings: warning_lines(warnings),
         })
     }
 }
@@ -39,8 +39,9 @@ impl SieveScriptCheckCommand {
 pub(crate) struct SieveScriptOutput {
     /// The name of the script uploaded, `null` for a check.
     pub(crate) name: Option<String>,
-    /// The warnings of the server, `null` when it sent none.
-    pub(crate) warnings: Option<String>,
+    /// The warnings of the server, one per line of its text, `[]` when
+    /// it sent none.
+    pub(crate) warnings: Vec<String>,
 }
 
 impl fmt::Display for SieveScriptOutput {
@@ -50,9 +51,48 @@ impl fmt::Display for SieveScriptOutput {
             None => write!(f, "Sieve script is valid")?,
         }
 
-        match &self.warnings {
-            Some(warnings) => writeln!(f, " ({warnings})"),
-            None => writeln!(f),
+        match self.warnings.as_slice() {
+            [] => writeln!(f),
+            warnings => writeln!(f, " ({})", sanitize::text(&warnings.join("; "))),
         }
+    }
+}
+
+/// The warnings a server attached to an accepted script, one per line of
+/// its text, blank lines dropped.
+pub(crate) fn warning_lines(warnings: Option<impl ToString>) -> Vec<String> {
+    let Some(warnings) = warnings else {
+        return Vec::new();
+    };
+
+    warnings
+        .to_string()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sieve::check::{SieveScriptOutput, warning_lines};
+
+    /// The warnings print as a list, one per line the server sent, `[]`
+    /// when it sent none, as a receipt carries them.
+    #[test]
+    fn the_warnings_are_a_list() {
+        let output = SieveScriptOutput {
+            name: None,
+            warnings: warning_lines(Some("line 2: unused\r\nline 5: odd\r\n")),
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(
+            json["warnings"],
+            serde_json::json!(["line 2: unused", "line 5: odd"])
+        );
+
+        let none = warning_lines(None::<String>);
+        assert!(none.is_empty());
     }
 }

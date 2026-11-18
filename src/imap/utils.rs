@@ -77,6 +77,15 @@ fn format_email(addr: &Address<'_>) -> String {
     }
 }
 
+/// Checks a sequence set argument as clap takes it, so a value that is
+/// none is refused with the command line, before the session opens.
+pub fn sequence_set_parser(raw: &str) -> Result<String, String> {
+    match parse_sequence_set(raw) {
+        Ok(_) => Ok(raw.to_owned()),
+        Err(err) => Err(err.to_string()),
+    }
+}
+
 /// Parses a sequence set argument, naming it when it is not one.
 pub fn parse_sequence_set(raw: &str) -> Result<SequenceSet> {
     SequenceSet::try_from(raw).map_err(|_| {
@@ -94,5 +103,33 @@ mod tests {
 
         let err = parse_sequence_set("abc").unwrap_err().to_string();
         assert!(err.starts_with("Invalid sequence set `abc`"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod parser_tests {
+    use clap::Parser;
+
+    use crate::cli::Cli;
+
+    /// A sequence set that is none is refused with the command line, so
+    /// it exits 2 before the secret command runs and the session opens.
+    #[test]
+    fn a_bad_sequence_set_is_refused_by_the_grammar() {
+        for args in [
+            &["imap", "fetch", "abc"][..],
+            &["imap", "store", "abc", "-f", "\\Seen"],
+            &["imap", "copy", "abc", "Archive"],
+            &["imap", "move", "abc", "Archive"],
+        ] {
+            let argv = [&["himalaya"][..], args].concat();
+            let err = Cli::try_parse_from(&argv).err();
+            let err = err.unwrap_or_else(|| panic!("{args:?} parsed"));
+            assert_eq!(err.kind(), clap::error::ErrorKind::ValueValidation, "{err}");
+
+            let argv = [&["himalaya"][..], args].concat();
+            let argv: Vec<String> = argv.iter().map(|arg| arg.replace("abc", "1:*")).collect();
+            assert!(Cli::try_parse_from(&argv).is_ok(), "{argv:?}");
+        }
     }
 }

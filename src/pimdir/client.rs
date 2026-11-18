@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use io_pimdir::{
     client::{
         PimdirError, PimdirStore,
@@ -29,6 +29,7 @@ use crate::{
     account::context::Account,
     config::{AccountConfig, Config, pimdir::PimdirConfig},
     error::{ErrorCode, pimdir_error},
+    pimdir::backend::is_mail,
 };
 
 /// The producer name recorded on every action this client enqueues, so the
@@ -57,10 +58,11 @@ impl PimdirClient {
         let root = config.root.clone();
 
         if !root.join("pimdir.db").exists() {
-            return Err(anyhow!(
+            let message = format!(
                 "No pimdir store at `{}`; check `pimdir.root`, and run a sync to create one",
                 root.display(),
-            ));
+            );
+            return Err(CodedError::new(ErrorCode::StoreUncreated, message).into());
         }
 
         // NOTE: reads overlay the queue, so what this client staged shows on
@@ -143,13 +145,7 @@ impl PimdirClient {
             PimdirActionStatus::Pending { kind, .. }
             | PimdirActionStatus::Parked { kind, .. }
             | PimdirActionStatus::Unconfirmed { kind, .. } => kind,
-            PimdirActionStatus::Applied { .. } => bail!("Row {id} was applied already"),
-            // NOTE: a bare row id states no store, so io-pimdir follows
-            // it unchecked and never answers a reset for it.
-            PimdirActionStatus::Unknown | PimdirActionStatus::Reset => bail!(
-                "No queued action with row {id} in this account's queue; \
-                 it may have been synced already"
-            ),
+            status => return Err(uncancellable(id, &status)),
         };
 
         // NOTE: a store of another draft is refused saying how to reinstall
@@ -172,7 +168,7 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .with_context(|| format!("Cancel queued action {id}"))?
         {
-            bail!("No queued action with row {id}; it may have been synced already");
+            return Err(row_not_found(id));
         }
         Ok(kind)
     }
@@ -323,18 +319,36 @@ pub fn build_pimdir_client(
 /// configuration.
 ///
 /// A store several accounts share is what `pimdir.account` answers, and
-/// leaving it unset there errors rather than guess: picking one would show
-/// the wrong mailbox set.
+/// leaving it unset there errors rather than guess, under
+/// `store-account-ambiguous`: picking one would show the wrong mailbox
+/// set. Only the accounts holding mail count, so a store sharing one mail
+/// account with the contacts or calendars of others needs no
+/// configuration. An account named that the store does not hold is
+/// refused under `store-account-unknown`, rather than read as an empty
+/// one.
 fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<Option<String>> {
-    if configured.is_some() {
-        return Ok(configured);
-    }
-
-    let mut accounts: Vec<Option<String>> = store
+    let collections = store
         .list_collections()
         .map_err(pimdir_error)
-        .context("List pimdir collections")?
+        .context("List pimdir collections")?;
+
+    if let Some(account) = configured {
+        let held = collections
+            .iter()
+            .any(|collection| collection.account.as_deref() == Some(account.as_str()));
+        if !held {
+            let message = format!(
+                "The pimdir store holds no account `{account}`; check `pimdir.account`, \
+                 or run a sync of that account"
+            );
+            return Err(CodedError::new(ErrorCode::StoreAccountUnknown, message).into());
+        }
+        return Ok(Some(account));
+    }
+
+    let mut accounts: Vec<Option<String>> = collections
         .into_iter()
+        .filter(|collection| is_mail(&collection.kind))
         .map(|collection| collection.account)
         .collect();
     accounts.sort();
@@ -347,10 +361,29 @@ fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<O
                 .iter()
                 .map(|account| account.as_deref().unwrap_or("<ungrouped>"))
                 .collect();
-            Err(anyhow!(
-                "The pimdir store holds several accounts ({}); name one with `pimdir.account`",
+            let message = format!(
+                "The pimdir store holds several accounts of mail ({}); name one with \
+                 `pimdir.account`",
                 names.join(", "),
-            ))
+            );
+            Err(CodedError::new(ErrorCode::StoreAccountAmbiguous, message).into())
         }
     }
+}
+
+/// Why queue row `id`, standing at `status`, cannot be cancelled: applied
+/// already, or not a row of the account's queue, under `row-not-found`.
+pub fn uncancellable(id: i64, status: &PimdirActionStatus) -> anyhow::Error {
+    match status {
+        PimdirActionStatus::Applied { .. } => anyhow!("Row {id} was applied already"),
+        _ => row_not_found(id),
+    }
+}
+
+/// The refusal of a queue row the account's queue does not hold.
+fn row_not_found(id: i64) -> anyhow::Error {
+    let message = format!(
+        "No queued action with row {id} in this account's queue; it may have been synced already"
+    );
+    CodedError::new(ErrorCode::RowNotFound, message).into()
 }
