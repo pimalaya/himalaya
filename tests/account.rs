@@ -173,3 +173,46 @@ fn account_list_splits_the_declared_backends_by_build() {
         .join(",");
     assert_eq!(text, format!("a  {cell}  default\n"));
 }
+
+/// `account check` names the TLS each network backend connected with:
+/// the account's `tls` reaching both, the SMTP block's own provider
+/// winning over it, a local backend naming none.
+#[cfg(all(feature = "imap", feature = "smtp", feature = "maildir"))]
+#[test]
+fn an_account_check_names_the_trust_of_each_transport() {
+    let home = TempDir::new().unwrap();
+    let maildir = home.path().join("mail");
+    for subdir in ["cur", "new", "tmp"] {
+        fs::create_dir_all(maildir.join(subdir)).unwrap();
+    }
+    let toml = format!(
+        "[accounts.a]\ndefault = true\n\
+         tls.cert = \"/etc/ca.pem\"\n\
+         imap.server = \"imaps://127.0.0.1:1\"\n\
+         imap.sasl.plain.username = \"a\"\n\
+         imap.sasl.plain.password.raw = \"x\"\n\
+         smtp.server = \"smtps://127.0.0.1:1\"\n\
+         smtp.tls.provider = \"rustls\"\n\
+         maildir.root = {:?}\n",
+        maildir.to_str().unwrap()
+    );
+
+    let output = run(home.path(), &toml, &["account", "check"]);
+    let json = printed(&output, 3);
+    let row = |backend: &str| {
+        let rows = json["backends"].as_array().unwrap();
+        rows.iter()
+            .find(|row| row["backend"] == backend)
+            .unwrap()
+            .clone()
+    };
+
+    let imap = row("imap");
+    assert_eq!(imap["tls"]["cert"], "/etc/ca.pem", "{json}");
+    assert_eq!(imap["tls"]["provider"], Value::Null, "{json}");
+    let smtp = row("smtp");
+    assert_eq!(smtp["tls"]["cert"], "/etc/ca.pem", "{json}");
+    assert_eq!(smtp["tls"]["provider"], "rustls", "{json}");
+    assert_eq!(smtp["tls"]["clientCert"], Value::Null, "{json}");
+    assert_eq!(row("maildir")["tls"], Value::Null, "{json}");
+}

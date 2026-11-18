@@ -19,8 +19,8 @@ use ariadne::{Config, Label, Report, ReportKind, Source};
 use chrono::{DateTime, FixedOffset, Local};
 use io_pimdir::{
     client::search::{
-        PimdirIndex, PimdirSearchClock, PimdirSearchHit, PimdirSearchMatched, PimdirSearchOptions,
-        PimdirSearchThread,
+        PimdirIndex, PimdirSearchClock, PimdirSearchCursor, PimdirSearchHit, PimdirSearchMatched,
+        PimdirSearchOptions, PimdirSearchThread,
     },
     search::{
         coverage::{PimdirSearchCoverage, PimdirSearchTemporal, PimdirSearchUnread},
@@ -67,7 +67,7 @@ impl PimdirClient {
 
         Ok(PimdirMailPage {
             hits,
-            more: answer.more,
+            next: answer.next,
             coverage: PimdirMailCoverage::from(&answer.coverage),
             errors,
         })
@@ -101,7 +101,7 @@ impl PimdirClient {
 
         Ok(PimdirMailThreads {
             threads,
-            more: answer.more,
+            next: answer.next,
             coverage: PimdirMailCoverage::from(&answer.coverage),
             errors,
         })
@@ -423,8 +423,8 @@ fn refusal_report(query: &str, err: &PimdirQueryError) -> String {
 pub struct PimdirMailPage {
     /// The hits, in the order asked.
     pub hits: Vec<PimdirMailHit>,
-    /// Whether hits follow this page.
-    pub more: bool,
+    /// Where the next page starts, `None` on the last one.
+    pub next: Option<PimdirSearchCursor>,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
     /// The error of each hit the store could not read.
@@ -435,8 +435,8 @@ pub struct PimdirMailPage {
 pub struct PimdirMailThreads {
     /// The threads, in the order of their first hit.
     pub threads: Vec<PimdirMailThread>,
-    /// Whether threads follow this page.
-    pub more: bool,
+    /// Where the next page starts, `None` on the last one.
+    pub next: Option<PimdirSearchCursor>,
     /// What the answer could not see.
     pub coverage: PimdirMailCoverage,
     /// The error of each hit the store could not read.
@@ -950,24 +950,24 @@ mod tests {
     }
 
     #[test]
-    fn a_page_says_whether_more_follow() {
+    fn a_page_names_where_the_next_starts() {
         let (_dir, client) = indexed_store();
-        let options = |offset| PimdirSearchOptions {
+        let options = |after| PimdirSearchOptions {
             limit: 3,
-            offset,
+            after,
             ..Default::default()
         };
 
         let first = client
-            .search_mail(query("date:2026-05-01.."), &options(0))
+            .search_mail(query("date:2026-05-01.."), &options(None))
             .unwrap();
         assert_eq!(first.hits.len(), 3);
-        assert!(first.more);
+        assert!(first.next.is_some());
         let last = client
-            .search_mail(query("date:2026-05-01.."), &options(3))
+            .search_mail(query("date:2026-05-01.."), &options(first.next))
             .unwrap();
         assert_eq!(last.hits.len(), 1);
-        assert!(!last.more);
+        assert!(last.next.is_none());
         assert_eq!(
             client
                 .count_mail(query("date:2026-05-01.."), &PimdirSearchClock::default())

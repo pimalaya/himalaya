@@ -7,19 +7,15 @@ use std::{collections::BTreeMap, fmt};
 
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::{
-    client::JmapClientStd,
-    rfc8621::{JMAP_MAIL_CAPABILITY, email::import::JmapEmailImportArgs},
-};
+use io_jmap::rfc8621::{JMAP_MAIL_CAPABILITY, email::import::JmapEmailImportArgs};
 use pimalaya_cli::printer::Printer;
-use pimalaya_config::secret::SecretResolver;
 use schemars::JsonSchema;
 use serde::Serialize;
 use url::Url;
 
 use crate::{
     jmap::{
-        client::{JmapClient, connect_options, jmap_http_auth},
+        client::JmapClient,
         error::{format_set_error, set_error},
     },
     shared::message::arg::MessageArg,
@@ -71,12 +67,10 @@ impl JmapEmailImportCommand {
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id
         } else {
-            let mut resolver = SecretResolver::new();
-            let http_auth = jmap_http_auth(client.config.auth.clone(), &mut resolver)?;
-            let opts = connect_options(&client.config, &mut resolver)?;
-            let mut upload_client = JmapClientStd::connect(&upload_url, http_auth, opts)?;
-            upload_client
-                .blob_upload(&upload_url, "message/rfc822", data)?
+            client
+                .auxiliary(&upload_url, |upload| {
+                    upload.blob_upload(&upload_url, "message/rfc822", data.clone())
+                })?
                 .blob_id
         };
 

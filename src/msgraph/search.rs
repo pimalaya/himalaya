@@ -46,6 +46,12 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Date(date) => format!("sent:{}", date_kql(*date)),
         SearchEmailsFilterQuery::AfterDate(date) => format!("sent>{}", date_kql(*date)),
         SearchEmailsFilterQuery::BeforeDate(date) => format!("sent<{}", date_kql(*date)),
+        SearchEmailsFilterQuery::AfterInstant(_) | SearchEmailsFilterQuery::BeforeInstant(_) => {
+            return Err(unsupported(
+                filter,
+                "Microsoft Graph search compares days alone; give a day, or `today`",
+            ));
+        }
         SearchEmailsFilterQuery::From(pattern) => format!("from:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::To(pattern) => format!("to:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::Cc(pattern) => format!("cc:{}", value_kql(pattern)),
@@ -113,6 +119,16 @@ mod tests {
         );
         assert_eq!(message_id_filter(&both), None);
         assert!(filter_to_search(&both).is_err());
+    }
+
+    /// KQL compares days alone: an instant is refused, coded
+    /// `search-unsupported`, nothing searched.
+    #[test]
+    fn an_instant_is_refused() {
+        let at = chrono::DateTime::parse_from_rfc3339("2026-11-14T10:00:00Z").unwrap();
+        let err = filter_to_search(&SearchEmailsFilterQuery::AfterInstant(at)).unwrap_err();
+        let code = pimalaya_cli::error::code_of::<crate::error::ErrorCode>(&err);
+        assert_eq!(code, Some(crate::error::ErrorCode::SearchUnsupported));
     }
 
     #[test]

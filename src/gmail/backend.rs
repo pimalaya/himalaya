@@ -29,7 +29,7 @@ use serde::de::{DeserializeOwned, IgnoredAny};
 
 use crate::{
     email::{
-        address::Address,
+        address::{self, Address},
         envelope::{
             Envelope, EnvelopePage, normalize_message_id, parse_message_ids, parse_rfc2822_date,
         },
@@ -998,30 +998,10 @@ fn target(
     if present { add } else { remove }.push(label.into());
 }
 
-/// Parses an RFC 5322 address-list header value into shared addresses
-/// (best-effort: split on commas, extract `<addr>` plus optional name).
+/// Parses an RFC 5322 address-list header value into shared addresses,
+/// as every other backend reads one.
 fn parse_addresses(raw: &str) -> Vec<Address> {
-    raw.split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-        .map(parse_address)
-        .collect()
-}
-
-/// Parses one address of a header value into a shared [`Address`].
-fn parse_address(part: &str) -> Address {
-    if let Some(open) = part.rfind('<')
-        && let Some(end) = part[open..].find('>')
-    {
-        let email = part[open + 1..open + end].trim().to_string();
-        let name = part[..open].trim().trim_matches('"').trim();
-        let name = (!name.is_empty()).then(|| name.to_string());
-        return Address { name, email };
-    }
-    Address {
-        name: None,
-        email: part.to_string(),
-    }
+    address::parse(raw.as_bytes())
 }
 
 #[cfg(test)]
@@ -1039,9 +1019,30 @@ mod tests {
         error::{ErrorCode, ItemError},
         gmail::backend::{
             batch_all, batch_item_error, is_unknown_id, label_patch, labelled, listed,
-            reply_parents, sublabel_renames,
+            parse_addresses, reply_parents, sublabel_renames,
         },
     };
+
+    /// A display name quoting a comma names one address, groups are
+    /// flattened and an empty group gives none, as the other backends read
+    /// them.
+    #[test]
+    fn an_address_header_reads_as_the_other_backends_read_it() {
+        let addresses = parse_addresses("\"Doe, John\" <john@x.org>, Team: a@x.org, b@x.org;");
+        let emails: Vec<(Option<&str>, &str)> = addresses
+            .iter()
+            .map(|address| (address.name.as_deref(), address.email.as_str()))
+            .collect();
+        assert_eq!(
+            emails,
+            [
+                (Some("Doe, John"), "john@x.org"),
+                (None, "a@x.org"),
+                (None, "b@x.org"),
+            ]
+        );
+        assert!(parse_addresses("undisclosed-recipients:;").is_empty());
+    }
 
     /// A batch answering each call with what `answer` says for its index
     /// and round, recording the indexes each round sent.

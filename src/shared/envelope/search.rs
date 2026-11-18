@@ -64,10 +64,10 @@ pub struct EnvelopeSearchCommand {
     ///
     /// Clauses:
     ///
-    /// - `date <yyyy-mm-dd>`: sent on that day;
+    /// - `date <day>`: sent on that day;
     ///
-    /// - `after <yyyy-mm-dd>`, `before <yyyy-mm-dd>`: sent strictly after,
-    ///   strictly before that day;
+    /// - `after <date>`, `before <date>`: sent strictly after, strictly
+    ///   before that day or that instant, to the second;
     ///
     /// - `from <pattern>`, `to <pattern>`, `cc <pattern>`, `bcc <pattern>`:
     ///   that header holds the pattern, in a name or an address;
@@ -84,9 +84,18 @@ pub struct EnvelopeSearchCommand {
     /// - `message-id <id>`: the message whose `Message-ID:` is the id, its
     ///   angle brackets optional.
     ///
-    /// Dates also read `yyyy/mm/dd`, `dd-mm-yyyy` and `dd/mm/yyyy`. A pattern
-    /// holding spaces is quoted, `"weekly report"`, or its spaces are
-    /// escaped, `weekly\ report`.
+    /// A day is `2026-11-14`, `2026/11/14`, `14-11-2026` or `14/11/2026`,
+    /// its year in four digits, `today`, `yesterday`, or
+    /// `<n> day|week|month|year[s] ago`, counted back in calendar terms:
+    /// `after 2 days ago`. An instant is `<n> minute|hour[s] ago`, as in
+    /// `before 5 hours ago`, or an RFC 3339 date-time, its seconds and
+    /// offset optional: `after 2026-11-14T09:30`. Days and instants with no
+    /// offset are read in the local zone (`TZ`, then the system's). IMAP
+    /// serves an instant on the chain of `and` from the root alone,
+    /// Microsoft Graph none.
+    ///
+    /// A pattern holding spaces is quoted, `"weekly report"`, or its spaces
+    /// are escaped, `weekly\ report`.
     ///
     /// Clauses join with `not`, `and` and `or`, binding in that order, and
     /// group with parentheses: `from alice and (subject report or

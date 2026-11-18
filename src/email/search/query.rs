@@ -60,8 +60,8 @@ fn filter_options(filter: &SearchEmailsFilterQuery, options: &mut Vec<SearchOpti
         }
         Q::Not(inner) => return filter_options(inner, options),
         Q::Date(_) => SearchOption::Date,
-        Q::AfterDate(_) => SearchOption::After,
-        Q::BeforeDate(_) => SearchOption::Before,
+        Q::AfterDate(_) | Q::AfterInstant(_) => SearchOption::After,
+        Q::BeforeDate(_) | Q::BeforeInstant(_) => SearchOption::Before,
         Q::From(_) => SearchOption::From,
         Q::To(_) => SearchOption::To,
         Q::Cc(_) => SearchOption::Cc,

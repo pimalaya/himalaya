@@ -101,6 +101,8 @@ fn matches(
         Q::Date(target) => same_day(envelope.date, *target),
         Q::AfterDate(target) => after_day(envelope.date, *target),
         Q::BeforeDate(target) => before_day(envelope.date, *target),
+        Q::AfterInstant(target) => envelope.date.is_some_and(|date| date > *target),
+        Q::BeforeInstant(target) => envelope.date.is_some_and(|date| date < *target),
         Q::From(pattern) => addresses_contain(&envelope.from, pattern),
         Q::To(pattern) => addresses_contain(&envelope.to, pattern),
         Q::Cc(pattern) => addresses_contain(&copies.cc, pattern),
@@ -311,6 +313,24 @@ mod tests {
             &raw,
             &SearchEmailsFilterQuery::AfterDate(naive(2026, 5, 15))
         ));
+    }
+
+    /// An instant compares to the second, strictly, whatever offset each
+    /// side is written in.
+    #[test]
+    fn an_instant_compares_to_the_second() {
+        let env = envelope();
+        let sent = env.date.unwrap();
+        let at = |seconds: i64| sent + chrono::TimeDelta::seconds(seconds);
+        let matches = |filter| matches_filter(&env, None, &[], &filter);
+
+        assert!(matches(SearchEmailsFilterQuery::AfterInstant(at(-1))));
+        assert!(!matches(SearchEmailsFilterQuery::AfterInstant(at(0))));
+        assert!(matches(SearchEmailsFilterQuery::BeforeInstant(at(1))));
+        assert!(!matches(SearchEmailsFilterQuery::BeforeInstant(at(0))));
+
+        let utc = at(-1).with_timezone(&chrono::Utc).fixed_offset();
+        assert!(matches(SearchEmailsFilterQuery::AfterInstant(utc)));
     }
 
     #[test]

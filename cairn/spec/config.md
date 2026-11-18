@@ -75,7 +75,7 @@ An `mbox` block SHALL name `root`, the directory of mbox files, and MAY name `in
 Every network backend's `tls` block MAY name a `client` table holding `cert` and `key`, the PEM certificate (optionally followed by its intermediates) and its private key, presented when the server asks for a client certificate. Both keys SHALL be required once the table is present.
 
 ### Requirement: Path keys expand as the configuration is read
-Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert`, `tls.client.cert` and `tls.client.key` of every backend.
+Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `mbox.root`, `mbox.inbox`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert`, `tls.client.cert` and `tls.client.key` of the account and of every backend.
 
 An expansion that fails, an undefined variable being the case, SHALL leave the raw value untouched rather than fail the load.
 
@@ -97,6 +97,14 @@ The resolved value SHALL live no longer than the run that resolved it, and SHALL
 An account's `proxy` SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph) whose own block names no `proxy`, and a backend's own `proxy` SHALL win over it. With neither, the connection SHALL read the `all_proxy` and `https_proxy` environment variables, honouring `no_proxy`.
 
 `proxy.url` SHALL take `socks5://`, `socks5h://` or `http://`. `proxy.username` and `proxy.password` SHALL override the URL's user info, the password being a secret like any credential; a password without a username SHALL be rejected.
+
+### Requirement: One TLS policy per account
+An account's `tls` table SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph), field by field: each of `provider`, `rustls.crypto`, `cert` and `client` a backend's own `tls` leaves unset SHALL take the account's, and one it sets SHALL win. A certificate an account trusts is so trusted on every transport, a JMAP download host and an SMTP submission after IMAP alike. The account table SHALL take the keys a backend's does, unknown ones refused.
+
+#### Scenario: One certificate for every transport
+- GIVEN an account setting `tls.cert = "/etc/ca.pem"`, an `imap` block and an `smtp` block setting `smtp.tls.provider = "native-tls"`
+- WHEN a command connects over IMAP, then over SMTP
+- THEN both trust `/etc/ca.pem`, SMTP through native-tls
 
 ### Requirement: Unknown keys are refused
 Every table of the configuration SHALL refuse a key it does not know, the top level and the account blocks included, the error naming the key and the line. The one exception SHALL be the `tui` table, at the top level and in an account, which holds himalaya-tui's own keys: Himalaya SHALL load it whatever it holds and read none of it. A table a previous major version read and v3 dropped SHALL be refused by name in pimalaya-config's sentence (`removed_key!`), ``The `<name>` table is removed, <why>: <instead>, see MIGRATION.md``: `table`, `attachment`, the top-level `account` and `envelope.list.table`, `the output being plain text: delete it`, and v1's `folder`, which v2 renamed `mailbox`, ``v2 renaming it `mailbox`: move `folder.alias` to `mailbox.alias` and delete the rest``. The v1 `backend` table and the `m2dir` block SHALL load as their requirements say.

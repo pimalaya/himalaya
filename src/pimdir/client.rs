@@ -16,13 +16,11 @@ use io_pimdir::{
     client::{
         PimdirError, PimdirStore,
         blobs::PimdirBlobs,
-        producer::{PimdirActionStatus, PimdirProducer},
+        producer::{PimdirActionStatus, PimdirEnqueue, PimdirEnqueued, PimdirProducer},
         reader::PimdirReader,
     },
     codec::PimdirAction,
-    object::PimdirObject,
 };
-use log::warn;
 use pimalaya_cli::error::CodedError;
 
 use crate::{
@@ -83,24 +81,35 @@ impl PimdirClient {
         })
     }
 
-    /// Queues `action` through `producer`, warning about each capability
-    /// its source supports in part (pimdir STORAGE §15.6), and answers
-    /// the row it waits in.
-    ///
-    /// The enqueue runs the gate of §15.6 itself, once, and answers the
-    /// partial supports it passed the action with.
-    pub(crate) fn enqueue(
+    /// Queues `actions` on `collection` as one batch (pimdir STORAGE
+    /// §15.1), each passing the gate of §15.6 once, and answers their rows
+    /// in order: an action the gate refuses, or the store failing, leaves
+    /// nothing staged, the failure read by `context` with the id the gate
+    /// refuses alone, `None` when it refuses none. No action takes no
+    /// write transaction.
+    pub(crate) fn enqueue_all(
         &self,
-        producer: &mut PimdirProducer,
         collection: &str,
-        action: &PimdirAction,
-        object: Option<&PimdirObject>,
-    ) -> Result<i64, PimdirError> {
-        let enqueued = producer.enqueue(collection, action, object)?;
-        for partial in &enqueued.partial {
-            warn!("{partial}");
+        actions: &[(&str, PimdirAction)],
+        context: impl Fn(Option<&str>) -> String,
+    ) -> Result<Vec<PimdirEnqueued>> {
+        if actions.is_empty() {
+            return Ok(Vec::new());
         }
-        Ok(enqueued.handle.id)
+
+        let mut producer = self.producer()?;
+        let batch: Vec<PimdirEnqueue> = actions
+            .iter()
+            .map(|(_, action)| PimdirEnqueue::new(collection, action.clone()))
+            .collect();
+
+        producer.enqueue_batch(&batch).map_err(|err| {
+            let refused = actions
+                .iter()
+                .find(|(_, action)| producer.check(collection, action).is_err())
+                .map(|(id, _)| *id);
+            pimdir_error(err).context(context(refused))
+        })
     }
 
     /// Opens a producer for the length of one staging batch.

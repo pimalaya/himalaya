@@ -549,3 +549,71 @@ fn a_mailbox_created_twice_is_a_duplicate() {
     let entries = fs::read_dir(maildir.join("Archive")).unwrap().count();
     assert_eq!(entries, 3);
 }
+
+/// A message attaching `ok.txt` as part 3 and, as part 4, a file whose
+/// name is `long` bytes of `é`, two bytes each, then `.txt`.
+fn attaching(long: usize) -> String {
+    let name = format!("{}.txt", "\u{e9}".repeat(long / 2));
+    format!(
+        "Subject: files\nMIME-Version: 1.0\n\
+         Content-Type: multipart/mixed; boundary=\"b\"\n\n\
+         --b\nContent-Type: text/plain\n\nbody\n\
+         --b\nContent-Type: text/plain\nContent-Disposition: attachment; filename=\"ok.txt\"\n\nok\n\
+         --b\nContent-Type: text/plain; charset=utf-8\n\
+         Content-Disposition: attachment; filename*=utf-8''{}\n\nlong\n\
+         --b--\n",
+        name.bytes()
+            .map(|b| format!("%{b:02X}"))
+            .collect::<String>()
+    )
+}
+
+/// An id the message does not hold is refused before any file is written,
+/// and a name over the file system's limit is cut at a character boundary,
+/// its extension kept, where the download wrote the first parts, then
+/// failed whole.
+#[test]
+fn an_attachment_download_checks_its_ids_first_and_cuts_long_names() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir.join("A"));
+    fs::write(maildir.join("A/cur/one:2,S"), attaching(300)).unwrap();
+    let lines = maildir_lines(&maildir, "");
+    let out_dir = dir.path().join("out");
+    let out = out_dir.to_str().unwrap();
+
+    let (ok, list) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
+    assert!(ok, "{list}");
+    let id = list["envelopes"][0]["id"].as_str().unwrap().to_owned();
+
+    let args = [
+        "attachment",
+        "download",
+        "-m",
+        "A",
+        &id,
+        "3",
+        "99",
+        "-d",
+        out,
+    ];
+    let (ok, refused) = himalaya(dir.path(), &lines, &args);
+    assert!(!ok, "{refused}");
+    let written = fs::read_dir(&out_dir).map_or(0, |dir| dir.count());
+    assert_eq!(written, 0, "{refused}");
+
+    let args = ["attachment", "download", "-m", "A", &id, "-d", out];
+    let (ok, done) = himalaya(dir.path(), &lines, &args);
+    assert!(ok, "{done}");
+    let mut names: Vec<String> = fs::read_dir(&out_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(names.len(), 2, "{names:?}");
+    assert_eq!(names[0], "ok.txt");
+    assert!(names[1].len() <= 255, "{}", names[1].len());
+    assert!(names[1].starts_with('\u{e9}'), "{}", names[1]);
+    assert!(names[1].ends_with(".txt"), "{}", names[1]);
+    assert_eq!(fs::read(out_dir.join(&names[1])).unwrap(), b"long");
+}

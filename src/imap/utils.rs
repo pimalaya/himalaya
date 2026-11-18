@@ -38,10 +38,19 @@ pub fn output_data<T>(command: &str, output: ImapOutput<T>) -> T {
     output.data
 }
 
+/// Turns an ENVELOPE address list into shared addresses, the markers of
+/// a group (RFC 3501 §7.4.2, a NIL host) left out and its members kept.
+pub fn to_addresses(list: &[Address<'_>]) -> Vec<crate::email::address::Address> {
+    list.iter()
+        .filter(|addr| addr.host.0.is_some())
+        .map(to_address)
+        .collect()
+}
+
 /// Turns an envelope address into the shared address shape, its personal
 /// name read as `message read` reads a header, `None` when absent or
 /// empty.
-pub fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
+fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
     let name = addr
         .name
         .0

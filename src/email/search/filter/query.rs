@@ -5,11 +5,11 @@
 
 use std::fmt;
 
-use chrono::NaiveDate;
+use chrono::{DateTime, FixedOffset, NaiveDate};
 
 use crate::email::flag::Flag;
 
-/// The filter half of a search query: three operators over eleven
+/// The filter half of a search query: three operators over sixteen
 /// conditions.
 ///
 /// The date conditions read the `Date:` header, the sent-at, rather than
@@ -28,6 +28,10 @@ pub enum SearchEmailsFilterQuery {
     AfterDate(NaiveDate),
     /// Emails sent strictly before that day.
     BeforeDate(NaiveDate),
+    /// Emails sent strictly after that instant, to the second.
+    AfterInstant(DateTime<FixedOffset>),
+    /// Emails sent strictly before that instant, to the second.
+    BeforeInstant(DateTime<FixedOffset>),
     /// Emails whose `From:` header contains the pattern.
     From(String),
     /// Emails whose `To:` header contains the pattern.
@@ -65,6 +69,8 @@ impl fmt::Display for SearchEmailsFilterQuery {
             Q::Date(date) => write!(f, "date {date}"),
             Q::AfterDate(date) => write!(f, "after {date}"),
             Q::BeforeDate(date) => write!(f, "before {date}"),
+            Q::AfterInstant(instant) => write!(f, "after {}", instant.to_rfc3339()),
+            Q::BeforeInstant(instant) => write!(f, "before {}", instant.to_rfc3339()),
             Q::From(pattern) => write!(f, "from {}", Pattern(pattern)),
             Q::To(pattern) => write!(f, "to {}", Pattern(pattern)),
             Q::Cc(pattern) => write!(f, "cc {}", Pattern(pattern)),
@@ -108,6 +114,8 @@ mod tests {
             "(cc bob or attachment)",
             "(before 2026-01-01 and address \"say \\\"hi\\\"\")",
             "message-id id@example.com",
+            "after 2026-11-14T09:30:00+01:00",
+            "before 2026-11-14T09:30:00Z",
             "not message-id \"a b@example.com\"",
         ];
 

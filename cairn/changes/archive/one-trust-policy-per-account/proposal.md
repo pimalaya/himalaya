@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: one-trust-policy-per-account
-status: draft
+status: landed
 created: 2026-10-18
 ---
 

@@ -45,7 +45,7 @@ tmpdir=$(mktemp -d) || die "Cannot create temporary directory"
 trap "rm -rf $tmpdir" EXIT
 
 echo "Downloading latest $system release…"
-curl -sLo "$tmpdir/himalaya.tgz" \
+curl -fsSLo "$tmpdir/himalaya.tgz" \
      "$RELEASES_URL/latest/download/himalaya.$target.tgz"
 
 echo "Installing binary…"
@@ -62,4 +62,4 @@ if [ -f "$tmpdir/$sample" ]; then
     cp -f -- "$tmpdir/$sample" "$PREFIX/$sample"
 fi
 
-die"$("$PREFIX/bin/$binary" --version) installed!" 0
+die "$("$PREFIX/bin/$binary" --version) installed!" 0

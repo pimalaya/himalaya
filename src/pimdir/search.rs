@@ -7,9 +7,8 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use io_pimdir::client::search::{PimdirSearchOptions, PimdirSearchSort};
+use io_pimdir::client::search::{PimdirSearchCursor, PimdirSearchOptions, PimdirSearchSort};
 use pimalaya_cli::{
-    clap::args::PageTokenArg,
     listing::{Listing, ListingPage},
     printer::Printer,
     sanitize,
@@ -47,15 +46,13 @@ use crate::{
 /// messages whose body is not local, mail outside what the store holds,
 /// the index lagging the store.
 ///
-/// A page ends with the number of the next one, which `--page-token`
-/// takes; the last page has none. A message the store cannot read is an
+/// A page ends with the token of the next one, which `--page-token`
+/// takes with the same query, order and `--threads`; the last page has
+/// none. The next page starts after the last message shown, whatever
+/// the index gained or lost since. A message the store cannot read is an
 /// item error, the others listed.
 #[derive(Debug, Parser)]
 pub struct PimdirSearchCommand {
-    /// Page number, starting at 1.
-    #[arg(long, short = 'p')]
-    #[arg(value_name = "N", default_value = "1")]
-    pub page: usize,
     /// Maximum number of messages per page, threads with `--threads`.
     ///
     /// Omitted, the configured `envelope.list.page-size` answers, and 25
@@ -63,8 +60,10 @@ pub struct PimdirSearchCommand {
     #[arg(long = "page-size", short = 's')]
     #[arg(value_name = "N")]
     pub page_size: Option<usize>,
-    #[command(flatten)]
-    pub page_token: PageTokenArg,
+    /// Start after the page that printed this token as its `nextPage`.
+    #[arg(long = "page-token")]
+    #[arg(value_name = "TOKEN")]
+    pub page_token: Option<String>,
     /// The order of the messages.
     #[arg(long, value_enum, default_value_t)]
     pub sort: PimdirSearchSortArg,
@@ -94,35 +93,28 @@ impl PimdirSearchCommand {
     ) -> Result<()> {
         let words = self.query.join(" ");
         let query = parse_query(&self.query, printer.is_json())?;
-        let page = match &self.page_token.token {
-            Some(token) => token
-                .parse()
-                .ok()
-                .filter(|page: &usize| *page > 0)
-                .ok_or_else(|| page_token_invalid(token))?,
-            None => self.page,
-        };
         let limit = self
             .page_size
             .unwrap_or(account.envelopes_list_page_size() as usize)
             .max(1);
-        let options = PimdirSearchOptions {
-            sort: self.sort.into(),
-            limit,
-            offset: page.saturating_sub(1).saturating_mul(limit),
-            clock: local_clock(),
-        };
         let place = PimdirSearchPlace {
             account: account.name().to_string(),
             query: words,
-            page: page.max(1) as u64,
-            size: limit as u64,
+            sort: self.sort,
+            threads: self.threads,
+        };
+        let after = self.page_token.as_deref();
+        let options = PimdirSearchOptions {
+            sort: self.sort.into(),
+            limit,
+            after: after.map(|token| place.cursor(token)).transpose()?,
+            clock: local_clock(),
         };
 
         if self.threads {
             let page = client.search_mail_threads(query, &options)?;
             let output = PimdirSearchThreadsOutput {
-                next_page: place.next(page.more),
+                next_page: page.next.as_ref().map(|next| place.token(next)),
                 place,
                 threads: page.threads,
                 coverage: page.coverage,
@@ -135,7 +127,7 @@ impl PimdirSearchCommand {
 
         let page = client.search_mail(query, &options)?;
         let output = PimdirSearchOutput {
-            next_page: place.next(page.more),
+            next_page: page.next.as_ref().map(|next| place.token(next)),
             place,
             style: PimdirListStyle::new(account),
             hits: page.hits,
@@ -296,18 +288,18 @@ impl fmt::Display for PimdirSearchThreadsOutput {
     }
 }
 
-/// Where a page of `pimdir search` stands: the account, the query and the
-/// page.
+/// Where a page of `pimdir search` stands: the account, the query, its
+/// order and whether it lists threads, which a page token is bound to.
 #[derive(Clone, Debug, Default)]
 pub struct PimdirSearchPlace {
     /// The name of the account searched.
     pub account: String,
     /// The query, its words joined by spaces.
     pub query: String,
-    /// The page listed, from 1.
-    pub page: u64,
-    /// The size of a page.
-    pub size: u64,
+    /// The order of the hits.
+    pub sort: PimdirSearchSortArg,
+    /// Whether the page lists threads.
+    pub threads: bool,
 }
 
 impl PimdirSearchPlace {
@@ -318,31 +310,58 @@ impl PimdirSearchPlace {
         listing
     }
 
-    /// The number of the page after this one, while `more` follow.
-    fn next(&self, more: bool) -> Option<String> {
-        more.then(|| (self.page + 1).to_string())
+    /// The FNV-1a hash of the account, the query, the order and the
+    /// listing, which a page token starts with.
+    fn fingerprint(&self) -> String {
+        let sort = match self.sort {
+            PimdirSearchSortArg::Date => "date",
+            PimdirSearchSortArg::Name => "name",
+            PimdirSearchSortArg::Relevance => "relevance",
+        };
+        let threads = if self.threads { "threads" } else { "hits" };
+        let parts = [self.account.as_str(), &self.query, sort, threads];
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+
+        for byte in parts.join("\0").bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+
+        format!("{hash:016x}")
+    }
+
+    /// The page token of `next`: the fingerprint, a dot, then the cursor.
+    fn token(&self, next: &PimdirSearchCursor) -> String {
+        format!("{}.{}", self.fingerprint(), next.token())
+    }
+
+    /// The cursor a page token names, refused when this place did not
+    /// print it.
+    fn cursor(&self, token: &str) -> Result<PimdirSearchCursor> {
+        token
+            .split_once('.')
+            .filter(|(fingerprint, _)| *fingerprint == self.fingerprint())
+            .and_then(|(_, cursor)| PimdirSearchCursor::from_token(cursor))
+            .ok_or_else(|| page_token_invalid(token))
     }
 
     /// Adds to `listing` the page the `count` items fill, then the flag
     /// reaching the `next` one.
     fn end(&self, listing: &mut Listing, count: usize, nouns: [&str; 2], next: Option<&str>) {
-        let page = ListingPage::Numbered {
-            page: self.page,
-            size: self.size,
-        };
-
-        listing.page(page, count, nouns, next);
+        listing.page(ListingPage::Token, count, nouns, next);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use io_pimdir::client::search::PimdirSearchCursor;
+
     use crate::{
         email::{address::Address, envelope::Envelope},
         error::{ErrorCode, ItemError},
         pimdir::{
             index::{PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched},
-            search::{PimdirSearchOutput, PimdirSearchPlace},
+            search::{PimdirSearchOutput, PimdirSearchPlace, PimdirSearchSortArg},
         },
     };
 
@@ -367,8 +386,8 @@ mod tests {
             place: PimdirSearchPlace {
                 account: String::from("work"),
                 query: String::from("report"),
-                page: 1,
-                size: 25,
+                sort: PimdirSearchSortArg::Date,
+                threads: false,
             },
             style: PimdirListStyle {
                 datetime_fmt: String::from("%F"),
@@ -398,7 +417,7 @@ mod tests {
         let expected = "\
 Account:     work (pimdir)
 Query:       report
-Page:        1, message 1, the last
+Page:        1 message, the last
 Incomplete:  1 message(s) have no local body and matched on their headers alone
 
 7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
@@ -407,12 +426,14 @@ Incomplete:  1 message(s) have no local body and matched on their headers alone
     }
 
     /// A page pages as every listing does: `nextPage`, which `--page-token`
-    /// takes, `--page` in text, and no `more`; a message the store could not
+    /// takes, in text too, and no `more`; a message the store could not
     /// read is an `errors` entry, printed after the items.
     #[test]
     fn a_page_names_the_next_and_its_errors() {
         let mut output = output();
-        output.next_page = output.place.next(true);
+        let cursor = PimdirSearchCursor::from_token("1.0.-.-..7.").unwrap();
+        let next = output.place.token(&cursor);
+        output.next_page = Some(next.clone());
         output.errors = vec![ItemError {
             id: Some(String::from("9")),
             code: Some(ErrorCode::MessageUnreadable),
@@ -424,22 +445,64 @@ Incomplete:  1 message(s) have no local body and matched on their headers alone
         let mut keys: Vec<&str> = json.as_object().unwrap().keys().map(|k| &**k).collect();
         keys.sort();
         assert_eq!(keys, ["coverage", "errors", "hits", "nextPage"]);
-        assert_eq!(json["nextPage"], "2");
+        assert_eq!(json["nextPage"], next.as_str());
         assert_eq!(json["errors"][0]["id"], "9");
         assert_eq!(json["errors"][0]["code"], "message-unreadable");
 
-        let expected = "\
+        let expected = format!(
+            "\
 Account:     work (pimdir)
 Query:       report
-Page:        1, message 1
+Page:        1 message
 Incomplete:  1 message(s) have no local body and matched on their headers alone
 
 7  *  @  -  imap/INBOX,imap/Archive  body  Alice  Quarterly report
 
-Next page: --page 2
+Next page: --page-token {next}
 
 Error:  9  message-unreadable  Read message `9`
-";
+"
+        );
         assert_eq!(output.to_string(), expected);
+    }
+
+    /// A page token reads back under the place that printed it alone: a
+    /// token of another query, order, listing or account is refused, as
+    /// a page number of the offset paging is.
+    #[test]
+    fn a_page_token_is_bound_to_its_query() {
+        let place = output().place;
+        let cursor = PimdirSearchCursor::from_token("1.0.-.-..7.").unwrap();
+        let token = place.token(&cursor);
+        assert_eq!(place.cursor(&token).unwrap(), cursor);
+
+        let others = [
+            PimdirSearchPlace {
+                query: String::from("invoice"),
+                ..place.clone()
+            },
+            PimdirSearchPlace {
+                sort: PimdirSearchSortArg::Name,
+                ..place.clone()
+            },
+            PimdirSearchPlace {
+                threads: true,
+                ..place.clone()
+            },
+            PimdirSearchPlace {
+                account: String::from("home"),
+                ..place.clone()
+            },
+        ];
+
+        for other in others {
+            let error = other.cursor(&token).unwrap_err();
+            let code = crate::error::code(&error);
+            assert_eq!(code, Some(ErrorCode::PageTokenInvalid));
+        }
+
+        for token in ["2", "", "x.1.0.-.-..7."] {
+            assert!(place.cursor(token).is_err(), "{token}");
+        }
     }
 }

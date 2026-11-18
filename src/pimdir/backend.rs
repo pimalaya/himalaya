@@ -25,10 +25,7 @@ use io_pimdir::{
     capability,
     client::{
         PimdirError,
-        producer::{
-            PimdirActionStatus, PimdirEnqueue, PimdirEnqueued, PimdirParkedAction,
-            PimdirPendingAction,
-        },
+        producer::{PimdirActionStatus, PimdirEnqueued, PimdirParkedAction, PimdirPendingAction},
         reader::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
@@ -829,7 +826,6 @@ impl PimdirClient {
         op: FlagOp,
     ) -> Result<Outcome<Vec<PimdirFlagged>>> {
         let collection = self.hub_id(mailbox)?;
-        let mut producer = self.producer()?;
 
         let mut staged = Vec::with_capacity(ids.len());
         let mut changes = Vec::with_capacity(ids.len());
@@ -859,31 +855,10 @@ impl PimdirClient {
             staged.push((*id, changed));
         }
 
-        // NOTE: a batch changing nothing takes no write transaction.
-        let rows = match changes.is_empty() {
-            true => Vec::new(),
-            false => {
-                let batch: Vec<PimdirEnqueue> = changes
-                    .iter()
-                    .map(|(_, action)| PimdirEnqueue::new(&collection, action.clone()))
-                    .collect();
-                match producer.enqueue_batch(&batch) {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        // NOTE: a batch refused says why, not on which
-                        // action: the gate run alone names the message.
-                        let refused = changes
-                            .iter()
-                            .find(|(_, action)| producer.check(&collection, action).is_err());
-                        let context = match refused {
-                            Some((id, _)) => format!("Stage flags on `{id}` in `{mailbox}`"),
-                            None => format!("Stage flags in `{mailbox}`"),
-                        };
-                        return Err(pimdir_error(err).context(context));
-                    }
-                }
-            }
-        };
+        let rows = self.enqueue_all(&collection, &changes, |id| match id {
+            Some(id) => format!("Stage flags on `{id}` in `{mailbox}`"),
+            None => format!("Stage flags in `{mailbox}`"),
+        })?;
         let mut rows = rows.into_iter();
 
         let staged = staged
@@ -1301,8 +1276,10 @@ impl PimdirClient {
     /// Deletes each id `mailbox` holds, staged as `Remove` (the next sync
     /// pushes it as the backend's own disposal), returning how many it found.
     ///
-    /// Every id is checked before the first row is staged, an unknown one
-    /// skipped, so the caller reports how many messages it found.
+    /// Every id is checked before the rows are staged, an unknown one
+    /// skipped, so the caller reports how many messages it found. The rows
+    /// are one batch (pimdir STORAGE §15.1): an id the gate refuses leaves
+    /// nothing staged.
     ///
     /// The remove names no body it read and resolves no conflict (pimdir
     /// STORAGE §15.3): it deletes whatever the message holds, and the
@@ -1314,22 +1291,23 @@ impl PimdirClient {
             value: found,
             errors,
         } = self.found(&collection, ids)?;
-        let mut producer = self.producer()?;
-
-        for (id, seq) in &found {
-            self.enqueue(
-                &mut producer,
-                &collection,
-                &PimdirAction::Remove {
+        let actions: Vec<_> = found
+            .iter()
+            .map(|(id, seq)| {
+                let action = PimdirAction::Remove {
                     seq: *seq,
                     if_match: None,
                     resolves: None,
-                },
-                None,
-            )
-            .map_err(pimdir_error)
-            .with_context(|| format!("Stage delete of `{id}` in `{mailbox}`"))?;
-        }
+                };
+                (*id, action)
+            })
+            .collect();
+
+        let rows = self.enqueue_all(&collection, &actions, |id| match id {
+            Some(id) => format!("Stage delete of `{id}` in `{mailbox}`"),
+            None => format!("Stage deletes in `{mailbox}`"),
+        })?;
+        warn_partials(&rows);
         Ok(Outcome {
             value: found.len(),
             errors,
@@ -1339,8 +1317,10 @@ impl PimdirClient {
     /// Stages one refiling action per id `from` holds, `build` deciding
     /// whether the source copy stays, returning how many it found.
     ///
-    /// Every id is checked before the first row is staged, an unknown one
-    /// an item error, so the caller reports how many messages it found.
+    /// Every id is checked before the rows are staged, an unknown one an
+    /// item error, so the caller reports how many messages it found. The
+    /// rows are one batch (pimdir STORAGE §15.1): an id the gate refuses
+    /// leaves nothing staged.
     fn refile(
         &mut self,
         from: &str,
@@ -1354,13 +1334,16 @@ impl PimdirClient {
             value: found,
             errors,
         } = self.found(&source, ids)?;
-        let mut producer = self.producer()?;
+        let actions: Vec<_> = found
+            .iter()
+            .map(|(id, seq)| (*id, build(*seq, target.clone())))
+            .collect();
 
-        for (id, seq) in &found {
-            self.enqueue(&mut producer, &source, &build(*seq, target.clone()), None)
-                .map_err(pimdir_error)
-                .with_context(|| format!("Stage refile of `{id}` from `{from}` to `{to}`"))?;
-        }
+        let rows = self.enqueue_all(&source, &actions, |id| match id {
+            Some(id) => format!("Stage refile of `{id}` from `{from}` to `{to}`"),
+            None => format!("Stage refiles from `{from}` to `{to}`"),
+        })?;
+        warn_partials(&rows);
         Ok(Outcome {
             value: found.len(),
             errors,
@@ -1538,6 +1521,14 @@ impl PimdirClient {
 
 /// Whether a queued action is a message waiting for a public id: a create,
 /// or a send the owner performs.
+/// Logs each capability the sources support in part that the gate of
+/// pimdir STORAGE §15.6 passed `rows` with.
+fn warn_partials(rows: &[PimdirEnqueued]) {
+    for partial in rows.iter().flat_map(|row| &row.partial) {
+        warn!("{partial}");
+    }
+}
+
 fn is_queued_mail(action: &PimdirAction) -> bool {
     match action {
         PimdirAction::Add { .. } => true,
@@ -4680,6 +4671,35 @@ mod tests {
                 .is_err()
         );
         assert_eq!(queued(&client), 3);
+    }
+
+    /// A copy of several ids is one queue transaction: the gate refusing
+    /// the second id leaves the first unstaged too, so a rerun stages it
+    /// once.
+    #[test]
+    fn a_refile_refused_on_one_id_stages_none() {
+        use io_pimdir::capability::{
+            MAIL_FLAGS_KEYWORDS, MAIL_FLAGS_SEEN, MAIL_MESSAGE_COPY, PimdirSupport,
+        };
+
+        let (dir, mut client) = flag_store(Some(&[
+            (MAIL_FLAGS_SEEN, PimdirSupport::Full),
+            (MAIL_MESSAGE_COPY, PimdirSupport::Full),
+            (MAIL_FLAGS_KEYWORDS, PimdirSupport::None),
+        ]));
+        seed(dir.path(), "imap/Archive", &[]);
+        let ids: Vec<String> = (0..3).map(|n| id_of(&mut client, n)).collect();
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let queued = |client: &PimdirClient| client.store.list_pending_actions().unwrap().len();
+
+        let copied = client.copy_messages("imap/INBOX", "imap/Archive", &ids);
+        let err = format!("{:#}", copied.unwrap_err());
+        assert!(err.contains(&format!("`{}`", ids[1])), "{err}");
+        assert_eq!(queued(&client), 0);
+
+        let copied = client.copy_messages("imap/INBOX", "imap/Archive", &[ids[0], ids[2]]);
+        assert_eq!(copied.unwrap().value, 2);
+        assert_eq!(queued(&client), 2);
     }
 
     /// A held item whose blob file is gone reads as not local yet, the

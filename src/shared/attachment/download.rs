@@ -103,25 +103,33 @@ impl AttachmentDownloadCommand {
             return part.print(printer);
         }
 
+        let wanted_all = self.attachment_ids.is_empty();
+        let mut remaining: BTreeSet<String> = self.attachment_ids.iter().cloned().collect();
+        let wanted: Vec<_> = list::attachments(&message)
+            .filter(|attachment| match wanted_all {
+                true => self.inline || attachment.role != PartRole::Inline,
+                false => remaining.remove(&attachment.id),
+            })
+            .collect();
+
+        if !remaining.is_empty() {
+            let missing: Vec<String> = remaining.into_iter().collect();
+            bail!(
+                "No attachment with id {} on message `{}`",
+                missing.join(", "),
+                self.message_id,
+            );
+        }
+
         let dir = self.dir.clone().unwrap_or_else(|| account.downloads_dir());
 
         if !dir.exists() {
             fs::create_dir_all(&dir)?;
         }
 
-        let wanted_all = self.attachment_ids.is_empty();
-        let mut remaining: BTreeSet<String> = self.attachment_ids.iter().cloned().collect();
         let mut written = Vec::new();
 
-        for mut attachment in list::attachments(&message) {
-            if !wanted_all && !remaining.remove(&attachment.id) {
-                continue;
-            }
-
-            if wanted_all && !self.inline && attachment.role == PartRole::Inline {
-                continue;
-            }
-
+        for mut attachment in wanted {
             let on_disk_name = attachment
                 .filename
                 .clone()
@@ -136,15 +144,6 @@ impl AttachmentDownloadCommand {
 
             attachment.path = Some(path.display().to_string());
             written.push(attachment);
-        }
-
-        if !remaining.is_empty() {
-            let missing: Vec<String> = remaining.into_iter().collect();
-            bail!(
-                "No attachment with id {} on message `{}`",
-                missing.join(", "),
-                self.message_id,
-            );
         }
 
         let resolution = client.resolution();
@@ -283,20 +282,55 @@ fn sanitize(name: &str) -> String {
     }
 }
 
-/// Creates an unoccupied file, suffixing its name and refusing symlinks.
+/// Options creating a file readable by its owner alone (0600 on Unix),
+/// which `create_new` keeps from following a symbolic link.
+///
+/// The minimal form of pimalaya-cli's `file::private_options`, which
+/// replaces it once released.
+fn private_options() -> OpenOptions {
+    #[allow(unused_mut)]
+    let mut options = OpenOptions::new();
+
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+
+    options
+}
+
+/// The longest file name the common file systems take, in bytes.
+const NAME_MAX: usize = 255;
+
+/// The longest extension kept whole when a name is cut, dot included.
+const EXT_MAX: usize = 32;
+
+/// `stem`, `suffix` and `ext` joined, the stem cut at a character
+/// boundary so the name fits in [`NAME_MAX`] bytes.
+fn fit_name(stem: &str, suffix: &str, ext: &str) -> String {
+    let room = NAME_MAX.saturating_sub(suffix.len() + ext.len());
+    let mut end = stem.len().min(room);
+
+    while !stem.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    format!("{}{suffix}{ext}", &stem[..end])
+}
+
+/// Creates an unoccupied file, private to its owner, suffixing its name
+/// and refusing symlinks, the name cut to what a file system takes.
 fn create_unique_file(dir: &Path, name: &str) -> Result<(PathBuf, File)> {
     let (stem, ext) = match name.rsplit_once('.') {
-        Some((s, e)) if !s.is_empty() => (s.to_string(), format!(".{e}")),
+        Some((s, e)) if !s.is_empty() && e.len() < EXT_MAX => (s.to_string(), format!(".{e}")),
         _ => (name.to_string(), String::new()),
     };
 
     for n in 0..1024 {
         let candidate = if n == 0 {
-            dir.join(name)
+            dir.join(fit_name(&stem, "", &ext))
         } else {
-            dir.join(format!("{stem} ({n}){ext}"))
+            dir.join(fit_name(&stem, &format!(" ({n})"), &ext))
         };
-        match OpenOptions::new()
+        match private_options()
             .write(true)
             .create_new(true)
             .open(&candidate)
@@ -375,6 +409,20 @@ mod tests {
         assert!(!target.exists());
         assert_eq!(path, dir.path().join("report (1).txt"));
         assert_eq!(fs::read(path).unwrap(), b"attachment");
+    }
+
+    /// An attachment is created readable by its owner alone, whatever the
+    /// umask, so one landing in the shared temporary directory stays
+    /// private.
+    #[cfg(unix)]
+    #[test]
+    fn an_attachment_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let (path, _) = create_unique_file(dir.path(), "report.txt").unwrap();
+        let mode = fs::metadata(path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "{mode:o}");
     }
 
     #[test]

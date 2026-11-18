@@ -11,7 +11,7 @@ use clap::Parser;
 use humansize::{BINARY, format_size};
 use mime::{
     header::marker::{DATE, IN_REPLY_TO, MESSAGE_ID, REFERENCES},
-    tree::{cst::MimeCst, entity::MimeEntity},
+    tree::{cst::MimeCst, entity::MimeEntity, field::address::parse_mailboxes},
     value::{content_type::MimeParam, datetime::MimeDateTime},
 };
 use pimalaya_cli::{fields::Fields, output::Bytes, printer::Printer, sanitize};
@@ -410,22 +410,25 @@ fn split_addresses(value: &str) -> Vec<String> {
     items
 }
 
-/// One address of a list: `email`, `<email>` or `name <email>`.
+/// One address of a list: `email`, `<email>` or `name <email>`, read by
+/// mime-rs as every listing reads it, its comments dropped and its
+/// address a valid one.
 fn mailbox(item: &str) -> Option<MailAddress> {
     let item = strip_comments(item);
-    let item = item.trim();
+    let list = parse_mailboxes(item.as_bytes());
+    let mut mailboxes = list.mailboxes();
+    let mailbox = mailboxes.next()?;
 
-    let (name, email) = match (item.find('<'), item.rfind('>')) {
-        (Some(open), Some(close)) if open < close => (&item[..open], &item[open + 1..close]),
-        _ => ("", item),
-    };
+    if mailboxes.next().is_some() {
+        return None;
+    }
 
-    let email = email.trim();
+    let email = mailbox.address.as_deref()?.trim();
     if !is_email(email) {
         return None;
     }
 
-    let name = header::decode_words(&unquote(name));
+    let name = mailbox.name.as_deref().unwrap_or_default();
     let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
 
     Some(MailAddress {
@@ -474,26 +477,6 @@ fn strip_comments(value: &str) -> String {
             _ => (),
         }
         out.push(c);
-    }
-
-    out
-}
-
-/// A display name without its quotes and backslash escapes.
-fn unquote(value: &str) -> String {
-    let mut out = String::new();
-    let (mut quoted, mut escaped) = (false, false);
-
-    for c in value.chars() {
-        match (quoted, escaped, c) {
-            (true, true, _) => {
-                out.push(c);
-                escaped = false;
-            }
-            (true, false, '\\') => escaped = true,
-            (_, _, '"') => quoted = !quoted,
-            _ => out.push(c),
-        }
     }
 
     out
@@ -998,6 +981,29 @@ mod tests {
             line("Cc:").as_deref(),
             Some("Bob <bob@example.com>, (unreadable: nobody)")
         );
+    }
+
+    /// A display name quoting angle brackets and a comma is a name, as
+    /// `envelope list` reads it, not an unreadable entry.
+    #[test]
+    fn a_quoted_name_holding_an_address_is_a_name() {
+        let raw = b"From: \"Doe, John <john@x.org>\" <john@x.org>\r\n\
+            To: \"Doe, John\" <john@x.org>\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            body\r\n";
+
+        let json = view(raw);
+
+        assert_eq!(
+            json["headers"]["from"],
+            serde_json::json!([{ "name": "Doe, John <john@x.org>", "email": "john@x.org" }])
+        );
+        assert_eq!(
+            json["headers"]["to"],
+            serde_json::json!([{ "name": "Doe, John", "email": "john@x.org" }])
+        );
+        assert_eq!(json["headers"]["invalid"]["from"], serde_json::json!([]));
     }
 
     #[test]

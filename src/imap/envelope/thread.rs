@@ -169,44 +169,49 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
     }
 }
 
+/// The most ids one `FETCH` of [`fetch_envelopes`] names, as io-imap's
+/// sort fallback chunks its own, keeping a gapped set's command line
+/// within what a server takes.
+const FETCH_CHUNK: usize = 255;
+
 /// Fetches the envelope of every threaded message, keyed by the id the
-/// threads name it by.
+/// threads name it by, [`FETCH_CHUNK`] ids a command. Without `uid`, an
+/// envelope falls back to its message number as id.
 fn fetch_envelopes(
     client: &mut ImapClient,
     ids: &[NonZeroU32],
     uid: bool,
 ) -> Result<HashMap<u32, Envelope>> {
-    if ids.is_empty() {
-        return Ok(HashMap::new());
+    let mut envelopes = HashMap::with_capacity(ids.len());
+
+    for chunk in ids.chunks(FETCH_CHUNK) {
+        let sequence_set: SequenceSet = chunk
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+            .parse()?;
+
+        let mut names = vec![MessageDataItemName::Flags, MessageDataItemName::Envelope];
+        if uid {
+            names.push(MessageDataItemName::Uid);
+        }
+
+        let data = client.fetch(
+            sequence_set,
+            MacroOrMessageDataItemNames::MessageDataItemNames(names),
+            ImapMessageFetchOptions {
+                uid,
+                modifiers: Vec::new(),
+            },
+        )?;
+
+        let fetched = output_data("FETCH", data)
+            .into_iter()
+            .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
+            .filter_map(|envelope| Some((envelope.id.parse().ok()?, envelope)));
+        envelopes.extend(fetched);
     }
-
-    let sequence_set: SequenceSet = ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<_>>()
-        .join(",")
-        .parse()?;
-
-    // Without UID, an envelope falls back to its message number as id.
-    let mut names = vec![MessageDataItemName::Flags, MessageDataItemName::Envelope];
-    if uid {
-        names.push(MessageDataItemName::Uid);
-    }
-
-    let data = client.fetch(
-        sequence_set,
-        MacroOrMessageDataItemNames::MessageDataItemNames(names),
-        ImapMessageFetchOptions {
-            uid,
-            modifiers: Vec::new(),
-        },
-    )?;
-
-    let envelopes = output_data("FETCH", data)
-        .into_iter()
-        .map(|(seq, items)| envelope_from(seq.get(), items.into_inner()))
-        .filter_map(|envelope| Some((envelope.id.parse().ok()?, envelope)))
-        .collect();
 
     Ok(envelopes)
 }
@@ -447,5 +452,58 @@ Mailbox:  INBOX
 6        2026-11-11 10:00  Me     Re: Invoice
 ";
         assert_eq!(output.to_string(), expected);
+    }
+
+    /// The envelopes of a long thread listing are fetched in chunks, so
+    /// no command line outgrows what a server takes, whatever the gaps
+    /// between the ids.
+    #[test]
+    fn a_long_thread_listing_fetches_in_chunks() {
+        use std::{
+            io::{BufRead, BufReader, Write},
+            net::TcpListener,
+            thread,
+        };
+
+        use crate::{config::imap::ImapConfig, imap::client::ImapClient};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut out = stream;
+            let mut commands = Vec::new();
+            write!(out, "* PREAUTH [CAPABILITY IMAP4rev1] ready\r\n").unwrap();
+
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap() > 0 {
+                let (tag, command) = line.trim_end().split_once(' ').unwrap();
+                let tag = tag.to_string();
+                commands.push(command.to_string());
+                line.clear();
+                write!(out, "{tag} OK done\r\n").unwrap();
+            }
+            commands
+        });
+
+        let config: ImapConfig = toml::from_str(&format!("server = \"imap://{addr}\"")).unwrap();
+        let mut secrets = pimalaya_config::secret::SecretResolver::new();
+        let mut client = ImapClient::new(config, &mut secrets).unwrap();
+        let ids: Vec<NonZeroU32> = (1..=600).filter_map(|n| NonZeroU32::new(n * 2)).collect();
+        super::fetch_envelopes(&mut client, &ids, true).unwrap();
+        drop(client);
+
+        let fetches: Vec<String> = server
+            .join()
+            .unwrap()
+            .into_iter()
+            .filter(|command| command.starts_with("UID FETCH"))
+            .collect();
+        let sizes: Vec<usize> = fetches
+            .iter()
+            .map(|fetch| fetch.split(' ').nth(2).unwrap().split(',').count())
+            .collect();
+        assert_eq!(sizes, [255, 255, 90], "{fetches:?}");
     }
 }

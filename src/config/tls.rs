@@ -1,6 +1,6 @@
 //! # TLS configuration
 //!
-//! The `tls` block of a network backend.
+//! The `tls` block of an account and of each of its network backends.
 
 use std::path::PathBuf;
 
@@ -21,6 +21,26 @@ pub struct TlsConfig {
     pub cert: Option<PathBuf>,
     /// A client certificate, presented when the server asks for one.
     pub client: Option<TlsClientConfig>,
+}
+
+impl TlsConfig {
+    /// Takes from `account` each field this block leaves unset: the
+    /// provider, the rustls crypto, the trusted certificate and the
+    /// client certificate.
+    pub fn inherit(&mut self, account: &TlsConfig) {
+        if self.provider.is_none() {
+            self.provider.clone_from(&account.provider);
+        }
+        if self.rustls.crypto.is_none() {
+            self.rustls.crypto.clone_from(&account.rustls.crypto);
+        }
+        if self.cert.is_none() {
+            self.cert.clone_from(&account.cert);
+        }
+        if self.client.is_none() {
+            self.client.clone_from(&account.client);
+        }
+    }
 }
 
 /// Client certificate configuration, both in PEM format.

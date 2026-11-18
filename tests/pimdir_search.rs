@@ -148,11 +148,19 @@ fn a_search_pages_by_next_page_and_page_token() {
     assert!(first.status.success());
     let first = json(&first);
     assert_eq!(subjects(&first), ["Report 3", "Report 2"], "{first}");
-    assert_eq!(first["nextPage"], "2", "{first}");
+    let token = first["nextPage"].as_str().unwrap().to_owned();
     assert_eq!(first["errors"], Value::Array(Vec::new()), "{first}");
     assert!(first.get("more").is_none(), "{first}");
 
-    let args = ["--json", "pimdir", "search", "-s", "2", "--page-token", "2"];
+    let args = [
+        "--json",
+        "pimdir",
+        "search",
+        "-s",
+        "2",
+        "--page-token",
+        &token,
+    ];
     let last = run(&[&args[..], &["report"]].concat());
     assert!(last.status.success());
     let last = json(&last);
@@ -174,15 +182,15 @@ fn a_search_pages_by_next_page_and_page_token() {
     assert!(threads.status.success());
     let threads = json(&threads);
     assert_eq!(threads["threads"].as_array().unwrap().len(), 2, "{threads}");
-    assert_eq!(threads["nextPage"], "2", "{threads}");
+    assert!(threads["nextPage"].is_string(), "{threads}");
     assert!(threads.get("more").is_none(), "{threads}");
 
     let text = run(&["pimdir", "search", "-s", "2", "report"]);
     let text = String::from_utf8_lossy(&text.stdout);
-    let next = |line: &str| line.starts_with("Next page:") && line.ends_with(" --page 2");
+    let next = |line: &str| line == format!("Next page: --page-token {token}");
     assert!(text.lines().any(next), "{text}");
 
-    for token in ["0", "two"] {
+    for token in ["0", "2", "two"] {
         let refused = run(&[
             "--json",
             "pimdir",
@@ -240,11 +248,47 @@ fn an_option_after_the_query_is_the_option() {
     assert!(page.status.success());
     let page = json(&page);
     assert_eq!(subjects(&page), ["Report 3", "Report 2"], "{page}");
-    assert_eq!(page["nextPage"], "2", "{page}");
+    assert!(page["nextPage"].is_string(), "{page}");
 
     let count = json(&run(&["pimdir", "count", "report", "--json"]));
     assert_eq!(count["count"], 3, "{count}");
 
     let negated = run(&["--json", "pimdir", "count", "report", "--", "-subject:3"]);
     assert_eq!(json(&negated)["count"], 2);
+}
+
+/// A page token reads back under the query, order and listing that
+/// printed it alone: under another it is refused, coded
+/// `page-token-invalid`, where a page number paged any query.
+#[test]
+fn a_token_of_another_query_is_refused() {
+    let home = TempDir::new().unwrap();
+    let root = home.path().join("store");
+    fs::create_dir(&root).unwrap();
+    store(&root);
+    let run = |args: &[&str]| himalaya(home.path(), &root, args);
+
+    let first = json(&run(&["--json", "pimdir", "search", "-s", "2", "report"]));
+    let token = first["nextPage"].as_str().unwrap().to_owned();
+
+    let others: [&[&str]; 3] = [
+        &["from:a@x.test"],
+        &["--sort", "name", "report"],
+        &["--threads", "report"],
+    ];
+
+    for other in others {
+        let args = [
+            "--json",
+            "pimdir",
+            "search",
+            "-s",
+            "2",
+            "--page-token",
+            &token,
+        ];
+        let refused = run(&[&args[..], other].concat());
+        assert_eq!(refused.status.code(), Some(1), "{other:?}");
+        assert_eq!(json(&refused)["code"], "page-token-invalid", "{other:?}");
+    }
 }

@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow, bail};
-use chrono::{DateTime, Datelike, FixedOffset, NaiveDate};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveTime, TimeDelta};
 use io_jmap::{
     rfc8620::{filter::JmapFilter, get::JmapUnparsed},
     rfc8621::{
@@ -1162,6 +1162,8 @@ enum PostFilter {
     Date(NaiveDate),
     AfterDate(NaiveDate),
     BeforeDate(NaiveDate),
+    AfterInstant(DateTime<FixedOffset>),
+    BeforeInstant(DateTime<FixedOffset>),
 }
 
 /// JMAP-side filter + sort, plus the residual client-side predicates.
@@ -1206,9 +1208,12 @@ fn build(query: Option<&SearchEmailsQuery>, mailbox_id: String) -> Converted {
 /// JMAP dates read the received-at, the shared clauses the sent-at. On the
 /// chain of `and` from the root, `post_filters` is given: a date leaf
 /// over-approximates on the wire and pushes a [`PostFilter`] re-checking
-/// the sent-at exactly, every residual having to hold. Under `or` or `not`
-/// a residual cannot be ANDed onto the whole result, so a date leaf there
-/// reads the received-at day alone.
+/// the sent-at exactly, every residual having to hold: a message being
+/// received no earlier than it is sent, the first instant of its day in
+/// any offset (10:00 UTC the day before, at UTC+14:00) bounds the
+/// received-at from below, an offset east of UTC included. Under `or` or
+/// `not` a residual cannot be ANDed onto the whole result, so a date leaf
+/// there reads the received-at day alone.
 fn convert_filter(
     node: &SearchEmailsFilterQuery,
     mut post_filters: Option<&mut Vec<PostFilter>>,
@@ -1280,13 +1285,11 @@ fn convert_filter(
         // so this never runs; were it reached, it matches nothing.
         Q::MessageId(_) => JmapFilter::not(vec![condition(JmapEmailFilter::default())]),
 
-        // NOTE: a message is received no earlier than it is sent, so the
-        // start of the day bounds the received-at from below.
         Q::Date(target) => match post_filters {
             Some(post_filters) => {
                 post_filters.push(PostFilter::Date(*target));
                 condition(JmapEmailFilter {
-                    after: Some(utc_midnight(*target)),
+                    after: Some(earliest_start(*target)),
                     ..Default::default()
                 })
             }
@@ -1296,15 +1299,19 @@ fn convert_filter(
                 ..Default::default()
             }),
         },
-        Q::AfterDate(target) => {
-            if let Some(post_filters) = post_filters {
+        Q::AfterDate(target) => match post_filters {
+            Some(post_filters) => {
                 post_filters.push(PostFilter::AfterDate(*target));
+                condition(JmapEmailFilter {
+                    after: Some(earliest_start(next_day(*target))),
+                    ..Default::default()
+                })
             }
-            condition(JmapEmailFilter {
+            None => condition(JmapEmailFilter {
                 after: Some(utc_midnight(next_day(*target))),
                 ..Default::default()
-            })
-        }
+            }),
+        },
         // NOTE: a message sent before the day may be received any time
         // after, so nothing bounds the received-at and the sent-at is
         // checked client-side alone.
@@ -1315,6 +1322,25 @@ fn convert_filter(
             }
             None => condition(JmapEmailFilter {
                 before: Some(utc_midnight(*target)),
+                ..Default::default()
+            }),
+        },
+        Q::AfterInstant(target) => {
+            if let Some(post_filters) = post_filters {
+                post_filters.push(PostFilter::AfterInstant(*target));
+            }
+            condition(JmapEmailFilter {
+                after: Some(utc_instant(target)),
+                ..Default::default()
+            })
+        }
+        Q::BeforeInstant(target) => match post_filters {
+            Some(post_filters) => {
+                post_filters.push(PostFilter::BeforeInstant(*target));
+                condition(JmapEmailFilter::default())
+            }
+            None => condition(JmapEmailFilter {
+                before: Some(utc_instant(target)),
                 ..Default::default()
             }),
         },
@@ -1334,14 +1360,17 @@ fn next_day(date: NaiveDate) -> NaiveDate {
 /// True when `envelope` matches every residual predicate.
 fn post_match(envelope: &Envelope, post_filters: &[PostFilter]) -> bool {
     post_filters.iter().all(|post_filter| {
-        let Some(sent) = envelope.date.map(|date| date.date_naive()) else {
+        let Some(sent_at) = envelope.date else {
             return false;
         };
+        let sent = sent_at.date_naive();
 
         match post_filter {
             PostFilter::Date(target) => sent == *target,
             PostFilter::AfterDate(target) => sent > *target,
             PostFilter::BeforeDate(target) => sent < *target,
+            PostFilter::AfterInstant(target) => sent_at > *target,
+            PostFilter::BeforeInstant(target) => sent_at < *target,
         }
     })
 }
@@ -1399,6 +1428,18 @@ fn utc_midnight(date: NaiveDate) -> String {
     )
 }
 
+/// `instant` as a JMAP UTCDate.
+fn utc_instant(instant: &DateTime<FixedOffset>) -> String {
+    instant.naive_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+/// The first instant of `date` in any offset, UTC+14:00 being the
+/// easternmost: 10:00 UTC the day before.
+fn earliest_start(date: NaiveDate) -> String {
+    let start = date.and_time(NaiveTime::MIN) - TimeDelta::hours(14);
+    start.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
 /// The creation id of a mailbox `Mailbox/set` creates, which its answer
 /// is keyed by.
 const CREATED: &str = "new";
@@ -1406,6 +1447,7 @@ const CREATED: &str = "new";
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
+    use io_jmap::rfc8620::filter::JmapFilterOperatorKind;
 
     use crate::{
         email::{envelope::Envelope, search::query::SearchEmailsQuery},
@@ -1440,6 +1482,79 @@ mod tests {
 
         assert!(rechecked("not after 2026-01-01", &december));
         assert!(rechecked("date 2026-01-01 or subject x", &december));
+    }
+
+    /// Whether a server holding `received` as the received-at answers
+    /// `filter`, reading its `after` and `before` bounds alone.
+    fn received_matches(filter: &JmapFilter<JmapEmailFilter>, received: &str) -> bool {
+        let instant = |text: &str| DateTime::parse_from_rfc3339(text).unwrap();
+
+        match filter {
+            JmapFilter::Condition(condition) => {
+                let received = instant(received);
+                let after = condition.after.as_deref().map(instant);
+                let before = condition.before.as_deref().map(instant);
+                after.is_none_or(|after| received >= after)
+                    && before.is_none_or(|before| received < before)
+            }
+            JmapFilter::Operator(op) => {
+                let mut matched = op.conditions.iter().map(|c| received_matches(c, received));
+                match op.operator {
+                    JmapFilterOperatorKind::And => matched.all(|m| m),
+                    JmapFilterOperatorKind::Or => matched.any(|m| m),
+                    JmapFilterOperatorKind::Not => !matched.any(|m| m),
+                }
+            }
+        }
+    }
+
+    /// A message dated in an offset east of UTC is received the day
+    /// before in UTC: the wire filter keeps it for the residual to judge
+    /// on its sent day, as the header writes it.
+    /// An instant on the chain of `and` bounds the received-at from below
+    /// and is re-checked on the sent-at; under `or` it reads the received-at
+    /// alone.
+    #[test]
+    fn an_instant_bounds_the_received_at_and_rechecks_the_sent_at() {
+        let before = sent_on("2026-11-14T09:59:59+01:00");
+        let after = sent_on("2026-11-14T10:00:01+01:00");
+
+        assert!(!rechecked("after 2026-11-14T10:00:00+01:00", &before));
+        assert!(rechecked("after 2026-11-14T10:00:00+01:00", &after));
+        assert!(rechecked("before 2026-11-14T10:00:00+01:00", &before));
+        assert!(!rechecked("before 2026-11-14T10:00:00+01:00", &after));
+
+        let parsed: SearchEmailsQuery = "after 2026-11-14T10:00:00+01:00".parse().unwrap();
+        let converted = build(Some(&parsed), String::from("inbox"));
+        assert!(received_matches(&converted.filter, "2026-11-14T09:00:01Z"));
+        assert!(!received_matches(&converted.filter, "2026-11-14T08:59:59Z"));
+
+        let parsed: SearchEmailsQuery = "before 2026-11-14T10:00:00+01:00 or from a"
+            .parse()
+            .unwrap();
+        let converted = build(Some(&parsed), String::from("inbox"));
+        assert!(converted.post_filters.is_empty());
+        assert!(received_matches(&converted.filter, "2026-11-14T08:59:59Z"));
+    }
+
+    #[test]
+    fn a_date_east_of_utc_is_found_on_its_own_day() {
+        let tokyo = sent_on("2026-05-15T00:30:00+09:00");
+        let received = "2026-05-14T15:31:00Z";
+
+        for query in ["date 2026-05-15", "after 2026-05-14"] {
+            let parsed: SearchEmailsQuery = query.parse().unwrap();
+            let converted = build(Some(&parsed), String::from("inbox"));
+            assert!(received_matches(&converted.filter, received), "{query}");
+            assert!(post_match(&tokyo, &converted.post_filters), "{query}");
+        }
+
+        let kiritimati = sent_on("2026-05-15T00:00:00+14:00");
+        let received = "2026-05-14T10:00:00Z";
+        let parsed: SearchEmailsQuery = "date 2026-05-15".parse().unwrap();
+        let converted = build(Some(&parsed), String::from("inbox"));
+        assert!(received_matches(&converted.filter, received));
+        assert!(post_match(&kiritimati, &converted.post_filters));
     }
 
     fn email(id: &str, mailboxes: &[&str]) -> JmapEmail {

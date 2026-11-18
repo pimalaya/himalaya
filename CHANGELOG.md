@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added relative and time-of-day dates to the `date`, `after` and `before` search clauses: `today`, `yesterday`, `<n> day|week|month|year[s] ago` (a day, counted back in calendar terms) and `<n> minute|hour[s] ago` or an RFC 3339 date-time, its seconds and offset optional (an instant, compared to the second), read in the local zone ([#528]). `date` takes a day alone; IMAP serves an instant on the chain of `and` from the root alone, Microsoft Graph none, both refusing it otherwise with `search-unsupported`.
+- Added an account-level `tls` table (`tls.provider`, `tls.rustls.crypto`, `tls.cert`, `tls.client.cert`, `tls.client.key`) inherited by every network backend field by field, a backend's own `tls` winning, so one trusted certificate reaches IMAP, SMTP, ManageSieve, JMAP, Gmail and Microsoft Graph alike. `account check` prints for each backend the TLS it connected with, `tls` `{provider, crypto, cert, clientCert}` (`null` for a local backend), and in text after its outcome.
 - Added the refusals of pimdir storage-draft-13 (STORAGE §15.4): `pimdir queue show` prints, on an applied row, `refusals`, one `{collection, source, reason, refusedAt}` per source whose server refused for good the change the row led to, and a `Refused by <source> in <mailbox> at <instant>: <reason>` line each, `seq` naming the message any applied row acted on; `pimdir queue list` prints the mailbox's refusals under `refused` (`{collection, itemId, source, reason, refusedAt}`), `refused` lines after the parked rows in text. The sync engine holds a refused change until the message is changed again or removed.
 - Added `jmap request <JSON>`, the name of an HTTP API's escape hatch across the family, taking and printing what Cardamum's `jmap request` does: one whole JMAP request object (`{"using": [...], "methodCalls": [...]}`, `using` the core and mail capabilities when absent), as a path to a JSON file, the JSON itself or `-` for stdin, and printing `{response}`, the server's `{methodResponses, createdIds, sessionState}`. `jmap query`, taking a method-calls array, keeps its shape, hidden from the help and the manual, under its schema key `himalaya-jmap-query`.
 - Added `gmail request <METHOD> <PATH> [JSON]` and `msgraph request <METHOD> <PATH> [JSON]`, the escape hatches of the Gmail and Microsoft Graph APIs, as Cardamum's `gpeople request` and `msgraph request`: the method (`get`, `post`, `patch`, `delete`, `put` on Gmail), a path joined onto `gmail/v1/` or `v1.0/` or a full URL on the same API, a URL off its origin refused before sending so the bearer token never leaves for another host, a JSON body, printing `{response}`, the body the provider answered as it sent it.
@@ -78,6 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `attachments` to the JSON template the composers print without `--save` or `--send`, each attached file as `{filename, mime, size}`: the template carries no bytes, so handing it back means passing the files again through `--attach`.
 ### Changed
 
+- **BREAKING**: Changed `pimdir search` to page by cursor: `nextPage` is an opaque token naming where the next page starts, bound to the account, the query, the order and `--threads`, so a hit arriving or leaving between two pages neither repeats nor hides another; `--page-token` refuses a token of another query, coded `page-token-invalid`, and `--page` is gone.
+- **BREAKING**: Changed a Google daily quota (`dailyLimitExceeded`, or a refusal naming a daily limit) to be coded `rate-limited`, as the other Pimalaya programs code it, where Gmail commands coded it `permission-denied`.
+- Bumped io-pimdir to 0.16.0: search pages by cursor, a calendar `VTIMEZONE` with a huge `INTERVAL` no longer aborts the process, and the search index is extracted again once.
 - **BREAKING**: Changed a server's refusal in the `gmail`, `msgraph`, `jmap`, `sieve` and `smtp` namespaces to print as the command's result and exit 3, as `imap` and the `raw` commands do (pimalaya-cli's *A protocol refusal is a result*), where it printed the failure object and exited 1: an HTTP 4xx or 5xx, a JMAP request or method error and a refused JMAP write print `{refusal: {status, reason, message, code, retryAfter}}`, the `request` commands included; a typed `sieve` command answered `NO` prints `{status, code, text}`; a refused `smtp send` prints `{refusals: [{rcptTo, code, text}]}`. Each command's JSON Schema admits the refusal.
 - **BREAKING**: Changed `jmap email delete|update|copy`, `jmap mailbox destroy`, `jmap identity delete` and `jmap submission cancel` to print `{ids, errors}`, the objects the server applied the write to and an item error per object it refused, exit 3, where a set applied in part printed only a failure naming the refused objects, exit 1.
 - **BREAKING**: Changed a send whose follow-up failed to print its receipt and exit 3, where it printed a failure object and exited 1: a copy refused after the send (`message send`, the composers, `message add --send`, Gmail filing the sent message) and a reply's answered flag are item errors of the receipt, which gains `errors`, `[]` when nothing failed; `message reply --send` prints one value, not the receipt then a failure object.
@@ -288,6 +293,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed install.sh exiting 127 after a successful install (`die"…"` missing its space) and saving an HTTP error page as the archive: the download fails on an HTTP error (`curl -fsSLo`).
+- Fixed a JMAP `date` or `after` search missing mail whose `Date:` carries an offset east of UTC, received the day before in UTC.
+- Fixed `message read`, `attachment list|download`, `message reply` and `message forward` on IMAP sending `SELECT sent` for a role: the mailbox resolves as `envelope list` resolves it.
+- Fixed a pimdir `message delete`, `copy` or `move` of several ids staging the ids before the one the store's gate refused: the rows are one batch, all staged or none.
+- Fixed the Gmail envelopes splitting an address header on commas (`"Doe, John" <john@x.org>` listed as two senders) and the read view filing a quoted name holding angle brackets under `invalid`: every address header is read by mime-rs.
+- Fixed `gmail labels update` clearing the label's colour and visibility: it renames through `labels.patch`.
+- **BREAKING**: Fixed the IMAP `ENVELOPE` group markers printing as addresses in `envelope list`, `envelope search` and `imap fetch`: `To: undisclosed-recipients:;` lists no recipient, as on Maildir and mbox.
+- Fixed `imap thread` fetching every threaded message in one command line: it fetches 255 ids a `FETCH`.
+- Fixed `attachment download` writing parts before refusing an id the message does not hold, and failing whole on a name past 255 bytes: ids are checked first, and a long name is cut at a character boundary, its extension kept.
+- Fixed `attachment download` creating its files readable by others, in the shared temporary directory when no download directory is known: they are created 0600.
+- Fixed saving the mbox cache taking time quadratic in the mailbox.
+- Fixed the Maildir and mbox listings holding every message of the mailbox in memory: Maildir reads 64 files at a time, mbox drops each message's bytes before the next.
+- Fixed each JMAP blob download on another host running the credential command again and opening a new connection: the session's credential and one connection per host are kept.
+- **BREAKING**: Fixed a search date with a two-digit year (`after 15-11-26`) reading as the year 15: a year is written with four digits, another refused with `search-invalid`.
 - Fixed a Gmail search flattening an `and` under an `or`: `from alice and subject invoice or from bob` went out as `{from:alice subject:invoice from:bob}`, which Gmail reads as three alternatives, and a `date` clause beside an `or` matched the whole label. An alternative holding more than one term is now wrapped in parentheses, `{(from:alice subject:invoice) from:bob}`.
 - Fixed `envelope list` and `envelope search` with `--page-size 0` on Gmail reading the first 100 messages and saying the listing was complete: they follow every next page token, 500 messages a page, as Microsoft Graph and IMAP list the whole mailbox.
 - Fixed `pimdir queue show` and `pimdir queue cancel` reaching a row another app of the store queued on an address book or calendar of the same account: such a row reads `unknown` and is refused, as Cardamum and Calendula keep to their own kind.
@@ -1775,6 +1794,7 @@ Few major concepts changed:
 [#522]: https://github.com/pimalaya/himalaya/issues/522
 [#523]: https://github.com/pimalaya/himalaya/issues/523
 [#525]: https://github.com/pimalaya/himalaya/issues/525
+[#528]: https://github.com/pimalaya/himalaya/issues/528
 [#535]: https://github.com/pimalaya/himalaya/issues/535
 [#536]: https://github.com/pimalaya/himalaya/issues/536
 [#538]: https://github.com/pimalaya/himalaya/issues/538

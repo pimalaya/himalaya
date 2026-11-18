@@ -22,6 +22,12 @@ default = true				# the account commands run on without -a
 #proxy.username = "alice"		# its username
 #proxy.password.command = "exit 127"	# prints its password
 
+#tls.provider = "rustls"			# the build's first otherwise, for every network backend [native-tls]
+#tls.rustls.crypto = "ring"			# the build's first otherwise [aws]
+#tls.cert = "/path/to/cert.pem"			# a PEM certificate to trust, such as Proton Bridge's
+#tls.client.cert = "/path/to/client.pem"	# a PEM client certificate, for mutual TLS
+#tls.client.key = "/path/to/client.key.pem"	# its PEM private key, PKCS#8 under native-tls
+
 # IMAP
 #imap.server = "imap.example.org"	# implicit TLS on 993; imap://host is cleartext on 143, unix://path a local proxy
 #imap.starttls = false			# upgrade an imap:// connection with STARTTLS
@@ -43,11 +49,7 @@ default = true				# the account commands run on without -a
 
 # Network, the same keys under smtp, sieve, jmap, gmail and msgraph
 #imap.alpn = ["imap"]					# the ALPN ids rustls offers, empty for none
-#imap.tls.provider = "rustls"				# the build's first otherwise [native-tls]
-#imap.tls.rustls.crypto = "ring"			# the build's first otherwise [aws]
-#imap.tls.cert = "/path/to/cert.pem"			# a PEM certificate to trust, such as Proton Bridge's
-#imap.tls.client.cert = "/path/to/client.pem"		# a PEM client certificate, for mutual TLS
-#imap.tls.client.key = "/path/to/client.key.pem"	# its PEM private key, PKCS#8 under native-tls
+#imap.tls.cert = "/path/to/cert.pem"			# the tls keys, for IMAP alone, field by field
 #imap.proxy.url = "socks5h://localhost:1080"		# the proxy keys, for IMAP alone
 
 # SMTP

@@ -251,15 +251,31 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
 
 /// The code of what Gmail refused: a rate limit (a 429, or a 403 naming
 /// one, `rateLimitExceeded`, `userRateLimitExceeded` or `quotaExceeded`)
-/// is `rate-limited`, any other 403 `permission-denied`.
+/// and the daily quota ([`is_daily_limit`]) are `rate-limited`, as the
+/// family codes a Google quota, any other 403 `permission-denied`.
 pub(crate) fn refusal_of(err: &GmailApiError) -> Option<ErrorCode> {
-    if err.is_rate_limited() {
+    if err.is_rate_limited() || is_daily_limit(err) {
         Some(ErrorCode::RateLimited)
     } else if err.status == 403 {
         Some(ErrorCode::PermissionDenied)
     } else {
         None
     }
+}
+
+/// Whether Google refused the daily quota: the reason `dailyLimitExceeded`,
+/// or a message naming a daily limit or a quota per day, the daily limit
+/// of unauthenticated use aside, which a missing credential meets.
+fn is_daily_limit(err: &GmailApiError) -> bool {
+    let text: String = err
+        .message
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect();
+    let named = text.contains("dailylimit") || text.contains("perday");
+
+    err.has_reason("dailyLimitExceeded") || (named && !text.contains("unauthenticated"))
 }
 
 /// The refusal of a Gmail error in a chain, for the `gmail` commands: the
@@ -321,5 +337,17 @@ mod tests {
             Some(ErrorCode::PermissionDenied)
         );
         assert_eq!(code(500, "backendError"), None);
+    }
+
+    /// A daily quota is a rate limit as the family codes it, though
+    /// waiting a minute does not lift it, where it was `permission-denied`.
+    #[test]
+    fn a_daily_limit_is_rate_limited() {
+        let code = |status, reason| error::code(&refused(status, reason));
+
+        assert_eq!(
+            code(403, "dailyLimitExceeded"),
+            Some(ErrorCode::RateLimited)
+        );
     }
 }

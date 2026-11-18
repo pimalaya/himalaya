@@ -76,7 +76,11 @@ type UpdatePlan = (BTreeMap<String, MboxEntryUpdateEdit>, Vec<ItemError>);
 
 /// The envelopes a read gave, each with its bytes when asked, beside the
 /// error of each message holding no header field.
-type ReadEnvelopes = (Vec<(Envelope, Option<Vec<u8>>)>, Vec<ItemError>);
+type ReadEnvelopes = (Vec<Envelope>, Vec<ItemError>);
+
+/// Whether a listing keeps an envelope, given the message's bytes when
+/// the listing reads them.
+type KeepEnvelope<'a> = dyn FnMut(&Envelope, Option<&[u8]>) -> bool + 'a;
 
 impl MboxClient {
     /// Lists the mbox files of the store, the spool as `INBOX`.
@@ -153,8 +157,7 @@ impl MboxClient {
         _with_attachment: bool,
     ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
         let path = self.open_mbox(mailbox)?;
-        let (read, errors) = self.envelopes(&path, false)?;
-        let mut envelopes: Vec<Envelope> = read.into_iter().map(|(envelope, _)| envelope).collect();
+        let (mut envelopes, errors) = self.envelopes(&path, false, &mut |_, _| true)?;
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
         let total = u64::try_from(envelopes.len() + errors.len()).ok();
 
@@ -181,20 +184,13 @@ impl MboxClient {
     ) -> Result<Outcome<EnvelopePage>> {
         let path = self.open_mbox(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
-        let (read, errors) = self.envelopes(&path, filter.is_some())?;
-
-        let mut hits: Vec<Envelope> = Vec::new();
-        for (envelope, contents) in read {
-            let keep = match (filter, contents) {
-                (Some(filter), Some(contents)) => {
-                    eval::matches_filter(&envelope, None, &contents, filter)
-                }
-                _ => true,
-            };
-            if keep {
-                hits.push(envelope);
+        let mut keep = |envelope: &Envelope, contents: Option<&[u8]>| match (filter, contents) {
+            (Some(filter), Some(contents)) => {
+                eval::matches_filter(envelope, None, contents, filter)
             }
-        }
+            _ => true,
+        };
+        let (mut hits, errors) = self.envelopes(&path, filter.is_some(), &mut keep)?;
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
 
@@ -702,9 +698,11 @@ impl MboxClient {
         })
     }
 
-    /// The envelope of every message of `path`, pseudo message aside, in
-    /// file order, with its bytes when `contents` is set, beside the error
-    /// of each message holding no header field.
+    /// The envelope of every message of `path` that `keep` keeps, pseudo
+    /// message aside, in file order, beside the error of each message
+    /// holding no header field. `keep` is handed the message's bytes when
+    /// `contents` is set, dropped once it answered, so no listing holds
+    /// more than one message.
     ///
     /// Envelopes come from the cache when it has them, the flags always
     /// from the fresh index. A message the cache lacks is read and parsed
@@ -712,10 +710,15 @@ impl MboxClient {
     ///
     /// A read finding the index stale, another client having rewritten the
     /// file meanwhile, rebuilds it and starts over once.
-    fn envelopes(&self, path: &MboxFsPath, contents: bool) -> Result<ReadEnvelopes> {
-        match self.envelopes_once(path, contents, false) {
+    fn envelopes(
+        &self,
+        path: &MboxFsPath,
+        contents: bool,
+        keep: &mut KeepEnvelope,
+    ) -> Result<ReadEnvelopes> {
+        match self.envelopes_once(path, contents, false, keep) {
             Err(err) if err.downcast_ref().is_some_and(is_stale) => {
-                self.envelopes_once(path, contents, true)
+                self.envelopes_once(path, contents, true, keep)
             }
             result => result,
         }
@@ -728,6 +731,7 @@ impl MboxClient {
         path: &MboxFsPath,
         contents: bool,
         rebuild: bool,
+        keep: &mut KeepEnvelope,
     ) -> Result<ReadEnvelopes> {
         let (index, mut cache) = self.index(path, rebuild)?;
         let mut envelopes = Vec::new();
@@ -758,7 +762,9 @@ impl MboxClient {
 
             envelope.id = entry.id.clone();
             envelope.flags = entry.flags.iter().filter_map(flag_from_mbox).collect();
-            envelopes.push((envelope, bytes));
+            if keep(&envelope, bytes.as_deref()) {
+                envelopes.push(envelope);
+            }
         }
 
         if parsed {

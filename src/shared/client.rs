@@ -447,7 +447,9 @@ impl EmailClient {
     /// asked.
     ///
     /// IMAP folds the flag into the fetch itself, where the other
-    /// backends issue a separate update.
+    /// backends issue a separate update. Each adapter resolves the
+    /// mailbox itself, JMAP, Gmail and Graph only when the message is not
+    /// where it was named.
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]

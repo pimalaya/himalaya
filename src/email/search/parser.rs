@@ -128,7 +128,7 @@ pub(crate) fn keyword<'a>(
 
 /// A run of ASCII letters, digits and underscores, the characters ending it
 /// left unnamed.
-fn word_chars<'a>() -> impl Parser<'a, &'a str, &'a str, ParserError<'a>> + Clone {
+pub(crate) fn word_chars<'a>() -> impl Parser<'a, &'a str, &'a str, ParserError<'a>> + Clone {
     any()
         .filter(|c: &char| is_word_char(*c))
         .labelled(hidden())

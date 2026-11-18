@@ -52,7 +52,7 @@ use crate::config::{
     envelope::EnvelopeConfig, gmail::GmailConfig, imap::ImapConfig, jmap::JmapConfig,
     mailbox::MailboxConfig, maildir::MaildirConfig, mbox::MboxConfig, message::MessageConfig,
     msgraph::MsgraphConfig, pimdir::PimdirConfig, proxy::ProxyConfig, sieve::SieveConfig,
-    smtp::SmtpConfig,
+    smtp::SmtpConfig, tls::TlsConfig,
 };
 
 /// The whole TOML configuration file, refusing a key it does not know
@@ -117,11 +117,33 @@ impl TomlConfig for Config {
     fn take_named_account(&mut self, name: &str) -> Option<(String, Self::Account)> {
         let (name, mut account) = self.accounts.remove_entry(name)?;
         account.inherit_proxy();
+        account.inherit_tls();
         Some((name, account))
     }
 }
 
 impl AccountConfig {
+    /// Hands the account TLS to every network backend, each field its
+    /// own `tls` leaves unset taking the account's.
+    fn inherit_tls(&mut self) {
+        let Some(tls) = &self.tls else {
+            return;
+        };
+
+        let slots = [
+            self.imap.as_mut().map(|c| &mut c.tls),
+            self.jmap.as_mut().map(|c| &mut c.tls),
+            self.gmail.as_mut().map(|c| &mut c.tls),
+            self.msgraph.as_mut().map(|c| &mut c.tls),
+            self.smtp.as_mut().map(|c| &mut c.tls),
+            self.sieve.as_mut().map(|c| &mut c.tls),
+        ];
+
+        for slot in slots.into_iter().flatten() {
+            slot.inherit(tls);
+        }
+    }
+
     /// Hands the account proxy to every network backend naming none of
     /// its own.
     fn inherit_proxy(&mut self) {
@@ -195,6 +217,10 @@ pub struct AccountConfig {
     /// its own block names one.
     #[serde(default)]
     pub proxy: Option<ProxyConfig>,
+    /// TLS every network backend of this account uses, a backend's own
+    /// `tls` overriding it field by field.
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
     /// The IMAP backend of this account.
     pub imap: Option<ImapConfig>,
     /// The JMAP backend of this account.
@@ -469,6 +495,43 @@ mod tests {
             proxy(account.smtp.unwrap().proxy).as_deref(),
             Some("http://smtp:3128")
         );
+    }
+
+    /// The account's `tls` reaches every network backend, a backend's own
+    /// `tls` winning field by field.
+    #[test]
+    fn backends_inherit_the_account_tls_field_by_field() {
+        let mut config: Config = toml::from_str(
+            r#"
+            [accounts.example]
+            tls.cert = "/etc/ca.pem"
+            tls.provider = "rustls"
+            imap.server = "imap.example.org"
+            jmap.server = "https://jmap.example.org"
+            jmap.auth.header.raw = "x"
+            smtp.server = "smtp.example.org"
+            smtp.tls.provider = "native-tls"
+            sieve.server = "sieve.example.org"
+            sieve.tls.cert = "/etc/sieve.pem"
+            "#,
+        )
+        .expect("the tls blocks must deserialize");
+
+        let (_, account) = config.take_named_account("example").unwrap();
+        let cert = |tls: &tls::TlsConfig| tls.cert.clone().map(|cert| cert.display().to_string());
+        let native =
+            |tls: &tls::TlsConfig| matches!(tls.provider, Some(tls::TlsProviderConfig::NativeTls));
+
+        let imap = account.imap.unwrap().tls;
+        let jmap = account.jmap.unwrap().tls;
+        let smtp = account.smtp.unwrap().tls;
+        let sieve = account.sieve.unwrap().tls;
+        assert_eq!(cert(&imap).as_deref(), Some("/etc/ca.pem"));
+        assert_eq!(cert(&jmap).as_deref(), Some("/etc/ca.pem"));
+        assert_eq!(cert(&smtp).as_deref(), Some("/etc/ca.pem"));
+        assert!(native(&smtp) && !native(&imap));
+        assert_eq!(cert(&sieve).as_deref(), Some("/etc/sieve.pem"));
+        assert!(!native(&sieve));
     }
 
     #[test]

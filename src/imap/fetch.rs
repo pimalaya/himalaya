@@ -28,7 +28,7 @@ use crate::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
-        utils::{output_data, parse_sequence_set, sequence_set_parser, to_address},
+        utils::{output_data, parse_sequence_set, sequence_set_parser, to_addresses},
     },
     shared::{base64, envelope::list::format_addresses, message::header},
 };
@@ -264,12 +264,12 @@ impl From<&Envelope<'_>> for EnvelopeView {
                 .map(|s| header::decode_bytes(s.as_ref())),
             message_id: nstring(&env.message_id),
             in_reply_to: nstring(&env.in_reply_to),
-            from: env.from.iter().map(to_address).collect(),
-            sender: env.sender.iter().map(to_address).collect(),
-            reply_to: env.reply_to.iter().map(to_address).collect(),
-            to: env.to.iter().map(to_address).collect(),
-            cc: env.cc.iter().map(to_address).collect(),
-            bcc: env.bcc.iter().map(to_address).collect(),
+            from: to_addresses(&env.from),
+            sender: to_addresses(&env.sender),
+            reply_to: to_addresses(&env.reply_to),
+            to: to_addresses(&env.to),
+            cc: to_addresses(&env.cc),
+            bcc: to_addresses(&env.bcc),
         }
     }
 }

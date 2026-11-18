@@ -178,7 +178,7 @@ pub fn registry() -> JsonSchemaRegistry {
     );
     insert!(
         "himalaya-account-check",
-        pimalaya_cli::account::AccountCheckOutput<ErrorCode>
+        crate::account::check::AccountCheckReport
     );
     insert!(
         "himalaya-account-capability",

@@ -52,6 +52,12 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             Ok(format!("after:{}", since_q(next_day(*date))))
         }
         SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("before:{}", day_start(*date))),
+        SearchEmailsFilterQuery::AfterInstant(instant) => {
+            Ok(format!("after:{}", instant.timestamp()))
+        }
+        SearchEmailsFilterQuery::BeforeInstant(instant) => {
+            Ok(format!("before:{}", instant.timestamp()))
+        }
         SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(filter, pattern)?)),
@@ -93,6 +99,12 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
             Ok(format!("-after:{}", since_q(next_day(*date))))
         }
         SearchEmailsFilterQuery::BeforeDate(date) => Ok(format!("-before:{}", day_start(*date))),
+        SearchEmailsFilterQuery::AfterInstant(instant) => {
+            Ok(format!("-after:{}", instant.timestamp()))
+        }
+        SearchEmailsFilterQuery::BeforeInstant(instant) => {
+            Ok(format!("-before:{}", instant.timestamp()))
+        }
         SearchEmailsFilterQuery::From(pattern) => {
             Ok(format!("-from:{}", value_q(filter, pattern)?))
         }
@@ -242,6 +254,14 @@ mod tests {
     fn q_err(query: &str) -> String {
         let query = SearchEmailsQuery::from_str(query).unwrap();
         filter_to_q(&query.filter.unwrap()).unwrap_err().to_string()
+    }
+
+    /// An instant goes out as its Unix seconds, `after:` and `before:`
+    /// being strict.
+    #[test]
+    fn an_instant_is_sent_in_seconds() {
+        assert_eq!(q("after 2026-11-14T10:00:00+01:00"), "after:1794646800");
+        assert_eq!(q("not before 2026-11-14T09:00:00Z"), "-before:1794646800");
     }
 
     #[test]

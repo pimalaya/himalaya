@@ -32,7 +32,6 @@ use io_imap::{
         body::{BodyStructure, SpecificFields},
         core::{AString, Atom, Vec1},
         datetime::NaiveDate as ImapNaiveDate,
-        envelope::Address as ImapAddress,
         extensions::sort::{SortCriterion, SortKey},
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
         flag::{Flag as ImapFlag, FlagFetch, FlagNameAttribute, FlagPerm, StoreType},
@@ -50,7 +49,6 @@ use pimalaya_cli::error::CodedError;
 use crate::{
     capability,
     email::{
-        address::Address,
         envelope::{
             Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids,
             parse_rfc2822_date,
@@ -69,7 +67,10 @@ use crate::{
         ErrorCode, ItemError, existing_mailbox, mailbox_not_found, message_not_found,
         missing_message,
     },
-    imap::{client::ImapClient, utils::output_data},
+    imap::{
+        client::ImapClient,
+        utils::{output_data, to_addresses},
+    },
     shared::message::{header, part},
 };
 
@@ -250,13 +251,18 @@ impl ImapClient {
 
         let uids = self.sort(
             sort_criteria,
-            search_criteria,
+            search_criteria.clone(),
             ImapMessageSortOptions {
                 uid: true,
                 fallback,
             },
         )?;
-        let uids = output_data("SORT", uids);
+        let mut uids = output_data("SORT", uids);
+        let instants = root_instants(query.and_then(|q| q.filter.as_ref()));
+        if !instants.is_empty() {
+            let outside = self.outside_instants(&search_criteria, &instants)?;
+            uids.retain(|uid| !outside.contains(uid));
+        }
         let (page_uids, more) = paginate_uids(&uids, page, page_size);
         if page_uids.is_empty() {
             return Ok(Outcome::from(EnvelopePage::default()));
@@ -299,6 +305,76 @@ impl ImapClient {
             value: EnvelopePage { envelopes, more },
             errors,
         })
+    }
+
+    /// The UIDs the search under `criteria` lists that an instant of
+    /// `instants` does not hold: the messages of each instant's band
+    /// ([`InstantBand`]) are searched, their dates fetched, and a message
+    /// sent on the wrong side of any instant, or undated, is left out.
+    fn outside_instants(
+        &mut self,
+        criteria: &Vec1<SearchKey<'static>>,
+        instants: &[&SearchEmailsFilterQuery],
+    ) -> Result<BTreeSet<NonZeroU32>> {
+        let mut banded = BTreeSet::new();
+
+        for instant in instants {
+            let (SearchEmailsFilterQuery::AfterInstant(at)
+            | SearchEmailsFilterQuery::BeforeInstant(at)) = instant
+            else {
+                continue;
+            };
+            let band = InstantBand::of(at);
+            let mut keys = criteria.as_ref().to_vec();
+            keys.push(SearchKey::SentSince(imap_date(band.first)?));
+            keys.push(SearchKey::SentBefore(imap_date(band.end)?));
+            let keys = Vec1::try_from(keys).map_err(|_| anyhow!("Empty IMAP search"))?;
+            let found = self.search(keys, ImapMessageSearchOptions { uid: true })?;
+            banded.extend(output_data("SEARCH", found));
+        }
+
+        let banded: Vec<NonZeroU32> = banded.into_iter().collect();
+        let mut outside = BTreeSet::new();
+
+        for chunk in banded.chunks(255) {
+            let set = chunk
+                .iter()
+                .map(|uid| uid.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let set: SequenceSet = set
+                .as_str()
+                .try_into()
+                .map_err(|_| anyhow!("Invalid IMAP UID set `{set}`"))?;
+            let names = vec![MessageDataItemName::Uid, MessageDataItemName::Envelope];
+            let output = self.fetch(
+                set,
+                MacroOrMessageDataItemNames::MessageDataItemNames(names),
+                ImapMessageFetchOptions {
+                    uid: true,
+                    ..Default::default()
+                },
+            )?;
+
+            for (seq, items) in output_data("FETCH", output) {
+                let envelope = envelope_from(seq.get(), items.into_inner());
+                let Some(uid) = envelope.id.parse().ok() else {
+                    continue;
+                };
+                let holds = instants
+                    .iter()
+                    .all(|instant| match (instant, envelope.date) {
+                        (SearchEmailsFilterQuery::AfterInstant(at), Some(date)) => date > *at,
+                        (SearchEmailsFilterQuery::BeforeInstant(at), Some(date)) => date < *at,
+                        _ => false,
+                    });
+                if !holds {
+                    outside.insert(uid);
+                }
+            }
+        }
+
+        Ok(outside)
     }
 
     /// Adds, sets or removes flags on a UID set, returning how many of
@@ -347,8 +423,10 @@ impl ImapClient {
     }
 
     /// Fetches one message's raw RFC 5322 bytes, marking it seen only
-    /// when asked.
+    /// when asked, the mailbox named by role as a listing names it.
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(&[id])?;
 
@@ -981,8 +1059,8 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
                 if let Some(m) = env.in_reply_to.into_option() {
                     in_reply_to = parse_message_ids(&bytes_to_string(m.as_ref()));
                 }
-                from = env.from.iter().map(address_from).collect();
-                to = env.to.iter().map(address_from).collect();
+                from = to_addresses(&env.from);
+                to = to_addresses(&env.to);
             }
             MessageDataItem::Rfc822Size(n) => size = Some(u64::from(n)),
             MessageDataItem::BodyStructure(structure) => {
@@ -1017,39 +1095,6 @@ fn flag_from_fetch(fetch: FlagFetch<'_>) -> Option<Flag> {
         return None;
     };
     Some(Flag::from_raw(flag.to_string()))
-}
-
-/// Converts an ENVELOPE address into a shared [`Address`].
-fn address_from(addr: &ImapAddress<'_>) -> Address {
-    let name = addr
-        .name
-        .0
-        .as_ref()
-        .map(|s| header::decode_bytes(s.as_ref()))
-        .filter(|s| !s.is_empty());
-
-    let mailbox = addr
-        .mailbox
-        .0
-        .as_ref()
-        .map(|s| bytes_to_string(s.as_ref()))
-        .unwrap_or_default();
-    let host = addr
-        .host
-        .0
-        .as_ref()
-        .map(|s| bytes_to_string(s.as_ref()))
-        .unwrap_or_default();
-
-    let email = if mailbox.is_empty() {
-        host
-    } else if host.is_empty() {
-        mailbox
-    } else {
-        format!("{mailbox}@{host}")
-    };
-
-    Address { name, email }
 }
 
 /// Whether a body structure holds an attachment, see
@@ -1342,41 +1387,57 @@ fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
 /// refuses `NOT (a b)`. The rewrite (De Morgan, double negations
 /// cancelled) means the same on every server.
 fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>> {
-    convert_filter_with(filter, false)
+    convert_filter_with(filter, false, true)
 }
 
-/// Translates `filter`, or its negation when `negated` holds.
+/// Translates `filter`, or its negation when `negated` holds, `root`
+/// telling it sits on the chain of `and` from the root, where an instant
+/// is searched by the days around it and checked once fetched
+/// ([`InstantBand`]); elsewhere one is refused.
 fn convert_filter_with(
     filter: &SearchEmailsFilterQuery,
     negated: bool,
+    root: bool,
 ) -> Result<SearchKey<'static>> {
     use SearchEmailsFilterQuery as Q;
 
     let key = match filter {
-        Q::Not(inner) => return convert_filter_with(inner, !negated),
+        Q::Not(inner) => return convert_filter_with(inner, !negated, false),
         Q::And(left, right) if !negated => {
             return Ok(and_key(
-                convert_filter_with(left, false)?,
-                convert_filter_with(right, false)?,
+                convert_filter_with(left, false, root)?,
+                convert_filter_with(right, false, root)?,
             ));
         }
         Q::And(left, right) => {
             return Ok(SearchKey::Or(
-                Box::new(convert_filter_with(left, true)?),
-                Box::new(convert_filter_with(right, true)?),
+                Box::new(convert_filter_with(left, true, false)?),
+                Box::new(convert_filter_with(right, true, false)?),
             ));
         }
         Q::Or(left, right) if !negated => {
             return Ok(SearchKey::Or(
-                Box::new(convert_filter_with(left, false)?),
-                Box::new(convert_filter_with(right, false)?),
+                Box::new(convert_filter_with(left, false, false)?),
+                Box::new(convert_filter_with(right, false, false)?),
             ));
         }
         Q::Or(left, right) => {
             return Ok(and_key(
-                convert_filter_with(left, true)?,
-                convert_filter_with(right, true)?,
+                convert_filter_with(left, true, false)?,
+                convert_filter_with(right, true, false)?,
             ));
+        }
+        Q::AfterInstant(_) | Q::BeforeInstant(_) if !root => {
+            return Err(unsupported(
+                filter,
+                "IMAP searches days alone, so an instant holds on the chain of `and` from the root alone",
+            ));
+        }
+        Q::AfterInstant(instant) => {
+            SearchKey::SentSince(imap_date(InstantBand::of(instant).first)?)
+        }
+        Q::BeforeInstant(instant) => {
+            SearchKey::SentBefore(imap_date(InstantBand::of(instant).end)?)
         }
         Q::Address(pattern) => return address_key(pattern, negated),
 
@@ -1413,6 +1474,45 @@ fn convert_filter_with(
         Ok(SearchKey::Not(Box::new(key)))
     } else {
         Ok(key)
+    }
+}
+
+/// The days around an instant whose messages may be sent on either side
+/// of it, a `Date:` naming its day in its own offset (UTC-12:00 to
+/// UTC+14:00): from the day before the instant's UTC day, up to and
+/// excluding the second day after it. A message dated before the band is
+/// sent before the instant, one dated on or after its end after it.
+struct InstantBand {
+    /// The first day of the band.
+    first: chrono::NaiveDate,
+    /// The day after its last.
+    end: chrono::NaiveDate,
+}
+
+impl InstantBand {
+    fn of(instant: &DateTime<FixedOffset>) -> Self {
+        let day = instant.naive_utc().date();
+        Self {
+            first: day.pred_opt().unwrap_or(day),
+            end: day.succ_opt().and_then(|day| day.succ_opt()).unwrap_or(day),
+        }
+    }
+}
+
+/// The instant clauses on the chain of `and` from the root, which a
+/// message of their band is checked against once its date is fetched.
+fn root_instants(filter: Option<&SearchEmailsFilterQuery>) -> Vec<&SearchEmailsFilterQuery> {
+    match filter {
+        Some(SearchEmailsFilterQuery::And(left, right)) => {
+            let mut instants = root_instants(Some(left));
+            instants.extend(root_instants(Some(right)));
+            instants
+        }
+        Some(
+            instant @ (SearchEmailsFilterQuery::AfterInstant(_)
+            | SearchEmailsFilterQuery::BeforeInstant(_)),
+        ) => vec![instant],
+        _ => Vec::new(),
     }
 }
 
@@ -1684,6 +1784,102 @@ mod tests {
         assert_eq!(root_message_ids(query.filter.as_ref()), ["a@b.org"]);
     }
 
+    /// An instant on the chain of `and` from the root is searched by the
+    /// days of its band, and refused under `or` or `not`, where no check
+    /// of the fetched dates holds.
+    #[test]
+    fn an_instant_is_searched_by_its_band_on_the_root_chain_alone() {
+        assert_eq!(
+            search_line("after 2026-11-14T10:00:00+01:00 and from c"),
+            "A UID SEARCH SENTSINCE \"13-Nov-2026\" FROM c",
+        );
+        assert_eq!(
+            search_line("before 2026-11-14T10:00:00+01:00"),
+            "A UID SEARCH SENTBEFORE \"16-Nov-2026\"",
+        );
+
+        for query in [
+            "after 2026-11-14T10:00:00Z or from c",
+            "not before 2026-11-14T10:00:00Z",
+        ] {
+            let query: SearchEmailsQuery = query.parse().unwrap();
+            let err = search_keys(query.filter.as_ref()).unwrap_err();
+            let code = code_of::<crate::error::ErrorCode>(&err);
+            assert_eq!(code, Some(crate::error::ErrorCode::SearchUnsupported));
+        }
+    }
+
+    /// The messages of an instant's band are kept by their fetched dates:
+    /// of three sent on 14 November 2026 at 09:00, 11:00 and 12:00 (UTC+1),
+    /// `after` 10:00 keeps the last two.
+    #[test]
+    fn an_instant_keeps_the_messages_on_its_side() {
+        use std::{
+            io::{BufRead, BufReader, Write},
+            net::TcpListener,
+            thread,
+        };
+
+        use crate::{config::imap::ImapConfig, imap::client::ImapClient};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let envelope = |uid: u32, hour: u32| {
+            format!(
+                "* {uid} FETCH (UID {uid} FLAGS () RFC822.SIZE 1 ENVELOPE \
+                 (\"Sat, 14 Nov 2026 {hour:02}:00:00 +0100\" \"m{uid}\" NIL NIL NIL NIL NIL NIL NIL NIL))\r\n"
+            )
+        };
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut out = stream;
+            let mut commands = Vec::new();
+            write!(out, "* PREAUTH [CAPABILITY IMAP4rev1 SORT] ready\r\n").unwrap();
+
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap() > 0 {
+                let (tag, command) = line.trim_end().split_once(' ').unwrap();
+                let (tag, command) = (tag.to_string(), command.to_string());
+                line.clear();
+                let data = if command.starts_with("SELECT") {
+                    String::from("* 3 EXISTS\r\n")
+                } else if command.starts_with("UID SORT") {
+                    String::from("* SORT 3 2 1\r\n")
+                } else if command.starts_with("UID SEARCH") {
+                    String::from("* SEARCH 1 2 3\r\n")
+                } else if command.starts_with("UID FETCH") {
+                    let set = command.split(' ').nth(2).unwrap();
+                    set.split(',')
+                        .flat_map(|part| match part.split_once(':') {
+                            Some((first, last)) => first.parse().unwrap()..=last.parse().unwrap(),
+                            None => part.parse().unwrap()..=part.parse().unwrap(),
+                        })
+                        .map(|uid: u32| envelope(uid, [9, 11, 12][uid as usize - 1]))
+                        .collect()
+                } else {
+                    String::new()
+                };
+                commands.push(command);
+                write!(out, "{data}{tag} OK done\r\n").unwrap();
+            }
+            commands
+        });
+
+        let config: ImapConfig = toml::from_str(&format!("server = \"imap://{addr}\"")).unwrap();
+        let mut secrets = pimalaya_config::secret::SecretResolver::new();
+        let mut client = ImapClient::new(config, &mut secrets).unwrap();
+        let query: SearchEmailsQuery = "after 2026-11-14T10:00:00+01:00".parse().unwrap();
+        let page = client
+            .search_envelopes("INBOX", Some(&query), None, None, false)
+            .unwrap();
+        drop(client);
+        let commands = server.join().unwrap();
+
+        let ids: Vec<&str> = page.value.envelopes.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["3", "2"], "{commands:?}");
+    }
+
     #[test]
     fn a_uid_the_server_sorts_twice_is_listed_once() {
         let uids = [1, 1, 7, 3, 1].map(|uid| NonZeroU32::new(uid).unwrap());
@@ -1742,6 +1938,31 @@ mod tests {
             Some("\u{201c}Ann\u{201d} \u{e9}")
         );
         assert_eq!(envelope.from[0].email, "a@example.org");
+    }
+
+    /// The markers of an ENVELOPE group (RFC 3501 §7.4.2) are no address:
+    /// an empty group lists none, as the header does on Maildir and mbox,
+    /// and a group lists its members.
+    #[test]
+    fn an_envelope_group_lists_its_members_alone() {
+        const LINE: &[u8] = b"* 1 FETCH (UID 7 ENVELOPE (NIL NIL \
+            ((NIL NIL \"a\" \"x.org\")) NIL NIL \
+            ((NIL NIL \"undisclosed-recipients\" NIL)(NIL NIL NIL NIL)\
+            (NIL NIL \"Team\" NIL)(\"Bob\" NIL \"b\" \"x.org\")(NIL NIL NIL NIL)) \
+            NIL NIL NIL NIL))\r\n";
+
+        let (_, response) = ResponseCodec::new().decode(LINE).unwrap();
+        let Response::Data(Data::Fetch { items, .. }) = response else {
+            panic!("not a FETCH answer");
+        };
+        let envelope = envelope_from(1, items.into_inner());
+
+        let to: Vec<(Option<&str>, &str)> = envelope
+            .to
+            .iter()
+            .map(|address| (address.name.as_deref(), address.email.as_str()))
+            .collect();
+        assert_eq!(to, [(Some("Bob"), "b@x.org")]);
     }
 
     /// What `hasAttachment` reads off an untagged `FETCH` answer.
@@ -2058,6 +2279,7 @@ mod tests {
                         }
                         ["LIST", ..] => format!(
                             "* LIST () \"/\" INBOX\r\n* LIST () \"/\" Locked\r\n\
+                             * LIST (\\Sent) \"/\" \"Sent Messages\"\r\n\
                              {tag} OK done\r\n"
                         ),
                         ["FETCH", "1:*", ..] => format!("{}{tag} OK done\r\n", fetch_lines()),
@@ -2382,7 +2604,10 @@ mod tests {
             handle.join().unwrap();
 
             let counts: Vec<_> = outcome.value.iter().map(|m| (m.unread, m.total)).collect();
-            assert_eq!(counts, [(Some(0), Some(1)), (None, None)]);
+            assert_eq!(
+                counts,
+                [(Some(0), Some(1)), (None, None), (Some(0), Some(1))]
+            );
 
             let [error] = outcome.errors.as_slice() else {
                 panic!("{:?}", outcome.errors);
@@ -2459,6 +2684,24 @@ mod tests {
             assert_eq!(err.to_string(), expected);
             let code = pimalaya_cli::error::code_of::<crate::error::ErrorCode>(&err);
             assert_eq!(code, Some(crate::error::ErrorCode::MessageNotFound));
+        }
+
+        /// A read names its mailbox by role as a listing does: `sent`
+        /// selects the mailbox whose special-use attribute is `\Sent`.
+        #[test]
+        fn reading_resolves_a_mailbox_role() {
+            let (server, handle) = serve(PLAIN, vec![1], none);
+            let mut client = client(&server);
+            let _ = client.get_message("sent", "999", false);
+            drop(client);
+            let commands = handle.join().unwrap();
+
+            let selects: Vec<&str> = commands
+                .iter()
+                .filter(|command| command.starts_with("SELECT"))
+                .map(String::as_str)
+                .collect();
+            assert_eq!(selects, ["SELECT \"Sent Messages\""], "{commands:?}");
         }
 
         #[test]

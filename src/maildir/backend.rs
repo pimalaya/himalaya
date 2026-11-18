@@ -22,10 +22,15 @@ use crate::{
 use anyhow::{Result, bail};
 use io_maildir::{
     client::{MaildirClientError, MaildirUnreadableEntry},
-    entry::{MaildirFullEntry, get::MaildirEntryGetError, locate::MaildirEntryLocateError},
+    entry::{
+        MaildirEntry, MaildirFullEntry, get::MaildirEntryGetError, locate::MaildirEntryLocateError,
+    },
     flag::{MaildirFlag, MaildirFlags},
     maildir::{Maildir, MaildirSubdir},
 };
+
+/// The most message files a Maildir listing holds read at once.
+const READ_CHUNK: usize = 64;
 
 impl MaildirClient {
     /// Lists every Maildir under the configured root, sorted by name,
@@ -94,17 +99,16 @@ impl MaildirClient {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
         let total = u64::try_from(entries.len()).ok();
-        let read = self.read_readable_entries(&maildir, &entries);
-
         let mut envelopes = Vec::new();
         let mut headerless = Vec::new();
 
-        for entry in &read.entries {
-            match envelope_from_entry(entry) {
-                Some(envelope) => envelopes.push(envelope),
-                None => headerless.push(entry.id().unwrap_or_default()),
-            }
-        }
+        let unreadable =
+            self.visit_entries(&maildir, &entries, |entry| {
+                match envelope_from_entry(entry) {
+                    Some(envelope) => envelopes.push(envelope),
+                    None => headerless.push(entry.id().unwrap_or_default().to_owned()),
+                }
+            });
 
         envelopes.sort_by_key(|envelope| std::cmp::Reverse(envelope.date));
 
@@ -113,7 +117,7 @@ impl MaildirClient {
 
         let listed = Outcome {
             value: EnvelopePage { envelopes, more },
-            errors: entry_errors(read.unreadable, headerless, page),
+            errors: entry_errors(unreadable, headerless, page),
         };
 
         Ok((listed, total))
@@ -132,16 +136,14 @@ impl MaildirClient {
     ) -> Result<Outcome<EnvelopePage>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let read = self.read_readable_entries(&maildir, &entries);
-
         let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = Vec::new();
         let mut headerless = Vec::new();
 
-        for full in &read.entries {
+        let unreadable = self.visit_entries(&maildir, &entries, |full| {
             let Some(envelope) = envelope_from_entry(full) else {
-                headerless.push(full.id().unwrap_or_default());
-                continue;
+                headerless.push(full.id().unwrap_or_default().to_owned());
+                return;
             };
             let keep = match filter {
                 Some(filter) => eval::matches_filter(&envelope, None, full.contents(), filter),
@@ -150,7 +152,7 @@ impl MaildirClient {
             if keep {
                 hits.push(envelope);
             }
-        }
+        });
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
 
@@ -159,8 +161,29 @@ impl MaildirClient {
 
         Ok(Outcome {
             value: EnvelopePage { envelopes, more },
-            errors: entry_errors(read.unreadable, headerless, page),
+            errors: entry_errors(unreadable, headerless, page),
         })
+    }
+
+    /// Reads `entries` of `maildir` [`READ_CHUNK`] files at a time, handing
+    /// each file read to `visit` and dropping its bytes with its chunk, so a
+    /// listing holds a chunk of messages, never the mailbox; returns the
+    /// entries it could not read.
+    fn visit_entries(
+        &self,
+        maildir: &Maildir,
+        entries: &[MaildirEntry],
+        mut visit: impl FnMut(&MaildirFullEntry),
+    ) -> Vec<MaildirUnreadableEntry> {
+        let mut unreadable = Vec::new();
+
+        for chunk in entries.chunks(READ_CHUNK) {
+            let read = self.read_readable_entries(maildir, chunk);
+            read.entries.iter().for_each(&mut visit);
+            unreadable.extend(read.unreadable);
+        }
+
+        unreadable
     }
 
     /// Adds, sets, or removes `flags` on the messages of `ids` the Maildir
@@ -515,7 +538,7 @@ fn flag_from_maildir(flag: &MaildirFlag) -> Flag {
 /// not repeat them.
 fn entry_errors(
     unreadable: Vec<MaildirUnreadableEntry>,
-    headerless: Vec<&str>,
+    headerless: Vec<String>,
     page: Option<u32>,
 ) -> Vec<ItemError> {
     if page.unwrap_or(1) > 1 {
@@ -530,7 +553,7 @@ fn entry_errors(
     });
 
     unreadable
-        .chain(headerless.into_iter().map(headerless_message))
+        .chain(headerless.iter().map(|id| headerless_message(id)))
         .collect()
 }
 

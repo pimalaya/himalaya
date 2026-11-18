@@ -10,7 +10,7 @@
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow, bail};
-use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions};
+use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions, JmapClientStdError};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
@@ -30,10 +30,16 @@ use crate::{
 /// A live JMAP session and the mailbox index it caches.
 pub struct JmapClient {
     inner: Inner,
-    /// The `[jmap]` block, kept so a command can open an auxiliary
-    /// session of its own against an upload or download authority the
-    /// API one does not cover.
+    /// The `[jmap]` block the session was opened from.
     pub config: JmapConfig,
+    /// The `Authorization` value, resolved once with the session, so an
+    /// auxiliary connection spawns no credential command again.
+    http_auth: SecretString,
+    /// The connect options, the proxy password resolved once.
+    options: JmapClientStdConnectOptions,
+    /// The connection to an upload or download authority the API one
+    /// does not cover, kept for the next blob on that authority.
+    auxiliary: Option<(Url, Inner)>,
     /// The mailboxes [`Self::resolve_mailbox_id`] maps names and roles
     /// through, fetched once and cached for the client's lifetime.
     mailbox_index: Option<MailboxIndex>,
@@ -48,12 +54,15 @@ impl JmapClient {
         let opts = connect_options(&config, &mut resolver)?;
         let url = parse_server_url(&config.server)?;
 
-        let mut inner = Inner::connect(&url, http_auth, opts)?;
+        let mut inner = Inner::connect(&url, http_auth.clone(), opts.clone())?;
         inner.session_get(&url)?;
 
         Ok(Self {
             inner,
             config,
+            http_auth,
+            options: opts,
+            auxiliary: None,
             mailbox_index: None,
         })
     }
@@ -96,10 +105,10 @@ impl JmapClient {
 
     /// Downloads a blob, whose URL may live on another authority.
     ///
-    /// A matching host reuses the live session, a foreign one opens a
-    /// fresh authenticated connection. Reusing the API socket would send
-    /// the request to the API server, which answers with a redirect no
-    /// download follows.
+    /// A matching host reuses the live session, a foreign one the
+    /// auxiliary connection to it ([`Self::auxiliary`]). Reusing the API
+    /// socket would send the request to the API server, which answers with
+    /// a redirect no download follows.
     pub fn download_blob(&mut self, download_url: &Url) -> Result<Vec<u8>> {
         let api_url = {
             let session = self
@@ -112,12 +121,31 @@ impl JmapClient {
             return Ok(self.blob_download(download_url)?);
         }
 
-        let mut resolver = SecretResolver::new();
-        let http_auth = jmap_http_auth(self.config.auth.clone(), &mut resolver)?;
-        let opts = connect_options(&self.config, &mut resolver)?;
-        let mut download_client = Inner::connect(download_url, http_auth, opts)?;
+        self.auxiliary(download_url, |client| client.blob_download(download_url))
+    }
 
-        Ok(download_client.blob_download(download_url)?)
+    /// Runs `request` over the connection to the authority of `url`, one
+    /// the API session does not cover, opened with the credential the
+    /// session resolved and kept for the next request there. A request
+    /// failing over a kept connection, which the server may have closed
+    /// since, is sent once more over a fresh one.
+    pub fn auxiliary<T>(
+        &mut self,
+        url: &Url,
+        mut request: impl FnMut(&mut Inner) -> Result<T, JmapClientStdError>,
+    ) -> Result<T> {
+        if let Some((authority, mut client)) = self.auxiliary.take()
+            && same_authority(&authority, url)
+            && let Ok(answer) = request(&mut client)
+        {
+            self.auxiliary = Some((authority, client));
+            return Ok(answer);
+        }
+
+        let mut client = Inner::connect(url, self.http_auth.clone(), self.options.clone())?;
+        let answer = request(&mut client)?;
+        self.auxiliary = Some((url.clone(), client));
+        Ok(answer)
     }
 }
 
@@ -240,5 +268,80 @@ mod tests {
         assert_eq!(url.host_str(), Some("xn--bcher-kva.example"));
         let url = parse_server_url("xn--bcher-kva.example").unwrap();
         assert_eq!(url.host_str(), Some("xn--bcher-kva.example"));
+    }
+
+    /// Blob downloads on an authority other than the API's run the
+    /// credential command once, with the session, and share one
+    /// connection.
+    #[test]
+    fn blob_downloads_reuse_the_credential_and_the_connection() {
+        use std::{
+            io::{BufRead, BufReader, Write},
+            net::TcpListener,
+            sync::{
+                Arc,
+                atomic::{AtomicUsize, Ordering},
+            },
+            thread,
+        };
+
+        use crate::{config::jmap::JmapConfig, jmap::client::JmapClient};
+
+        fn answer(listener: TcpListener, body: String, accepted: Arc<AtomicUsize>) {
+            for stream in listener.incoming() {
+                let stream = stream.unwrap();
+                accepted.fetch_add(1, Ordering::SeqCst);
+                let body = body.clone();
+                thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut out = stream;
+                    let mut line = String::new();
+                    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                        if line == "\r\n" {
+                            let len = body.len();
+                            let head = "HTTP/1.1 200 OK\r\nContent-Type: application/json";
+                            write!(out, "{head}\r\nContent-Length: {len}\r\n\r\n{body}").unwrap();
+                        }
+                        line.clear();
+                    }
+                });
+            }
+        }
+
+        let api = TcpListener::bind("127.0.0.1:0").unwrap();
+        let blobs = TcpListener::bind("127.0.0.1:0").unwrap();
+        let api_url = format!("http://{}", api.local_addr().unwrap());
+        let blob_url = format!("http://{}", blobs.local_addr().unwrap());
+        let session = serde_json::json!({
+            "username": "user",
+            "accounts": {},
+            "primaryAccounts": { "urn:ietf:params:jmap:mail": "A" },
+            "capabilities": { "urn:ietf:params:jmap:core": {}, "urn:ietf:params:jmap:mail": {} },
+            "apiUrl": format!("{api_url}/api"),
+            "downloadUrl": format!("{blob_url}/download/{{accountId}}/{{blobId}}"),
+            "uploadUrl": format!("{api_url}/upload/{{accountId}}"),
+            "eventSourceUrl": format!("{api_url}/events"),
+            "state": "s",
+        });
+        let downloads = Arc::new(AtomicUsize::new(0));
+        let accepted = downloads.clone();
+        thread::spawn(move || answer(api, session.to_string(), Arc::default()));
+        thread::spawn(move || answer(blobs, String::from("blob"), accepted));
+
+        let dir = tempfile::tempdir().unwrap();
+        let runs = dir.path().join("runs");
+        let command = format!("echo run >> '{}'; echo token", runs.display());
+        let config = format!("server = \"{api_url}/session\"\nauth.header.command = {command:?}\n");
+        let config: JmapConfig = toml::from_str(&config).unwrap();
+
+        let mut client = JmapClient::new(config).unwrap();
+        for blob in ["B1", "B2"] {
+            let url = url::Url::parse(&format!("{blob_url}/download/A/{blob}")).unwrap();
+            assert_eq!(client.download_blob(&url).unwrap(), b"blob");
+        }
+
+        let runs = std::fs::read_to_string(runs).unwrap();
+        assert_eq!(runs.lines().count(), 1, "{runs}");
+        assert_eq!(downloads.load(Ordering::SeqCst), 1);
     }
 }

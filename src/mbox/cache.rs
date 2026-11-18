@@ -12,7 +12,7 @@
 //! failing to write one is not an error.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -74,15 +74,16 @@ impl MboxCache {
     }
 
     /// Saves the cache of the mbox at `path` under `dir`, dropping the
-    /// envelopes of messages the index no longer holds.
+    /// envelopes of messages the index no longer holds, in one pass over
+    /// each.
     pub fn save(&mut self, dir: Option<&Path>, path: &MboxFsPath) {
         let Some(dir) = dir else {
             return;
         };
 
         if let Some(index) = &self.index {
-            let ids: Vec<&str> = index.entries.iter().map(|e| e.id.as_str()).collect();
-            self.envelopes.retain(|id, _| ids.contains(&id.as_str()));
+            let ids: HashSet<&str> = index.entries.iter().map(|e| e.id.as_str()).collect();
+            self.envelopes.retain(|id, _| ids.contains(id.as_str()));
         }
 
         self.version = VERSION;
