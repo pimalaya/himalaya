@@ -6,96 +6,53 @@ status: current
 
 # JMAP *specific* API on Fastmail: test report
 
-Companion to [jmap-fastmail.md](jmap-fastmail.md) (unified commands). This
-exercises `himalaya jmap …`: the raw JMAP method surface.
+Companion to [jmap-fastmail.md](jmap-fastmail.md) (unified commands). This exercises `himalaya jmap …`: the raw JMAP method surface.
 
-- himalaya: `v2.0.0-alpha.1 +jmap +rustls-ring` (working tree)
+- himalaya: release build of master c66b8629, default features (io-jmap 0.10.0)
 - account: `fastmail-jmap`
-- date: 2026-07-17
-- method: every `jmap` subcommand and flag, inside two throwaway JMAP
-  mailboxes, per [provider-test-plan.md](provider-test-plan.md).
+- date: 2026-11-18
+- method: every `jmap` subcommand inside the run's mailboxes (`J1` `PBh-`, `J2` `PBhV`, `J3` `PBnw`), per [provider-test-plan.md](provider-test-plan.md). The throwaway identity, mailboxes and emails were deleted.
 
 ## Results
 
 | Command | Variants | Result |
 | --- | --- | --- |
-| `jmap query` | raw method-calls array | ✅ (used throughout) |
-| `jmap mailbox get` | by id | ✅ |
-| `jmap mailbox query` | `--name`, `--all`, `--sort`, `-s/-p`, `--role` | ✅ (K1) |
-| `jmap mailbox create` | `<name>` | ✅ |
-| `jmap mailbox update` | `--name`, `--subscribe`/`--unsubscribe` | ✅ |
-| `jmap mailbox destroy` | `--purge` | ✅ |
-| `jmap email get` | by id | ✅ |
-| `jmap email query` | `-m`, `--subject`, `--has-attachment`, filters | ✅ |
-| `jmap email read` | by id | ✅ |
-| `jmap email update` | `--add/remove-keyword`, `--add/remove-mailbox` | ✅ |
-| `jmap email delete` | by id | ✅ |
-| `jmap email export` | blob download → raw RFC 5322 | ✅ |
-| `jmap email import` | `--mailbox-id`, `--keyword` | ✅ |
-| `jmap email parse` | blob id → `{"bodies":[…]}` | ✅ |
-| `jmap email copy` | `--from-account` | ⚪ not tested (cross-account, needs a 2nd account) |
-| `jmap thread get` | by thread id | ✅ |
-| `jmap identity get` | all / by id | ✅ |
-| `jmap identity create/update/delete` | round-trip | ✅ |
-| `jmap submission create` | `--identity-id --mail-from --rcpt-to` → send | ✅ delivered (K2) |
-| `jmap submission get/query/cancel` | by id / filter | ✅ but transient (K2) |
-| `jmap vacation-response get/set` | - | ⚠️ 403 on Fastmail (K3) |
-
-JMAP send genuinely works via `jmap submission create` using the account
-identity (id `178831439`, `pimalaya@fastmail.org`): status `final`, the
-message was delivered to the inbox. This is the JMAP equivalent of the
-unified `message send` that J3 (shared report) blocks on missing config.
+| `jmap request` | a request object, a method error inside it (`accountNotFound`) | ✅ raw response, exit 0 |
+| `jmap request` | a bare method-calls array | ✅ refused `The JSON body must be an object` |
+| `jmap request` | a request refused whole (`using: ["urn:bogus"]`, HTTP 400) | ❌ failure object, exit 1 (K4) |
+| `jmap mailbox get` | a known id and an unknown one | ✅ `errors` `mailbox-not-found`, exit 3 |
+| `jmap mailbox query` | `--name`, `--role sent -s 1` | ✅ `nextPage` `null` |
+| `jmap mailbox create` / `update` | `--name` | ✅ `{id}` |
+| `jmap mailbox create ''` | empty name | ✅ `{refusal: {status: null, reason: invalidArguments, …}}`, exit 3 |
+| `jmap mailbox destroy` | a real id and an unknown one | ✅ `{ids, errors}`, exit 3 |
+| `jmap email get` / `query` | by id, `-m --subject` | ✅ raw objects |
+| `jmap email read` / `export` | | ✅ |
+| `jmap email update` | `--add-keyword --remove-keyword`, a real id and an unknown one | ✅ `{ids, errors}`, exit 3 |
+| `jmap email import` | `--mailbox-id --keyword` | ✅ `{id, blobId}` |
+| `jmap email parse` | a real blob and an unknown one | ✅ `{bodies: [{blobId, body}], errors}`, exit 3 |
+| `jmap thread get` | a real id and an unknown one | ✅ `thread-not-found`, exit 3 |
+| `jmap identity get` | | ✅ |
+| `jmap identity create` | name, email | ❌ created, but exit 1 (K5) |
+| `jmap identity update` / `delete` | `--text-signature`; delete with an unknown id beside | ✅; unknown id `invalidProperties`, exit 3 |
+| `jmap submission create` | to self, `--rcpt-to` missing | ✅ delivered, `undoStatus: final`; missing flag refused, exit 2 |
+| `jmap submission query` / `cancel` | unknown id | ✅ `submission-not-found`, exit 3 (K2) |
+| `jmap vacation-response get` | raw `VacationResponse/get` | ✅ Fastmail now answers (K3) |
+| `jmap email copy` | | ⚪ not tested (needs a second account) |
 
 ## Findings
 
+### Bugs
+
+- **K4: a JMAP request refused whole by `jmap request` is no refusal result.** `himalaya -a fastmail-jmap --json jmap request -- '{"using":["urn:bogus"],"methodCalls":[["Mailbox/get",{},"0"]]}'` prints `{"code":null,"error":"JMAP send failed: HTTP 400: JMAP unknownCapability: Invalid or unknown capabilities: urn:bogus","sources":[],"backtrace":null}`, exit 1. commands.md (*A protocol refusal is a result*) asks for `{refusal: {status: 400, reason: "unknownCapability", …}}` and exit 3, the `request` commands included; src/jmap/error.rs `refusal` reads `JmapSendError::Request`, so the error `send_raw` returns (wrapped in io-jmap's `JmapClientStdError::Send`) does not reach it on this path.
+- **K5: `jmap identity create` fails after the server created the identity.** `himalaya -a fastmail-jmap --json jmap identity create 'himalaya-v3-live identity' pimalaya@fastmail.org` prints `{"code":null,"error":"JMAP identity created without an id",…}`, exit 1, while `jmap identity get` then lists the new identity (`187602447`, deleted afterwards). The cause is in io-jmap 0.10.0: src/rfc8621/identity/set.rs builds `JmapIdentitySetOutput` with `created: BTreeMap::new()` and `updated: BTreeMap::new()` whatever the server answered, so src/jmap/identity/create.rs never finds its `new` entry. A caller retrying on exit 1 creates a duplicate each time, which likely explains the 32 leftover test identities found on this account on 2026-07-17. An upstream fix, then a himalaya bump.
+
 ### Behaviour (not bugs)
 
-- **K1: `jmap mailbox query` defaulted to subscribed-only. FIXED.**
-  himalaya (not JMAP) was sending `isSubscribed: true` unless `--all`, so
-  `--name Himalaya` returned `{"mailboxes":[]}` for the unsubscribed fake
-  mailboxes while the raw `Mailbox/query {filter:{name:"Himalaya"}}`
-  returned both. Since native `Mailbox/query` applies no subscription
-  filter, the default is now flipped to match: bare `jmap mailbox query`
-  lists **all** mailboxes, and `--subscribed` opts into the filter
-  (`--all` removed). Verified: `--name X` now matches unsubscribed
-  mailboxes; `--name X --subscribed` correctly excludes them.
-
-- **K2: Fastmail does not retain EmailSubmission objects.**
-  `submission create` succeeds and delivers, returning the object with a
-  short id (e.g. `S39`), `undoStatus: final`, and `emailId`/`identityId`
-  echoed as `null` (Fastmail's `EmailSubmission/set` create response only
-  returns server-set fields: hence the blank columns). A *later*
-  `submission get <id>` / `query` (a separate JMAP session) returns
-  `{"submissions":[]}`, and `cancel` → `notFound`. This is **not** a
-  consequence of the CLI running one operation per invocation: JMAP
-  objects normally persist across sessions and could be fetched later:
-  Fastmail simply discards the submission once it reaches `final`. And
-  `cancel` needs `undoStatus: pending` (a send-undo window), which
-  Fastmail's immediate send never provides. On a server with delayed
-  send + retention, `get`/`cancel` across invocations would work. The
-  send itself is confirmed by inbox delivery.
-
-- **K3: vacation response unsupported on Fastmail.**
-  `jmap vacation-response get/set` → `Vacation response is not supported
-  by the server`; the raw `VacationResponse/get` returns `HTTP 403`.
-  Fastmail does not grant the `urn:ietf:params:jmap:vacationresponse`
-  capability to this token, and himalaya surfaces it cleanly rather than
-  leaking the 403.
-
-### Housekeeping
-
-- Found **32 leftover test identities** (`Himalaya Test Identity…`, `Test
-  Updated`) accumulated from prior JMAP identity testing on this shared
-  test account; deleted them, keeping the real `Pimalaya` identity. A
-  reminder that identity/mailbox create tests must clean up after
-  themselves.
+- **K2 (kept): Fastmail keeps no EmailSubmission.** `submission query` lists none after a `final` send; `cancel` answers `notFound`.
+- **K3: the vacation response now reads.** `jmap vacation-response get` prints the raw `VacationResponse/get` object (`isEnabled: false`); no `set` was attempted.
+- An identity delete with an id Fastmail cannot parse comes back `invalidProperties` rather than `notFound`, so its item error is uncoded; a provider choice.
+- A method error inside a 2xx `jmap request` stays in the raw response, exit 0: the command prints the response as JMAP sent it.
 
 ## Verdict
 
-The raw JMAP surface is **complete and works end-to-end** on Fastmail:
-mailbox/email/thread/identity/submission methods all behave per RFC 8620/
-8621, including real message submission. K1 (subscribed default) is
-**fixed**: `jmap mailbox query` now mirrors native `Mailbox/query` and
-lists all by default. K2/K3 are Fastmail-side behaviours handled
-cleanly. `email copy` (cross-account) is the only untested cell, for
-lack of a second account. No functional blocker.
+The raw JMAP surface **works** and follows the v3 contract for every typed command: gets and queries list unknown ids as coded errors, the sets print `{ids, errors}`, refused writes print the refusal object, all with exit 3. Two bugs: a request refused whole by `jmap request` exits 1 without the refusal object (K4), and `jmap identity create` reports a failure after creating (K5, io-jmap).

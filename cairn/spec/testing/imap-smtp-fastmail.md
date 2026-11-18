@@ -6,120 +6,64 @@ status: current
 
 # IMAP + SMTP on Fastmail: unified-command test report
 
-- himalaya: `v2.0.0-alpha.1 +imap +smtp +rustls-ring` (rev `1dddbe8`,
-  working tree with the shared-JMAP / CRLF / date fixes applied)
-- account: `fastmail` (`imap.server = imaps://imap.fastmail.com`,
-  `smtp.server = smtps://smtp.fastmail.com`, SASL PLAIN)
-- date: 2026-07-17
-- method: every unified command × every flag variant, run by hand inside
-  two throwaway mailboxes (`Himalaya-Test-A` / `-B`), per
-  [provider-test-plan.md](provider-test-plan.md). Fixtures: 6 messages
-  (Alpha…Epsilon + Eta) with distinct sender/subject/date/flags and one
-  `multipart/mixed` with a `note.txt` attachment.
+- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
+- account: `fastmail` (`imaps://imap.fastmail.com`, `smtps://smtp.fastmail.com`, SASL PLAIN), plus two scratch copies of it: `fastmail-tls` (an account-level `tls.cert`) and the same with `imap.tls.provider` overriding it
+- date: 2026-11-18
+- method: every unified command and flag variant, inside throwaway mailboxes `himalaya-v3-live-A`, `-B` and `-T` (260 threaded messages for the chunked thread fetch), per [provider-test-plan.md](provider-test-plan.md). Fixtures: six messages dated 3 hours, 8 hours, yesterday, 3 days and 10 days before the run, one `multipart/mixed` with `note.txt` and a `To:` group. Every delivered copy was moved into `A`, and the mailboxes were deleted at the end; Inbox, Sent, Drafts and Trash came back to their starting counts.
 
 ## Results
 
 | Command | Variants tested | Result |
 | --- | --- | --- |
-| `mailbox list` | base, `--counts`, `--max-width`, `--json`, combos | ✅ all pass |
-| `envelope list` | base, `-p/-s` paging, `-r`, `--has-attachment`, `-w`, `--json`, empty mbox | ✅ pass; default `-m` → error (see F3) |
-| `envelope search` | from/to/subject/body/flag/date/after, and/or/not/grouping, `order by … asc/desc`, `--json` | ✅ DSL correct; matching + date semantics are server-defined (P1, P2) |
-| `message add` | inline-escape, inline-LF, file, stdin, `-f` multi, `--json` | ✅ pass; empty input (F1), missing `-m` clean error |
-| `message read` | pretty, multipart, `--raw`, `--json`, bad id | ✅ pass; PEEK (no `\Seen`); `--json` is low-level (O1) |
-| `flag add/set/remove` | multi-flag, multi-id, set-replaces, remove, errors | ✅ all pass |
-| `message copy` | single, multi, errors, non-existent id, default source | ✅ copies; F2 + F3 |
-| `message move` | single, source-emptied, errors | ✅ pass; F2 |
-| `attachment list` | multipart, `-i` inline, no-attachment | ✅ all pass |
-| `attachment download` | `-d`, `--json`, collision de-dupe | ✅ all pass |
-| `message compose` | from/to/cc/bcc/subject/body/body-file/attach/signature[-file]/save/send | ✅ all pass |
-| `message send` | raw RFC 5322 via stdin, `--save` | ✅ pass |
-| `message reply` | `Re:`, threading, quote, `-P top/bottom`, `-Q` | ✅ all pass |
-| `message forward` | `Fwd:`, quoted original, `--to`, `--save` | ✅ pass |
-
-SMTP delivery confirmed end-to-end (`compose --send` and `message send`
-both landed in the inbox; delivered copies moved to Trash on cleanup).
+| `account check` | text, `--json` | ✅ `tls` row per backend |
+| `account check` | account `tls.cert` | ✅ both IMAP and SMTP name it; a missing file fails both, exit 3 |
+| `account check` | `imap.tls.provider` beside the account `tls.cert` | ✅ IMAP shows `rustls, cert …`, SMTP `cert …` (field-by-field override) |
+| config | `tls.certs` at account level | ✅ refused by serde, naming the line and the known keys |
+| `mailbox list` / `create` / `delete` | `--counts`, `--json` | ✅ |
+| `envelope list` | base, `-s 2 -p 2`, `-r` (group members listed alone), `--json`, empty mailbox, default mailbox | ✅ |
+| `envelope search` | `today`, `yesterday`, `2 days ago`, `1 week ago`, `15-11-2026`, `5 hours ago` after and before, an RFC 3339 instant in UTC | ✅ |
+| `envelope search` | an instant under `or` or `not` | ✅ refused `search-unsupported` |
+| `envelope search` | `date 1 hour ago`, `after 15-11-26`, 200 nested parentheses | ✅ refused `search-invalid` |
+| `envelope search` | `order by date asc`, `order by subject desc`, `flag … or flag …`, `not flag seen`, `body`, `message-id`, `subject rep` | ✅ (word matching, P1) |
+| `envelope search` | `attachment` | ✅ refused `search-unsupported` |
+| `message add` | file, stdin, `-f` multi, `--json`, empty, a missing path holding a colon | ✅; the colon path is refused as no file and no header (HIM-5) |
+| `message add` | missing mailbox | ⚠️ uncoded (F4) |
+| `message read` | pretty, multipart, `--raw`, `--json`, unknown id, `--seen` | ✅ PEEK by default; `--seen` sets `\Seen` |
+| `message read` | `-m sent` (a role, the server naming it `Sent`) | ✅ resolved (HIM-7); `imap select sent` answers `NO` |
+| `flag add/set/remove` | multi-flag, multi-id, set replaces, unknown id beside a real one, errors | ✅ item error, exit 3 |
+| `message copy` / `move` | single, multi, unknown id, missing `--to` | ✅ counts from `COPYUID`, item error exit 3 |
+| `message move` | missing target | ⚠️ uncoded (F4) |
+| `message delete` | from `A`, then from `trash` | ✅ `moved-to-trash`, then `deleted` |
+| `attachment list` / `download` | `-i`, none, `--json`, second download | ✅ `note (1).txt`, files 0600 |
+| `message compose` | from/to/cc/bcc/subject/body/body-file/attach/signature/signature-file/save/send | ✅ |
+| `message send` | `--save` of a missing mailbox | ✅ `sent: true`, `saved: false`, item error, exit 3; uncoded (F4) |
+| `message reply` | `--save`, `--send --no-save` | ✅ `Re:`, threading, quote; source flagged `\Answered` |
+| `message forward` | `--save` | ✅ |
 
 ## Findings
 
 ### Bugs / issues
 
-- **F1: empty message is not validated client-side. FIXED.**
-  `message add -m "$A" -- ''` used to reach the server and fail with
-  `IMAP APPEND failed: NO Zero-length message literal`. `MessageArg`
-  now resolves the message first and rejects an empty result uniformly
-  (positional `''`, empty file, empty stdin) with `Error: Message is
-  empty`; a TTY with no input gives `No message provided: …`.
-
-- **F2: no-op copy/move reported success. FIXED.** IMAP `UID COPY`/
-  `UID MOVE` of a UID that does not exist is a server no-op that returns
-  `OK`, so himalaya used to print `Message(s) successfully copied/moved`
-  although nothing moved. `copy_messages`/`move_messages` now return the
-  **actual affected count** and the command prints it: `N message(s)
-  successfully copied`, or `No message copied: no id matched in the
-  source mailbox` when zero. Sources of truth per backend: IMAP reads
-  the UIDPLUS `COPYUID` source set (absent ⇒ 0 on a UIDPLUS server, else
-  the requested count); JMAP uses `Email/set.updated`; the other
-  backends error per id, so their success count equals the request.
-  - Sub-fix in **io-imap**: MOVE's `COPYUID` arrives in an *untagged*
-    `OK` (RFC 6851 §4.4), which the coroutine ignored: it only read the
-    tagged reply: so every successful move reported `0`. `move.rs` now
-    also scans untagged codes (+ a regression test). himalaya
-    path-patches io-imap until a release >0.2.0 ships this.
-
-- **F3: inconsistent default-mailbox resolution across unified
-  commands. FIXED.** `copy`/`move` used to hardcode
-  `#[arg(default_value = "Inbox")]` on `--from`, silently selecting the
-  literal INBOX, while `envelope list`/`search` required
-  `mailbox.alias.inbox`. `--from` is now `Option<String>` resolved via
-  the shared `resolve_mailbox_or_default`, so an omitted source falls
-  back to the `inbox` alias and errors identically when none is
-  configured. Every unified command now shares one policy: names come
-  from the user or the alias map; the shared layer never guesses an
-  inbox id.
+- **F4: a missing IMAP mailbox is not coded `mailbox-not-found`.** The code table of commands.md lists IMAP under `mailbox-not-found`, and the send-copy scenario prints that code, but the reads and writes that meet the server's `NO` print `code: null`:
+  - `himalaya -a fastmail --json envelope list -m himalaya-v3-live-nope` prints `{"code":null,"error":"IMAP SELECT failed: NO Mailbox does not exist",…}`, exit 1;
+  - `himalaya -a fastmail --json message add -m himalaya-v3-live-nope -- alpha.eml` prints `{"code":null,"error":"IMAP APPEND failed: NO Mailbox does not exist",…}`, exit 1;
+  - `himalaya -a fastmail --json message move -f himalaya-v3-live-A -t himalaya-v3-live-nope 5` prints `{"code":null,"error":"IMAP MOVE failed: NO Mailbox does not exist",…}`, exit 1;
+  - `himalaya -a fastmail --json message send --save himalaya-v3-live-nope -- send1.eml` prints `{"id":null,"saved":false,"sent":true,"queued":false,"errors":[{"id":null,"code":null,"error":"Message sent, but saving a copy to himalaya-v3-live-nope failed","sources":["IMAP APPEND failed: NO Mailbox does not exist"]}]}`, exit 3.
+  src/imap/backend.rs `explain` codes a missing mailbox for the writes it wraps (a create under a parent); `SELECT`, `APPEND` and `MOVE` do not pass through it. Fastmail answers a plain `NO` with no `[NONEXISTENT]` code.
 
 ### Provider-specific behaviour (not bugs)
 
-- **P1: Fastmail search is word/token-based, not substring.**
-  `from ali`, `subject nline`, single letters `subject e` / `subject a`
-  all return 0; whole words (`from alice`, `subject inline`,
-  `subject Eta`) match. The trace shows himalaya issues the correct
-  `SEARCH SUBJECT "e"` (inside a UID `SORT`); Fastmail's full-text index
-  decides matching. Users expecting substring search will be surprised:
-  worth documenting per provider (Dovecot-based servers may differ).
-
-- **P2: `date`/`after` target the `Date:` header (sent date), not
-  server arrival.** Freshly-appended messages (all with today's
-  INTERNALDATE) still filtered by their `Date:` header:
-  `after 2026-07-16` returned only the 17th-dated messages,
-  `date 2026-07-16` returned the single 16th-dated one. This makes the
-  RFC 2822 date parser (and the wrong-weekday tolerance fix) load-bearing
-  for search correctness.
-
-- **P3: omitting `-m` needs `mailbox.alias.inbox`.** By design there is
-  no universal inbox default (JMAP's inbox is an opaque id), so the
-  fallback requires an explicit alias; without it the error is clear and
-  actionable. Set `mailbox.alias.inbox = "Inbox"` to use bare `-m`-less
-  commands on IMAP.
+- **P1: Fastmail (Cyrus) matches whole words.** `subject rep` finds nothing, `subject report` finds both; himalaya sends the substring `SEARCH` the RFC asks for.
+- **P2: date clauses read the `Date:` header**, as the help says: every fixture arrived within the same minute and still split by its `Date:` on `yesterday`, `2 days ago` and the instants.
+- **P4: the listing follows arrival.** `envelope list` orders by UID, newest first: Epsilon (dated 10 days ago, added fifth) lists above Delta (3 days ago, added fourth). Use `envelope search order by date desc` for the `Date:` order.
 
 ### Observations
 
-- **O1: `message read --json`** emits the raw `mail_parser` `Message`
-  structure (byte offsets, nested `parts`), which is low-level compared
-  to the clean `envelope list --json` shape. Fine for machine use, but
-  not an obvious public contract.
-- `message read` uses `BODY.PEEK[]`: reading does not set `\Seen`.
-- `attachment download` de-duplicates filename collisions on disk
-  (`note.txt` → `note (1).txt`).
-- `forward` quotes the original body with `> …` (like a reply) rather
-  than a `-------- Forwarded message --------` block: a stylistic
-  choice, flagged for awareness.
-- Flag table symbols: `*` = unseen, `!` = flagged, blank = seen.
+- An account-level `tls.cert` that does not exist fails every transport with `No such file or directory (os error 2)` and `code: null`: the message does not name the path, which the row's `tls.cert` does.
+- `after 15-11-26` is refused, but its diagnostic reads `found -11-26, expected something else or space after the number` rather than naming the four-digit year.
+- A reply composed on an account without `email` and without `--from` carries no `From:`; the composer's `Message-ID` then sits on the machine's hostname, as the composer spec says.
+- Flag table symbols: `*` unseen, `!` flagged, `R` answered, `@` attachment (JMAP, Maildir).
 
 ## Verdict
 
-IMAP + SMTP on Fastmail is **solid and release-ready** for the unified
-command surface: every command and flag works, output (table + JSON) is
-correct, error handling is clean. No functional blocker. F1 (empty-input
-validation), F2 (accurate copy/move counts, incl. the io-imap untagged
-MOVE `COPYUID` sub-fix) and F3 (default-mailbox consistency) are all
-**fixed**. P1/P2/P3 are provider/design behaviours to document, not fix.
+IMAP + SMTP on Fastmail is **solid for v3**: relative dates and instants, the bounded query, the account-level TLS policy and `account check` rows, role resolution on reads, the send-copy receipt with exit 3 and private downloads all pass against the live server. One bug: a missing mailbox is uncoded on IMAP (F4), against the code table.

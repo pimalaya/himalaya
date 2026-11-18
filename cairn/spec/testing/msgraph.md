@@ -6,77 +6,45 @@ status: current
 
 # Microsoft Graph on Outlook: unified-command test report
 
-Unified commands on the Microsoft Graph backend.
-Companion: [msgraph-specific.md](msgraph-specific.md) (the `msgraph …`
-raw API). Method: [provider-test-plan.md](provider-test-plan.md),
-inside a throwaway Graph mail folder.
+Unified commands on the Microsoft Graph backend. Companion: [msgraph-specific.md](msgraph-specific.md) (the `msgraph …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside throwaway mail folders.
 
-- himalaya: `v2.0.0-alpha.1 +msgraph +rustls-ring` (working tree)
-- account: `msgraph` (Microsoft Graph REST API, OAuth via `ortie token
-  show -a msgraph`; a bearer token scoped to `https://graph.microsoft.com`
-  mail permissions: `Mail.ReadWrite`, `Mail.Send`)
-- date: 2026-07-18
-- account locale: French (folder display names are localised, e.g.
-  `Boîte de réception` for the inbox), which makes the name→id issue easy
-  to see: Graph accepts English *well-known* names (`inbox`, `archive`,
-  …) in the path but not the localised display name.
-- fixtures: two throwaway folders `Himalaya-Test` / `Himalaya-Test-2`,
-  populated with two drafts created straight into the folder (one
-  `multipart/mixed` with a small `note.txt` attachment). Both folders and
-  every sent-test message were deleted afterwards; Deleted Items checked
-  clean.
+- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features
+- account: `microsoft` (Microsoft Graph, `msgraph.auth.token.command`), the Exchange Online test tenant, which holds a fake corpus kept untouched; its folders list under their English names (`Inbox`, `Sent Items`, `Deleted Items`) although the user's preferred language is French
+- date: 2026-11-18
+- fixtures: folders `himalaya-v3-live-A` and `himalaya-v3-live-B`; Graph has no MIME append, so six drafts were made with `msgraph messages create` (the same relative dates as the other reports) and moved into `A` with `message move -f drafts`. Both folders were deleted at the end, after the run's Inbox and Sent Items copies were moved into `A`; Inbox, Sent Items, Drafts and Deleted Items hold no run message.
+- live suite: `cargo test --test microsoft -- --ignored`, 11 passed (anonymous and credentialed, `graph_writes` included).
 
 ## Results
 
 | Command | Variants | Result |
 | --- | --- | --- |
-| `mailbox list` | base (folders + counts) | ✅ |
-| `envelope list` | by folder **name**, by id, well-known name, `-s`, `--json` | ✅ (name resolves, M1 fixed) |
-| `envelope search` | - | ⚪ Graph has no shared search (bails cleanly) |
-| `message add` | - | ⚪ Graph has no append (bails cleanly) |
-| `message read` | pretty, `--json` (folder ignored) | ✅ |
-| `flag add/set/remove` | seen/flagged/importance → Graph scalar fields | ✅ |
-| `message copy` / `move` | `--from`/`--to` by name, F2 counts | ✅ |
-| `attachment list` / `download` | list, `-d` | ✅ |
-| `message send` | real send to self | ✅ delivered (Inbox + Sent) |
+| `account check` | text, `--json` | ✅ |
+| `mailbox list` / `create` / `delete` | `--counts` | ✅ |
+| `envelope list` | by name, `-s 2 -p 2`, `-r`, empty folder, role `inbox` | ✅ |
+| `envelope search` | `yesterday`, `2 days ago`, `1 week ago`, `from … and (… or attachment)`, `order by date asc`, `body`, `attachment`, `message-id`, `not from`, `from … or from …`, `subject OR` | ✅ |
+| `envelope search` | `after 5 hours ago`, `flag flagged` | ✅ refused `search-unsupported` (KQL compares days, has no flag) |
+| `message add` | | ✅ refused `capability-missing` (Graph creates drafts only) |
+| `message read` | pretty, `--raw`, malformed id | ✅ (`message-not-found`, Graph's 400 in `sources`) |
+| `flag add/set/remove` | seen, flagged, important, malformed id beside a real one | ✅ item error exit 3; `answered` refused `capability-missing` |
+| `message copy` / `move` | multi-id, malformed id, missing target | ✅; missing target uncoded (M4) |
+| `attachment list` / `download` | `--json` | ✅ file 0600 |
+| `message send` | `--no-save` | ✅ refused `capability-missing` before connecting |
+| `message send` | `--save` of a missing folder | ✅ `saved: true`, `sent: true` (Graph files in Sent Items, `--save` ignored) |
+| `message reply --send` | to self | ✅ |
 
 ## Findings
 
 ### Bugs
 
-- **M1: unified `-m <folder-name>` now resolves to a folder id. FIXED.**
-  `envelope list -m "Boîte de réception"` (a localised display name) used
-  to fail `HTTP 400 (ErrorInvalidIdMalformed): Id is malformed`; only the
-  opaque id or an English well-known name (`inbox`) worked. Graph mail
-  folders are opaque-id + display-name like JMAP mailboxes and Gmail
-  labels, so `MsgraphClient` now gains a cached `resolve_mailbox_id`
-  (name → id via a `mailFolders` listing, id passthrough, unknown value
-  handed back so Graph well-known names still reach the API), wired into
-  `EmailClient::resolve_mailbox_id` next to the JMAP and Gmail arms.
-  Verified: `envelope list`/`flag`/`copy`/`move` now address folders by
-  localised name, by opaque id, or by well-known name.
+- **M4: a missing folder is reported without a code.** `himalaya -a microsoft --json message move -f himalaya-v3-live-A -t himalaya-v3-live-nope <id>` prints ``{"code":null,"error":"Mailbox `himalaya-v3-live-nope` not found",…}``, exit 1. Same class as Gmail G6 and IMAP F4; Graph is not in the `mailbox-not-found` row of the code table, so it is a gap there rather than a broken promise.
 
 ### Behaviour (not bugs)
 
-- `message read` works regardless of `-m` because the Graph backend
-  fetches by the globally-unique message id and ignores the folder (like
-  JMAP `get_message` and the Gmail backend).
-- `message add` and `envelope search` bail with clear messages
-  (`Microsoft Graph does not support adding messages` / `… the unified
-  envelope search`): Graph has no MIME append and no server-side
-  shared-query search (its own `$search`/`$filter` live on the specific
-  `msgraph messages list`).
-- `flag`/`copy`/`move` map onto Graph's model: `seen` = `isRead`,
-  `flagged` = the follow-up flag, `important` = `importance: high`,
-  non-IANA flags = `categories`; copy = `POST /messages/{id}/copy`, move
-  = `POST /messages/{id}/move`. The compact text FLAGS column has no
-  glyph for `\Draft`/`\Seen`, so freshly-created read drafts show an
-  empty column even though `--json` lists the flags correctly.
+- Graph files every sent message in Sent Items itself: `--save` is ignored on a send and the receipt says `saved: true` with a `null` id; `--no-save` is refused before connecting. The send-copy failure path cannot be provoked on Graph.
+- Instants are refused (`after 5 hours ago`): KQL `sent` compares days, as the search spec says.
+- Moved drafts keep `\Draft` (Graph's `isDraft` is read-only), so every fixture listed `\Draft`.
+- `envelope list -r` shows the account owner's display name for its own address, as Graph's directory resolves it.
 
 ## Verdict
 
-Unified commands on Microsoft Graph are **solid** for the supported
-subset (Graph legitimately lacks unified `add`/`search`):
-list/read/flag/copy/move/attachment/send all work, now addressing
-folders by **name, id, or well-known name** (M1 fixed). No functional
-blocker.
+Unified commands on Graph are **solid** for the subset Graph serves: list, search (days, KQL text, `attachment`, `message-id`), read, flags, copy, move, attachments and send all pass, and the unsupported cells are refused with a code before any write. One gap: a missing folder is uncoded (M4).

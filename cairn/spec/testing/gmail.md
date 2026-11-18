@@ -6,65 +6,50 @@ status: current
 
 # Gmail REST on Google: unified-command test report
 
-Unified commands on the Gmail REST backend. Companion:
-[gmail-specific.md](gmail-specific.md) (the `gmail …` raw API). Method:
-[provider-test-plan.md](provider-test-plan.md), inside a throwaway Gmail
-label.
+Unified commands on the Gmail REST backend. Companion: [gmail-specific.md](gmail-specific.md) (the `gmail …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside throwaway labels.
 
-- himalaya: `v2.0.0-alpha.1 +gmail +rustls-ring` (working tree)
-- account: `gmail` (Gmail REST API, OAuth via `ortie token show -a
-  gmail`; needs a token scoped to `https://mail.google.com/`, not
-  `carddav`)
-- date: 2026-07-17
-- fixtures: a fake label `Himalaya-Test` (`Label_7`) with a few inserted
-  messages (one `multipart/mixed` with a small `note.txt` attachment).
+- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features; `--version` still prints `v2.2.1`
+- account: `google` (Gmail REST API, `gmail.auth.token.command`), the pimalaya.org Workspace test mailbox, which holds a fake corpus kept untouched
+- date: 2026-11-18
+- fixtures: labels `himalaya-v3-live-A` (`Label_532`), `himalaya-v3-live-B` (`Label_533`) and `himalaya-v3-live-T` (`Label_534`, 120 messages for the unpaged listing), six messages added with `message add` dated relative to the run (3 hours, 8 hours, yesterday, 3 days, 10 days ago, and a `multipart/mixed` with `note.txt`). Every message and label the run made was deleted at the end; the profile counts came back to 487 messages and 419 threads.
+- live suite: `cargo test --test google -- --ignored`, 11 passed (anonymous and credentialed, `gmail_writes` included).
 
 ## Results
 
 | Command | Variants | Result |
 | --- | --- | --- |
-| `mailbox list` | base (labels) | ✅ |
-| `envelope list` | by label **id**, paging, `-r`, `--json` | ✅ by id; **by name fails** (G1) |
-| `envelope search` | - | ⚪ Gmail has no shared search (bails cleanly) |
-| `message add` | - | ⚪ Gmail has no append (bails cleanly) |
-| `message read` | pretty, `--raw`, `--json` | ✅ (label ignored) |
-| `flag add/set/remove` | seen/flagged → Gmail labels | ✅ |
-| `message copy` / `move` | label add / add+remove, F2 counts | ✅ |
-| `attachment list` / `download` | list, `-d` | ✅ (reads inline data) |
-| `message send` | real send | ✅ delivered |
+| `account check` | text, `--json` (row `tls` all `null`) | ✅ |
+| `mailbox list` | `--counts` | ✅ |
+| `mailbox create` / `rename` / `delete` | label lifecycle, rename by id | ✅ |
+| `envelope list` | by name, by id, `-s 2 -p 2`, `--json`, empty label | ✅ |
+| `envelope list -s 0` | 120 messages over two Gmail pages | ✅ all 120, `nextPage` `null` |
+| `envelope search` | `today`, `yesterday`, `2 days ago`, `1 week ago`, `5 hours ago` (after, before, under `or` and `not`) | ✅ |
+| `envelope search` | conjunctions under a disjunction, `from … and (… or attachment)`, `order by date asc`, `flag flagged or not flag seen`, `body`, `attachment`, `message-id`, `subject OR` | ✅ |
+| `envelope search` | `flag answered`, `after 15-11-26` | ✅ refused (`search-unsupported`, `search-invalid`) |
+| `message add` | `-f seen`, `-f flagged`, `--json` | ✅; `-f answered` refused `capability-missing` |
+| `message read` | pretty, multipart, `--raw`, `--json`, unknown id | ✅ (`message-not-found`) |
+| `flag add/set/remove` | seen, flagged, important, unknown id beside a real one | ✅ (item error, exit 3); answered refused `capability-missing` |
+| `message copy` / `move` | multi-id, unknown id, missing target label | ✅; missing label uncoded (G6) |
+| `attachment list` / `download` | `--json`, second download | ✅ `note (1).txt`, files 0600 |
+| `message send` | `--save` of a missing label | ✅ `sent: true`, item error, exit 3; uncoded (G6) |
+| `message compose --send --save` | to self | ✅ one message, labelled, its id reported |
+| `message reply --send --no-save` / `forward --save` | to self | ✅ |
+| rate limit | per-minute quota met during the search run | ✅ items `rate-limited`, exit 3 |
 
 ## Findings
 
 ### Bugs
 
-- **G1: unified `-m <label-name>` now resolves to a label id. FIXED.**
-  `envelope list -m Himalaya-Test` used to fail `HTTP 400: Invalid
-  label`; only `-m Label_7` (the opaque id) worked. Gmail labels are
-  opaque-id + display-name like JMAP mailboxes, so `GmailClient` now
-  gains a cached `resolve_mailbox_id` (name → id via `labels.list`, id
-  passthrough), wired into `EmailClient::resolve_mailbox_id` next to the
-  JMAP arm. Verified: `envelope list`/`flag`/`copy`/`move` now address
-  labels by name (and ids still work).
+- **G6: a missing label is reported without a code.** `himalaya -a google --json message move -f himalaya-v3-live-A -t himalaya-v3-live-nope <id>` prints ``{"code":null,"error":"Gmail has no label `himalaya-v3-live-nope`, by id, name or role",…}``, exit 1, and `message send --save himalaya-v3-live-nope` lists the save failure with `"code":null`, exit 3. The same class shows on IMAP, where the code table promises `mailbox-not-found` (imap-smtp-fastmail.md, F4); Gmail is not named in that row, so here it is a gap rather than a contract break, but "coded by its cause" (*Saving a sent message follows the send*) reads as `mailbox-not-found`.
 
 ### Behaviour (not bugs)
 
-- `message read` works with a label name because the gmail backend
-  fetches by the globally-unique message id and ignores the `-m` label
-  (like JMAP `get_message`).
-- `message add` and `envelope search` bail with clear messages (`Gmail
-  does not support adding messages` / `… the unified envelope search`):
-  Gmail has no append and no server-side shared-query search.
-- `flag`/`copy`/`move` map onto Gmail labels (seen = absence of
-  `UNREAD`, flagged = `STARRED`; copy = add label, move = add + remove).
-
-### Observation
-
-- `message read` renders an empty `Received:` header line: Gmail stamps
-  a `Received` header on inserted/sent messages that parses to empty.
+- The Gmail search reached the per-minute quota (`Units per minute per user`) after about twenty searches in a row. The per-message reads of `envelope search` then printed one `rate-limited` item error each (exit 3), and a whole-command refusal printed `{"refusal":{"status":403,"reason":"rateLimitExceeded",…,"code":"rate-limited","retryAfter":null}}`, exit 3, under `gmail request`. The same searches passed after a two-minute pause. The daily limit (COH-4) was not met.
+- Gmail has no `answered` label: `message add -f answered`, `flag add -f answered` and `envelope search flag answered` are refused before any write. A reply's source is therefore not flagged on Gmail.
+- A message sent to the account itself is one message carrying `INBOX` and `SENT`; `compose --send --save <label>` labels that message rather than adding a copy.
+- An inserted message gains a `Received:` header from `gmailapi.google.com`, which `message read --raw` shows verbatim.
+- Gmail date clauses compare the received date (`partial`); the inserted fixtures took their `Date:` as the internal date, so the relative-date cells matched as on the local backends.
 
 ## Verdict
 
-Unified commands on Gmail are **solid** for the supported subset (Gmail
-legitimately lacks unified `add`/`search`): list/read/flag/copy/move/
-attachment/send all work, now addressing labels by **name or id** (G1
-fixed). No functional blocker.
+Unified commands on Gmail are **solid**: `message add` and `envelope search` now work, the unpaged listing reads every page (HIM-3), conjunctions under `or` keep their groups (HIM-2), relative dates and instants resolve as specified, and the rate-limited code reaches both item errors and refusals. One gap: a missing label is uncoded (G6).

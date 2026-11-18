@@ -6,84 +6,54 @@ status: current
 
 # Maildir (local): unified-command test report
 
-Unified commands on the Maildir backend. Companion:
-[maildir-specific.md](maildir-specific.md) (the `maildir …` raw API).
-Method: [provider-test-plan.md](provider-test-plan.md), against a
-throwaway Maildir tree in `/tmp`.
+Unified commands on the Maildir backend. Companion: [maildir-specific.md](maildir-specific.md) (the `maildir …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), against a throwaway Maildir tree.
 
-- himalaya: `v2.0.0-alpha.1 +maildir +rustls-ring` (working tree).
-  **`maildir` is not a default feature** (the default local backend is
-  `m2dir`); build with `cargo build --features maildir`.
-- backend: local filesystem, io-maildir default **fs layout** (root is
-  itself INBOX, subfolders are real nested dirs with their own
-  `cur`/`new`/`tmp`, not the dot-prefixed Maildir++ layout).
-- date: 2026-07-18
-- fixture: `/tmp/himalaya-maildir` with `cur`/`new`/`tmp` at the root
-  and three subfolders `Archive` / `Sent` / `Drafts`, config:
+- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features (`maildir` is one)
+- backend: local filesystem, io-maildir fs layout (the root is INBOX, subfolders are nested directories with their own `cur`/`new`/`tmp`)
+- date: 2026-11-18
+- fixture: an empty store in the session's scratchpad, config:
 
   ```toml
   [accounts.maildir]
-  maildir.root = "/tmp/himalaya-maildir"
-  mailbox.alias.inbox = "/tmp/himalaya-maildir"
+  maildir.root = "<scratchpad>/stores/maildir"
+  mailbox.alias.inbox = "INBOX"
   ```
+
+  with the six messages of the network runs (dated 3 hours to 10 days before it, one `multipart/mixed` with `note.txt`).
 
 ## Results
 
 | Command | Variants | Result |
 | --- | --- | --- |
-| `mailbox list` | base | ✅ (id = path, name = last segment) |
-| `envelope list` | by name, by `.`, by **absolute id**, by `inbox` alias, default, `--json` | ✅ (absolute id / alias fixed, D1) |
-| `envelope search` | `-- subject <term>` | ✅ (client-side filter) |
-| `message add` | into root (`-m .`) and subfolders | ✅ |
-| `message read` | pretty, `--json` | ✅ |
-| `flag add/set/remove` | seen/flagged/answered → `S`/`F`/`R` on disk | ✅ |
-| `message copy` / `move` | `--from`/`--to`, counts | ✅ (new id on delivery) |
-| `attachment list` / `download` | list, `-d` | ✅ |
-| `message send` | no send backend, no SMTP | ⚪ bails cleanly |
+| `account check` | text, `--json` | ✅ `tls` `null` |
+| `mailbox list` / `create` | `--json` | ✅ (id = path) |
+| `envelope list` | default, `.`, absolute root, `inbox` alias, `-s 2 -p 2`, `-r`, empty folder | ✅ date-descending |
+| `envelope list` | missing folder | ✅ `mailbox-not-found`, exit 1 |
+| `envelope search` | `today`, `yesterday`, `2 days ago`, `1 week ago`, `5 hours ago` after, before, under `or` and `not` | ✅ |
+| `envelope search` | `from … and (… or attachment)`, `subject rep` (substring), flags, `body`, `attachment`, `message-id` | ✅ |
+| `envelope search` | `date 1 hour ago` | ✅ refused `search-invalid` |
+| `message add` | `-f` flags, `--json` | ✅ `S`/`F`/`RS` on disk |
+| `message read` | pretty, multipart, `--raw`, `--raw --json`, unknown id | ✅ (`message-not-found`) |
+| `flag add/set/remove` | multi-flag, multi-id, set replaces, unknown id beside a real one | ✅ item error, exit 3 |
+| `message copy` / `move` | multi-id, unknown id, missing target | ✅ item error exit 3; missing target `mailbox-not-found` |
+| `attachment list` / `download` | `--json` | ✅ file 0600 |
+| `message compose` / `reply` | `--save B` | ✅ |
+| `message send` | no sending backend | ✅ refused `capability-missing` |
+| `message delete` | no trash folder | ✅ refused `capability-missing`, naming `mailbox.alias.trash` |
 
 ## Findings
 
 ### Bugs
 
-- **D1: the mailbox id from `mailbox list` (and an absolute `inbox`
-  alias) were not usable as a selector. FIXED.** `mailbox list` prints
-  each mailbox id as its absolute path, but feeding one back
-  (`envelope list -m /tmp/himalaya-maildir/Archive`) failed `path
-  /tmp/himalaya-maildir//tmp/himalaya-maildir/Archive is not a
-  directory`, and `mailbox.alias.inbox = "/tmp/himalaya-maildir"`
-  (the natural way to make the root the default mailbox) failed the same
-  way. Root cause: io-maildir resolves every logical name **relative to
-  the store root**, and himalaya's `resolve_maildir` re-joined the root
-  onto an already-absolute path (io-maildir's `MaildirFsPath::join`
-  concatenates rather than replacing on an absolute component, so
-  `<root> + <root>/Archive`). `resolve_maildir` now reduces an absolute
-  path to its root-relative name first (the empty name maps back to the
-  root/INBOX). Verified: `envelope list` now works by relative name, by
-  the absolute id from `mailbox list`, by the absolute root, by the
-  `inbox` alias, and as the implicit default.
+- None.
 
 ### Behaviour (not bugs)
 
-- Maildir **supports the unified `envelope search`** (it lists then
-  filters/sorts client-side against the already-read bytes), unlike the
-  Gmail and Graph backends which bail.
-- The root maildir is INBOX: `mailbox list` names it `INBOX` with the
-  inbox role (`.` when a top-level `Inbox` folder takes the role, see
-  backends.md "A Maildir is named relative to the root"). Select it by
-  that name, by `.`, by its full path or by omitting `-m`. Subfolders
-  are addressed by their relative name (`-m Archive`, `-m
-  Projects/Work`).
-- `message send` bails with `No send-capable backend (JMAP/Gmail/Graph)
-  or SMTP is configured`: correct: Maildir cannot send, and the fixture
-  has no `[smtp]` block. Add `[smtp]` to send from a Maildir account.
-- `flag`/`copy`/`move` write straight to the Maildir filename info
-  section (`:2,` + `S`/`R`/`F`/`D`/`T`/`P`) and re-deliver copied/moved
-  messages under a fresh id, as Maildir requires.
+- Maildir is the backend where a missing mailbox is coded `mailbox-not-found` on every path the run tried; the network backends print `code: null` there (imap-smtp-fastmail.md F4, jmap-fastmail.md J5, gmail.md G6, msgraph.md M4).
+- Text matching is a case-insensitive substring (`subject rep` finds both reports), and instants compare to the second under `or` and `not` as on the root, the evaluator being local.
+- `message delete` needs a trash: with none marked it is refused before acting, naming the key to set.
+- `message send` needs a sending block (SMTP, JMAP, Gmail, Graph or pimdir).
 
 ## Verdict
 
-Unified commands on Maildir are **solid**: list/search/add/read/flag/
-copy/move/attachment all work, addressing folders by relative name, by
-the absolute id from `mailbox list`, or the root by alias/`.`/path (D1
-fixed). `message send` correctly needs an `[smtp]` block. No functional
-blocker.
+Unified commands on Maildir are **solid**: every list, search (relative dates and instants included), add, read, flag, copy, move, attachment and compose cell passes, with coded refusals. No bug found.

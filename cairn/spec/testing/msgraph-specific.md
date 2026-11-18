@@ -6,82 +6,42 @@ status: current
 
 # Microsoft Graph *specific* API on Outlook: test report
 
-Companion to [msgraph.md](msgraph.md) (unified commands). Exercises
-`himalaya msgraph …`: the raw Microsoft Graph mail surface (profile,
-mail folders, messages, attachments).
+Companion to [msgraph.md](msgraph.md) (unified commands). Exercises `himalaya msgraph …`: the raw Microsoft Graph mail surface.
 
-- himalaya: `v2.0.0-alpha.1 +msgraph +rustls-ring` (working tree)
-- account: `msgraph` (Microsoft Graph REST, OAuth via ortie)
-- date: 2026-07-18
-- method: every `msgraph` subcommand, inside two throwaway folders, per
-  [provider-test-plan.md](provider-test-plan.md). Every folder and
-  sent-test message was deleted afterwards; Deleted Items checked clean.
+- himalaya: release build of master c66b8629, default features
+- account: `microsoft` (Microsoft Graph, the test tenant)
+- date: 2026-11-18
+- method: the `msgraph` subcommands inside the run's folders, per [provider-test-plan.md](provider-test-plan.md). Every folder and message created was deleted.
 
 ## Results
 
 | Command | Variants | Result |
 | --- | --- | --- |
-| `profile get` | text + `--json` | ✅ (`--json` structured, M2 fixed) |
-| `mail-folders list` | text + `--json` | ✅ |
-| `mail-folders get` | by id, `--json` | ✅ |
-| `mail-folders create` | `<name>` | ✅ |
-| `mail-folders rename` | `<id> <name>` | ✅ |
-| `mail-folders delete` | `<id>` (recursive) | ✅ (used for cleanup) |
-| `messages create` | `--folder <id>`, raw MIME | ✅ draft placed in folder |
-| `messages list` | `--folder`, `--top`/`--skip` | ✅ |
-| `messages get` | parsed + `--raw` | ✅ |
-| `messages update` | `--read`/`--unread`, `--importance`, `--category` | ✅ |
-| `messages send` | raw MIME | ✅ delivered |
-| `messages copy` | `<id> <dest>` | ✅ |
-| `messages move` | `<id> <dest>` | ✅ on a settled id; ⚠️ 405 on a just-copied id (M3) |
-| `messages delete` | permanent | ✅ (used for cleanup) |
-| `attachments list` | `<msg>` | ✅ |
-| `attachments get` | `<msg> <att-id> -o` | ✅ |
-
-Not separately exercised here: `mail-folders child-folders`, `copy`,
-`move` (folder-level), and `attachments create`/`delete`: same request
-shapes as the verified verbs.
+| `profile get` | `--json` | ✅ Graph's `/me` payload as sent |
+| `request` | `get` of a malformed id, text and `--json` | ✅ `{refusal: {status: 400, reason: ErrorInvalidIdMalformed, …}}`, exit 3 |
+| `request` | off-origin URL | ✅ refused `usage-invalid`, exit 2 |
+| `mail-folders create/rename/get/delete` | lifecycle | ✅ |
+| `mail-folders child-folders` | empty folder | ✅ `{folders: [], nextPage: null}` |
+| `messages create` | raw MIME (into Drafts) | ✅ |
+| `messages list` | `--folder --top 2`, `--page-token` of its next link | ✅ Graph's `@odata.nextLink` as `nextPage`, followed as is |
+| `messages list` | `--page-token` beside `--top` | ✅ refused `usage-invalid`, exit 2 |
+| `messages get` | parsed, `--raw` | ✅ Graph's resource whole; raw MIME |
+| `messages update` | `--unread --importance low --category`, no change | ✅; no change refused `usage-invalid`, exit 2 |
+| `messages copy` | `<id> <folder>` | ✅ |
+| `messages move` | malformed id | ✅ refusal 400, exit 3 |
+| `messages send` | raw MIME to self | ✅ `{id: null}` |
+| `attachments list` / `get` | `note.txt` | ✅ |
+| `attachments create` / `delete` | a file on a moved draft | ✅ |
 
 ## Findings
 
 ### Behaviour / usability
 
-- **M2: `msgraph profile get --json` is now structured. FIXED.** It
-  used to emit `{"message":"Id: …\n…"}` because the command formatted a
-  plain `String` into a `Message` (which serializes as `{"message":
-  …}`): the same shape Gmail's `profile get` had before its fix. A
-  dedicated `MsgraphProfileOutput { id, display-name, mail,
-  user-principal-name }` (Display + Serialize) replaces it, so `--json`
-  now emits
-  `{"id":"…","display-name":"…","mail":"…","user-principal-name":"…"}`
-  and the text output is unchanged.
-
-- **M3: moving a *just-copied* message can 405.** `msgraph messages move
-  <id> <dest>` on the id returned directly by `msgraph messages copy`
-  fails `HTTP 405 (ErrorInvalidRequest): The OData request is not
-  supported`. The command is byte-identical to the unified `message move`
-  (both call `message_move`) and works on any settled message id: the
-  405 comes from Graph itself, whose `copy` is **asynchronous**: the id
-  it returns points at a copy still materialising and is not yet
-  operable. Not a himalaya bug; re-list the destination folder to get the
-  settled id before moving it. The raw 405 is surfaced verbatim.
-
-- `msgraph messages create --folder` and `messages list --folder` take a
-  raw folder id or a Graph *well-known* name (`inbox`, `drafts`, …), not
-  a display name: the specific commands mirror the REST path and do not
-  run the shared name→id resolver (that is `msgraph.md`'s M1, a
-  shared-layer convenience). This is the established raw-vs-shared split;
-  the friendly path is the unified `envelope list -m <name>`.
-
-- Graph regenerates the `Date` header on stored/sent messages (a wrong
-  weekday in the submitted MIME comes back corrected), and stamps its own
-  `Message-ID` on `sendMail`. Expected server behaviour.
+- **M3 (kept): Graph's `copy` is asynchronous.** Not re-provoked in this run; the copy returned an id used by no later command.
+- The specific commands take folder ids or Graph's well-known names, not display names; the unified commands resolve names (msgraph.md).
+- A deleted mail folder did not show under Deleted Items' child folders afterwards.
+- `messages send` answers `{id: null}`, `sendMail` returning no id; the delivered copy is found by subject.
 
 ## Verdict
 
-The Microsoft Graph mail surface is **broad and works**: profile, mail
-folders (list/get/create/rename/delete), messages
-(create/list/get/update/send/copy/move/delete) and attachments
-(list/get) all behave. **M2** (profile `--json`) is **fixed**. **M3**
-(move a just-copied id → 405) is Graph's asynchronous-copy semantics, not
-a bug. No functional blocker.
+The raw Graph surface **works end-to-end**: refusals print the refusal object with exit 3, the next link pages as given and refuses query options beside it, and the arguments Graph would refuse are refused before the session. No bug found on this surface.

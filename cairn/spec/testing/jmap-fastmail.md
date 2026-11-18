@@ -6,85 +6,51 @@ status: current
 
 # JMAP on Fastmail: unified-command test report
 
-Unified commands on the JMAP backend. Companion:
-[jmap-specific-fastmail.md](jmap-specific-fastmail.md) (the `jmap …` raw
-API). Method: [provider-test-plan.md](provider-test-plan.md), every
-command × flag by hand inside two throwaway JMAP mailboxes
-(`Himalaya-Jmap-A`/`-B`).
+Unified commands on the JMAP backend. Companion: [jmap-specific-fastmail.md](jmap-specific-fastmail.md) (the `jmap …` raw API). Method: [provider-test-plan.md](provider-test-plan.md), inside two throwaway JMAP mailboxes (`himalaya-v3-live-J1`/`-J2`).
 
-- himalaya: `v2.0.0-alpha.1 +jmap +rustls-ring` (working tree with the
-  shared-JMAP name→id, blob-download, CRLF, F1/F2/F3 fixes)
-- account: `fastmail-jmap` (`jmap.server = api.fastmail.com`, bearer
-  token)
-- date: 2026-07-17
-- fixtures: 5 messages (Alpha…Epsilon) with distinct
-  sender/subject/date/flags + one `multipart/mixed` with a `note.txt`
-  attachment.
+- himalaya: release build of master c66b8629 (the three v3 batches of 2026-11-18), default features
+- account: `fastmail-jmap` (`jmap.server = https://api.fastmail.com/jmap/session`, bearer token; no identity or drafts id configured)
+- date: 2026-11-18
+- fixtures: the six messages of the IMAP run (dated 3 hours to 10 days before it, one `multipart/mixed` with `note.txt`), imported with `message add`. Fastmail deduplicated them against the identical bytes the IMAP run had appended: each import returned the existing Email, now in both run mailboxes (J2). Everything was deleted at the end with the run mailboxes; a whole-account `jmap email query --subject v3live` finds nothing.
+- live suite: `cargo test --test fastmail -- --ignored`, 2 passed (anonymous only: Fastmail issues tokens through a browser consent).
 
 ## Results
 
 | Command | Variants tested | Result |
 | --- | --- | --- |
-| `mailbox list` | base, `--counts` (inline), `--json` | ✅ |
-| `envelope list` | base, paging, `-r`, `--has-attachment`, `--json`, by-name **and** by-opaque-id, empty mbox | ✅ |
-| `envelope search` | from/to/subject/body/flag/not, date/after, and/or/grouping, `order by … asc/desc`, `--json` | ✅ (see J1) |
-| `message add` | inline-esc, inline-LF, stdin, `--json`, `-f`; empty → `Message is empty` | ✅ |
-| `message read` | pretty, multipart, `--raw`, `--json`, bad id | ✅ (blob download OK) |
-| `flag add/set/remove` | multi-flag, set-replaces, remove | ✅ |
-| `message copy` / `move` | by name, F2 counts, bogus id | ✅ (J2) |
-| `attachment list` / `download` | list, `-i`, `-d` | ✅ |
-| `message compose` | from/to/cc/bcc/subject/body/body-file/attach/signature/`--save` | ✅ |
-| `message reply` / `forward` | `--save` (threading, `Re:`/`Fwd:`, quote) | ✅ |
-| `message send` / `compose --send` | JMAP submission path | ✅ (auto-discovers identity + drafts, J3) |
-
-Every earlier shared-JMAP bug (name-as-`inMailbox`, import-by-name,
-`message read` 302 redirect) stays fixed: all commands address mailboxes
-by their display **name** and resolve to the opaque id transparently.
+| `account check` | text, `--json` | ✅ |
+| `mailbox list` / `create` / `delete` | `--counts`, `--json` | ✅ |
+| `envelope list` | by name, by id, `-s 2 -p 2`, `-r`, empty mailbox | ✅ |
+| `envelope search` | `today`, `yesterday`, `2 days ago`, `1 week ago`, `5 hours ago` after and before, on the root `and` | ✅ sent date re-checked |
+| `envelope search` | a date under `or` or `not` | ⚠️ reads the received date (J4) |
+| `envelope search` | `from … and (… or attachment)`, `order by date asc`, `order by subject desc`, flags, `body`, `attachment`, `subject rep` | ✅ (word matching) |
+| `envelope search` | `message-id` | ✅ refused `search-unsupported` |
+| `message add` | `-f`, `--json` | ✅ |
+| `message read` | pretty, multipart, `--raw` (and `--json` Base64), unknown id | ✅ (`message-not-found`) |
+| `flag add/set/remove` | multi-flag, set replaces, unknown id beside a real one | ✅ item error, exit 3 |
+| `message copy` / `move` | multi-id, unknown id | ✅ item error, exit 3 |
+| `message move` | missing target | ⚠️ uncoded (J5) |
+| `attachment list` / `download` | `--json`, second download | ✅ `note (1).txt` |
+| `message send` | `--save` of a missing mailbox | ✅ `sent: true`, item error, exit 3; uncoded (J5) |
+| `message compose --send --save` | to self | ✅ |
+| `message reply --send --no-save` | to self | ✅ (J6) |
+| `message forward --save` | | ✅ |
+| `vacation get` | | ✅ `Enabled: no` |
 
 ## Findings
 
+### Bugs
+
+- **J5: a missing mailbox is reported without a code.** `himalaya -a fastmail-jmap --json message move -f himalaya-v3-live-J1 -t himalaya-v3-live-nope <id>` prints ``{"code":null,"error":"Mailbox `himalaya-v3-live-nope` not found",…}``, exit 1, and the send copy to a missing mailbox lists `"code":null`. Same class as IMAP F4; JMAP's unified commands are not named in the `mailbox-not-found` row, so this is a gap rather than a broken promise.
+
 ### Behaviour / config (not bugs)
 
-- **J1: `envelope search` attached short flags land in the query.**
-  `envelope search -m A -s20 order by date asc` fails with `cannot parse
-  search emails query \`-s20\``: the trailing `[QUERY]...` positional
-  swallows the attached `-s20`. The spaced `-s 20` and `--page-size 20`
-  both work. Inconsistent with `envelope list` (no trailing positional),
-  where `-s20` is fine: worth documenting, and a candidate for a clap
-  tweak. Not a JMAP/logic bug: sort + pagination work with the spaced
-  form.
-
-- **J2: copy/move counts, bogus ids.** F2 counts work on JMAP
-  (`Email/set.updated`): `1 message successfully copied`, etc. A bogus id
-  **errors** (`Email/set failed for: <id>`, via `bail_on_not_updated`)
-  rather than the IMAP no-op: stricter, and fine.
-
-- **J3: JMAP send config is now auto-discovered. FIXED.** `message
-  send` / `compose --send` used to fail with `JMAP \`identity_id\` is
-  required to send` because this account sets only server + token. The
-  JMAP backend now falls back when those config fields are omitted: the
-  identity from the account's default (first `Identity/get`), the drafts
-  mailbox from the `drafts`-role mailbox (`Mailbox/get`). Set
-  `identity_id` / `drafts_mailbox_id` only to pin specific ones.
-  Verified: `message send` and `compose --send` deliver from this
-  minimal (server + token) account with no extra config. A clear error
-  is still raised if the account genuinely has no identity or no
-  `drafts`-role mailbox.
-
-- Date semantics match the shared DSL: `date`/`after` filter `receivedAt`
-  on the wire then re-check `sentAt` client-side, so results follow the
-  `Date:` header (Gamma@16th matched `date 2026-07-16`, excluded from
-  `after 2026-07-16`).
-
-- JMAP query index is eventually consistent right after a burst of
-  imports: a sort-only query returned stale (empty) results once, then
-  self-corrected. Not reproducible after settling.
+- **J4: under `or` or `not`, a date clause reads the received date.** `envelope search -m himalaya-v3-live-J1 -- after 5 hours ago or from eve` listed all six messages and `not after 5 hours ago` (or `not after yesterday`) none, because every fixture was received minutes before. search.md specifies it (the client-side residual cannot hold across a disjunction or a negation, the JMAP date clauses declared `partial`), but `envelope search --help` says "A date clause reads the `Date:` header": the help could name the exception, as it does for IMAP's instants.
+- **J6: a JMAP send always lands in Sent.** The submission's `onSuccessUpdateEmail` moves the message to the sent role, so `reply --send --no-save` and the send whose `--save` failed both left a copy in Sent while their receipts said `saved: false`. backends.md specifies the move; the receipt does not count it as a save.
+- **J2 (kept): a bogus id is an item error** coded `message-not-found`, never a silent no-op.
+- Sending works from the minimal account (identity and drafts mailbox discovered, J3).
+- A raw message without `Date:` sent through `message send` keeps none: the Sent copy lists no date.
 
 ## Verdict
 
-Unified commands on JMAP are **solid and release-ready**: every command
-and flag works, addressing mailboxes by name via the id resolver, table
-+ JSON output correct, errors clean. No functional blocker. J1 is a
-minor CLI-ergonomics nit (left in docs); J3 is **fixed**: JMAP send now
-works from a minimal server + token account by auto-discovering the
-identity and drafts mailbox.
+Unified commands on JMAP are **solid**: relative dates on the root `and` (re-checked on the sent date, east-of-UTC days included), refusals with codes, the send-copy receipt with exit 3 and the blob downloads all pass. One gap: a missing mailbox is uncoded (J5); J4 and J6 are specified behaviours the help and the receipt could make plainer.
