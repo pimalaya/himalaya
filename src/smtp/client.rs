@@ -40,7 +40,7 @@ impl SmtpClient {
     /// Opens the SMTP connection (TCP/TLS/STARTTLS, greeting, EHLO,
     /// SASL).
     pub fn new(config: SmtpConfig, resolver: &mut SecretResolver) -> Result<Self> {
-        let tls = config.tls.into_tls(config.alpn);
+        let tls = config.tls.into_tls(config.alpn)?;
         let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {

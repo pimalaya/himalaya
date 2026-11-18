@@ -25,7 +25,10 @@ use crate::{
 
 /// Search the envelopes of a mailbox with the shared query language.
 ///
-/// A date clause reads the `Date:` header, the sent-at. A text clause is
+/// A date clause reads the `Date:` header, the sent-at, but where the
+/// server compares the received date: on Gmail, and on JMAP under `or`
+/// or `not` (on the chain of `and` from the root, JMAP re-checks the
+/// sent date). A text clause is
 /// matched as the backend matches text: a case-insensitive substring on
 /// Maildir, mbox and pimdir, as the server matches it on IMAP (RFC
 /// 3501 asks for a substring, some servers match whole words), whole words

@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `attachments` to the JSON template the composers print without `--save` or `--send`, each attached file as `{filename, mime, size}`: the template carries no bytes, so handing it back means passing the files again through `--attach`.
 ### Changed
 
+- **BREAKING**: Changed a mailbox the backend does not hold to fail coded `mailbox-not-found` on IMAP, JMAP, Gmail and Microsoft Graph, where it printed `code: null`: an IMAP `SELECT`, `APPEND`, `COPY`, `MOVE`, `RENAME` or `DELETE` refused `NO [NONEXISTENT]` or `NO [TRYCREATE]`, or refused with a plain `NO` (as Fastmail answers) for a mailbox the one `LIST` then sent does not show, the server's answer kept in `sources`; a JMAP, Gmail or Graph name, id or role no mailbox, label or folder carries. The copy a send saves to such a mailbox is an `errors` entry so coded.
 - **BREAKING**: Changed `pimdir search` to page by cursor: `nextPage` is an opaque token naming where the next page starts, bound to the account, the query, the order and `--threads`, so a hit arriving or leaving between two pages neither repeats nor hides another; `--page-token` refuses a token of another query, coded `page-token-invalid`, and `--page` is gone.
 - **BREAKING**: Changed a Google daily quota (`dailyLimitExceeded`, or a refusal naming a daily limit) to be coded `rate-limited`, as the other Pimalaya programs code it, where Gmail commands coded it `permission-denied`.
 - Bumped io-pimdir to 0.16.0: search pages by cursor, a calendar `VTIMEZONE` with a huge `INTERVAL` no longer aborts the process, and the search index is extracted again once.
@@ -293,6 +294,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `jmap request` refused whole (RFC 8620 §3.6.1, such as an HTTP 400 `unknownCapability`) printing the failure object and exiting 1: it prints `{refusal: {status, reason, message, code, retryAfter}}` and exits 3, as the typed `jmap` commands do.
+- Fixed a `tls.cert`, `tls.client.cert` or `tls.client.key` that cannot be opened failing with `No such file or directory (os error 2)`: the command fails before it connects, naming the file and its path.
+- Fixed the diagnostic of a search date with a short year (`after 15-11-26`), which read `found -11-26, expected something else or space after the number`: it says a year takes four digits, over the value given.
+- Fixed `envelope search --help` saying every date clause reads the `Date:` header: it names Gmail, and JMAP under `or` or `not`, which compare the received date.
 - Fixed install.sh exiting 127 after a successful install (`die"…"` missing its space) and saving an HTTP error page as the archive: the download fails on an HTTP error (`curl -fsSLo`).
 - Fixed a JMAP `date` or `after` search missing mail whose `Date:` carries an offset east of UTC, received the day before in UTC.
 - Fixed `message read`, `attachment list|download`, `message reply` and `message forward` on IMAP sending `SELECT sent` for a role: the mailbox resolves as `envelope list` resolves it.

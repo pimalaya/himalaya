@@ -9,7 +9,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use io_jmap::client::{JmapClientStd as Inner, JmapClientStdConnectOptions, JmapClientStdError};
 use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
@@ -23,6 +23,7 @@ use crate::{
         proxy::ProxyConfig,
     },
     email::mailbox::{MailboxIndex, MailboxRole},
+    error::mailbox_not_found,
     server::parse_server,
     shared::base64,
 };
@@ -77,7 +78,7 @@ impl JmapClient {
         let id = index.resolve(mailbox)?;
 
         if !index.0.iter().any(|m| m.id == id) {
-            bail!("Mailbox `{mailbox}` not found");
+            return Err(mailbox_not_found(format!("Mailbox `{mailbox}` not found")));
         }
 
         Ok(id)
@@ -205,7 +206,7 @@ pub fn connect_options(
     resolver: &mut SecretResolver,
 ) -> Result<JmapClientStdConnectOptions> {
     Ok(JmapClientStdConnectOptions {
-        tls: config.tls.clone().into_tls(config.alpn.clone()),
+        tls: config.tls.clone().into_tls(config.alpn.clone())?,
         proxy: ProxyConfig::resolve(config.proxy.clone(), resolver)?,
     })
 }

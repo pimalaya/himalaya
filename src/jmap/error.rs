@@ -8,6 +8,7 @@ use std::fmt;
 
 use anyhow::Error;
 use io_jmap::{
+    client::JmapClientStdError,
     rfc8620::{
         blob_download::JmapBlobDownloadError,
         blob_upload::JmapBlobUploadError,
@@ -85,6 +86,7 @@ pub fn set_error<E: JmapSetError>(message: String, err: &E) -> Error {
 /// answered, as is a method error `forbidden` (RFC 8620 §3.6.2), and a
 /// refused write is coded by its SetError type.
 pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
+    let cause = unwrapped(cause);
     if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
         return set_error_code(&err.type_name);
     }
@@ -119,6 +121,7 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
 /// server refused whole), a method error or a refused write by its type
 /// and description.
 pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
+    let cause = unwrapped(cause);
     if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
         let message = err
             .description
@@ -150,6 +153,21 @@ pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refus
     };
 
     Some(described(Some(status), None, cause.to_string()))
+}
+
+/// The error io-jmap's client error wraps transparently, `cause` itself
+/// otherwise: a transparent wrapper hands the chain the source of what
+/// it wraps, so the chain never lists the send, session or blob error.
+fn unwrapped<'a>(
+    cause: &'a (dyn std::error::Error + 'static),
+) -> &'a (dyn std::error::Error + 'static) {
+    match cause.downcast_ref::<JmapClientStdError>() {
+        Some(JmapClientStdError::Send(err)) => err,
+        Some(JmapClientStdError::SessionGet(err)) => err,
+        Some(JmapClientStdError::BlobUpload(err)) => err,
+        Some(JmapClientStdError::BlobDownload(err)) => err,
+        _ => cause,
+    }
 }
 
 /// The refusal of a request the server refused whole: its problem type,

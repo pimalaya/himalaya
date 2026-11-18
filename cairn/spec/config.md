@@ -99,7 +99,7 @@ An account's `proxy` SHALL apply to every network backend of that account (IMAP,
 `proxy.url` SHALL take `socks5://`, `socks5h://` or `http://`. `proxy.username` and `proxy.password` SHALL override the URL's user info, the password being a secret like any credential; a password without a username SHALL be rejected.
 
 ### Requirement: One TLS policy per account
-An account's `tls` table SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph), field by field: each of `provider`, `rustls.crypto`, `cert` and `client` a backend's own `tls` leaves unset SHALL take the account's, and one it sets SHALL win. A certificate an account trusts is so trusted on every transport, a JMAP download host and an SMTP submission after IMAP alike. The account table SHALL take the keys a backend's does, unknown ones refused.
+An account's `tls` table SHALL apply to every network backend of that account (IMAP, SMTP, ManageSieve, JMAP, Gmail, Microsoft Graph), field by field: each of `provider`, `rustls.crypto`, `cert` and `client` a backend's own `tls` leaves unset SHALL take the account's, and one it sets SHALL win. A certificate an account trusts is so trusted on every transport, a JMAP download host and an SMTP submission after IMAP alike. The account table SHALL take the keys a backend's does, unknown ones refused. A `cert`, `client.cert` or `client.key` file, the account's or a backend's, that cannot be opened SHALL fail the command before it connects, the message naming the file and its path.
 
 #### Scenario: One certificate for every transport
 - GIVEN an account setting `tls.cert = "/etc/ca.pem"`, an `imap` block and an `smtp` block setting `smtp.tls.provider = "native-tls"`

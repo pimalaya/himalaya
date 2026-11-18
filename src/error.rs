@@ -262,11 +262,26 @@ fn account_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> 
 /// A refusal under `mailbox-not-found`: the mailbox named does not
 /// exist.
 #[cfg_attr(
-    not(any(feature = "imap", feature = "maildir", feature = "mbox")),
+    not(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "mbox"
+    )),
     allow(dead_code)
 )]
 pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
+}
+
+/// The failure of a command naming a mailbox the server does not hold,
+/// under `mailbox-not-found`, worded `message`, `cause` what the server
+/// answered kept in `sources`.
+#[cfg(any(feature = "imap", feature = "msgraph"))]
+pub fn unknown_mailbox(message: String, cause: impl Into<Error>) -> Error {
+    with_code(cause.into(), |_| Some(ErrorCode::MailboxNotFound)).context(message)
 }
 
 /// The sentence of every refusal under `mailbox-duplicate`, the family's

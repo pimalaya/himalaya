@@ -183,15 +183,15 @@ verbatim, so the flags differ from the shared enum-driven ones.
   `--from/--subject/--since/--larger/--seen/…` key, plus `--seq`);
   `sort -S <key> [-r]`; `thread -A <algo>`; `store <seq> --action
   add|set|remove -f <flag>`; `copy`/`move <seq> <target> [--seq]`;
-  `expunge`; `raw '<TAG> <COMMAND>'` (each command tagged, e.g. `a1 NOOP`;
-  CRLF-separate to batch several).
+  `expunge`; `raw -- '<TAG> <COMMAND>'`, or the commands on stdin (each
+  command tagged, e.g. `a1 NOOP`; CRLF-separate to batch several).
   - **Raw flags are literal tokens**, not the shared enum: `-f seen`
     stores a *keyword* `seen`, not `\Seen`. Pass `-f '\Seen'` for the
     system flag. Verify with `search --seen` and `fetch --flags`.
   - **`search --since/--on/--before` use `INTERNALDATE`** (arrival), not
     the `Date:` header.
 - **SMTP**: `send --mail-from <addr> --rcpt-to <addr> -- <msg>` (explicit
-  envelope, no header parsing); `raw <COMMAND>` (e.g. `NOOP` → `250`).
+  envelope, no header parsing); `raw -- <COMMAND>` (e.g. `NOOP` → `250`).
 - **JMAP** (`jmap …`, all inside fake mailboxes): `query <method-calls>`
   (raw); `mailbox get/query/create/update/destroy` (`query` lists all by
   default, `--subscribed` to filter; `destroy --purge` for non-empty);
@@ -206,6 +206,11 @@ verbatim, so the flags differ from the shared enum-driven ones.
   - **Unified `message send`/`compose --send` need `identity_id` +
     `drafts_mailbox_id`** in the account config; without them the raw
     `jmap submission create --identity-id …` is the send path.
+- **Maildir** (`maildir …`, inside a fake folder): `create <name>`;
+  `rename --maildir <path> <new>` and `delete --maildir <path>` (the folder
+  named by `--maildir`, never a positional); `list`; `message add -m <path>
+  -- <msg>`, `message copy|move --target <path> <id>…`; `flag
+  add|set|remove --flag <flag> <id>…`.
 - **Gmail** (`gmail …`, inside a fake label; the OAuth token must be
   scoped to `https://mail.google.com/`, not `carddav`): `profile get`;
   `labels list/get/create/update/delete`; `messages

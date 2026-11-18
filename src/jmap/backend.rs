@@ -1810,7 +1810,9 @@ mod tests {
         };
 
         /// The response a scripted server gives a method call: its name
-        /// (`error` for a method error) and its arguments.
+        /// (`error` for a method error, `problem` for a request refused
+        /// whole, answered 400 with the arguments as its body) and its
+        /// arguments.
         type Answer = (&'static str, Value);
 
         fn created() -> Answer {
@@ -1876,6 +1878,7 @@ mod tests {
                     reader.read_exact(&mut body).unwrap();
                     line.clear();
 
+                    let mut status = "200 OK";
                     let reply = if path == "/session" {
                         session.clone()
                     } else if path.starts_with("/download/") {
@@ -1887,13 +1890,18 @@ mod tests {
                         let call = &request["methodCalls"][0];
                         calls.push(json!([call[0], call[1]]));
                         let (name, args) = answers.next().unwrap();
-                        json!({ "methodResponses": [[name, args, call[2]]], "sessionState": "s" })
+                        if name == "problem" {
+                            status = "400 Bad Request";
+                            args
+                        } else {
+                            json!({ "methodResponses": [[name, args, call[2]]], "sessionState": "s" })
+                        }
                     };
 
                     let reply = reply.to_string();
                     write!(
                         out,
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+                        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\n\
                          Content-Length: {}\r\n\r\n{reply}",
                         reply.len()
                     )
@@ -2323,6 +2331,62 @@ mod tests {
             let output = printer.into_single().unwrap();
             assert_eq!(output["refusal"]["reason"], "forbidden", "{output}");
             assert_eq!(output["refusal"]["code"], "permission-denied", "{output}");
+        }
+        /// A request the server refuses whole (RFC 8620 section 3.6.1) is
+        /// the result of `jmap request`, under `refusal`, and exits 3.
+        #[test]
+        fn a_request_refused_whole_is_the_result() {
+            let problem = json!({
+                "type": "urn:ietf:params:jmap:error:unknownCapability",
+                "status": 400,
+                "detail": "Invalid or unknown capabilities: urn:bogus",
+            });
+            let (url, server) = serve(vec![("problem", problem)]);
+
+            let mut client = client_at(&url);
+            let mut printer = CapturePrinter::default();
+            let body = r#"{"using":["urn:bogus"],"methodCalls":[["Mailbox/get",{},"0"]]}"#;
+            let cli = crate::cli::Cli::try_parse_from(["himalaya", "jmap", "request", "--", body])
+                .unwrap();
+            let Some(crate::cli::Command::Jmap(command)) = cli.cmd else {
+                unreachable!()
+            };
+            let result = command.execute(&mut printer, &mut Account::default(), &mut client);
+            drop(client);
+            server.join().unwrap();
+
+            let err = result.unwrap_err();
+            assert!(err.downcast_ref::<PartialOutcome>().is_some(), "{err}");
+            let refusal = json!({
+                "refusal": {
+                    "status": 400,
+                    "reason": "unknownCapability",
+                    "message": "Invalid or unknown capabilities: urn:bogus",
+                    "code": null,
+                    "retryAfter": null,
+                }
+            });
+            assert_eq!(printer.into_single().unwrap(), refusal);
+        }
+
+        /// A mailbox named by no id, name nor role is
+        /// `mailbox-not-found`.
+        #[test]
+        fn a_missing_mailbox_is_coded() {
+            let mailboxes = json!({
+                "list": [{ "id": "I", "name": "Inbox", "role": "inbox" }],
+                "notFound": [],
+                "state": "s",
+            });
+            let (url, server) = serve(vec![("Mailbox/get", mailboxes)]);
+
+            let mut client = client_at(&url);
+            let err = client.resolve_mailbox_id("Nope").unwrap_err();
+            drop(client);
+            server.join().unwrap();
+
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MailboxNotFound), "{err}");
         }
     }
 }

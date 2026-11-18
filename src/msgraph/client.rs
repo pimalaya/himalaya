@@ -10,7 +10,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use io_msgraph::v1::{
     client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions, MsgraphClientStdError},
     send::{MSGRAPH_API_BASE, MsgraphSend, MsgraphSendError, path_segment, user_path},
@@ -28,7 +28,7 @@ use crate::{
         proxy::ProxyConfig,
     },
     email::mailbox::{MailboxIndex, MailboxRole},
-    error::ErrorCode,
+    error::{ErrorCode, mailbox_not_found, unknown_mailbox},
     msgraph::backend::well_known_role,
     shared::refusal::Refusal,
 };
@@ -49,7 +49,7 @@ impl MsgraphClient {
         let mut resolver = SecretResolver::new();
         let token = msgraph_token(config.auth, &mut resolver)?;
         let options = MsgraphClientStdConnectOptions {
-            tls: config.tls.into_tls(config.alpn),
+            tls: config.tls.into_tls(config.alpn)?,
             proxy: ProxyConfig::resolve(config.proxy, &mut resolver)?,
             user_id: config.user_id,
         };
@@ -83,14 +83,15 @@ impl MsgraphClient {
         }
 
         if !may_name_folder(&id) {
-            bail!("Mailbox `{mailbox}` not found");
+            return Err(mailbox_not_found(format!("Mailbox `{mailbox}` not found")));
         }
 
         match self.mail_folder_get(&id) {
             Ok(folder) => Ok(folder.response.id),
-            Err(MsgraphClientStdError::Send(err)) if names_no_folder(&err) => {
-                bail!("Mailbox `{mailbox}` not found")
-            }
+            Err(MsgraphClientStdError::Send(err)) if names_no_folder(&err) => Err(unknown_mailbox(
+                format!("Mailbox `{mailbox}` not found"),
+                err,
+            )),
             Err(err) => Err(err.into()),
         }
     }
@@ -365,5 +366,31 @@ mod tests {
         assert!(!may_name_folder("No-Such-Folder"));
         assert!(!may_name_folder("Himalaya-Test-MS-A/Sub"));
         assert!(!may_name_folder("a/b?c#d"));
+    }
+
+    /// A folder named by no id, path nor role is `mailbox-not-found`,
+    /// and so is an id Graph answers it knows no folder by, its answer
+    /// kept.
+    #[test]
+    fn a_missing_folder_is_coded() {
+        use io_msgraph::v1::client::MsgraphClientStd;
+
+        use crate::{
+            email::mailbox::MailboxIndex,
+            msgraph::client::MsgraphClient,
+            shared::http_script::{Script, refused},
+        };
+
+        let body = r#"{"error":{"code":"ErrorItemNotFound","message":"Not found."}}"#;
+        let (script, _) = Script::new(vec![refused(404, body)]);
+        let inner = MsgraphClientStd::new(script, "token", Default::default());
+        let mut client = MsgraphClient::over(inner);
+        client.folder_index = Some(MailboxIndex(Vec::new()));
+
+        for name in ["No-Such-Folder", "AAMkADczZWY5NjZhLTY4NzMtNGM4OS1hZGZiAAA="] {
+            let err = client.resolve_mailbox_id(name).unwrap_err();
+            let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+            assert_eq!(code, Some(ErrorCode::MailboxNotFound), "{name}: {err}");
+        }
     }
 }

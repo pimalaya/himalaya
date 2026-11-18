@@ -220,7 +220,7 @@ fn connect_imap(imap_config: &ImapConfig, resolver: &mut SecretResolver) -> Resu
         })
         .transpose()?;
     let opts = ImapClientStdConnectOptions {
-        tls: imap_config.tls.clone().into_tls(imap_config.alpn.clone()),
+        tls: imap_config.tls.clone().into_tls(imap_config.alpn.clone())?,
         proxy: ProxyConfig::resolve(imap_config.proxy.clone(), resolver)?,
         sasl,
         session: ImapSessionOpenOptions {
@@ -267,7 +267,10 @@ fn connect_gmail(
 
     let token = gmail_token(gmail_config.auth.clone(), resolver)?;
     let options = GmailClientStdConnectOptions {
-        tls: gmail_config.tls.clone().into_tls(gmail_config.alpn.clone()),
+        tls: gmail_config
+            .tls
+            .clone()
+            .into_tls(gmail_config.alpn.clone())?,
         proxy: ProxyConfig::resolve(gmail_config.proxy.clone(), resolver)?,
         user_id: gmail_config.user_id.clone(),
     };
@@ -293,7 +296,7 @@ fn connect_msgraph(
         tls: msgraph_config
             .tls
             .clone()
-            .into_tls(msgraph_config.alpn.clone()),
+            .into_tls(msgraph_config.alpn.clone())?,
         proxy: ProxyConfig::resolve(msgraph_config.proxy.clone(), resolver)?,
         user_id: msgraph_config.user_id.clone(),
     };
@@ -392,7 +395,7 @@ fn connect_smtp(
         })
         .transpose()?;
     let opts = SmtpClientStdConnectOptions {
-        tls: smtp_config.tls.clone().into_tls(smtp_config.alpn.clone()),
+        tls: smtp_config.tls.clone().into_tls(smtp_config.alpn.clone())?,
         proxy: ProxyConfig::resolve(smtp_config.proxy.clone(), resolver)?,
         sasl,
         session: SmtpSessionOpenOptions {

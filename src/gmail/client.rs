@@ -10,7 +10,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use io_gmail::v1::{
     client::{GmailClientStd as Inner, GmailClientStdConnectOptions, GmailClientStdError},
     query::to_query_pairs,
@@ -29,7 +29,7 @@ use crate::{
         proxy::ProxyConfig,
     },
     email::mailbox::{MailboxIndex, MailboxRole},
-    error::ErrorCode,
+    error::{ErrorCode, mailbox_not_found},
     shared::refusal::Refusal,
 };
 
@@ -59,7 +59,7 @@ impl GmailClient {
         let mut resolver = SecretResolver::new();
         let token = gmail_token(config.auth, &mut resolver)?;
         let options = GmailClientStdConnectOptions {
-            tls: config.tls.into_tls(config.alpn),
+            tls: config.tls.into_tls(config.alpn)?,
             proxy: ProxyConfig::resolve(config.proxy, &mut resolver)?,
             user_id: config.user_id,
         };
@@ -80,7 +80,9 @@ impl GmailClient {
         let id = index.resolve(mailbox)?;
 
         if !index.0.iter().any(|label| label.id == id) {
-            bail!("Gmail has no label `{mailbox}`, by id, name or role");
+            return Err(mailbox_not_found(format!(
+                "Gmail has no label `{mailbox}`, by id, name or role"
+            )));
         }
 
         Ok(id)
@@ -349,5 +351,19 @@ mod tests {
             code(403, "dailyLimitExceeded"),
             Some(ErrorCode::RateLimited)
         );
+    }
+
+    /// A label named by no id, name nor role is `mailbox-not-found`.
+    #[test]
+    fn a_missing_label_is_coded() {
+        use crate::{email::mailbox::MailboxIndex, gmail::client::GmailClient};
+
+        let (mut client, requests) = GmailClient::scripted(&[]);
+        client.label_index = Some(MailboxIndex(Vec::new()));
+
+        let err = client.resolve_mailbox_id("Nope").unwrap_err();
+        let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
+        assert_eq!(code, Some(ErrorCode::MailboxNotFound), "{err}");
+        assert!(requests.lock().unwrap().is_empty());
     }
 }

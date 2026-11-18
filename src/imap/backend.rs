@@ -22,7 +22,7 @@ use io_imap::{
         copy::{ImapCopyUid, ImapMessageCopyOptions},
         fetch::ImapMessageFetchOptions,
         search::ImapMessageSearchOptions,
-        select::ImapMailboxSelectOptions,
+        select::{ImapMailboxSelectData, ImapMailboxSelectOptions},
         store::ImapMessageStoreOptions,
     },
     rfc5256::sort::ImapMessageSortOptions,
@@ -65,7 +65,7 @@ use crate::{
     },
     error::{
         ErrorCode, ItemError, existing_mailbox, mailbox_not_found, message_not_found,
-        missing_message,
+        missing_message, unknown_mailbox,
     },
     imap::{
         client::ImapClient,
@@ -110,10 +110,17 @@ impl ImapClient {
                 let output = match self.status(mbox, names.into()) {
                     Ok(output) => output,
                     Err(err) if err.status().is_some() => {
+                        let gone = err
+                            .status()
+                            .and_then(|status| status.code.as_ref())
+                            .is_some_and(names_no_mailbox);
                         let id = Some(mailbox.id.as_str());
                         let err = anyhow!(err).context("Cannot count the messages");
                         let mut error = ItemError::new(id, &err);
-                        error.code = Some(ErrorCode::MailboxUnreadable);
+                        error.code = Some(match gone {
+                            true => ErrorCode::MailboxNotFound,
+                            false => ErrorCode::MailboxUnreadable,
+                        });
                         errors.push(error);
                         continue;
                     }
@@ -188,8 +195,7 @@ impl ImapClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<(Outcome<EnvelopePage>, Option<u64>)> {
-        let mbox = parse_mailbox(mailbox)?;
-        let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
+        let select = self.select_mailbox(mailbox)?;
         let exists = output_data("SELECT", select).exists;
         let total = exists.map(u64::from);
 
@@ -239,8 +245,7 @@ impl ImapClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<Outcome<EnvelopePage>> {
-        let mbox = parse_mailbox(mailbox)?;
-        let select = self.select(mbox, ImapMailboxSelectOptions::default())?;
+        let select = self.select_mailbox(mailbox)?;
         if output_data("SELECT", select).exists.unwrap_or(0) == 0 {
             return Ok(Outcome::from(EnvelopePage::default()));
         }
@@ -393,7 +398,6 @@ impl ImapClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<Outcome<usize>> {
-        let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(ids)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
         let kind = match op {
@@ -402,7 +406,7 @@ impl ImapClient {
             FlagOp::Remove => StoreType::Remove,
         };
 
-        let selected = self.select(mbox, ImapMailboxSelectOptions::default())?;
+        let selected = self.select_mailbox(mailbox)?;
         let selected = output_data("SELECT", selected);
 
         // NOTE: a server sending no PERMANENTFLAGS lets every flag be
@@ -427,10 +431,9 @@ impl ImapClient {
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
-        let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(&[id])?;
 
-        self.select(mbox, ImapMailboxSelectOptions::default())?;
+        self.select_mailbox(mailbox)?;
 
         // NOTE: `BODY[]` sets `\Seen` server-side as a side effect, so
         // `--seen` costs no extra round trip where `BODY.PEEK[]` does not.
@@ -489,15 +492,16 @@ impl ImapClient {
         let mbox = parse_mailbox(mailbox)?;
         let imap_flags: Vec<ImapFlag<'static>> = flags.iter().map(flag_from).collect();
 
-        let (_, appenduid) = self.append(
-            mbox.clone(),
+        let appended = self.append(
+            mbox,
             &raw,
             ImapMessageAppendOptions {
                 flags: imap_flags,
                 date: None,
                 non_sync: false,
             },
-        )?;
+        );
+        let (_, appenduid) = appended.map_err(|err| self.explain(mailbox, err, None))?;
 
         if let Some((_, uid)) = appenduid {
             return Ok(Some(uid.to_string()));
@@ -516,7 +520,7 @@ impl ImapClient {
             return Ok(None);
         };
 
-        self.select(mbox, ImapMailboxSelectOptions::default())?;
+        self.select_mailbox(mailbox)?;
 
         let field =
             AString::try_from("Message-ID").map_err(|_| anyhow!("Invalid IMAP search header"))?;
@@ -537,16 +541,16 @@ impl ImapClient {
     /// Copies a UID set between two mailboxes, a UID not copied being an
     /// item error.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
-        let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
 
-        self.select(source, ImapMailboxSelectOptions::default())?;
-        let copy_uid = self.copy(
+        self.select_mailbox(from)?;
+        let copied = self.copy(
             sequence_set.clone(),
             target,
             ImapMessageCopyOptions { uid: true },
-        )?;
+        );
+        let copy_uid = copied.map_err(|err| self.explain(to, err, None))?;
 
         let copied = self.copied_uids(copy_uid, sequence_set, ids.len())?;
         Ok(found_uids(ids, &copied))
@@ -562,11 +566,10 @@ impl ImapClient {
     /// in the source, as `delete_messages` already does in the trash. A
     /// plain `EXPUNGE` would also remove every other `\Deleted` message.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
-        let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
 
-        self.select(source, ImapMailboxSelectOptions::default())?;
+        self.select_mailbox(from)?;
 
         // NOTE: a move onto its own mailbox changes nothing, as on every
         // backend, where a server would give the messages new UIDs.
@@ -584,11 +587,12 @@ impl ImapClient {
             if present.is_empty() {
                 return Ok(found_uids(ids, &present));
             }
-            let copy_uid = self.r#move(
+            let moved = self.r#move(
                 uid_sequence_set(present.clone())?,
                 target,
                 ImapMessageMoveOptions { uid: true },
-            )?;
+            );
+            let copy_uid = moved.map_err(|err| self.explain(to, err, None))?;
             // NOTE: a COPYUID counting more messages than were sent is
             // not believed.
             let mut outcome = found_uids(ids, &present);
@@ -600,11 +604,12 @@ impl ImapClient {
             return Ok(outcome);
         }
 
-        let copy_uid = self.copy(
+        let copied = self.copy(
             sequence_set.clone(),
             target,
             ImapMessageCopyOptions { uid: true },
-        )?;
+        );
+        let copy_uid = copied.map_err(|err| self.explain(to, err, None))?;
         let copied = self.copied_uids(copy_uid, sequence_set, ids.len())?;
         let outcome = found_uids(ids, &copied);
         if copied.is_empty() {
@@ -715,7 +720,7 @@ impl ImapClient {
         };
 
         if let Err(err) = self.rename(parse_mailbox(mailbox)?, parse_mailbox(&path)?) {
-            return Err(self.explain(mailbox, err.into(), None));
+            return Err(self.explain(mailbox, err, None));
         }
 
         Ok(path)
@@ -732,28 +737,44 @@ impl ImapClient {
         };
 
         let delimiter = self.delimiter().ok().flatten();
-        Err(self.explain(mailbox, err.into(), delimiter))
+        Err(self.explain(mailbox, err, delimiter))
     }
 
-    /// Replaces the server's refusal of a write on `mailbox` by what the
-    /// mailboxes it lists explain: `mailbox` missing, or holding others
-    /// when `delimiter` is given. The server's error stays otherwise.
+    /// Explains the server's refusal of a command addressing `mailbox`.
+    ///
+    /// A `NO` coded `NONEXISTENT` (RFC 5530 section 3) or `TRYCREATE`
+    /// (RFC 3501 section 6.3.11) is `mailbox-not-found`. A plain `NO`
+    /// costs one `LIST`: `mailbox-not-found` when it lists no such
+    /// mailbox, the server's error otherwise. With `delimiter` given, a
+    /// `NO` on a mailbox holding others names them. Any other failure
+    /// stays the server's error, which `sources` keeps.
     fn explain(
         &mut self,
         mailbox: &str,
-        err: anyhow::Error,
+        err: ImapClientError,
         delimiter: Option<char>,
     ) -> anyhow::Error {
+        let Some(status) = err.status().filter(|s| s.kind == StatusKind::No) else {
+            return err.into();
+        };
+        let plain = status.code.is_none();
+        if status.code.as_ref().is_some_and(names_no_mailbox) {
+            return missing_mailbox(mailbox, err);
+        }
+        if !plain && delimiter.is_none() {
+            return err.into();
+        }
+
         let Ok(names) = self.mailbox_names() else {
-            return err;
+            return err.into();
         };
 
-        if !names.iter().any(|known| same_name(known, mailbox)) {
-            return mailbox_not_found(format!("IMAP mailbox `{mailbox}` not found"));
+        if plain && !names.iter().any(|known| same_name(known, mailbox)) {
+            return missing_mailbox(mailbox, err);
         }
 
         let Some(delimiter) = delimiter else {
-            return err;
+            return err.into();
         };
 
         let prefix = format!("{mailbox}{delimiter}");
@@ -763,11 +784,18 @@ impl ImapClient {
             .collect();
 
         if children.is_empty() {
-            return err;
+            return err.into();
         }
 
         let children = children.join("`, `");
         anyhow!("Cannot delete IMAP mailbox `{mailbox}`: it holds `{children}`; delete them first")
+    }
+
+    /// `SELECT`s `mailbox`, a refusal explained as [`Self::explain`] does.
+    fn select_mailbox(&mut self, mailbox: &str) -> Result<ImapOutput<ImapMailboxSelectData>> {
+        let mbox = parse_mailbox(mailbox)?;
+        let selected = self.select(mbox, ImapMailboxSelectOptions::default());
+        selected.map_err(|err| self.explain(mailbox, err, None))
     }
 
     /// The server's hierarchy delimiter, `None` for a flat namespace.
@@ -838,10 +866,9 @@ impl ImapClient {
         mailbox: &str,
         ids: &[&str],
     ) -> Result<Outcome<(usize, bool)>> {
-        let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(ids)?;
 
-        self.select(mbox, ImapMailboxSelectOptions::default())?;
+        self.select_mailbox(mailbox)?;
         let echoes = self.store(
             sequence_set.clone(),
             StoreType::Add,
@@ -1234,6 +1261,24 @@ fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
 /// case-insensitive (RFC 3501 section 5.1).
 fn same_name(left: &str, right: &str) -> bool {
     left == right || (left.eq_ignore_ascii_case("INBOX") && right.eq_ignore_ascii_case("INBOX"))
+}
+
+/// Whether a refusal coded `code` says the mailbox addressed does not
+/// exist: `NONEXISTENT` (RFC 5530 section 3), or `TRYCREATE`, which an
+/// `APPEND`, `COPY` or `MOVE` to a missing mailbox answers (RFC 3501
+/// section 6.3.11, RFC 6851 section 3.3).
+fn names_no_mailbox(code: &Code<'_>) -> bool {
+    match code {
+        Code::TryCreate => true,
+        Code::Other(code) => code.inner().eq_ignore_ascii_case(b"NONEXISTENT"),
+        _ => false,
+    }
+}
+
+/// The failure of a command addressing `mailbox`, which the server does
+/// not hold, under `mailbox-not-found`, its refusal `err` kept.
+fn missing_mailbox(mailbox: &str, err: ImapClientError) -> anyhow::Error {
+    unknown_mailbox(format!("IMAP mailbox `{mailbox}` not found"), err)
 }
 
 /// How many of `ids` the server found among the `found` UIDs, beside the

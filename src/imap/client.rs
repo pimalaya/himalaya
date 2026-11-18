@@ -43,7 +43,7 @@ impl ImapClient {
     /// the handshake reported.
     pub fn new(config: ImapConfig, resolver: &mut SecretResolver) -> Result<Self> {
         let sort_fallback = config.sort.fallback;
-        let tls = config.tls.into_tls(config.alpn);
+        let tls = config.tls.into_tls(config.alpn)?;
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {

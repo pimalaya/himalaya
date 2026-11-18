@@ -34,7 +34,7 @@ impl SieveClient {
     /// IMAP, SMTP and ManageSieve blocks name one credential command
     /// spawns it once.
     pub fn new(config: SieveConfig, resolver: &mut SecretResolver) -> Result<Self> {
-        let tls = config.tls.into_tls(config.alpn);
+        let tls = config.tls.into_tls(config.alpn)?;
         let server = parse_sieve_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
             // NOTE: a `unix://` socket is already authenticated, so no

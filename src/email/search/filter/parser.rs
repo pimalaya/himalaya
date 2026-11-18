@@ -93,7 +93,7 @@ fn date<'a, Tz: TimeZone + 'a>(
     now: DateTime<Tz>,
 ) -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
     clause("date", "`date`", "space after `date`")
-        .ignore_then(date_value(now).labelled("date after `date`"))
+        .ignore_then(dated(now, "date after `date`"))
         .try_map(|value, span| match value {
             DateValue::Day(day) => Ok(SearchEmailsFilterQuery::Date(day)),
             DateValue::Instant(_) => Err(Rich::custom(
@@ -107,7 +107,7 @@ fn after_date<'a, Tz: TimeZone + 'a>(
     now: DateTime<Tz>,
 ) -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
     clause("after", "`after`", "space after `after`")
-        .ignore_then(date_value(now).labelled("date after `after`"))
+        .ignore_then(dated(now, "date after `after`"))
         .map(|value| match value {
             DateValue::Day(day) => SearchEmailsFilterQuery::AfterDate(day),
             DateValue::Instant(instant) => SearchEmailsFilterQuery::AfterInstant(instant),
@@ -118,7 +118,7 @@ fn before_date<'a, Tz: TimeZone + 'a>(
     now: DateTime<Tz>,
 ) -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
     clause("before", "`before`", "space after `before`")
-        .ignore_then(date_value(now).labelled("date after `before`"))
+        .ignore_then(dated(now, "date after `before`"))
         .map(|value| match value {
             DateValue::Day(day) => SearchEmailsFilterQuery::BeforeDate(day),
             DateValue::Instant(instant) => SearchEmailsFilterQuery::BeforeInstant(instant),
@@ -243,6 +243,22 @@ fn local_now() -> DateTime<Local> {
     Local::now()
 }
 
+/// A [`date_value`] labelled `label`, a day spelled with a short year
+/// refused by name: the label would hide a refusal of its own.
+fn dated<'a, Tz: TimeZone + 'a>(
+    now: DateTime<Tz>,
+    label: &'static str,
+) -> impl Parser<'a, &'a str, DateValue, ParserError<'a>> + Clone {
+    let short = pattern().try_map(|value, span| {
+        Err(match short_year(&value) {
+            true => Rich::custom(span, "a year takes four digits, as in `2026-11-15`"),
+            false => mismatch(span),
+        })
+    });
+
+    choice((short, date_value(now).labelled(label)))
+}
+
 /// A date value: `today`, `yesterday`, `<n> <unit> ago`, a day in one of
 /// its four spellings or an RFC 3339 date-time, its seconds and offset
 /// optional, one with no offset read in the zone of `now`.
@@ -254,12 +270,18 @@ fn date_value<'a, Tz: TimeZone + 'a>(
     let zone = now.timezone();
     let now = now.fixed_offset();
 
-    let ago = text::int(10)
+    let count = unquoted_pattern().try_map(|count: String, span| {
+        match count.bytes().all(|byte| byte.is_ascii_digit()) {
+            true => Ok(count),
+            false => Err(mismatch(span)),
+        }
+    });
+    let ago = count
         .then_ignore(blanks1("space after the number"))
         .then(word_chars().labelled("unit, `day` to `year` or `minute` and `hour`"))
         .then_ignore(blanks1("space before `ago`"))
         .then_ignore(keyword("ago", "`ago`"))
-        .try_map(move |(count, unit), span| ago(now, count, unit).ok_or_else(|| mismatch(span)));
+        .try_map(move |(count, unit), span| ago(now, &count, unit).ok_or_else(|| mismatch(span)));
 
     choice((
         ago,
@@ -364,6 +386,15 @@ fn day(value: &str) -> Option<NaiveDate> {
     }
 
     NaiveDate::from_ymd_opt(year.parse().ok()?, month.parse().ok()?, day.parse().ok()?)
+}
+
+/// Whether `value` is spelled as a day whose year lacks digits: three
+/// runs of digits joined by `-` or `/`, none of four.
+fn short_year(value: &str) -> bool {
+    let parts: Vec<&str> = value.split(['-', '/']).collect();
+    let numeric = |part: &&str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+
+    parts.len() == 3 && parts.iter().all(numeric) && parts.iter().all(|part| part.len() < 4)
 }
 
 fn pattern<'a>() -> impl Parser<'a, &'a str, String, ParserError<'a>> + Clone {
@@ -480,10 +511,17 @@ mod tests {
     #[test]
     fn a_two_digit_year_is_refused() {
         for query in ["after 15-11-26", "before 26/11/15", "date 1-1-1"] {
+            let errs = super::query().parse(query).into_result().unwrap_err();
+            let reason = errs[0].reason().to_string();
             assert!(
-                super::query().parse(query).into_result().is_err(),
-                "{query}"
+                reason.contains("a year takes four digits"),
+                "{query}: {reason}"
             );
+        }
+        for query in ["after 2026-13-45", "after foo", "after 3 dayz ago"] {
+            let errs = super::query().parse(query).into_result().unwrap_err();
+            let reason = errs[0].reason().to_string();
+            assert!(!reason.contains("four digits"), "{query}: {reason}");
         }
         assert!(
             super::query()
