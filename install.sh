@@ -62,4 +62,4 @@ if [ -f "$tmpdir/$sample" ]; then
     cp -f -- "$tmpdir/$sample" "$PREFIX/$sample"
 fi
 
-die"$("$PREFIX/bin/$binary" --version) installed!" 0
+die "$("$PREFIX/bin/$binary" --version) installed!" 0
