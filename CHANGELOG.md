@@ -295,6 +295,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed, through pimalaya-cli 0.6.1 and pimalaya-config 0.6.0, the text error report writing the control characters of its causes raw to the terminal (each line is sanitized, the suggestions naming `--json` when a character was replaced), `--log-file` creating the file under the umask and following a symbolic link (it is created at 0600 and a link is refused), the manual pages printing `vv<version>`, a TOML parse error of the configuration printing its source line, and a refused secret echoing its value. A secret command that fails names the command and says to run it yourself, never printing its output.
 - Fixed `jmap request` refused whole (RFC 8620 §3.6.1, such as an HTTP 400 `unknownCapability`) printing the failure object and exiting 1: it prints `{refusal: {status, reason, message, code, retryAfter}}` and exits 3, as the typed `jmap` commands do.
 - Fixed a `tls.cert`, `tls.client.cert` or `tls.client.key` that cannot be opened failing with `No such file or directory (os error 2)`: the command fails before it connects, naming the file and its path.
 - Fixed the diagnostic of a search date with a short year (`after 15-11-26`), which read `found -11-26, expected something else or space after the number`: it says a year takes four digits, over the value given.
