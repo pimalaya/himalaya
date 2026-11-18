@@ -5,7 +5,8 @@
 //!
 //! The filter half becomes one `q` string: leaf conditions map to
 //! operators (`from alice` becomes `from:alice`), conjunctions flatten
-//! into whitespace, disjunctions into brace groups, and negations expand
+//! into whitespace, disjunctions into brace groups (a conjunction inside
+//! one wrapped in parentheses, see `any_of`), and negations expand
 //! through De Morgan so a `-` only ever prefixes a leaf, the shape Gmail
 //! matches reliably. Two conditions have no Gmail counterpart and are
 //! refused with `search-unsupported` rather than return wrong hits: `flag
@@ -40,9 +41,7 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::And(lhs, rhs) => {
             Ok(format!("{} {}", filter_to_q(lhs)?, filter_to_q(rhs)?))
         }
-        SearchEmailsFilterQuery::Or(lhs, rhs) => {
-            Ok(format!("{{{} {}}}", filter_to_q(lhs)?, filter_to_q(rhs)?))
-        }
+        SearchEmailsFilterQuery::Or(lhs, rhs) => Ok(any_of(&filter_to_q(lhs)?, &filter_to_q(rhs)?)),
         SearchEmailsFilterQuery::Not(inner) => not_to_q(inner),
         SearchEmailsFilterQuery::Date(date) => Ok(format!(
             "after:{} before:{}",
@@ -81,9 +80,7 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
 fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
     match filter {
         SearchEmailsFilterQuery::Not(inner) => filter_to_q(inner),
-        SearchEmailsFilterQuery::And(lhs, rhs) => {
-            Ok(format!("{{{} {}}}", not_to_q(lhs)?, not_to_q(rhs)?))
-        }
+        SearchEmailsFilterQuery::And(lhs, rhs) => Ok(any_of(&not_to_q(lhs)?, &not_to_q(rhs)?)),
         SearchEmailsFilterQuery::Or(lhs, rhs) => {
             Ok(format!("{} {}", not_to_q(lhs)?, not_to_q(rhs)?))
         }
@@ -117,6 +114,37 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::MessageId(id) => {
             Ok(format!("-rfc822msgid:{}", value_q(filter, id)?))
         }
+    }
+}
+
+/// The brace group matching `lhs` or `rhs`, each wrapped in parentheses
+/// when it holds more than one term: Gmail reads every term inside braces
+/// as an alternative of its own.
+fn any_of(lhs: &str, rhs: &str) -> String {
+    format!("{{{} {}}}", group(lhs), group(rhs))
+}
+
+/// `q` in parentheses when it is a conjunction, a blank outside any
+/// quote, brace or parenthesis separating two of its terms.
+fn group(q: &str) -> String {
+    let mut depth = 0usize;
+    let mut quoted = false;
+
+    let conjunction = q.chars().any(|c| {
+        match c {
+            '"' => quoted = !quoted,
+            '{' | '(' if !quoted => depth += 1,
+            '}' | ')' if !quoted => depth = depth.saturating_sub(1),
+            c if c.is_whitespace() => return !quoted && depth == 0,
+            _ => (),
+        }
+        false
+    });
+
+    if conjunction {
+        format!("({q})")
+    } else {
+        q.to_string()
     }
 }
 
@@ -283,6 +311,33 @@ mod tests {
     #[test]
     fn disjunctions_become_brace_groups() {
         assert_eq!(q("from f or to t"), "{from:f to:t}");
+    }
+
+    /// Gmail reads every blank-separated term inside braces as one
+    /// alternative, so a conjunction under a disjunction keeps its grouping
+    /// in parentheses.
+    #[test]
+    fn conjunctions_under_disjunctions_keep_their_group() {
+        assert_eq!(
+            q("from alice and subject invoice or from bob"),
+            "{(from:alice subject:invoice) from:bob}",
+        );
+        assert_eq!(
+            q("date 2026-09-08 or from alice"),
+            "{(after:1788825599 before:1788912000) from:alice}",
+        );
+        assert_eq!(
+            q("from a or (to b and (cc c or subject \"d e\"))"),
+            "{from:a (to:b {cc:c subject:\"d e\"})}",
+        );
+        assert_eq!(
+            q("not ((from a or to b) and subject c)"),
+            "{(-from:a -to:b) -subject:c}",
+        );
+        assert_eq!(
+            q("not (address e and to b)"),
+            "{(-from:e -to:e -cc:e -bcc:e) -to:b}",
+        );
     }
 
     #[test]

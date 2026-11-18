@@ -84,7 +84,8 @@ impl MboxClient {
     ///
     /// A name goes through the store, `INBOX` reaching the spool. An
     /// absolute path is taken as is, so any mbox file opens without
-    /// configuring it, as `mail -f` does.
+    /// configuring it, as `mail -f` does, except inside an MCP server, which
+    /// refuses it: a tool reaches no file outside `mbox.root`.
     ///
     /// `INBOX` fails, naming `mbox.inbox`, when the spool is a directory,
     /// or when no spool is set and the root holds no file of that name,
@@ -92,6 +93,11 @@ impl MboxClient {
     pub fn resolve_mbox(&self, mailbox: &str) -> Result<MboxFsPath> {
         let path = Path::new(mailbox);
         if path.is_absolute() {
+            if crate::mcp::paths_closed() {
+                bail!(
+                    "Invalid mailbox `{mailbox}`: a tool takes a mailbox of `mbox.root` by name, not a path"
+                );
+            }
             return Ok(MboxFsPath::from(path));
         }
 

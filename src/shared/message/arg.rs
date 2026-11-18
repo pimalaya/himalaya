@@ -54,15 +54,17 @@ impl MessageArg {
 
     /// Reads the message off the positional, a file it names, or piped
     /// stdin, normalising its line endings to CRLF.
+    ///
+    /// The path is looked up as typed, before the `\n` and `\r` escapes of
+    /// an inline message are decoded; a file that fails to read is an
+    /// error, never read as the message. An MCP caller names no local file:
+    /// what it gives is the message, whatever path it spells.
     fn resolve(&self) -> anyhow::Result<Vec<u8>> {
         if !self.raw.is_empty() {
-            let mime = self.raw.join(" ").replace("\\r", "").replace("\\n", "\r\n");
+            let joined = self.raw.join(" ");
+            let mime = joined.replace("\\r", "").replace("\\n", "\r\n");
 
-            // NOTE: a real file that fails to read is a hard error, never
-            // silently reinterpreted as the message body.
-            // NOTE: an MCP caller names no local file: what it gives is
-            // the message, whatever path it happens to spell.
-            let path = path_parser(&mime)
+            let path = path_parser(&joined)
                 .ok()
                 .filter(|path| !mcp::paths_closed() && path.is_file());
 
@@ -72,14 +74,12 @@ impl MessageArg {
                 return Ok(crlf::normalize(&contents));
             }
 
-            // NOTE: a mistyped path would otherwise be stored as a message
-            // made of that path alone.
             if !opens_on_a_field(&mime) {
                 if mcp::paths_closed() {
                     bail!("The message opens on no header field");
                 }
 
-                bail!("No file at `{mime}`, nor a header field opening a message");
+                bail!("No file at `{joined}`, nor a header field opening a message");
             }
 
             return Ok(crlf::normalize(mime.as_bytes()));
@@ -99,14 +99,25 @@ impl MessageArg {
     }
 }
 
-/// Whether an inline message opens on a header field, a name of printable
-/// ASCII then a colon (RFC 5322 §2.2).
+/// Whether an inline message opens on a header field, a name then a colon
+/// (RFC 5322 §2.2), so a mistyped path is not stored as a message made of
+/// itself.
+///
+/// The name is held to the letters, digits, `-`, `_` and `.` header names
+/// are spelled with, which a path holding a colon (a Maildir file name, its
+/// `:2,` info) breaks with a separator, and a one-letter name followed by a
+/// separator is a Windows drive.
 fn opens_on_a_field(message: &str) -> bool {
-    let Some((name, _)) = message.split_once(':') else {
+    let Some((name, value)) = message.split_once(':') else {
         return false;
     };
 
-    !name.is_empty() && name.bytes().all(|b| b.is_ascii_graphic())
+    let named = name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'));
+    let drive = name.len() == 1 && value.starts_with(['/', '\\']);
+
+    !name.is_empty() && named && !drive
 }
 
 #[cfg(test)]
@@ -128,5 +139,37 @@ mod tests {
 
         let message = arg("Subject: hi\\n\\nbody").parse().unwrap();
         assert_eq!(message, b"Subject: hi\r\n\r\nbody");
+    }
+
+    /// A Maildir file name holds a colon, as a Windows drive does, so a
+    /// mistyped path holding one opens on no header field either.
+    #[test]
+    fn a_missing_path_holding_a_colon_is_not_a_message() {
+        for path in [
+            "/nonexistent/Mail/cur/1700000000.host:2,S",
+            "nonexistent/cur/1700000000.host:2,S",
+            "C:\\Users\\nick\\mail.eml",
+            "C:/Users/nick/mail.eml",
+        ] {
+            let err = arg(path).parse().unwrap_err();
+            assert!(err.to_string().contains("No file at"), "{path}: {err}");
+        }
+
+        let message = arg("X-Spam.Level: *\\n\\nbody").parse().unwrap();
+        assert_eq!(message, b"X-Spam.Level: *\r\n\r\nbody");
+    }
+
+    /// The path is looked up as typed, before the `\n` and `\r` escapes of
+    /// an inline message are decoded.
+    #[test]
+    fn a_path_holding_a_backslash_is_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("a\\nb");
+        std::fs::create_dir(&sub).unwrap();
+        let path = sub.join("m.eml");
+        std::fs::write(&path, "Subject: hi\n\nbody\n").unwrap();
+
+        let message = arg(path.to_str().unwrap()).parse().unwrap();
+        assert_eq!(message, b"Subject: hi\r\n\r\nbody\r\n");
     }
 }

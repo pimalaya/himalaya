@@ -14,6 +14,7 @@
 use std::{
     collections::BTreeMap,
     fs,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -88,14 +89,46 @@ impl MboxCache {
 
         let file = cache_file(dir, path);
         let tmp = file.with_extension("json.tmp");
-        let result = fs::create_dir_all(dir)
-            .and_then(|()| fs::write(&tmp, serde_json::to_vec(self).unwrap_or_default()))
+        let result = create_private_dir(dir)
+            .and_then(|()| write_private(&tmp, &serde_json::to_vec(self).unwrap_or_default()))
             .and_then(|()| fs::rename(&tmp, &file));
 
         if let Err(err) = result {
             debug!("cannot save mbox cache {}: {err}", file.display());
         }
     }
+}
+
+/// Creates `dir` and its missing parents readable by the owner alone, and
+/// tightens `dir` when it exists open: the cache holds the subject, sender,
+/// recipients and Message-ID of every message.
+fn create_private_dir(dir: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(dir)?;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+    }
+
+    #[cfg(not(unix))]
+    fs::create_dir_all(dir)
+}
+
+/// Writes `bytes` to a new file at `path`, readable by the owner alone,
+/// replacing whatever file was there.
+fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let _ = fs::remove_file(path);
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+
+    options.open(path)?.write_all(bytes)
 }
 
 /// The cache file of the mbox at `path`, named after a hash of its
@@ -193,5 +226,30 @@ mod tests {
 
         fs::write(cache_file(dir.as_path(), &path), b"not json").unwrap();
         assert!(MboxCache::load(Some(dir.as_path()), &path).index.is_none());
+    }
+
+    /// The cache holds the envelopes of private mail: its directory is
+    /// the owner's alone, tightened when an older run left it open, and
+    /// its files are read by the owner alone, whatever the umask.
+    #[cfg(unix)]
+    #[test]
+    fn a_cache_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir("private").join("mbox");
+        fs::create_dir_all(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        let path = MboxFsPath::new("/nowhere/mbox");
+
+        let mut cache = MboxCache {
+            envelopes: BTreeMap::from([("kept".to_string(), Some(envelope("kept")))]),
+            ..Default::default()
+        };
+        cache.save(Some(&dir), &path);
+        cache.save(Some(&dir), &path);
+
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&dir), 0o700);
+        assert_eq!(mode(&cache_file(&dir, &path)), 0o600);
     }
 }

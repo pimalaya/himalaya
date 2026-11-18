@@ -13,7 +13,7 @@ use std::borrow::Cow;
 use anyhow::Result;
 use mime::{
     codec::flowed,
-    tree::{body::MimeBodyNode, cst::MimeCst, entity::MimeEntity},
+    tree::{anomaly::MimeAnomaly, body::MimeBodyNode, cst::MimeCst, entity::MimeEntity},
 };
 use pimalaya_cli::error::CodedError;
 use schemars::JsonSchema;
@@ -33,7 +33,9 @@ pub const MAX_PARTS: usize = 200;
 pub const MAX_HEADER_LINES: usize = 500;
 
 /// Parses a raw message, refusing it whole with `message-too-complex`
-/// when it is nested too deep or holds too many parts or header lines.
+/// when it is nested too deep or holds too many parts or header lines,
+/// or when mime-rs stopped splitting it at its own caps, a part it left
+/// unsplit hiding what it holds.
 ///
 /// Any bytes parse: mime-rs recovers from malformed mail rather than
 /// failing on it.
@@ -54,6 +56,14 @@ struct Tally {
 /// of a multipart one level deeper, and an attached message's top-level
 /// part one level deeper too, encoded or not.
 fn measure(part: &MimeEntity, depth: usize, tally: &mut Tally) -> Result<()> {
+    if part.anomalies.contains(MimeAnomaly::PartLimit)
+        || part.anomalies.contains(MimeAnomaly::NestingLimit)
+    {
+        return Err(too_complex(String::from(
+            "more parts or levels than the MIME parser splits",
+        )));
+    }
+
     if depth > MAX_DEPTH {
         return Err(too_complex(format!(
             "parts nested deeper than {MAX_DEPTH} levels"
@@ -678,6 +688,22 @@ mod tests {
         assert!(refused(&nested(MAX_DEPTH + 1)));
         assert!(refused(&wide(MAX_PARTS)));
         assert!(refused(&tall(MAX_HEADER_LINES + 1)));
+    }
+
+    /// mime-rs stops past its own entity cap and leaves the multipart it
+    /// stopped at unsplit, one part to a walk: such a message is refused,
+    /// not read in part, even behind a decoy text part.
+    #[test]
+    fn a_message_past_the_parser_cap_is_refused() {
+        let count = mime::tree::parse::ENTITIES_MAX + 1;
+        assert!(refused(&wide(count)));
+
+        let inner = String::from_utf8(wide(count)).unwrap();
+        let raw = format!(
+            "Content-Type: multipart/mixed; boundary=\"top\"\r\n\r\n\
+             --top\r\nContent-Type: text/plain\r\n\r\ndecoy\r\n--top\r\n{inner}--top--\r\n"
+        );
+        assert!(refused(raw.as_bytes()));
     }
 
     #[test]

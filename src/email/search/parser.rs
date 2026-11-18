@@ -10,6 +10,12 @@ use crate::email::search::{
     error::Error, filter, query::SearchEmailsQuery, sort::parser::order_by,
 };
 
+/// The deepest parentheses may nest in a query.
+pub const MAX_NESTING: usize = 32;
+
+/// The most `and`, `or` and `not` a query may hold.
+pub const MAX_OPERATORS: usize = 256;
+
 /// A rich chumsky error, which is what the diagnostics are drawn from.
 pub type ParserError<'a> = extra::Err<Rich<'a, char>>;
 
@@ -22,10 +28,66 @@ pub type ParserError<'a> = extra::Err<Rich<'a, char>>;
 pub fn parse(input: impl AsRef<str>) -> Result<SearchEmailsQuery, Error> {
     let input = input.as_ref().trim();
 
+    if let Some(err) = past_bounds(input) {
+        return Err(Error::ParseError(vec![err], String::from(input)));
+    }
+
     query().parse(input).into_result().map_err(|errs| {
         let errs = errs.into_iter().map(Rich::into_owned).collect();
         Error::ParseError(errs, String::from(input))
     })
+}
+
+/// The error over the first parenthesis nesting deeper than
+/// [`MAX_NESTING`] or the first operator past [`MAX_OPERATORS`], read
+/// before the grammar recurses into the query or builds a tree the
+/// backends walk.
+///
+/// Quoted text and backslash-escaped characters are skipped, as the
+/// grammar reads them as patterns; a bare `and`, `or` or `not` counts
+/// wherever it stands.
+fn past_bounds(input: &str) -> Option<Rich<'static, char>> {
+    let mut depth = 0usize;
+    let mut operators = 0usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut word = 0..0;
+
+    for (index, c) in input.char_indices().chain([(input.len(), ' ')]) {
+        if is_word_char(c) && !quoted && !escaped {
+            if word.is_empty() {
+                word = index..index;
+            }
+            word.end = index + c.len_utf8();
+            continue;
+        }
+
+        if matches!(&input[word.clone()], "and" | "or" | "not") {
+            operators += 1;
+            if operators > MAX_OPERATORS {
+                let reason = format!("more than {MAX_OPERATORS} `and`, `or` and `not`");
+                return Some(Rich::custom(word.into(), reason));
+            }
+        }
+        word = index..index;
+
+        match c {
+            _ if escaped => escaped = false,
+            '\\' => escaped = true,
+            '"' => quoted = !quoted,
+            '(' if !quoted => {
+                depth += 1;
+                if depth > MAX_NESTING {
+                    let reason = format!("parentheses nested deeper than {MAX_NESTING} levels");
+                    return Some(Rich::custom((index..index + 1).into(), reason));
+                }
+            }
+            ')' if !quoted => depth = depth.saturating_sub(1),
+            _ => (),
+        }
+    }
+
+    None
 }
 
 /// The whole query: a sort alone, or a filter followed by an optional
@@ -110,7 +172,7 @@ mod tests {
     use crate::email::search::{
         error::Error,
         filter::query::SearchEmailsFilterQuery::*,
-        parser::parse,
+        parser::{MAX_NESTING, MAX_OPERATORS, parse},
         query::SearchEmailsQuery,
         sort::query::{SearchEmailsSorterKind, SearchEmailsSorterOrder},
     };
@@ -196,5 +258,37 @@ mod tests {
         ] {
             assert_eq!(parse(query).unwrap(), expected, "{query}");
         }
+    }
+
+    /// `levels` parentheses around one condition.
+    fn nested(levels: usize) -> String {
+        format!("{}from a{}", "(".repeat(levels), ")".repeat(levels))
+    }
+
+    #[test]
+    fn nesting_at_the_bound_parses() {
+        assert!(parse(nested(MAX_NESTING)).is_ok());
+    }
+
+    /// Deep nesting is refused before the grammar recurses into it, where
+    /// 3,000 levels overflowed the stack.
+    #[test]
+    fn nesting_past_the_bound_is_refused() {
+        refused(&nested(3_000));
+        let (_, span) = refused(&nested(MAX_NESTING + 1));
+        assert_eq!(span, MAX_NESTING..MAX_NESTING + 1);
+    }
+
+    /// A chain of operators is a tree as deep as it is long, which the
+    /// backends then walk: it is bounded too.
+    #[test]
+    fn operators_past_the_bound_are_refused() {
+        let chain =
+            |op: &str, count: usize| format!("{}from a", format!("from a {op} ").repeat(count));
+        refused(&chain("or", 100_000));
+        refused(&format!("{}from a", "not ".repeat(100_000)));
+        assert!(parse(chain("and", MAX_OPERATORS)).is_ok());
+        refused(&chain("and", MAX_OPERATORS + 1));
+        assert!(parse(format!("subject \"{}\"", "a and ".repeat(1_000))).is_ok());
     }
 }

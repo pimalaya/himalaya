@@ -164,8 +164,8 @@ impl GmailClient {
     /// Gmail answers a next page token after an exactly full last page
     /// too, so `messages.list` is read up to one id past the page, the
     /// first call asking the pages before it and that id at once: a page
-    /// follows when that id exists. Without a page size, the first page
-    /// Gmail serves is the listing.
+    /// follows when that id exists. Without a page size, every page is
+    /// read, token after token, and none follows.
     fn page_ids(
         &mut self,
         mailbox: &str,
@@ -176,20 +176,13 @@ impl GmailClient {
         let label_ids = vec![mailbox.to_string()];
         let include_spam_trash = include_spam_trash(mailbox);
 
-        let Some(size) = page_size else {
-            let params = GmailMessagesListParams {
-                q,
-                label_ids: &label_ids,
-                include_spam_trash,
-                ..Default::default()
-            };
-            let response = self.messages_list(&params)?.response;
-            let ids = response.messages.into_iter().map(|m| m.id).collect();
-            return Ok((ids, false));
+        let (start, end) = match page_size {
+            Some(size) => {
+                let start = (page.unwrap_or(1).max(1) as usize - 1).saturating_mul(size as usize);
+                (start, start.saturating_add(size as usize))
+            }
+            None => (0, usize::MAX),
         };
-
-        let start = (page.unwrap_or(1).max(1) as usize - 1).saturating_mul(size as usize);
-        let end = start.saturating_add(size as usize);
 
         let mut ids = list_ids(end.saturating_add(1), |max_results, page_token| {
             let params = GmailMessagesListParams {
@@ -1386,6 +1379,31 @@ mod script_tests {
         let requests = requests.lock().unwrap();
         assert!(requests[0].contains("maxResults=5"), "{}", requests[0]);
         assert_eq!(requests.len(), 2);
+    }
+
+    /// Without a page size (`--page-size 0`) the listing follows every
+    /// next page token, asking the largest page each time, and says no page
+    /// follows only once Gmail served the last one.
+    #[test]
+    fn a_listing_without_page_size_reads_every_page() {
+        let (mut client, requests) = gmail(vec![
+            listing(&["a", "b"], Some("T")),
+            listing(&["c"], None),
+            metadata(&[message("a"), message("b"), message("c")]),
+        ]);
+        let listed = client.list_envelopes("L", None, None, false).unwrap();
+        let ids: Vec<&str> = listed
+            .value
+            .envelopes
+            .iter()
+            .map(|e| e.id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", "b", "c"]);
+        assert!(!listed.value.more);
+
+        let requests = requests.lock().unwrap();
+        assert!(requests[0].contains("maxResults=500"), "{}", requests[0]);
+        assert!(requests[1].contains("pageToken=T"), "{}", requests[1]);
     }
 
     /// Past the largest page Gmail serves, the listing goes on by token,

@@ -314,6 +314,17 @@ mod tests {
     }
 
     #[test]
+    fn a_query_past_its_bounds_says_which() {
+        let query = format!("{}from a{}", "(".repeat(40), ")".repeat(40));
+        let rendered = render(&query);
+
+        assert!(
+            rendered.contains("parentheses nested deeper than 32 levels"),
+            "{rendered}",
+        );
+    }
+
+    #[test]
     fn a_date_clause_expects_a_date() {
         let rendered = render("after foo");
 

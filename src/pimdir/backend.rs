@@ -1032,7 +1032,8 @@ impl PimdirClient {
 
     /// Where queue row `id` stands (pimdir STORAGE §15.4): pending, parked,
     /// unconfirmed, applied with the item an `add` created, or unknown. A
-    /// row anchored on another account's collection reads as unknown.
+    /// row anchored on a collection that is not one of the account's
+    /// mailboxes, another account's or another app's, reads as unknown.
     ///
     /// A row applied on a collection gone since (§15.4) names none, so no
     /// account can be told from it and it reads as applied.
@@ -1058,10 +1059,7 @@ impl PimdirClient {
         };
 
         let ours = self
-            .store
-            .list_collections_by_account(self.account.as_deref())
-            .map_err(pimdir_error)
-            .context("List the account's collections")?
+            .mail_collections()?
             .iter()
             .any(|ours| &ours.id == collection);
         Ok(if ours {
@@ -2675,6 +2673,41 @@ mod tests {
             client.queue_row(staged.queue_id).unwrap(),
             PimdirActionStatus::Unknown
         );
+    }
+
+    /// A row another app queued on a collection of the same account, an
+    /// address book here, reads as unknown: it can be neither shown nor
+    /// cancelled, as Cardamum and Calendula keep to their own kind.
+    #[test]
+    fn a_queue_row_of_another_kind_is_unknown() {
+        let (dir, client) = sent_store();
+        let card = b"BEGIN:VCARD\r\nVERSION:4.0\r\nUID:u1\r\nFN:A\r\nEND:VCARD\r\n";
+        let row = {
+            let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+            store
+                .ensure_collection("carddav/contacts", "text/vcard")
+                .unwrap();
+            drop(store);
+            client
+                .producer()
+                .unwrap()
+                .enqueue_with_body("carddav/contacts", card, |hash| PimdirAction::Add {
+                    link_id: Some(PimdirLinkId("u1".into())),
+                    flags: Default::default(),
+                    object: Some(hash),
+                    supersedes: None,
+                })
+                .unwrap()
+                .handle
+                .id
+        };
+
+        assert_eq!(client.queue_row(row).unwrap(), PimdirActionStatus::Unknown);
+        let err = client.cancel_queued(row).unwrap_err().to_string();
+        assert!(err.contains("No queued action"), "{err}");
+
+        let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        assert_eq!(store.pending_actions("carddav/contacts").unwrap().len(), 1);
     }
 
     /// A cancel takes the owner role on the store as it stands: a store

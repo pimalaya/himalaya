@@ -64,9 +64,16 @@ impl ImapRawCommand {
             .iter()
             .any(|completion| completion.status != ImapStatus::Ok);
 
+        let unframed = output.unframed;
+        if unframed {
+            log::warn!(
+                "a literal of the reply is not UTF-8, so its octet count cannot be told and the responses from it on are left unparsed"
+            );
+        }
+
         printer.out(output)?;
 
-        if refused {
+        if refused || unframed {
             return Err(PartialOutcome::default().into());
         }
 
@@ -84,6 +91,10 @@ pub(crate) struct ImapRawOutput {
     /// Every response as received, for the text form.
     #[serde(skip)]
     lines: Vec<String>,
+    /// Whether a literal holding no UTF-8 left the reply unframed from the
+    /// response announcing it on.
+    #[serde(skip)]
+    unframed: bool,
 }
 
 impl fmt::Display for ImapRawOutput {
@@ -103,7 +114,9 @@ fn split_reply(reply: &str) -> (Vec<ImapRawEvent>, ImapRawOutput) {
     let mut completions = Vec::new();
     let mut lines = Vec::new();
 
-    for response in split_responses(reply) {
+    let (responses, rest) = split_responses(reply);
+
+    for response in responses {
         lines.push(response.to_owned());
 
         match parse_response(response) {
@@ -112,7 +125,20 @@ fn split_reply(reply: &str) -> (Vec<ImapRawEvent>, ImapRawOutput) {
         }
     }
 
-    (events, ImapRawOutput { completions, lines })
+    let unframed = rest.is_some();
+    if let Some(rest) = rest {
+        lines.push(rest.to_owned());
+        events.push(ImapRawEvent::Unparsed {
+            text: rest.to_owned(),
+        });
+    }
+
+    let output = ImapRawOutput {
+        completions,
+        lines,
+        unframed,
+    };
+    (events, output)
 }
 
 /// A tagged completion, split into its parts.
@@ -180,8 +206,13 @@ enum ImapResponse {
 
 /// Splits a raw reply into its responses: lines, a literal's announced
 /// octets kept with the line announcing them.
-fn split_responses(reply: &str) -> Vec<&str> {
-    let bytes = reply.as_bytes();
+///
+/// io-imap decodes the reply lossily, an octet that is no UTF-8 growing
+/// into a U+FFFD of three bytes, so a literal holding one has no
+/// knowable size: the reply from the response announcing it on is
+/// returned unsplit, as the rest, rather than let a line of the literal
+/// read as a response.
+fn split_responses(reply: &str) -> (Vec<&str>, Option<&str>) {
     let mut responses = Vec::new();
     let mut start = 0;
     let mut cursor = 0;
@@ -189,10 +220,16 @@ fn split_responses(reply: &str) -> Vec<&str> {
     while let Some(offset) = reply[cursor..].find("\r\n") {
         let end = cursor + offset;
 
-        // NOTE: a line ending with `{n}` or `{n+}` announces n octets of
-        // literal, which belong to the same response.
         if let Some(size) = literal_size(&reply[cursor..end]) {
-            cursor = (end + 2 + size).min(bytes.len());
+            let body = end + 2;
+            let stop = body.saturating_add(size).min(reply.len());
+
+            if !reply.is_char_boundary(stop) || reply[body..stop].contains('\u{FFFD}') {
+                let rest = reply[start..].trim_end_matches("\r\n");
+                return (responses, Some(rest));
+            }
+
+            cursor = stop;
             continue;
         }
 
@@ -205,7 +242,7 @@ fn split_responses(reply: &str) -> Vec<&str> {
         responses.push(&reply[start..]);
     }
 
-    responses
+    (responses, None)
 }
 
 /// The octet count a line announces as literal, if it ends with one.
@@ -306,11 +343,14 @@ mod tests {
 
         assert_eq!(
             split_responses(reply),
-            [
-                "* 1 FETCH (BODY[] {5}\r\nab\r\nc)",
-                "* 2 EXISTS",
-                "A1 OK done"
-            ]
+            (
+                vec![
+                    "* 1 FETCH (BODY[] {5}\r\nab\r\nc)",
+                    "* 2 EXISTS",
+                    "A1 OK done"
+                ],
+                None
+            )
         );
     }
 
@@ -345,6 +385,43 @@ mod tests {
         assert_eq!(
             json("garbage"),
             json!({ "event": "unparsed", "text": "garbage" })
+        );
+    }
+
+    /// The reply as io-imap hands it over, decoded lossily.
+    fn lossy(bytes: &[u8]) -> String {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+
+    /// A Latin-1 octet grows into a three-byte U+FFFD, so a literal's
+    /// announced count no longer lands on a character boundary: the reply
+    /// splits without a panic, the rest left unframed.
+    #[test]
+    fn a_literal_that_is_no_utf8_does_not_panic() {
+        let reply = lossy(b"* 1 FETCH (BODY[] {4}\r\nab\xe9c)\r\nA1 OK done\r\n");
+        let (events, output) = split_reply(&reply);
+
+        assert!(output.completions.is_empty());
+        assert!(output.unframed);
+        assert_eq!(
+            serde_json::to_value(&events[0]).unwrap(),
+            json!({ "event": "unparsed", "text": reply.trim_end() })
+        );
+    }
+
+    /// A body line spelling a tagged completion stays in its literal, the
+    /// lossy decoding having grown it past its announced count.
+    #[test]
+    fn a_body_line_is_never_a_completion() {
+        let mut reply = b"* 1 FETCH (BODY[] {21}\r\n".to_vec();
+        reply.extend_from_slice(&[0xe9; 7]);
+        reply.extend_from_slice(b"\r\nA1 NO forged)\r\nA1 OK done\r\n");
+        let (_, output) = split_reply(&lossy(&reply));
+
+        assert!(
+            output.completions.iter().all(|c| c.text != "forged)"),
+            "{:?}",
+            output.completions,
         );
     }
 }

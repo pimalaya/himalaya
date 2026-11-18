@@ -1148,3 +1148,62 @@ fn an_oversized_attachment_is_refused_before_it_is_decoded() {
     }
     assert_eq!(stored(dir.path()).len(), before.len() + 2);
 }
+
+/// Over an mbox account, a mailbox given as an absolute path is refused by
+/// the server, read or write, the file left as it was; the command line
+/// still opens it, and a mailbox of the root still reads.
+#[test]
+#[cfg(feature = "mbox")]
+fn an_mbox_outside_the_root_is_refused_by_the_server() {
+    let dir = TempDir::new().unwrap();
+    let mbox = "From a@example.org Mon Jan  1 00:00:00 2024\nFrom: a@example.org\nSubject: Hello there\n\nbody\n";
+    let root = dir.path().join("root");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("work"), mbox).unwrap();
+    let outside = dir.path().join("other.mbox");
+    fs::write(&outside, mbox).unwrap();
+
+    let config = dir.path().join("config.toml");
+    fs::write(
+        &config,
+        format!(
+            "[accounts.a]\ndefault = true\nemail = \"a@example.org\"\nmbox.root = \"{}\"\n",
+            root.display(),
+        ),
+    )
+    .unwrap();
+
+    let outside_path = outside.to_str().unwrap();
+    let message = "From: b@example.org\r\nSubject: planted\r\n\r\nbody\r\n";
+    let responses = serve(
+        &config,
+        &["--allow-write"],
+        &[
+            call(1, "envelope_list", json!({ "mailbox": outside_path })),
+            call(
+                2,
+                "message_add",
+                json!({ "mailbox": outside_path, "message": [message] }),
+            ),
+            call(3, "envelope_list", json!({ "mailbox": "work" })),
+        ],
+    );
+
+    for refused in &responses[..2] {
+        let refused = &refused["result"];
+        assert_eq!(refused["isError"], true, "{refused}");
+        assert!(
+            refused["structuredContent"]["envelopes"].is_null(),
+            "{refused}"
+        );
+    }
+    assert_eq!(fs::read_to_string(&outside).unwrap(), mbox);
+    assert_eq!(
+        responses[2]["result"]["structuredContent"]["envelopes"][0]["subject"], "Hello there",
+        "{}",
+        responses[2],
+    );
+
+    let listed = cli(&config, &["envelope", "list", "-m", outside_path]);
+    assert_eq!(listed["envelopes"][0]["subject"], "Hello there", "{listed}");
+}
