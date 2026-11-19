@@ -27,7 +27,7 @@ pub struct MsgraphRequestCommand {
     #[arg(value_parser = ["get", "post", "patch", "delete"])]
     pub method: String,
     /// Graph path (joined onto `v1.0/`) or a full URL.
-    #[arg(value_name = "PATH", value_parser = path_parser)]
+    #[arg(value_name = "PATH")]
     pub path: String,
     /// Raw JSON body for post and patch.
     #[arg(value_name = "JSON")]
@@ -35,6 +35,12 @@ pub struct MsgraphRequestCommand {
 }
 
 impl MsgraphRequestCommand {
+    /// Refuses a URL off the Graph API, coded `request-origin`, before the
+    /// session opens.
+    pub fn check(&self) -> Result<()> {
+        api_url(BASE, &self.path).map(drop)
+    }
+
     /// Sends the request and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         let url = api_url(BASE, &self.path)?;
@@ -52,15 +58,6 @@ impl MsgraphRequestCommand {
         printer.out(RawJsonOutput {
             response: client.run(send)?.response,
         })
-    }
-}
-
-/// Checks a path as clap takes it: a URL off the Graph API is refused
-/// with the command line, before the session opens.
-fn path_parser(path: &str) -> Result<String, String> {
-    match api_url(BASE, path) {
-        Ok(_) => Ok(path.to_owned()),
-        Err(err) => Err(err.to_string()),
     }
 }
 

@@ -27,7 +27,7 @@ use crate::{
     account::context::Account,
     config::{AccountConfig, Config, pimdir::PimdirConfig},
     error::{ErrorCode, pimdir_error},
-    pimdir::backend::is_mail,
+    pimdir::backend::MAIL_KIND,
 };
 
 /// The producer name recorded on every action this client enqueues, so the
@@ -361,20 +361,18 @@ pub fn build_pimdir_client(
 /// `store-account-ambiguous`: picking one would show the wrong mailbox
 /// set. Only the accounts holding mail count, so a store sharing one mail
 /// account with the contacts or calendars of others needs no
-/// configuration. An account named that the store does not hold is
-/// refused under `store-account-unknown`, rather than read as an empty
-/// one.
+/// configuration. An account named that a store holding collections does
+/// not hold is refused under `store-account-unknown`, rather than read as
+/// an empty one; on a store holding no collection yet, a first sync not
+/// having run, it is read as named.
 fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<Option<String>> {
-    let collections = store
-        .list_collections()
-        .map_err(pimdir_error)
-        .context("List pimdir collections")?;
-
     if let Some(account) = configured {
-        let held = collections
-            .iter()
-            .any(|collection| collection.account.as_deref() == Some(account.as_str()));
-        if !held {
+        let held = store
+            .accounts_of(None)
+            .map_err(pimdir_error)
+            .context("List pimdir accounts")?;
+        let named = Some(account.as_str());
+        if !held.is_empty() && !held.iter().any(|held| held.as_deref() == named) {
             let message = format!(
                 "The pimdir store holds no account `{account}`; check `pimdir.account`, \
                  or run a sync of that account"
@@ -384,13 +382,10 @@ fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<O
         return Ok(Some(account));
     }
 
-    let mut accounts: Vec<Option<String>> = collections
-        .into_iter()
-        .filter(|collection| is_mail(&collection.kind))
-        .map(|collection| collection.account)
-        .collect();
-    accounts.sort();
-    accounts.dedup();
+    let accounts = store
+        .accounts_of(Some(MAIL_KIND))
+        .map_err(pimdir_error)
+        .context("List pimdir accounts")?;
 
     match accounts.as_slice() {
         [] | [_] => Ok(accounts.into_iter().next().flatten()),

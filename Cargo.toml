@@ -16,8 +16,8 @@ default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "maildir",
 native-tls = ["pimalaya-stream/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-gmail?/native-tls", "io-msgraph?/native-tls", "io-smtp?/native-tls", "io-managesieve?/native-tls"]
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-gmail?/rustls-aws", "io-msgraph?/rustls-aws", "io-smtp?/rustls-aws", "io-managesieve?/rustls-aws"]
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-gmail?/rustls-ring", "io-msgraph?/rustls-ring", "io-smtp?/rustls-ring", "io-managesieve?/rustls-ring"]
-imap = ["dep:io-imap", "dep:mime-rs", "io-imap/client", "io-imap/scram"]
-smtp = ["dep:io-smtp", "dep:mime-rs", "io-smtp/scram"]
+imap = ["dep:io-imap", "dep:mime-rs", "io-imap/std", "io-imap/scram"]
+smtp = ["dep:io-smtp", "dep:mime-rs", "io-smtp/std", "io-smtp/scram"]
 jmap = ["dep:io-jmap", "dep:mime-rs", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mime-rs", "io-gmail/client", "io-gmail/schemars"]
 msgraph = ["dep:io-msgraph", "dep:mime-rs", "io-msgraph/client", "io-msgraph/schemars"]
@@ -34,7 +34,7 @@ strip = "symbols"
 panic = "abort"
 
 [build-dependencies]
-pimalaya-cli = { version = "0.6.1", default-features = false, features = ["build"] }
+pimalaya-cli = { version = "0.7.0", default-features = false, features = ["build"] }
 
 [dev-dependencies]
 io-oauth = { version = "0.7", default-features = false, features = ["client", "jwt-bearer", "rustls-ring"] }
@@ -54,21 +54,21 @@ gethostname = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 idna_adapter = { version = "=1.0.0", default-features = false }
 io-gmail = { version = "0.9", default-features = false, optional = true }
-io-imap = { version = "0.11.2", default-features = false, optional = true }
+io-imap = { version = "0.12.0", default-features = false, optional = true }
 io-jmap = { version = "0.10.1", default-features = false, optional = true }
 io-maildir = { version = "0.5", default-features = false, optional = true }
-io-managesieve = { version = "0.4", default-features = false, optional = true }
+io-managesieve = { version = "0.5", default-features = false, optional = true }
 io-mbox = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.9.3", default-features = false, optional = true }
-io-pimdir = { version = "0.17.0", default-features = false, features = ["client"], optional = true }
-io-sasl = { version = "0.2", default-features = false, features = ["scram"] }
-io-smtp = { version = "0.9", default-features = false, optional = true }
+io-pimdir = { version = "0.18.0", default-features = false, features = ["client"], optional = true }
+io-sasl = { version = "0.3", default-features = false, features = ["scram"] }
+io-smtp = { version = "0.10", default-features = false, optional = true }
 jiff = { version = "1", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
 log = { version = "0.4", default-features = false }
 mime-rs = { version = "0.2", default-features = false, features = ["base64", "encoding", "parser"], optional = true }
 mime_guess = { version = "2", default-features = false, features = ["rev-mappings"] }
 percent-encoding = { version = "2", default-features = false }
-pimalaya-cli = { version = "0.6.1", default-features = false, features = ["mcp", "repl", "terminal"] }
+pimalaya-cli = { version = "0.7.0", default-features = false, features = ["mcp", "repl", "terminal"] }
 pimalaya-config = { version = "0.6.0", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.4", default-features = false, features = ["std"] }
 schemars = { version = "1", default-features = false, features = ["chrono04", "derive", "std"] }

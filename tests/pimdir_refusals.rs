@@ -148,3 +148,29 @@ fn the_account_is_the_one_holding_mail_or_refused() {
     let err = failure(&config, &["mailbox", "list"]);
     assert_eq!(err["code"], "store-account-ambiguous", "{err}");
 }
+
+/// A configured account is read on a store holding no collection yet, a
+/// first sync not having run: its mailbox set is empty, not refused.
+#[test]
+fn a_configured_account_is_read_on_an_empty_store() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("store");
+    fs::create_dir(&root).unwrap();
+    PimdirStore::open(&root).unwrap();
+    let config = config(dir.path(), &root, Some("work"));
+    let home = config.parent().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .arg("-c")
+        .arg(&config)
+        .args(["--json", "mailbox", "list"])
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", home)
+        .env_remove("XDG_CONFIG_DIRS")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{stdout}");
+    let mailboxes: Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(mailboxes["mailboxes"], serde_json::json!([]), "{stdout}");
+}

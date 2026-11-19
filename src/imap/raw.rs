@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     imap::{client::ImapClient, outcome::ImapStatus},
-    shared::raw::RawCommandArg,
+    shared::{base64, raw::RawCommandArg},
 };
 
 /// Send raw IMAP commands and print the server's responses.
@@ -28,8 +28,10 @@ use crate::{
 ///
 /// The text form prints every response as received. Under `--json`,
 /// untagged and continuation responses print as events, then the tagged
-/// completions as the result, each split into its parts. A tagged NO or
-/// BAD is part of the result and exits 3, the server having answered.
+/// completions as the result, each split into its parts. A response that
+/// is not UTF-8, such as one carrying an 8-bit literal, prints as an
+/// event holding its exact octets in base64. A tagged NO or BAD is part
+/// of the result and exits 3, the server having answered.
 #[derive(Debug, Parser)]
 pub struct ImapRawCommand {
     #[command(flatten)]
@@ -47,8 +49,8 @@ impl ImapRawCommand {
             command.push_str("\r\n");
         }
 
-        let reply = client.raw(command.as_bytes())?;
-        let (events, output) = split_reply(&reply);
+        let responses = client.raw(command.as_bytes())?;
+        let (events, output) = split_reply(&responses);
 
         // NOTE: a text event reaches a terminal only, and the untagged
         // responses are what a raw command asks for, so the text form
@@ -64,16 +66,16 @@ impl ImapRawCommand {
             .iter()
             .any(|completion| completion.status != ImapStatus::Ok);
 
-        let unframed = output.unframed;
-        if unframed {
+        let unread = output.unread;
+        if unread {
             log::warn!(
-                "a literal of the reply is not UTF-8, so its octet count cannot be told and the responses from it on are left unparsed"
+                "a tagged response is not UTF-8, so its status is left unread and it prints in base64"
             );
         }
 
         printer.out(output)?;
 
-        if refused || unframed {
+        if refused || unread {
             return Err(PartialOutcome::default().into());
         }
 
@@ -91,10 +93,10 @@ pub(crate) struct ImapRawOutput {
     /// Every response as received, for the text form.
     #[serde(skip)]
     lines: Vec<String>,
-    /// Whether a literal holding no UTF-8 left the reply unframed from the
-    /// response announcing it on.
+    /// Whether a response that is not UTF-8 opens with a tag, a completion
+    /// whose status is left unread.
     #[serde(skip)]
-    unframed: bool,
+    unread: bool,
 }
 
 impl fmt::Display for ImapRawOutput {
@@ -107,36 +109,38 @@ impl fmt::Display for ImapRawOutput {
     }
 }
 
-/// Splits a raw reply into the events printed before the result and the
-/// result.
-fn split_reply(reply: &str) -> (Vec<ImapRawEvent>, ImapRawOutput) {
+/// Splits the responses io-imap framed into the events printed before
+/// the result and the result.
+fn split_reply(responses: &[Vec<u8>]) -> (Vec<ImapRawEvent>, ImapRawOutput) {
     let mut events = Vec::new();
     let mut completions = Vec::new();
     let mut lines = Vec::new();
-
-    let (responses, rest) = split_responses(reply);
+    let mut unread = false;
 
     for response in responses {
-        lines.push(response.to_owned());
+        let bytes = response.strip_suffix(b"\r\n").unwrap_or(response);
 
-        match parse_response(response) {
+        let Ok(text) = str::from_utf8(bytes) else {
+            unread |= !matches!(bytes.first(), Some(b'*' | b'+'));
+            lines.push(String::from_utf8_lossy(bytes).into_owned());
+            events.push(ImapRawEvent::Undecoded {
+                base64: base64::encode(response),
+            });
+            continue;
+        };
+
+        lines.push(text.to_owned());
+
+        match parse_response(text) {
             ImapResponse::Completion(completion) => completions.push(completion),
             ImapResponse::Event(event) => events.push(event),
         }
     }
 
-    let unframed = rest.is_some();
-    if let Some(rest) = rest {
-        lines.push(rest.to_owned());
-        events.push(ImapRawEvent::Unparsed {
-            text: rest.to_owned(),
-        });
-    }
-
     let output = ImapRawOutput {
         completions,
         lines,
-        unframed,
+        unread,
     };
     (events, output)
 }
@@ -182,10 +186,17 @@ pub(crate) enum ImapRawEvent {
         #[serde(skip)]
         line: String,
     },
-    /// A response that could not be parsed.
+    /// A UTF-8 response that could not be parsed.
     Unparsed {
         /// The response as received.
         text: String,
+    },
+    /// A response that is not UTF-8, such as one carrying an 8-bit
+    /// literal.
+    Undecoded {
+        /// The response's exact octets, its literals and its final CRLF
+        /// included, in the RFC 4648 standard alphabet, padded.
+        base64: String,
     },
 }
 
@@ -194,6 +205,7 @@ impl fmt::Display for ImapRawEvent {
         match self {
             Self::Untagged { line, .. } | Self::Continuation { line, .. } => writeln!(f, "{line}"),
             Self::Unparsed { text } => writeln!(f, "{text}"),
+            Self::Undecoded { base64 } => writeln!(f, "{base64}"),
         }
     }
 }
@@ -202,54 +214,6 @@ impl fmt::Display for ImapRawEvent {
 enum ImapResponse {
     Completion(ImapCompletion),
     Event(ImapRawEvent),
-}
-
-/// Splits a raw reply into its responses: lines, a literal's announced
-/// octets kept with the line announcing them.
-///
-/// io-imap decodes the reply lossily, an octet that is no UTF-8 growing
-/// into a U+FFFD of three bytes, so a literal holding one has no
-/// knowable size: the reply from the response announcing it on is
-/// returned unsplit, as the rest, rather than let a line of the literal
-/// read as a response.
-fn split_responses(reply: &str) -> (Vec<&str>, Option<&str>) {
-    let mut responses = Vec::new();
-    let mut start = 0;
-    let mut cursor = 0;
-
-    while let Some(offset) = reply[cursor..].find("\r\n") {
-        let end = cursor + offset;
-
-        if let Some(size) = literal_size(&reply[cursor..end]) {
-            let body = end + 2;
-            let stop = body.saturating_add(size).min(reply.len());
-
-            if !reply.is_char_boundary(stop) || reply[body..stop].contains('\u{FFFD}') {
-                let rest = reply[start..].trim_end_matches("\r\n");
-                return (responses, Some(rest));
-            }
-
-            cursor = stop;
-            continue;
-        }
-
-        responses.push(&reply[start..end]);
-        start = end + 2;
-        cursor = start;
-    }
-
-    if start < reply.len() && !reply[start..].trim().is_empty() {
-        responses.push(&reply[start..]);
-    }
-
-    (responses, None)
-}
-
-/// The octet count a line announces as literal, if it ends with one.
-fn literal_size(line: &str) -> Option<usize> {
-    let inner = line.strip_suffix('}')?;
-    let (_, size) = inner.rsplit_once('{')?;
-    size.trim_end_matches('+').parse().ok()
 }
 
 /// Parses one response.
@@ -319,12 +283,24 @@ fn parse_response(response: &str) -> ImapResponse {
 mod tests {
     use serde_json::json;
 
-    use crate::imap::raw::{ImapResponse, parse_response, split_reply, split_responses};
+    use crate::{
+        imap::raw::{ImapResponse, parse_response, split_reply},
+        shared::base64,
+    };
+
+    /// The responses as io-imap frames them, each with its final CRLF.
+    fn framed(responses: &[&[u8]]) -> Vec<Vec<u8>> {
+        responses.iter().map(|response| response.to_vec()).collect()
+    }
 
     #[test]
     fn the_text_form_prints_the_untagged_responses() {
-        let reply = "* CAPABILITY IMAP4rev1 SORT\r\n+ go on\r\nA1 OK done\r\n";
-        let (events, output) = split_reply(reply);
+        let responses = framed(&[
+            b"* CAPABILITY IMAP4rev1 SORT\r\n",
+            b"+ go on\r\n",
+            b"A1 OK done\r\n",
+        ]);
+        let (events, output) = split_reply(&responses);
 
         assert_eq!(events.len(), 2);
         assert_eq!(
@@ -339,18 +315,17 @@ mod tests {
 
     #[test]
     fn a_literal_stays_in_its_response() {
-        let reply = "* 1 FETCH (BODY[] {5}\r\nab\r\nc)\r\n* 2 EXISTS\r\nA1 OK done\r\n";
+        let responses = framed(&[b"* 1 FETCH (BODY[] {5}\r\nab\r\nc)\r\n", b"A1 OK done\r\n"]);
+        let (events, _) = split_reply(&responses);
 
         assert_eq!(
-            split_responses(reply),
-            (
-                vec![
-                    "* 1 FETCH (BODY[] {5}\r\nab\r\nc)",
-                    "* 2 EXISTS",
-                    "A1 OK done"
-                ],
-                None
-            )
+            serde_json::to_value(&events).unwrap(),
+            json!([{
+                "event": "untagged",
+                "kind": "FETCH",
+                "number": 1,
+                "text": "(BODY[] {5}\r\nab\r\nc)",
+            }])
         );
     }
 
@@ -388,40 +363,55 @@ mod tests {
         );
     }
 
-    /// The reply as io-imap hands it over, decoded lossily.
-    fn lossy(bytes: &[u8]) -> String {
-        String::from_utf8_lossy(bytes).into_owned()
-    }
-
-    /// A Latin-1 octet grows into a three-byte U+FFFD, so a literal's
-    /// announced count no longer lands on a character boundary: the reply
-    /// splits without a panic, the rest left unframed.
+    /// An 8-bit literal keeps its exact octets, in base64 under its own
+    /// key, and the responses after it still parse.
     #[test]
-    fn a_literal_that_is_no_utf8_does_not_panic() {
-        let reply = lossy(b"* 1 FETCH (BODY[] {4}\r\nab\xe9c)\r\nA1 OK done\r\n");
-        let (events, output) = split_reply(&reply);
+    fn an_8bit_literal_prints_its_exact_octets() {
+        let fetch = b"* 1 FETCH (BODY[] {4}\r\nab\xe9c)\r\n";
+        let responses = framed(&[fetch, b"* 2 EXISTS\r\n", b"A1 OK done\r\n"]);
+        let (events, output) = split_reply(&responses);
 
-        assert!(output.completions.is_empty());
-        assert!(output.unframed);
         assert_eq!(
-            serde_json::to_value(&events[0]).unwrap(),
-            json!({ "event": "unparsed", "text": reply.trim_end() })
+            serde_json::to_value(&events).unwrap(),
+            json!([
+                { "event": "undecoded", "base64": base64::encode(fetch) },
+                { "event": "untagged", "kind": "EXISTS", "number": 2, "text": "" },
+            ])
+        );
+        assert_eq!(
+            serde_json::to_value(&output).unwrap(),
+            json!({ "completions": [{ "tag": "A1", "status": "OK", "code": null, "text": "done" }] })
+        );
+        assert!(!output.unread);
+    }
+
+    /// A line of an 8-bit literal spelling a tagged completion stays in
+    /// its response, never read as the command's completion.
+    #[test]
+    fn a_literal_line_spelling_a_completion_stays_in_its_literal() {
+        let fetch = b"* 1 FETCH (BODY[] {16}\r\n\xe9\xe9\r\nA1 NO forged)\r\n";
+        let responses = framed(&[fetch, b"A1 OK done\r\n"]);
+        let (events, output) = split_reply(&responses);
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            serde_json::to_value(&output).unwrap(),
+            json!({ "completions": [{ "tag": "A1", "status": "OK", "code": null, "text": "done" }] })
         );
     }
 
-    /// A body line spelling a tagged completion stays in its literal, the
-    /// lossy decoding having grown it past its announced count.
+    /// A tagged response that is not UTF-8 prints in base64 and marks the
+    /// outcome partial, its status left unread.
     #[test]
-    fn a_body_line_is_never_a_completion() {
-        let mut reply = b"* 1 FETCH (BODY[] {21}\r\n".to_vec();
-        reply.extend_from_slice(&[0xe9; 7]);
-        reply.extend_from_slice(b"\r\nA1 NO forged)\r\nA1 OK done\r\n");
-        let (_, output) = split_reply(&lossy(&reply));
+    fn an_8bit_completion_is_left_unread() {
+        let completion = b"A1 NO bo\xeete pleine\r\n";
+        let (events, output) = split_reply(&framed(&[completion]));
 
-        assert!(
-            output.completions.iter().all(|c| c.text != "forged)"),
-            "{:?}",
-            output.completions,
+        assert_eq!(
+            serde_json::to_value(&events).unwrap(),
+            json!([{ "event": "undecoded", "base64": base64::encode(completion) }])
         );
+        assert!(output.completions.is_empty());
+        assert!(output.unread);
     }
 }

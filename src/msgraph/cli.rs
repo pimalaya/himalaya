@@ -37,6 +37,15 @@ pub enum MsgraphCommand {
 }
 
 impl MsgraphCommand {
+    /// Refuses what the command cannot run before the session opens: a
+    /// `request` URL off the Graph API.
+    pub fn check(&self) -> Result<()> {
+        match self {
+            Self::Request(cmd) => cmd.check(),
+            _ => Ok(()),
+        }
+    }
+
     /// Runs the subcommand against the account's Graph client.
     pub fn execute(
         self,

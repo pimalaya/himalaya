@@ -6,7 +6,8 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
+use pimalaya_cli::error::request_origin;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -14,17 +15,16 @@ use url::Url;
 
 /// The URL of `path` under the API at `base`: a path joined onto it, a
 /// leading `/` dropped, or a full URL taken as is. A URL off the origin of
-/// `base` is refused before any request, so the bearer token the request
-/// carries never leaves for another host.
+/// `base` is refused before any request, coded `request-origin`, so the
+/// bearer token the request carries never leaves for another host.
 pub fn api_url(base: &str, path: &str) -> Result<Url> {
     let base = Url::parse(base)?;
     let url = base.join(path.trim_start_matches('/'))?;
 
     if url.origin() != base.origin() {
-        let origin = base.origin().ascii_serialization();
-        bail!(
-            "Refused URL `{url}`: it leaves the API at {origin}, which the request's bearer token is for"
-        );
+        let url = url.origin().ascii_serialization();
+        let api = base.origin().ascii_serialization();
+        return Err(request_origin(&url, &api));
     }
 
     Ok(url)
@@ -57,13 +57,14 @@ impl fmt::Display for RawJsonOutput {
 
 #[cfg(test)]
 mod tests {
+    use pimalaya_cli::error::{CommonCode, code_of};
     use serde_json::{Value, json};
 
     use super::RawJsonOutput;
 
     /// A path joins the API, a full URL on it stays as given, and a URL off
-    /// its origin is refused, whatever its case or spelling, the bearer
-    /// token never leaving for another host.
+    /// its origin is refused coded `request-origin`, whatever its case or
+    /// spelling, the bearer token never leaving for another host.
     #[test]
     fn a_url_off_the_api_is_refused() {
         let base = "https://graph.microsoft.com/v1.0/";
@@ -78,8 +79,10 @@ mod tests {
             "http://graph.microsoft.com/v1.0/me",
             "https://graph.microsoft.com.evil.example/me",
         ] {
-            let err = url(path).unwrap_err().to_string();
-            assert!(err.contains("Refused URL"), "{path}: {err}");
+            let err = super::api_url(base, path).unwrap_err();
+            let code = code_of::<CommonCode>(&err);
+            assert_eq!(code, Some(CommonCode::RequestOrigin), "{path}: {err}");
+            assert!(err.to_string().contains("off the API origin"), "{err}");
         }
     }
 

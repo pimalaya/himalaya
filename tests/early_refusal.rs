@@ -54,8 +54,6 @@ fn a_value_the_command_refuses_is_refused_before_the_session() {
         &["jmap", "submission", "create", "E1", "--identity-id", "I1"],
         &["msgraph", "messages", "update", "M1"],
         &["msgraph", "request", "frob", "me"],
-        &["msgraph", "request", "get", "https://evil.example.org/x"],
-        &["gmail", "request", "get", "https://evil.example.org/x"],
     ] {
         let args = refused(args);
         let output = run(dir.path(), &config, &args);
@@ -65,6 +63,28 @@ fn a_value_the_command_refuses_is_refused_before_the_session() {
         let json: Value = serde_json::from_str(stdout.trim()).unwrap();
         assert_eq!(json["code"], "usage-invalid", "{args:?}: {json}");
         assert!(!marker.exists(), "{args:?} ran the secret command");
+    }
+}
+
+/// A URL off the API a request command's token is for is refused coded
+/// `request-origin`, exit 1, before the session opens.
+#[test]
+fn a_request_off_its_api_is_refused_before_the_session() {
+    let dir = TempDir::new().unwrap();
+    let config = dir.path().join("config.toml");
+    let lines = "[accounts.t]\ndefault = true\nemail = \"t@example.org\"\n\
+                 gmail.auth.token.command = [\"false\"]\n\
+                 msgraph.auth.token.command = [\"false\"]\n";
+    fs::write(&config, lines).unwrap();
+
+    for backend in ["msgraph", "gmail"] {
+        let args = [backend, "request", "get", "https://evil.example.org/x"].map(String::from);
+        let output = run(dir.path(), &config, &args);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        assert_eq!(output.status.code(), Some(1), "{backend}: {stdout}");
+        let json: Value = serde_json::from_str(stdout.trim()).unwrap();
+        assert_eq!(json["code"], "request-origin", "{backend}: {json}");
     }
 }
 

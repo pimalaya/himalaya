@@ -377,19 +377,23 @@ impl Command {
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(feature = "gmail")]
-            Self::Gmail(cmd) => account.run(
-                printer,
-                &mut session.gmail,
-                build_gmail_client,
-                |printer, account, client| cmd.execute(printer, account, client),
-            ),
+            Self::Gmail(cmd) => cmd.check().and_then(|()| {
+                account.run(
+                    printer,
+                    &mut session.gmail,
+                    build_gmail_client,
+                    |printer, account, client| cmd.execute(printer, account, client),
+                )
+            }),
             #[cfg(feature = "msgraph")]
-            Self::Msgraph(cmd) => account.run(
-                printer,
-                &mut session.msgraph,
-                build_msgraph_client,
-                |printer, account, client| cmd.execute(printer, account, client),
-            ),
+            Self::Msgraph(cmd) => cmd.check().and_then(|()| {
+                account.run(
+                    printer,
+                    &mut session.msgraph,
+                    build_msgraph_client,
+                    |printer, account, client| cmd.execute(printer, account, client),
+                )
+            }),
             #[cfg(feature = "maildir")]
             Self::Maildir(cmd) => account.run(
                 printer,

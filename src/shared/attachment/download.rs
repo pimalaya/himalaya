@@ -14,7 +14,9 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
-use pimalaya_cli::{error::CodedError, file::private_options, printer::Printer};
+use pimalaya_cli::{
+    error::CodedError, file::private_options, printer::Printer, sanitize::path_component,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -263,33 +265,20 @@ impl PartBytes {
     }
 }
 
-/// Replaces path separators, control and bidirectional formatting
-/// characters, and strips parent traversals, so a hostile filename header
-/// neither escapes the download directory nor disguises its extension
-/// (pimdir STORAGE §18).
+/// The name trimmed and stripped of its leading dots, so it is never
+/// hidden, then made one path component by the family's rule
+/// (`pimalaya_cli::sanitize::path_component`, pimdir STORAGE §18): path
+/// separators, control and bidirectional formatting characters replaced,
+/// so a hostile filename header neither escapes the download directory
+/// nor disguises its extension. A name left empty is `attachment`.
 fn sanitize(name: &str) -> String {
-    let trimmed = name.trim();
-    let cleaned: String = trimmed
-        .chars()
-        .map(|c| match c {
-            '/' | '\\' => '_',
-            c if c.is_control() || BIDI.contains(&c) => '_',
-            _ => c,
-        })
-        .collect();
-    let cleaned = cleaned.trim_start_matches('.').trim();
-    if cleaned.is_empty() {
-        "attachment".to_string()
-    } else {
-        cleaned.to_string()
+    let stripped = name.trim().trim_start_matches('.').trim();
+    if stripped.is_empty() {
+        return String::from("attachment");
     }
-}
 
-/// The bidirectional formatting characters pimdir STORAGE §18 names.
-const BIDI: [char; 12] = [
-    '\u{061C}', '\u{200E}', '\u{200F}', '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}',
-    '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}',
-];
+    path_component(stripped)
+}
 
 /// The longest file name the common file systems take, in bytes.
 const NAME_MAX: usize = 255;

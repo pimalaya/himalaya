@@ -28,7 +28,7 @@ pub struct GmailRequestCommand {
     pub method: String,
     /// Gmail path (joined onto `gmail/v1/`, as `users/me/labels`) or a
     /// full URL.
-    #[arg(value_name = "PATH", value_parser = path_parser)]
+    #[arg(value_name = "PATH")]
     pub path: String,
     /// Raw JSON body for post, put and patch.
     #[arg(value_name = "JSON")]
@@ -36,6 +36,12 @@ pub struct GmailRequestCommand {
 }
 
 impl GmailRequestCommand {
+    /// Refuses a URL off the Gmail API, coded `request-origin`, before the
+    /// session opens.
+    pub fn check(&self) -> Result<()> {
+        api_url(BASE, &self.path).map(drop)
+    }
+
     /// Sends the request and prints the raw response.
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let url = api_url(BASE, &self.path)?;
@@ -54,15 +60,6 @@ impl GmailRequestCommand {
         printer.out(RawJsonOutput {
             response: client.run(send)?.response,
         })
-    }
-}
-
-/// Checks a path as clap takes it: a URL off the Gmail API is refused
-/// with the command line, before the session opens.
-fn path_parser(path: &str) -> Result<String, String> {
-    match api_url(BASE, path) {
-        Ok(_) => Ok(path.to_owned()),
-        Err(err) => Err(err.to_string()),
     }
 }
 

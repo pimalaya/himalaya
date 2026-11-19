@@ -31,7 +31,7 @@ use io_pimdir::{
         },
     },
     codec::{PimdirAction, PimdirActionHandle, action_from_payload},
-    collection::{PimdirCollectionId, PimdirCoverage},
+    collection::{self, PimdirCollectionId, PimdirCoverage},
     intent::{self, PimdirSubmit},
     object::PimdirHash,
     placement::PimdirFlags,
@@ -76,7 +76,7 @@ use crate::{
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
-const MAIL_KIND: &str = "message/rfc822";
+pub(crate) const MAIL_KIND: &str = "message/rfc822";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
@@ -87,12 +87,6 @@ const WALK_MIN: usize = 64;
 
 /// The sort key of a dated mail: its summary date (pimdir STORAGE Annex A.1).
 const KEY_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
-
-/// Whether a collection's declared kind makes it a mailbox, matched on
-/// the bare media type the way the store reads it.
-pub(crate) fn is_mail(kind: &str) -> bool {
-    kind.split(';').next().unwrap_or_default().trim() == MAIL_KIND
-}
 
 impl PimdirClient {
     /// The collection a user-typed mailbox addresses: the mailbox itself,
@@ -183,7 +177,7 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .context("List pimdir collections")?
             .into_iter()
-            .filter(|collection| is_mail(&collection.kind))
+            .filter(|held| collection::media_type(&held.kind) == MAIL_KIND)
             .collect())
     }
 
@@ -474,7 +468,12 @@ impl PimdirClient {
         }
 
         let pushdown = filter.map(PimdirPushdown::of).unwrap_or_default();
-        let unread = pushdown.unread && self.overlay_quiet(collection);
+        let unread = pushdown.unread
+            && self
+                .store
+                .overlay_quiet(collection)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Read the queue of `{collection}`"))?;
         // NOTE: one hit past the page says whether another follows; a page
         // in another order sits anywhere in the range, so it is read whole.
         let wanted = match is_store_order(sort) {
@@ -1387,7 +1386,7 @@ impl PimdirClient {
     ///
     /// `unread` reads through the store's unread chip, which reads the
     /// committed rows only: the caller checks no queued action changes what
-    /// the mailbox shows ([`Self::overlay_quiet`]).
+    /// the mailbox shows (`PimdirReader::overlay_quiet`).
     fn walk(
         &self,
         collection: &str,
@@ -1447,29 +1446,6 @@ impl PimdirClient {
             .map_err(pimdir_error)
             .with_context(|| format!("List unread items in `{collection}`"))?;
         Ok(entries.into_iter().map(|entry| entry.item).collect())
-    }
-
-    /// Whether no queued action changes what a read of `collection` shows,
-    /// so its committed rows are what the overlaying reader returns: no
-    /// `set-flags`, `update` or `remove` on it, no `move` out of it, no
-    /// `move` or `copy` into it. A queue that does not read counts as
-    /// changing it.
-    fn overlay_quiet(&self, collection: &str) -> bool {
-        let Ok(queued) = self.store.list_pending_actions() else {
-            return false;
-        };
-        !queued.iter().any(|queued| {
-            let here = queued.collection == collection;
-            match &queued.action {
-                PimdirAction::SetFlags { .. }
-                | PimdirAction::Update { .. }
-                | PimdirAction::Remove { .. } => here,
-                PimdirAction::Move { to, .. } | PimdirAction::Copy { to, .. } => {
-                    here || to.0 == collection
-                }
-                _ => false,
-            }
-        })
     }
 
     /// Pulls every live item of a collection with its summary by keyset
@@ -3844,7 +3820,7 @@ mod tests {
     #[test]
     fn paged_reads_agree_with_the_whole_mailbox_read() {
         let (_dir, mut client) = seeded_store();
-        assert!(client.overlay_quiet("imap/INBOX"));
+        assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
         assert_paged_reads_agree(&mut client, "imap/INBOX");
 
         // NOTE: a sanity check that the seed holds what the queries reach.
@@ -3914,8 +3890,8 @@ mod tests {
             .unwrap();
         client.add_message("imap/INBOX", &[], RAW.to_vec()).unwrap();
 
-        assert!(!client.overlay_quiet("imap/INBOX"));
-        assert!(!client.overlay_quiet("imap/Archive"));
+        assert!(!client.store.overlay_quiet("imap/INBOX").unwrap());
+        assert!(!client.store.overlay_quiet("imap/Archive").unwrap());
         assert_paged_reads_agree(&mut client, "imap/INBOX");
         assert_paged_reads_agree(&mut client, "imap/Archive");
     }
@@ -3941,14 +3917,14 @@ mod tests {
             )
             .unwrap();
         client.add_message("imap/INBOX", &[], RAW.to_vec()).unwrap();
-        assert!(client.overlay_quiet("imap/INBOX"));
-        assert!(!client.overlay_quiet("imap/Archive"));
+        assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
+        assert!(!client.store.overlay_quiet("imap/Archive").unwrap());
 
         client
             .copy_messages("imap/Archive", "imap/Work", &[id.as_str()])
             .unwrap();
-        assert!(!client.overlay_quiet("imap/Work"));
-        assert!(client.overlay_quiet("imap/INBOX"));
+        assert!(!client.store.overlay_quiet("imap/Work").unwrap());
+        assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
     }
 
     /// A row filed under another key than its date sends the search back

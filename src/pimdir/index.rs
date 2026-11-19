@@ -24,10 +24,7 @@ use io_pimdir::{
     },
     search::{
         coverage::{PimdirSearchCoverage, PimdirSearchTemporal, PimdirSearchUnread},
-        query::{
-            PimdirQuery, PimdirQueryError, PimdirQueryErrorCode, PimdirQueryKind,
-            PimdirQueryPredicate, PimdirQueryTerm,
-        },
+        query::{PimdirQuery, PimdirQueryError, PimdirQueryErrorCode, PimdirQueryKind},
         tag::{PimdirSearchTagPlacement, PimdirSearchTagSource},
     },
 };
@@ -242,26 +239,11 @@ impl PimdirClient {
 
     /// Reads `query` as Himalaya asks it: its conjuncts, `kind:mail`, and
     /// `account:` naming the account when the store groups it under a
-    /// name. The conjuncts stay at the top, where the index reads the date
-    /// range and the scope its coverage is computed over.
+    /// name, joined at the top by io-pimdir's `PimdirQuery::scoped`, where
+    /// the index reads the date range and the scope its coverage is
+    /// computed over.
     fn scope(&self, query: PimdirQuery) -> PimdirQuery {
-        let mut conjuncts = match query {
-            PimdirQuery::And(conjuncts) => conjuncts,
-            query => vec![query],
-        };
-        let term = |predicate| {
-            PimdirQuery::Term(PimdirQueryTerm {
-                predicate,
-                start: 0,
-                end: 0,
-            })
-        };
-
-        conjuncts.push(term(PimdirQueryPredicate::Kind(PimdirQueryKind::Mail)));
-        if let Some(account) = &self.account {
-            conjuncts.push(term(PimdirQueryPredicate::Account(account.clone())));
-        }
-        PimdirQuery::And(conjuncts)
+        query.scoped(Some(PimdirQueryKind::Mail), self.account.as_deref(), None)
     }
 
     /// The hits as Himalaya lists them, the item error of each one the
@@ -593,19 +575,10 @@ pub struct PimdirMailCoverage {
     pub until: Option<String>,
     /// Whether a first sync is still listing a mailbox in scope.
     pub filling: bool,
-    /// Whether a term of the query reads a mail body, so a `bodiless`, a
-    /// `missing` or an `unparseable` one leaves the answer incomplete.
+    /// The counts a term of the query reads, which leave the answer
+    /// incomplete, as io-pimdir's `unread_counted` answers them.
     #[serde(skip)]
-    pub reads: bool,
-    /// Whether a `bodiless` message leaves the answer incomplete though
-    /// no term reads its body: under `has:attachment`, answered by a mark
-    /// its body corrects.
-    #[serde(skip)]
-    pub reads_mark: bool,
-    /// Whether a text term is matched in a body or an attachment, so an
-    /// `encrypted` one leaves the answer incomplete.
-    #[serde(skip)]
-    pub reads_content: bool,
+    pub counted: PimdirSearchUnread,
 }
 
 impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
@@ -623,8 +596,6 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
         let unread = |count: fn(&PimdirSearchUnread) -> u64| -> u64 {
             coverage.local.kinds.values().map(count).sum()
         };
-        let reads = &coverage.local.reads;
-        let kinds = || coverage.local.kinds.keys();
 
         // NOTE: a zone that differs is never reported: a mail date is an
         // instant, which no zone of the index reads otherwise.
@@ -639,9 +610,7 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
             since,
             until,
             filling,
-            reads: kinds().any(|kind| reads.kinds.contains(kind)),
-            reads_mark: kinds().any(|kind| reads.counts_bodiless(kind)),
-            reads_content: reads.content,
+            counted: coverage.unread_counted(),
         }
     }
 }
@@ -651,30 +620,30 @@ impl PimdirMailCoverage {
     pub fn summary(&self) -> Option<String> {
         let mut parts = Vec::new();
         // NOTE: a count no term of the query reads leaves it complete.
-        if self.bodiless > 0 && (self.reads || self.reads_mark) {
+        if self.counted.bodiless > 0 {
             parts.push(format!(
                 "{} message(s) have no local body and matched on their headers alone",
-                self.bodiless
+                self.counted.bodiless
             ));
         }
-        if self.missing > 0 && self.reads {
+        if self.counted.missing > 0 {
             parts.push(format!(
                 "{} message(s) have a body the index could not read and matched on their \
                  headers alone",
-                self.missing
+                self.counted.missing
             ));
         }
-        if self.unparseable > 0 && self.reads {
+        if self.counted.unparseable > 0 {
             parts.push(format!(
                 "{} message(s) have a body the index could not parse and matched on their \
                  headers alone",
-                self.unparseable
+                self.counted.unparseable
             ));
         }
-        if self.encrypted > 0 && self.reads_content {
+        if self.counted.encrypted > 0 {
             parts.push(format!(
                 "{} message(s) are encrypted and matched on their headers alone",
-                self.encrypted
+                self.counted.encrypted
             ));
         }
         if let Some(since) = &self.since {
@@ -1414,9 +1383,7 @@ mod tests {
             since: Some("2026-05-15T00:00:00Z".into()),
             until: None,
             filling: true,
-            reads: false,
-            reads_mark: false,
-            reads_content: false,
+            counted: PimdirSearchUnread::default(),
         };
 
         assert_eq!(

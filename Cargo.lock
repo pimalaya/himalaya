@@ -985,9 +985,9 @@ dependencies = [
 
 [[package]]
 name = "io-imap"
-version = "0.11.2"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d67554dda30954adfdffac6535ab86cd5ea491b25074c0a7df9f262c383452c"
+checksum = "6dc29abf0aaf7b213697a91648634609ff7261fbe7dbcbfe5a33095567d87937"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1034,9 +1034,9 @@ dependencies = [
 
 [[package]]
 name = "io-managesieve"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ceba4bd93e105aadca6e3645f5ac17d4fbd062e19898837457359a113831704a"
+checksum = "cb20d3378c192962a59f2ada3c159ea9c925a456775a6b1ebd47b2ddebc87ac4"
 dependencies = [
  "anyhow",
  "base64",
@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63fc488dcec28fa1165a5f41c0e439994d6de4e4ddc4ed2ff0e78f0a9b4a811f"
+checksum = "a606fa3ba5f6f559d53683cb7fc017dc9df41d5fca83b98fb916ae1e3fb1aec2"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1138,9 +1138,9 @@ dependencies = [
 
 [[package]]
 name = "io-sasl"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41b6725f5378a27ba94468ff1663ead20f612fa16b70839af132dca27dabfe3f"
+checksum = "b74074034a8b5a55a08c4effb9d71c64ecea0617865cdcecde04721ffd877075"
 dependencies = [
  "base64-codec",
  "hmac",
@@ -1155,9 +1155,9 @@ dependencies = [
 
 [[package]]
 name = "io-smtp"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "160825eec4bad4ee026fabb088b64f9b560b9c9cd6f1c773122f43abab76efe7"
+checksum = "a03d3339c6579db6b03312807bba0443198bfae289c1b7ffbfb065308930717e"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1580,9 +1580,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pimalaya-cli"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "056e26afbb62acc7398ee2750e62c917e4c3552d92088fab4d4de941ae973dc9"
+checksum = "e13aefc2eb5d1b208af04a51f2e80acdd40f5e8523cd17cf9cf811b5a1bfa88a"
 dependencies = [
  "anyhow",
  "base64-codec",

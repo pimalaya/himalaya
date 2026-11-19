@@ -354,7 +354,7 @@ impl PimdirSearchPlace {
 
 #[cfg(test)]
 mod tests {
-    use io_pimdir::client::search::PimdirSearchCursor;
+    use io_pimdir::{client::search::PimdirSearchCursor, search::coverage::PimdirSearchUnread};
 
     use crate::{
         email::{address::Address, envelope::Envelope},
@@ -402,7 +402,10 @@ mod tests {
             next_page: None,
             coverage: PimdirMailCoverage {
                 bodiless: 1,
-                reads: true,
+                counted: PimdirSearchUnread {
+                    bodiless: 1,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             errors: Vec::new(),
