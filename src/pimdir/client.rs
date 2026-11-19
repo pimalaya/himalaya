@@ -19,7 +19,7 @@ use io_pimdir::{
         producer::{PimdirActionStatus, PimdirEnqueue, PimdirEnqueued, PimdirProducer},
         reader::PimdirReader,
     },
-    codec::{PimdirAction, PimdirActionHandle},
+    codec::{PimdirAction, PimdirActionHandle, PimdirStoreIdentity},
 };
 use pimalaya_cli::error::CodedError;
 
@@ -124,6 +124,37 @@ impl PimdirClient {
         Ok(match &self.account {
             Some(account) => producer.for_account(account),
             None => producer,
+        })
+    }
+}
+
+impl PimdirClient {
+    /// The store's identity, its id and incarnation (pimdir STORAGE §4.5),
+    /// which a row's handle names.
+    pub(crate) fn store_identity(&self) -> Result<PimdirStoreIdentity> {
+        let cursor = self
+            .store
+            .change_cursor()
+            .map_err(pimdir_error)
+            .context("Read the pimdir store identity")?;
+
+        Ok(PimdirStoreIdentity {
+            store_id: cursor.store_id,
+            incarnation: cursor.incarnation,
+        })
+    }
+
+    /// The handle `given` names under a store: as given when it names one,
+    /// a bare id named under this store's identity, as `pimdir queue list`
+    /// prints its handle.
+    pub(crate) fn named(&self, given: &PimdirActionHandle) -> Result<PimdirActionHandle> {
+        if given.store.is_some() {
+            return Ok(given.clone());
+        }
+
+        Ok(PimdirActionHandle {
+            id: given.id,
+            store: Some(self.store_identity()?),
         })
     }
 }
@@ -376,6 +407,16 @@ fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<O
             Err(CodedError::new(ErrorCode::StoreAccountAmbiguous, message).into())
         }
     }
+}
+
+/// The handle of the row `id` of the store `identity`, as `pimdir queue
+/// list` and `pimdir status` print it.
+pub(crate) fn handle(identity: &PimdirStoreIdentity, id: i64) -> String {
+    PimdirActionHandle {
+        id,
+        store: Some(identity.clone()),
+    }
+    .to_string()
 }
 
 /// Why the queue row `handle` names, standing at `status`, cannot be

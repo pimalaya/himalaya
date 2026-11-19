@@ -67,8 +67,9 @@ use crate::{
         pimdir_error,
     },
     pimdir::{
-        client::PimdirClient,
+        client::{PimdirClient, handle},
         queue::list::{PimdirQueueRefused, PimdirQueueRow},
+        status::{PimdirMailboxStatus, PimdirParkedStatus, PimdirStatusOutput},
     },
 };
 
@@ -591,6 +592,7 @@ impl PimdirClient {
     /// the action pins, derived the same way.
     pub fn queued_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRow>> {
         let queued = self.queued_mail(mailbox)?;
+        let identity = self.store_identity()?;
 
         Ok(queued
             .into_iter()
@@ -599,6 +601,7 @@ impl PimdirClient {
 
                 PimdirQueueRow {
                     row: queued.id,
+                    handle: handle(&identity, queued.id),
                     kind: queued.action.kind().to_owned(),
                     collection: queued.collection,
                     link_id: addressed.link_id,
@@ -642,6 +645,7 @@ impl PimdirClient {
     /// `pimdir queue list` prints them.
     pub fn parked_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRow>> {
         let parked = self.parked_actions(mailbox)?;
+        let identity = self.store_identity()?;
 
         Ok(parked
             .into_iter()
@@ -654,6 +658,7 @@ impl PimdirClient {
 
                 PimdirQueueRow {
                     row: parked.id,
+                    handle: handle(&identity, parked.id),
                     unconfirmed: parked.unconfirmed().is_some(),
                     kind: parked.action,
                     collection: parked.collection,
@@ -1501,6 +1506,85 @@ impl PimdirClient {
             .into_iter()
             .filter(|parked| parked.collection == collection)
             .collect())
+    }
+
+    /// What the store holds of the account, as `pimdir status` reports
+    /// it: its mailboxes by id with how many messages carry a local body
+    /// (read off the summaries, no body opened) and how many creations
+    /// and sends are queued, the rows parked in them and the refusals
+    /// standing there.
+    pub fn status(&self) -> Result<PimdirStatusOutput> {
+        let accounts = self
+            .store
+            .list_accounts()
+            .map_err(pimdir_error)
+            .context("List the pimdir store accounts")?;
+        let mut collections = self.mail_collections()?;
+        collections.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let mut mailboxes = Vec::new();
+        let mut refused = Vec::new();
+
+        for collection in &collections {
+            let id = collection.id.as_str();
+            refused.extend(self.refused_rows(id)?);
+
+            let total = self
+                .store
+                .count_items(id)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Count items in `{id}`"))?;
+            let mut hydrated = 0;
+            self.walk(id, None, false, SCAN_BATCH, |item| {
+                hydrated += u64::from(item.object.is_some());
+                ControlFlow::Continue(SCAN_BATCH)
+            })?;
+            let queued = self
+                .store
+                .pending_actions(id)
+                .map_err(pimdir_error)
+                .with_context(|| format!("List queued messages in `{id}`"))?
+                .iter()
+                .filter(|queued| is_queued_mail(&queued.action))
+                .count();
+
+            mailboxes.push(PimdirMailboxStatus {
+                id: collection.id.clone(),
+                name: match collection.name.is_empty() {
+                    true => collection.id.clone(),
+                    false => collection.name.clone(),
+                },
+                total,
+                hydrated,
+                queued: u64::try_from(queued).unwrap_or_default(),
+            });
+        }
+
+        let identity = self.store_identity()?;
+        let parked = self
+            .store
+            .parked_actions()
+            .map_err(pimdir_error)
+            .context("List parked actions")?
+            .into_iter()
+            .filter(|parked| collections.iter().any(|c| c.id == parked.collection))
+            .map(|parked| PimdirParkedStatus {
+                row: parked.id,
+                handle: handle(&identity, parked.id),
+                collection: parked.collection,
+                kind: parked.action,
+                error: parked.error,
+            })
+            .collect();
+
+        Ok(PimdirStatusOutput {
+            name: String::new(),
+            account: self.account.clone(),
+            accounts,
+            mailboxes,
+            parked,
+            refused,
+        })
     }
 
     /// The mailbox's pending creates and sends, in append order: the queued
@@ -2732,6 +2816,30 @@ mod tests {
 
         let bare = PimdirActionHandle::from(staged.queue_id.id);
         assert_eq!(client.cancel_queued(&bare).unwrap(), "add");
+    }
+
+    /// A receipt's row and handle are those `queue list` prints, and
+    /// `queue show` given the bare id prints the same pair.
+    #[test]
+    fn a_listed_row_carries_the_receipt_row_and_handle() {
+        use crate::pimdir::queue::show::PimdirQueueShowOutput;
+
+        let (_dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let handle = staged.queue_id.to_string();
+
+        let rows = client.queued_rows("imap/Sent").unwrap();
+        assert_eq!(
+            (rows[0].row, rows[0].handle.as_str()),
+            (staged.queue_id.id, handle.as_str())
+        );
+
+        let bare = PimdirActionHandle::from(staged.queue_id.id);
+        let named = client.named(&bare).unwrap();
+        let shown = PimdirQueueShowOutput::new(&named, client.queue_row(&bare).unwrap());
+        assert_eq!((shown.row, shown.handle), (staged.queue_id.id, handle));
     }
 
     /// A handle another store answered, a copy restored since, is refused
@@ -4223,7 +4331,7 @@ mod tests {
             .unwrap();
         drop(owner);
 
-        let show = PimdirQueueShowOutput::new(row.to_string(), client.queue_row(&row).unwrap());
+        let show = PimdirQueueShowOutput::new(&row, client.queue_row(&row).unwrap());
         let json = serde_json::to_value(&show).unwrap();
         assert_eq!(json["state"], "applied", "{json}");
         assert_eq!(json["seq"].to_string(), id, "{json}");
@@ -4990,11 +5098,22 @@ mod tests {
         assert_eq!(rows[0].link_id, None);
         assert_eq!(rows[0].subject.as_deref(), Some("hi"));
 
-        let shown =
-            PimdirQueueShowOutput::new(row.to_string(), client.queue_row(&row.into()).unwrap());
+        let named = client.named(&row.into()).unwrap();
+        let shown = PimdirQueueShowOutput::new(&named, client.queue_row(&named).unwrap());
         assert_eq!(shown.state, PimdirQueueState::Parked);
         assert_eq!(shown.kind.as_deref(), Some("move"));
         assert_eq!(shown.error.as_deref(), Some(parked[0].error.as_str()));
+
+        let status = client.status().unwrap();
+        assert_eq!(status.parked.len(), 1, "{:?}", status.parked);
+        assert_eq!(status.parked[0].row, row);
+        assert_eq!(status.parked[0].handle, named.to_string());
+        assert_eq!(status.parked[0].kind, "move");
+        assert_eq!(status.parked[0].collection, "imap/Drafts");
+        let drafts_status = &status.mailboxes[0];
+        assert_eq!(drafts_status.id, "imap/Drafts");
+        assert_eq!((drafts_status.hydrated, drafts_status.total), (1, 1));
+        assert_eq!(status.mailboxes[1].id, "imap/Trash");
 
         assert_eq!(listed(&mut client, "imap/Drafts"), drafts);
         assert!(listed(&mut client, "imap/Trash").is_empty());

@@ -40,7 +40,8 @@ impl PimdirMailboxDeleteCommand {
         let deleted = client.delete_mailbox(&mailbox)?;
 
         printer.out(PimdirMailboxDeleteOutput {
-            queue_id: deleted.queue_id.to_string(),
+            row: deleted.queue_id.id,
+            handle: deleted.queue_id.to_string(),
             mailbox,
             source: deleted.source,
         })
@@ -52,8 +53,10 @@ impl PimdirMailboxDeleteCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxDeleteOutput {
     /// The `collection-delete` row.
-    #[serde(rename = "row")]
-    pub queue_id: String,
+    pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check.
+    pub handle: String,
     /// The mailbox deleted, as given once its alias is resolved.
     pub mailbox: String,
     /// The source deleting it.
@@ -64,10 +67,11 @@ impl fmt::Display for PimdirMailboxDeleteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "Mailbox {} queued for deletion by {} as row {}",
+            "Mailbox {} queued for deletion by {} as row {} (handle {})",
             sanitize::text(&self.mailbox),
             sanitize::text(&self.source),
-            self.queue_id
+            self.row,
+            self.handle,
         )
     }
 }

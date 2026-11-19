@@ -1,13 +1,13 @@
 ---
 cairn: change
 id: gmail-delete-keeps-to-the-trash
-status: active
+status: abandoned
 created: 2026-11-19
 ---
 
 # Gmail delete keeps to the trash
 
-Owner question, not implemented: a recommendation, which is to change nothing.
+Owner ruling of 2026-11-19: kept as is, no code; closed as abandoned.
 
 ## Why
 
@@ -24,3 +24,7 @@ So both delete permanently from `TRASH` alone. They differ outside it: neverest 
 ## Recommendation
 
 Keep Himalaya as it is: one meaning of `message delete` across backends (commands.md, *A write prints what it acted on*: `moved-to-trash`, `deleted` from the trash), the permanent step only from `TRASH`, as neverest. Removing a label alone stays reachable as `message move` to another label, or `gmail messages modify --remove-label`. If unlabelling is wanted as a unified verb, it is a new verb (a `message remove`, for the label backends and JMAP's `mailboxIds`), not a new meaning of `delete`.
+
+## Ruling
+
+The owner ruled on 2026-11-19 to keep Himalaya as it is: `message delete` deletes for good only from `TRASH` and moves to `TRASH` from any other label, on Gmail as on every backend. Removing a label alone would be a new verb, not a new meaning of `delete`, and none is planned. The spec already states the behaviour (commands.md, *A write prints what it acted on*), so nothing changes and the change closes as abandoned.

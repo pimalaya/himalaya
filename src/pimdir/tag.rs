@@ -122,14 +122,12 @@ impl fmt::Display for PimdirTagOutput {
                 }
             };
 
-            let row = tagged.queue_id.clone();
-
             listing.items.push([
                 sanitize::text(&tagged.id).into_owned(),
                 flags,
                 tagged.status.to_string(),
                 sanitize::text(&tagged.mailbox).into_owned(),
-                row.unwrap_or_default(),
+                tagged.handle.clone().unwrap_or_default(),
                 sanitize::text(tagged.subject.as_deref().unwrap_or_default()).into_owned(),
             ]);
         }
@@ -159,7 +157,8 @@ mod tests {
             subject: None,
             flags: vec![Flag::from_raw("\\Seen"), Flag::from_raw("act")],
             status: PimdirTagStatus::Planned,
-            queue_id: None,
+            row: None,
+            handle: None,
         };
 
         let json = serde_json::to_value(&tagged).unwrap();

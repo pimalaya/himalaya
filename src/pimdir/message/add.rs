@@ -49,7 +49,8 @@ impl PimdirMessageAddCommand {
         let staged = client.add_message(mailbox, &flags, raw)?;
 
         printer.out(PimdirMessageAddOutput {
-            queue_id: staged.queue_id.to_string(),
+            row: staged.queue_id.id,
+            handle: staged.queue_id.to_string(),
             message_id: staged.message_id,
         })
     }
@@ -59,9 +60,12 @@ impl PimdirMessageAddCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMessageAddOutput {
-    /// The queue row the message waits in.
-    #[serde(rename = "row")]
-    pub queue_id: String,
+    /// The queue row the message waits in, as `pimdir queue list` prints
+    /// it.
+    pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check.
+    pub handle: String,
     /// The bare `Message-ID` it is filed under once applied.
     pub message_id: String,
 }
@@ -70,9 +74,10 @@ impl fmt::Display for PimdirMessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "Message {} queued as row {}",
+            "Message {} queued as row {} (handle {})",
             sanitize::text(&self.message_id),
-            self.queue_id
+            self.row,
+            self.handle,
         )
     }
 }

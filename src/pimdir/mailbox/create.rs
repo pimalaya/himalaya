@@ -44,7 +44,8 @@ impl PimdirMailboxCreateCommand {
         let created = client.create_mailbox(&self.name, parent.as_deref())?;
 
         printer.out(PimdirMailboxCreateOutput {
-            queue_id: created.queue_id.to_string(),
+            row: created.queue_id.id,
+            handle: created.queue_id.to_string(),
             name: self.name,
             parent,
             source: created.source,
@@ -57,8 +58,10 @@ impl PimdirMailboxCreateCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxCreateOutput {
     /// The `collection-create` row.
-    #[serde(rename = "row")]
-    pub queue_id: String,
+    pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check.
+    pub handle: String,
     /// The new mailbox's name.
     pub name: String,
     /// The mailbox it is created in, `null` at the top.
@@ -71,10 +74,11 @@ impl fmt::Display for PimdirMailboxCreateOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "Mailbox {} queued for creation by {} as row {}",
+            "Mailbox {} queued for creation by {} as row {} (handle {})",
             sanitize::text(&self.name),
             sanitize::text(&self.source),
-            self.queue_id
+            self.row,
+            self.handle,
         )
     }
 }
@@ -91,7 +95,8 @@ mod tests {
     #[test]
     fn a_mailbox_at_the_top_prints_a_null_parent() {
         let output = PimdirMailboxCreateOutput {
-            queue_id: "89".into(),
+            row: 89,
+            handle: "e2646df031cd876334410c4df14ebd86.1.89".into(),
             name: String::from("Projets"),
             parent: None,
             source: String::from("google/gmail"),
@@ -99,7 +104,13 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(&output).unwrap(),
-            json!({"row": "89", "name": "Projets", "parent": null, "source": "google/gmail"})
+            json!({
+                "row": 89,
+                "handle": "e2646df031cd876334410c4df14ebd86.1.89",
+                "name": "Projets",
+                "parent": null,
+                "source": "google/gmail",
+            })
         );
         let schema = output_schema::<PimdirMailboxCreateOutput>();
         let required = schema["required"].as_array().unwrap();

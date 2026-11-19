@@ -145,8 +145,10 @@ pub struct PimdirFlagRow {
     /// The `set-flags` row, which `pimdir queue show` and `cancel` take,
     /// `null` when the change left the message as it was and nothing was
     /// staged.
-    #[serde(rename = "row")]
-    pub queue_id: Option<String>,
+    pub row: Option<i64>,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), `null` when nothing was staged.
+    pub handle: Option<String>,
 }
 
 impl PimdirFlagStageOutput {
@@ -175,7 +177,8 @@ impl From<Vec<PimdirFlagged>> for PimdirFlagStageOutput {
                 }
                 PimdirFlagRow {
                     id: flagged.id,
-                    queue_id: flagged.queue_id.map(|handle| handle.to_string()),
+                    row: flagged.queue_id.as_ref().map(|handle| handle.id),
+                    handle: flagged.queue_id.map(|handle| handle.to_string()),
                 }
             })
             .collect();
@@ -188,9 +191,11 @@ impl fmt::Display for PimdirFlagStageOutput {
         let rows: Vec<String> = self
             .queued
             .iter()
-            .map(|row| match &row.queue_id {
-                Some(queue_id) => format!("{} as row {queue_id}", sanitize::text(&row.id)),
-                None => format!("{} unchanged", sanitize::text(&row.id)),
+            .map(|row| match (row.row, &row.handle) {
+                (Some(id), Some(handle)) => {
+                    format!("{} as row {id} (handle {handle})", sanitize::text(&row.id))
+                }
+                _ => format!("{} unchanged", sanitize::text(&row.id)),
             })
             .collect();
         writeln!(
@@ -310,7 +315,7 @@ mod tests {
         let output = PimdirFlagStageOutput::from(vec![
             PimdirFlagged {
                 id: "42".into(),
-                queue_id: Some(7.into()),
+                queue_id: Some("e2646df031cd876334410c4df14ebd86.1.7".parse().unwrap()),
                 partial: Vec::new(),
             },
             PimdirFlagged {
@@ -321,11 +326,12 @@ mod tests {
         ]);
         assert_eq!(
             output.to_string(),
-            "Flags staged on 2 message(s): 42 as row 7, 43 unchanged\n"
+            "Flags staged on 2 message(s): 42 as row 7 (handle \
+             e2646df031cd876334410c4df14ebd86.1.7), 43 unchanged\n"
         );
         assert_eq!(
             serde_json::to_string(&output).unwrap(),
-            r#"{"messages":[{"id":"42","row":"7"},{"id":"43","row":null}],"warnings":[]}"#
+            r#"{"messages":[{"id":"42","row":7,"handle":"e2646df031cd876334410c4df14ebd86.1.7"},{"id":"43","row":null,"handle":null}],"warnings":[]}"#
         );
     }
 }

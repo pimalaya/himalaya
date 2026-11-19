@@ -43,7 +43,8 @@ impl PimdirMailboxRenameCommand {
         let renamed = client.rename_mailbox(&mailbox, &self.name)?;
 
         printer.out(PimdirMailboxRenameOutput {
-            queue_id: renamed.queue_id.to_string(),
+            row: renamed.queue_id.id,
+            handle: renamed.queue_id.to_string(),
             mailbox,
             name: self.name,
             source: renamed.source,
@@ -56,8 +57,10 @@ impl PimdirMailboxRenameCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxRenameOutput {
     /// The `collection-rename` row.
-    #[serde(rename = "row")]
-    pub queue_id: String,
+    pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check.
+    pub handle: String,
     /// The mailbox renamed, as given once its alias is resolved.
     pub mailbox: String,
     /// Its new name.
@@ -70,11 +73,12 @@ impl fmt::Display for PimdirMailboxRenameOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "Mailbox {} queued for renaming to {} by {} as row {}",
+            "Mailbox {} queued for renaming to {} by {} as row {} (handle {})",
             sanitize::text(&self.mailbox),
             sanitize::text(&self.name),
             sanitize::text(&self.source),
-            self.queue_id
+            self.row,
+            self.handle,
         )
     }
 }

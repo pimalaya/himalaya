@@ -63,22 +63,24 @@ impl PimdirMessageSendCommand {
 
         // NOTE: an owner declaring no capabilities ignores the copy in the
         // intent, so it is queued beside the send, as `message send` does.
-        let copy_queue_id = match save {
+        let copy_handle = match save {
             Some(mailbox) if !sent.carried => {
                 let seen = Flag::from_iana(IanaFlag::Seen);
                 let copy = client.add_message(mailbox, &[seen], raw).with_context(|| {
                     format!("Message queued for sending, but queueing its copy to {mailbox} failed")
                 })?;
-                Some(copy.queue_id.to_string())
+                Some(copy.queue_id)
             }
             _ => None,
         };
 
         printer.out(PimdirMessageSendOutput {
-            queue_id: sent.staged.queue_id.to_string(),
+            row: sent.staged.queue_id.id,
+            handle: sent.staged.queue_id.to_string(),
             message_id: sent.staged.message_id,
             copy: sent.carried,
-            copy_queue_id,
+            copy_row: copy_handle.as_ref().map(|copy| copy.id),
+            copy_handle: copy_handle.map(|copy| copy.to_string()),
         })
     }
 }
@@ -87,29 +89,34 @@ impl PimdirMessageSendCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMessageSendOutput {
-    /// The `submit` row the message waits in until the owner sends it.
-    #[serde(rename = "row")]
-    pub queue_id: String,
+    /// The `submit` row the message waits in until the owner sends it, as
+    /// `pimdir queue list` prints it.
+    pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check.
+    pub handle: String,
     /// The message's bare `Message-ID`.
     pub message_id: String,
     /// Whether the `submit` row carries the copy, filed once sent.
     pub copy: bool,
     /// The row of the copy queued beside the send, for an owner that
     /// cannot carry it.
-    #[serde(rename = "copyRow")]
-    pub copy_queue_id: Option<String>,
+    pub copy_row: Option<i64>,
+    /// The handle of that row.
+    pub copy_handle: Option<String>,
 }
 
 impl fmt::Display for PimdirMessageSendOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Message {} queued for sending as row {}",
+            "Message {} queued for sending as row {} (handle {})",
             sanitize::text(&self.message_id),
-            self.queue_id
+            self.row,
+            self.handle,
         )?;
-        if let Some(copy) = &self.copy_queue_id {
-            write!(f, ", its copy as row {copy}")?;
+        if let (Some(row), Some(handle)) = (self.copy_row, &self.copy_handle) {
+            write!(f, ", its copy as row {row} (handle {handle})")?;
         }
         writeln!(f)
     }

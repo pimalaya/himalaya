@@ -1,13 +1,13 @@
 ---
 cairn: change
 id: receipt-rows-carry-their-handle
-status: active
+status: landed
 created: 2026-11-19
 ---
 
 # Receipt rows carry their handle
 
-Owner question, not implemented: a recommendation for the v3 contract.
+Owner ruling of 2026-11-19: accepted as recommended, implemented the same day.
 
 ## Why
 
@@ -31,3 +31,7 @@ The other option, `row` a handle string everywhere, breaks the family rule in ou
 - himalaya/src/pimdir/queue/list.rs:93 (`pub row: i64`).
 - calendula/src/pimdir/intent.rs:174 (`pub row: i64`), :178 (`pub handle: String`).
 - cli/cairn/spec/output.md:78.
+
+## Ruling
+
+The owner accepted the recommendation on 2026-11-19: `row` an integer everywhere, `handle` a string beside it, in every receipt, `pimdir queue list` and `pimdir queue show|cancel`, the JSON Schema included.

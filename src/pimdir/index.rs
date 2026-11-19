@@ -191,7 +191,7 @@ impl PimdirClient {
                 .map_err(pimdir_error)
                 .context("Stage the pimdir tag")?
             {
-                rows.insert((action.collection, action.seq), action.action.to_string());
+                rows.insert((action.collection, action.seq), action.action);
             }
         }
 
@@ -219,7 +219,8 @@ impl PimdirClient {
                     subject,
                     flags,
                     status,
-                    queue_id: row,
+                    row: row.as_ref().map(|handle| handle.id),
+                    handle: row.map(|handle| handle.to_string()),
                 });
             }
         }
@@ -521,8 +522,10 @@ pub struct PimdirTagged {
     /// What the tag does there.
     pub status: PimdirTagStatus,
     /// The queue row the change waits in, `null` when none was staged.
-    #[serde(rename = "row")]
-    pub queue_id: Option<String>,
+    pub row: Option<i64>,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), `null` when none was staged.
+    pub handle: Option<String>,
 }
 
 /// What a tag does to one placement.
@@ -1138,7 +1141,7 @@ mod tests {
             planned
                 .tagged
                 .iter()
-                .all(|tagged| tagged.queue_id.is_none())
+                .all(|tagged| tagged.row.is_none() && tagged.handle.is_none())
         );
         assert!(client.store.pending_actions(INBOX).unwrap().is_empty());
 
@@ -1165,7 +1168,7 @@ mod tests {
         let queued: Vec<&str> = tag
             .tagged
             .iter()
-            .filter_map(|t| t.queue_id.as_deref())
+            .filter_map(|t| t.handle.as_deref())
             .collect();
         for action in pending {
             assert!(
@@ -1199,7 +1202,7 @@ mod tests {
 
         assert_eq!(tag.tagged.len(), 1);
         assert_eq!(tag.tagged[0].status, PimdirTagStatus::UnknownFlags);
-        assert_eq!(tag.tagged[0].queue_id, None);
+        assert_eq!(tag.tagged[0].handle, None);
         assert!(client.store.pending_actions(INBOX).unwrap().is_empty());
     }
 

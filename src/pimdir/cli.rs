@@ -12,8 +12,8 @@ use crate::{
         attachment::cli::PimdirAttachmentCommand, client::PimdirClient, count::PimdirCountCommand,
         flag::cli::PimdirFlagCommand, mailbox::cli::PimdirMailboxCommand,
         message::cli::PimdirMessageCommand, performer::PimdirPerformerCommand,
-        queue::cli::PimdirQueueCommand, search::PimdirSearchCommand, tag::PimdirTagCommand,
-        thread::PimdirThreadCommand,
+        queue::cli::PimdirQueueCommand, search::PimdirSearchCommand, status::PimdirStatusCommand,
+        tag::PimdirTagCommand, thread::PimdirThreadCommand,
     },
 };
 
@@ -22,7 +22,8 @@ use crate::{
 /// Reaches what the store holds beside the mail a mailbox lists: the queue
 /// of writes the sync engine has not applied yet, any flag a message
 /// carries, and the files the account's messages attach. Searches, counts,
-/// threads and tags the account's mail through the store's search index.
+/// threads and tags the account's mail through the store's search index,
+/// and reports what the store holds of the account.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum PimdirCommand {
@@ -41,6 +42,7 @@ pub enum PimdirCommand {
     Count(PimdirCountCommand),
     Thread(PimdirThreadCommand),
     Tag(PimdirTagCommand),
+    Status(PimdirStatusCommand),
 }
 
 impl PimdirCommand {
@@ -62,6 +64,7 @@ impl PimdirCommand {
             Self::Count(cmd) => cmd.execute(printer, client),
             Self::Thread(cmd) => cmd.execute(printer, account, client),
             Self::Tag(cmd) => cmd.execute(printer, account, client),
+            Self::Status(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

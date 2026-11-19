@@ -542,6 +542,10 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::pimdir::thread::PimdirThreadOutput
         );
         insert!("himalaya-pimdir-tag", crate::pimdir::tag::PimdirTagOutput);
+        insert!(
+            "himalaya-pimdir-status",
+            crate::pimdir::status::PimdirStatusOutput
+        );
     }
 
     // NOTE: the writes of the protocol namespaces with no payload of their

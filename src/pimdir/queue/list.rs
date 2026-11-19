@@ -20,7 +20,7 @@ use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirC
 /// has no id until then, so `envelope list` cannot show it. A sent message
 /// waits there until the store's owner sends it, filed under the mailbox it
 /// was saved to or the account's sent alias. This is where both show: the
-/// row id to cancel one by, when it was queued, its kind (`add` or
+/// row handle to cancel one by, when it was queued, its kind (`add` or
 /// `submit`) and its subject. The whole account is listed, mailbox by
 /// mailbox, unless `--mailbox` names one.
 ///
@@ -37,9 +37,10 @@ use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirC
 ///
 /// JSON output: `{"messages": [<row>], "parked": [<row>], "refused":
 /// [{"collection", "itemId", "source", "reason", "refusedAt"}]}`, each row,
-/// pending or parked, `{"row", "kind", "collection", "linkId", "itemId",
-/// "producer", "queuedAt", "attempts", "unconfirmed", "error",
-/// "subject"}`, as every Pimalaya program prints a queue row.
+/// pending or parked, `{"row", "handle", "kind", "collection", "linkId",
+/// "itemId", "producer", "queuedAt", "attempts", "unconfirmed", "error",
+/// "subject"}`, as every Pimalaya program prints a queue row, plus the
+/// row's handle.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     /// The one mailbox to list, a name, alias, role or id; the whole
@@ -91,6 +92,10 @@ pub struct PimdirQueueRow {
     /// names a queued action, not a message: a creation has no id until
     /// the sync engine applies it, and gets a different one then.
     pub row: i64,
+    /// The row's handle, its id under the store's identity (pimdir STORAGE
+    /// §4.5), which `pimdir queue show` and `cancel` take and check, a
+    /// restored copy of the store refusing it rather than another row.
+    pub handle: String,
     /// The row's action as the store holds it, never re-spelled: `add`,
     /// `submit`, `set-flags`, `move`, `remove`, `collection-create`, ...
     pub kind: String,
@@ -199,11 +204,11 @@ impl fmt::Display for PimdirQueueListOutput {
     }
 }
 
-/// The text cells of `row`: its id, its `state`, when it was queued, its
+/// The text cells of `row`: its handle, its `state`, when it was queued, its
 /// kind, then `last`.
 fn cells(row: &PimdirQueueRow, state: &str, last: Option<&str>) -> [String; 5] {
     [
-        row.row.to_string(),
+        sanitize::text(&row.handle).into_owned(),
         String::from(state),
         sanitize::text(&row.queued_at).into_owned(),
         sanitize::text(&row.kind).into_owned(),
@@ -217,10 +222,13 @@ mod tests {
 
     use super::{PimdirQueueListOutput, PimdirQueueRefused, PimdirQueueRow};
 
+    const STORE: &str = "e2646df031cd876334410c4df14ebd86";
+
     /// A pending row of `kind` in `imap/Sent`.
     fn row(row: i64, kind: &str) -> PimdirQueueRow {
         PimdirQueueRow {
             row,
+            handle: format!("{STORE}.1.{row}"),
             kind: kind.into(),
             collection: "imap/Sent".into(),
             link_id: None,
@@ -272,6 +280,7 @@ mod tests {
             json["messages"][1],
             json!({
                 "row": 4,
+                "handle": format!("{STORE}.1.4"),
                 "kind": "submit",
                 "collection": "imap/Sent",
                 "linkId": null,
@@ -294,7 +303,7 @@ mod tests {
         assert!(text.contains("Cancel:"), "{text}");
         let lines: Vec<&str> = text.lines().skip_while(|l| !l.is_empty()).collect();
         assert!(
-            lines[1].starts_with("3 ") && lines[1].contains("add"),
+            lines[1].starts_with(&format!("{STORE}.1.3 ")) && lines[1].contains("add"),
             "{text}"
         );
         assert!(lines[1].ends_with("hi"), "{text}");

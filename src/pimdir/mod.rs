@@ -29,5 +29,6 @@ pub mod message;
 pub mod performer;
 pub mod queue;
 pub mod search;
+pub mod status;
 pub mod tag;
 pub mod thread;
