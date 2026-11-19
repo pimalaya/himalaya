@@ -54,6 +54,7 @@ impl MaildirFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirFlagListOutput {
+    /// The standard flags, each info letter as `raw`.
     flags: Vec<Flag>,
     /// The Maildir name of each flag, for the text form.
     #[serde(skip)]

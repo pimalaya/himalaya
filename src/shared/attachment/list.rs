@@ -89,9 +89,9 @@ pub struct Attachment {
     /// The 1-based position of the MIME part in the message, the same id
     /// `message read` prints.
     pub id: String,
-    /// The RFC 2231-decoded filename, `None` when the part names none.
+    /// The RFC 2231-decoded filename, `null` when the part names none.
     pub filename: Option<String>,
-    /// The MIME type, `None` when the part carries no `Content-Type`.
+    /// The MIME type, `null` when the part carries no `Content-Type`.
     pub mime: Option<String>,
     /// The size of the decoded part body, in bytes.
     pub size: u64,

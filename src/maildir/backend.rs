@@ -453,23 +453,18 @@ impl MaildirClient {
         maildir: &Maildir,
         ids: &[&'a str],
     ) -> Result<(Vec<&'a str>, Vec<&'a str>)> {
+        let located = self.locate_many(maildir.clone(), ids)?;
         let mut paths = HashSet::new();
+        let mut unknown = HashSet::new();
         let mut found = Vec::with_capacity(ids.len());
         let mut missing = Vec::new();
 
         for id in ids {
-            match self.locate(maildir.clone(), *id) {
-                Ok((path, _, _)) => {
-                    if paths.insert(path) {
-                        found.push(*id);
-                    }
-                }
-                Err(MaildirClientError::EntryLocate(MaildirEntryLocateError::NotFound(_))) => {
-                    if !missing.contains(id) {
-                        missing.push(*id);
-                    }
-                }
-                Err(err) => return Err(err.into()),
+            match located.get(*id) {
+                Some(entry) if paths.insert(entry.path.clone()) => found.push(*id),
+                Some(_) => (),
+                None if unknown.insert(*id) => missing.push(*id),
+                None => (),
             }
         }
 

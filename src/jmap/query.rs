@@ -138,6 +138,8 @@ impl JmapQueryCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct JmapQueryOutput {
+    /// The method responses, each `[name, arguments, call id]` as the
+    /// server sent it.
     method_responses: Vec<(String, Value, String)>,
 }
 

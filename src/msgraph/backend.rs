@@ -98,7 +98,7 @@ impl MsgraphClient {
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let roles = self.folder_roles()?;
         let mut folders = Vec::new();
-        self.list_folders_under(None, "", &mut folders)?;
+        self.list_folders_under(None, "", None, &mut folders)?;
 
         let requests = match with_counts {
             true => count_requests(&self.user_id, &folders)?,
@@ -129,10 +129,14 @@ impl MsgraphClient {
 
     /// Appends the folders under `parent` (the top when `None`) to
     /// `out`, each followed by its own children, every page read.
-    fn list_folders_under(
+    ///
+    /// With `path`, only the folder named by that path is appended, and
+    /// only the folders whose path leads to it are walked.
+    pub(super) fn list_folders_under(
         &mut self,
         parent: Option<&str>,
         prefix: &str,
+        path: Option<&str>,
         out: &mut Vec<(String, MsgraphMailFolder)>,
     ) -> Result<()> {
         let params = MsgraphMailFoldersListParams {
@@ -148,12 +152,16 @@ impl MsgraphClient {
             for folder in page.value {
                 let name = format!("{prefix}{}", folder.display_name);
                 let id = folder.id.clone();
-                let nested = folder.child_folder_count.unwrap_or(0) > 0;
-                out.push((name.clone(), folder));
+                let prefix = format!("{name}{FOLDER_DELIMITER}");
+                let nested = folder.child_folder_count.unwrap_or(0) > 0
+                    && path.is_none_or(|path| path.starts_with(&prefix));
+
+                if path.is_none_or(|path| path == name) {
+                    out.push((name, folder));
+                }
 
                 if nested {
-                    let prefix = format!("{name}{FOLDER_DELIMITER}");
-                    self.list_folders_under(Some(&id), &prefix, out)?;
+                    self.list_folders_under(Some(&id), &prefix, path, out)?;
                 }
             }
 
@@ -664,12 +672,13 @@ impl MsgraphClient {
     }
 }
 
-/// The role a well-known folder name carries, ignoring case.
-pub(super) fn well_known_role(name: &str) -> Option<MailboxRole> {
+/// The well-known folder name carrying `role`, `None` for a role no
+/// well-known folder carries.
+pub(super) fn well_known_name(role: &MailboxRole) -> Option<&'static str> {
     WELL_KNOWN_FOLDERS
         .iter()
-        .find(|(known, _)| known.eq_ignore_ascii_case(name))
-        .map(|(_, role)| role.clone())
+        .find(|(_, known)| known == role)
+        .map(|(name, _)| *name)
 }
 
 /// The failure of a request reading the message `id`: `message-not-found`
@@ -1141,7 +1150,7 @@ mod tests {
         email::mailbox::MailboxRole,
         error::{ErrorCode, ItemError},
         msgraph::backend::{
-            envelope_from, flag_patch, ids_found, roles_from, well_known_role, written,
+            envelope_from, flag_patch, ids_found, roles_from, well_known_name, written,
         },
     };
 
@@ -1201,10 +1210,10 @@ mod tests {
     }
 
     #[test]
-    fn a_well_known_name_reads_as_its_role() {
-        assert_eq!(well_known_role("DeletedItems"), Some(MailboxRole::Trash));
-        assert_eq!(well_known_role("sentitems"), Some(MailboxRole::Sent));
-        assert_eq!(well_known_role("outbox"), None);
+    fn a_role_reads_as_its_well_known_name() {
+        assert_eq!(well_known_name(&MailboxRole::Trash), Some("deleteditems"));
+        assert_eq!(well_known_name(&MailboxRole::Sent), Some("sentitems"));
+        assert_eq!(well_known_name(&MailboxRole::All), None);
     }
 
     fn codes(errors: &[ItemError]) -> Vec<(Option<&str>, Option<ErrorCode>)> {
@@ -1555,31 +1564,16 @@ mod read_tests {
         ok("application/json", &body.to_string())
     }
 
-    /// The answers listing the folders: the well-known lookups, the Inbox
-    /// `I` and the Sent Items `S` found, then the two folders.
-    fn folders() -> [Vec<u8>; 3] {
-        let found = |name: &str, id: &str| json!({"id": name, "status": 200, "body": {"id": id}});
-        let missing = |name: &str| {
-            let body = json!({"error": {"code": "ErrorItemNotFound"}});
-            json!({"id": name, "status": 404, "body": body})
-        };
-        let first = [
-            found("inbox", "I"),
-            found("sentitems", "S"),
-            missing("drafts"),
-            missing("deleteditems"),
-        ];
-        let second = [missing("junkemail"), missing("archive")];
+    /// The answers resolving `sentitems`: the top folders, none named so,
+    /// then the well-known folder, the Sent Items `S`.
+    fn folders() -> [Vec<u8>; 2] {
         let folders = json!({"value": [
             {"id": "I", "displayName": "Inbox"},
             {"id": "S", "displayName": "Sent Items"},
         ]});
+        let sent = json!({"id": "S", "displayName": "Sent Items"});
 
-        [
-            reply(json!({"responses": first})),
-            reply(json!({"responses": second})),
-            reply(folders),
-        ]
+        [reply(folders), reply(sent)]
     }
 
     /// A read names the mailbox it reads in, as IMAP and JMAP do: a
@@ -1591,8 +1585,8 @@ mod read_tests {
     fn a_read_of_a_message_another_folder_holds_is_not_found() {
         let message = || reply(json!({"id": "m1", "parentFolderId": "I"}));
 
-        let [first, second, listing] = folders();
-        let (mut client, requests) = graph(vec![message(), first, second, listing]);
+        let [listing, sent] = folders();
+        let (mut client, requests) = graph(vec![message(), listing, sent]);
         let err = client.get_message("sentitems", "m1", false).unwrap_err();
         let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
         assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");

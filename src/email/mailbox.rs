@@ -20,20 +20,20 @@ pub struct Mailbox {
     /// The identifier a follow-up command names the mailbox by.
     ///
     /// JMAP exposes an opaque id of its own, where IMAP and Maildir
-    /// repeat [`Self::name`].
+    /// repeat `name`.
     pub id: String,
     /// The human-readable name.
     pub name: String,
     /// The special-use role, from the backend or a `mailbox.alias.<role>`
-    /// entry, `None` when neither names one.
+    /// entry, `null` when neither names one.
     #[serde(default)]
     #[schemars(with = "Option<String>")]
     pub role: Option<MailboxRole>,
-    /// Total message count, `None` when counts were not asked for or the
+    /// Total message count, `null` when counts were not asked for or the
     /// backend cannot answer cheaply.
     #[serde(default)]
     pub total: Option<u64>,
-    /// Unread message count, `None` on the same terms as [`Self::total`].
+    /// Unread message count, `null` on the same terms as `total`.
     #[serde(default)]
     pub unread: Option<u64>,
 }
@@ -44,7 +44,6 @@ pub struct Mailbox {
     feature = "imap",
     feature = "jmap",
     feature = "gmail",
-    feature = "msgraph",
     feature = "pimdir"
 ))]
 #[derive(Clone, Debug, Default)]
@@ -54,7 +53,6 @@ pub struct MailboxIndex(pub Vec<Mailbox>);
     feature = "imap",
     feature = "jmap",
     feature = "gmail",
-    feature = "msgraph",
     feature = "pimdir"
 ))]
 impl MailboxIndex {
@@ -64,12 +62,7 @@ impl MailboxIndex {
     /// either erroring when several mailboxes match. An unknown
     /// value goes back as it is, so the backend surfaces the error or
     /// takes it as a native name.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph"
-    ))]
+    #[cfg(any(feature = "imap", feature = "jmap", feature = "gmail"))]
     pub fn resolve(&self, mailbox: &str) -> Result<String> {
         if self.0.iter().any(|m| m.id == mailbox) {
             return Ok(mailbox.to_string());
@@ -313,7 +306,7 @@ mod tests {
         assert_eq!(renamed_path("Top", '/', "Renamed"), "Renamed");
     }
 
-    #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+    #[cfg(any(feature = "imap", feature = "jmap", feature = "gmail"))]
     fn index() -> MailboxIndex {
         let mailbox = |id: &str, name: &str, role: Option<MailboxRole>| Mailbox {
             id: id.to_string(),
@@ -331,7 +324,7 @@ mod tests {
         ])
     }
 
-    #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+    #[cfg(any(feature = "imap", feature = "jmap", feature = "gmail"))]
     #[test]
     fn index_resolves_ids_then_names_then_roles() {
         let index = index();
@@ -343,7 +336,7 @@ mod tests {
         assert_eq!(index.resolve("unknown").unwrap(), "unknown");
     }
 
-    #[cfg(any(feature = "jmap", feature = "gmail", feature = "msgraph"))]
+    #[cfg(any(feature = "imap", feature = "jmap", feature = "gmail"))]
     #[test]
     fn index_rejects_a_role_several_mailboxes_carry() {
         let err = index().resolve("trash").unwrap_err().to_string();

@@ -297,9 +297,9 @@ pub struct MessageTemplateOutput {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TemplateAttachment {
-    /// The file name it is attached under, `None` when it has none.
+    /// The file name it is attached under, `null` when it has none.
     pub filename: Option<String>,
-    /// The MIME type, `None` when the part carries no `Content-Type`.
+    /// The MIME type, `null` when the part carries no `Content-Type`.
     pub mime: Option<String>,
     /// The size of its content, in bytes.
     pub size: u64,

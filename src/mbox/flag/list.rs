@@ -49,6 +49,7 @@ impl MboxFlagListCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxFlagListOutput {
+    /// The flags an mbox status header can carry.
     flags: Vec<MboxFlagRow>,
 }
 

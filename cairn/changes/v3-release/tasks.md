@@ -7,7 +7,7 @@ change: v3-release
 
 ## With the maintainer
 
-- [ ] Review every `json-schema` entry's shape; fold what changes into its command's change and spec
+- [ ] Review every `json-schema` entry's shape; fold what changes into its command's change and spec (2026-11-19: every schema-review finding walked, the non-breaking ones landed in the-schemas-describe-every-key; what is left for the review is in changes/the-schema-review-remainder)
 - [x] Publish pimalaya-cli and pimalaya-config 0.4: 0.4.0 published 2026-11-11
 - [x] Publish io-http, io-jmap, io-msgraph and io-pimdir: io-http 0.6.0 and io-jmap 0.7.0 were already out, io-msgraph 0.7.1 and io-pimdir 0.10.0 published 2026-11-11
 - [x] ~~Publish io-imap~~ Done: io-imap 0.8 comes from crates.io (529ed5d), out of the patch table.

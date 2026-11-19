@@ -3,6 +3,8 @@
 //! What a backend did over several items: what it listed or acted on,
 //! and the error of each item it could not.
 
+use std::collections::HashMap;
+
 use crate::error::ItemError;
 
 /// A result beside the errors of the items left out of it.
@@ -18,13 +20,18 @@ impl<T> Outcome<T> {
     /// Orders the errors as `ids` names their items, an error naming none
     /// of them last, so a write lists them in the order given.
     pub fn sorted_by(mut self, ids: &[&str]) -> Self {
+        let mut positions = HashMap::with_capacity(ids.len());
+        for (position, id) in ids.iter().enumerate() {
+            positions.entry(*id).or_insert(position);
+        }
+
         let position = |error: &ItemError| {
-            let id = error.id.as_deref();
-            ids.iter().position(|given| Some(*given) == id)
+            let id = error.id.as_deref()?;
+            positions.get(id).copied()
         };
 
         self.errors
-            .sort_by_key(|error| position(error).unwrap_or(usize::MAX));
+            .sort_by_cached_key(|error| position(error).unwrap_or(usize::MAX));
         self
     }
 

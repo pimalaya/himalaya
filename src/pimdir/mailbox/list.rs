@@ -62,7 +62,7 @@ impl PimdirMailboxListCommand {
     }
 }
 
-/// A scope's bounds, RFC 3339 instants, `None` for an open end.
+/// A scope's bounds, RFC 3339 instants, `null` for an open end.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxCoverage {

@@ -20,6 +20,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    email::address::Address,
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -197,12 +198,18 @@ impl fmt::Display for MessageReadView {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageHeaders {
-    pub from: Vec<MailAddress>,
-    pub to: Vec<MailAddress>,
-    pub cc: Vec<MailAddress>,
-    pub bcc: Vec<MailAddress>,
-    pub reply_to: Vec<MailAddress>,
-    pub sender: Vec<MailAddress>,
+    /// The `From` mailboxes, groups flattened.
+    pub from: Vec<Address>,
+    /// The `To` mailboxes, groups flattened.
+    pub to: Vec<Address>,
+    /// The `Cc` mailboxes, groups flattened.
+    pub cc: Vec<Address>,
+    /// The `Bcc` mailboxes, groups flattened.
+    pub bcc: Vec<Address>,
+    /// The `Reply-To` mailboxes, groups flattened.
+    pub reply_to: Vec<Address>,
+    /// The `Sender` mailboxes.
+    pub sender: Vec<Address>,
     /// The subject, RFC 2047 decoded.
     pub subject: Option<String>,
     /// The date as RFC 3339, with the offset the header carries, `Z` for
@@ -234,11 +241,17 @@ pub struct MessageHeaders {
 #[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InvalidAddresses {
+    /// The unreadable entries of `To`.
     pub to: Vec<String>,
+    /// The unreadable entries of `Cc`.
     pub cc: Vec<String>,
+    /// The unreadable entries of `Bcc`.
     pub bcc: Vec<String>,
+    /// The unreadable entries of `Reply-To`.
     pub reply_to: Vec<String>,
+    /// The unreadable entries of `From`.
     pub from: Vec<String>,
+    /// The unreadable entries of `Sender`.
     pub sender: Vec<String>,
 }
 
@@ -296,21 +309,13 @@ fn rfc3339(date: MimeDateTime) -> String {
     }
 }
 
-/// One address of an address header.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MailAddress {
-    /// The display name, RFC 2047 decoded; `null` when absent.
-    pub name: Option<String>,
-    pub email: String,
-}
-
 /// One leaf part of a read message.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagePartView {
     /// The id `attachment list` reports and `attachment download` takes.
     pub id: String,
+    /// What the part is to the message.
     pub role: PartRole,
     /// The MIME type, lowercased.
     pub mime: String,
@@ -331,7 +336,7 @@ pub struct MessagePartView {
 /// An address header as a list, read from its raw bytes: groups
 /// flattened, names unquoted and RFC 2047 decoded, entries without a
 /// valid email dropped and returned beside the list as decoded text.
-fn addresses(entity: &MimeEntity, name: &str) -> (Vec<MailAddress>, Vec<String>) {
+fn addresses(entity: &MimeEntity, name: &str) -> (Vec<Address>, Vec<String>) {
     let mut valid = Vec::new();
     let mut invalid = Vec::new();
 
@@ -413,7 +418,7 @@ fn split_addresses(value: &str) -> Vec<String> {
 /// One address of a list: `email`, `<email>` or `name <email>`, read by
 /// mime-rs as every listing reads it, its comments dropped and its
 /// address a valid one.
-fn mailbox(item: &str) -> Option<MailAddress> {
+fn mailbox(item: &str) -> Option<Address> {
     let item = strip_comments(item);
     let list = parse_mailboxes(item.as_bytes());
     let mut mailboxes = list.mailboxes();
@@ -431,7 +436,7 @@ fn mailbox(item: &str) -> Option<MailAddress> {
     let name = mailbox.name.as_deref().unwrap_or_default();
     let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
 
-    Some(MailAddress {
+    Some(Address {
         name: (!name.is_empty()).then_some(name),
         email: email.to_owned(),
     })

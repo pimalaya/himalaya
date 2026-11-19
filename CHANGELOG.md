@@ -255,6 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `gmail messages get --format full` to print the MIME `payload` under `--json` (`null` under the other formats), and its parts with their type, file name, size and attachment id in text.
 - Changed a `--backend` naming a block the account does not configure to fail with `capability-missing`.
 - Changed `account check` to list the Maildir stores, so a store the listing cannot walk fails the check.
+- Changed the `json-schema` output to describe every key and both alternatives of a command printing one of two shapes, in JSON's terms (`null`, not `None`), to list the values of `sieve raw` `status` and `pimdir performer` `capability`, and to name the read view's addresses `Address` as the envelopes' are.
 
 ### Deprecated
 
@@ -311,8 +312,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `attachment download` writing parts before refusing an id the message does not hold, and failing whole on a name past 255 bytes: ids are checked first, and a long name is cut at a character boundary, its extension kept.
 - Fixed `attachment download` creating its files readable by others, in the shared temporary directory when no download directory is known: they are created 0600.
 - Fixed saving the mbox cache taking time quadratic in the mailbox.
+- Fixed the ids of a write being deduplicated and its errors ordered in time quadratic in their number.
+- Fixed a Maildir write reading the folder once per id to look its ids up: one read looks them all up.
 - Fixed the Maildir and mbox listings holding every message of the mailbox in memory: Maildir reads 64 files at a time, mbox drops each message's bytes before the next.
 - Fixed each JMAP blob download on another host running the credential command again and opening a new connection: the session's credential and one connection per host are kept.
+- Fixed every Microsoft Graph command naming a mailbox listing the whole folder tree and the well-known folders first: a path lists only the folders leading to it, a role or a well-known name is one request, a folder id is asked of Graph, and a resolved mailbox is not looked up again.
+- Fixed `attachment download` saving a part under a name keeping its control and bidirectional formatting characters, which can disguise an extension (`invoice\u{202E}fdp.exe`): each is replaced by `_`.
 - **BREAKING**: Fixed a search date with a two-digit year (`after 15-11-26`) reading as the year 15: a year is written with four digits, another refused with `search-invalid`.
 - Fixed a Gmail search flattening an `and` under an `or`: `from alice and subject invoice or from bob` went out as `{from:alice subject:invoice from:bob}`, which Gmail reads as three alternatives, and a `date` clause beside an `or` matched the whole label. An alternative holding more than one term is now wrapped in parentheses, `{(from:alice subject:invoice) from:bob}`.
 - Fixed `envelope list` and `envelope search` with `--page-size 0` on Gmail reading the first 100 messages and saying the listing was complete: they follow every next page token, 500 messages a page, as Microsoft Graph and IMAP list the whole mailbox.

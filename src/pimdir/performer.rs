@@ -68,6 +68,7 @@ impl PimdirPerformerCommand {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirPerformers {
     /// The intent.
+    #[schemars(extend("enum" = INTENTS))]
     pub capability: String,
     /// The sources able to perform it.
     pub candidates: Vec<String>,
@@ -93,8 +94,9 @@ impl fmt::Display for PimdirPerformers {
 #[serde(rename_all = "camelCase")]
 pub struct PimdirPerformerChosen {
     /// The intent.
+    #[schemars(extend("enum" = INTENTS))]
     pub capability: String,
-    /// The source chosen, `None` when the choice was withdrawn.
+    /// The source chosen, `null` when the choice was withdrawn.
     pub source: Option<String>,
 }
 

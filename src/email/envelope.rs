@@ -28,7 +28,7 @@ pub struct Envelope {
     /// The messages this one replies to, from its `In-Reply-To:` header.
     ///
     /// A list, the grammar being `1*msg-id`. Each id is normalised like
-    /// [`Envelope::message_id`], so a client pairs a reply with its parent
+    /// `messageId`, so a client pairs a reply with its parent
     /// from a listing alone.
     #[serde(default, alias = "in-reply-to")]
     pub in_reply_to: Vec<String>,
@@ -45,15 +45,15 @@ pub struct Envelope {
     /// The primary recipients.
     #[serde(default)]
     pub to: Vec<Address>,
-    /// The author-claimed send time, from the `Date:` header, `None` when
+    /// The author-claimed send time, from the `Date:` header, `null` when
     /// it is missing or unparseable.
     #[serde(default)]
     pub date: Option<DateTime<FixedOffset>>,
-    /// The size of the raw RFC 5322 message, in bytes, `None` when the
+    /// The size of the raw RFC 5322 message, in bytes, `null` when the
     /// backend gives none.
     #[serde(default)]
     pub size: Option<u64>,
-    /// Whether the message carries an attachment, `None` when the caller
+    /// Whether the message carries an attachment, `null` when the caller
     /// did not ask or the backend cannot tell.
     #[serde(default, alias = "has-attachment")]
     pub has_attachment: Option<bool>,

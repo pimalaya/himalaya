@@ -102,6 +102,7 @@ pub(crate) struct SieveRawOutput {
     #[serde(skip)]
     data: Vec<String>,
     /// `OK`, `NO` or `BYE`.
+    #[schemars(extend("enum" = ["OK", "NO", "BYE"]))]
     status: &'static str,
     /// The response code, `null` when there is none.
     code: Option<String>,

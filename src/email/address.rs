@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Address {
-    /// The display name, `Alice` in `Alice <alice@example.org>`.
+    /// The display name, `Alice` in `Alice <alice@example.org>`, `null`
+    /// when absent.
     pub name: Option<String>,
     /// The address itself.
     pub email: String,

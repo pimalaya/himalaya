@@ -3,7 +3,7 @@
 //! The flag and message-id arguments the `flag` and `message add`
 //! commands take.
 
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 use clap::{Parser, ValueEnum};
 
@@ -89,13 +89,13 @@ impl MessageIdsArg {
     /// The ids, each once, in the order first given, so a repeated id is
     /// neither acted on nor counted twice.
     pub fn ids(&self) -> Vec<&str> {
-        let mut ids: Vec<&str> = Vec::with_capacity(self.inner.len());
-        for id in &self.inner {
-            if !ids.contains(&id.as_str()) {
-                ids.push(id);
-            }
-        }
-        ids
+        let mut seen = HashSet::with_capacity(self.inner.len());
+
+        self.inner
+            .iter()
+            .map(String::as_str)
+            .filter(|id| seen.insert(*id))
+            .collect()
     }
 }
 

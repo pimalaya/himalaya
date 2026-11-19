@@ -49,6 +49,7 @@ impl MboxMessageAddCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxMessageAddOutput {
+    /// The id the mbox gave the message.
     id: String,
 }
 

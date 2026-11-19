@@ -153,7 +153,7 @@ pub struct ImapFetchOutput {
     pub messages: Vec<FetchedMessage>,
 }
 
-/// The data items fetched for one message, each `None` when it was not
+/// The data items fetched for one message, each `null` when it was not
 /// asked for.
 #[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -87,7 +87,7 @@ impl ImapIdCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImapIdOutput {
-    /// The parameters, a `NIL` value coming through as `None`.
+    /// The parameters, a `NIL` value coming through as `null`.
     pub server_id: HashMap<String, Option<String>>,
 }
 

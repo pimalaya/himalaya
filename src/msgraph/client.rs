@@ -8,9 +8,12 @@
 //! the `msgraph` command reaches for the Graph mail surface through this
 //! wrapper.
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use io_msgraph::v1::{
     client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions, MsgraphClientStdError},
     send::{MSGRAPH_API_BASE, MsgraphSend, MsgraphSendError, path_segment, user_path},
@@ -27,18 +30,18 @@ use crate::{
         msgraph::{MsgraphAuthConfig, MsgraphConfig},
         proxy::ProxyConfig,
     },
-    email::mailbox::{MailboxIndex, MailboxRole},
+    email::mailbox::MailboxRole,
     error::{ErrorCode, mailbox_not_found, unknown_mailbox},
-    msgraph::backend::well_known_role,
+    msgraph::backend::well_known_name,
     shared::refusal::Refusal,
 };
 
-/// A live Microsoft Graph client and the folder index it caches.
+/// A live Microsoft Graph client and the folder ids it resolved.
 pub struct MsgraphClient {
     inner: Inner,
-    /// The folders [`Self::resolve_mailbox_id`] maps names and roles
-    /// through, fetched once and cached for the client's lifetime.
-    folder_index: Option<MailboxIndex>,
+    /// The folder id each value [`Self::resolve_mailbox_id`] took maps
+    /// onto, kept until a folder write.
+    mailbox_ids: HashMap<String, String>,
 }
 
 impl MsgraphClient {
@@ -56,55 +59,41 @@ impl MsgraphClient {
         let inner = Inner::connect(token.expose_secret(), options)?;
         Ok(Self {
             inner,
-            folder_index: None,
+            mailbox_ids: HashMap::new(),
         })
     }
 
     /// Maps a folder id, path or role onto its opaque Graph folder id.
     ///
-    /// A well-known name (`msgfolderroot`, `outbox`) or a folder id the
-    /// listing does not hold (a hidden folder) is asked of Graph; any
-    /// other value, or one Graph knows no folder by, is refused. It lives
-    /// here so every backend method stays a pure id consumer.
+    /// A value shaped like a folder id is asked of Graph first, which
+    /// reaches a hidden folder; then a path, only the folders leading to
+    /// it listed; then a role or a well-known name (`msgfolderroot`,
+    /// `outbox`), asked of Graph. Any other value, or one Graph knows no
+    /// folder by, is refused. It lives here so every backend method stays
+    /// a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
-        let index = self.folder_index()?;
-        let id = index.resolve(mailbox)?;
-
-        if index.0.iter().any(|m| m.id == id) {
-            return Ok(id);
+        if let Some(id) = self.mailbox_ids.get(mailbox) {
+            return Ok(id.clone());
         }
 
-        // NOTE: a well-known name maps onto the folder carrying its role,
-        // so it compares equal to that folder's id.
-        if let Some(role) = well_known_role(&id)
-            && let Some(id) = index.with_role(&role)?
-        {
-            return Ok(id);
-        }
-
-        if !may_name_folder(&id) {
-            return Err(mailbox_not_found(format!("Mailbox `{mailbox}` not found")));
-        }
-
-        match self.mail_folder_get(&id) {
-            Ok(folder) => Ok(folder.response.id),
-            Err(MsgraphClientStdError::Send(err)) if names_no_folder(&err) => Err(unknown_mailbox(
-                format!("Mailbox `{mailbox}` not found"),
-                err,
-            )),
-            Err(err) => Err(err.into()),
-        }
+        let id = self.lookup_mailbox_id(mailbox)?;
+        self.mailbox_ids.insert(mailbox.to_string(), id.clone());
+        Ok(id)
     }
 
     /// The id of the folder carrying `role`, `None` when none does.
     pub fn role_mailbox_id(&mut self, role: &MailboxRole) -> Result<Option<String>> {
-        self.folder_index()?.with_role(role)
+        let Some(name) = well_known_name(role) else {
+            return Ok(None);
+        };
+
+        Ok(self.folder_id(name)?.ok())
     }
 
-    /// Drops the cached folders, so the next lookup sees a folder created,
-    /// renamed or deleted since.
+    /// Drops the resolved folder ids, so the next lookup sees a folder
+    /// created, renamed or deleted since.
     pub fn forget_mailboxes(&mut self) {
-        self.folder_index = None;
+        self.mailbox_ids.clear();
     }
 
     /// The resource at `segments` under the mailbox owner (`me` or
@@ -122,13 +111,61 @@ impl MsgraphClient {
         Ok(self.run(MsgraphSend::<Value>::get(&auth, url))?.response)
     }
 
-    fn folder_index(&mut self) -> Result<&MailboxIndex> {
-        if self.folder_index.is_none() {
-            let folders = self.list_mailboxes(false)?.value;
-            self.folder_index = Some(MailboxIndex(folders));
+    fn lookup_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        let mut unknown = None;
+
+        if is_folder_id(mailbox) {
+            match self.folder_id(mailbox)? {
+                Ok(id) => return Ok(id),
+                Err(err) => unknown = Some(err),
+            }
         }
 
-        Ok(self.folder_index.get_or_insert_default())
+        let mut named = Vec::new();
+        self.list_folders_under(None, "", Some(mailbox), &mut named)?;
+
+        if let [(_, first), others @ ..] = named.as_slice() {
+            if others.is_empty() {
+                return Ok(first.id.clone());
+            }
+
+            let others: Vec<&str> = others.iter().map(|(_, f)| f.id.as_str()).collect();
+            bail!(
+                "Several mailboxes are named `{mailbox}` ({}, {}): pass the mailbox id",
+                first.id,
+                others.join(", ")
+            );
+        }
+
+        let well_known = match MailboxRole::known(mailbox) {
+            Some(role) => well_known_name(&role),
+            None => WELL_KNOWN_NAMES
+                .into_iter()
+                .find(|name| name.eq_ignore_ascii_case(mailbox)),
+        };
+
+        if let Some(name) = well_known {
+            match self.folder_id(name)? {
+                Ok(id) => return Ok(id),
+                Err(err) => unknown = Some(err),
+            }
+        }
+
+        let message = format!("Mailbox `{mailbox}` not found");
+        match unknown {
+            Some(err) => Err(unknown_mailbox(message, err)),
+            None => Err(mailbox_not_found(message)),
+        }
+    }
+
+    /// The id of the folder Graph knows by `value`, or Graph's answer when
+    /// it knows none.
+    fn folder_id(&mut self, value: &str) -> Result<Result<String, MsgraphSendError>> {
+        match self.mail_folder_get(value) {
+            Ok(folder) => Ok(Ok(folder.response.id)),
+            Err(MsgraphClientStdError::Send(err)) if names_no_folder(&err) => Ok(Err(err)),
+            Err(err) => Err(err.into()),
+        }
     }
 }
 
@@ -139,7 +176,7 @@ impl MsgraphClient {
     pub(crate) fn over(inner: Inner) -> Self {
         Self {
             inner,
-            folder_index: None,
+            mailbox_ids: HashMap::new(),
         }
     }
 
@@ -212,15 +249,12 @@ const WELL_KNOWN_NAMES: [&str; 17] = [
     "syncissues",
 ];
 
-/// Whether `value` may name a Graph folder: a well-known name, or shaped
-/// like a folder id (long, base64url).
-fn may_name_folder(value: &str) -> bool {
-    let id_like = value.len() >= 32
+/// Whether `value` is shaped like a Graph folder id: long, base64url.
+fn is_folder_id(value: &str) -> bool {
+    value.len() >= 32
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"-_=".contains(&byte));
-
-    id_like || WELL_KNOWN_NAMES.contains(&value.to_ascii_lowercase().as_str())
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-_=".contains(&byte))
 }
 
 /// Whether Graph's answer to a folder lookup means no such folder: an
@@ -298,15 +332,20 @@ pub fn msgraph_token(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use anyhow::Error;
     use io_msgraph::v1::{
-        client::MsgraphClientStdError,
+        client::{MsgraphClientStd, MsgraphClientStdError},
         send::{MsgraphApiError, MsgraphSendError},
     };
+    use serde_json::{Value, json};
 
     use crate::{
+        email::mailbox::MailboxRole,
         error::{self, ErrorCode},
-        msgraph::client::{may_name_folder, names_no_folder},
+        msgraph::client::{MsgraphClient, is_folder_id, names_no_folder},
+        shared::http_script::{Script, ok, refused as refused_with},
     };
 
     fn refused(status: u16, code: &str) -> MsgraphSendError {
@@ -357,15 +396,33 @@ mod tests {
     }
 
     #[test]
-    fn only_a_well_known_name_or_an_id_shape_is_asked_of_graph() {
-        assert!(may_name_folder("msgfolderroot"));
-        assert!(may_name_folder("Outbox"));
-        assert!(may_name_folder(
+    fn only_an_id_shape_is_asked_of_graph_as_an_id() {
+        assert!(is_folder_id(
             "AAMkADczZWY5NjZhLTY4NzMtNGM4OS1hZGZiLWZmNzdiNGU3YzUxZgAuAAAAAAAwyvki6t3BQokRIq4u7tKhAQC_mCAVB5-SQqiAnuFDrYg6AAAAAAELAAA="
         ));
-        assert!(!may_name_folder("No-Such-Folder"));
-        assert!(!may_name_folder("Himalaya-Test-MS-A/Sub"));
-        assert!(!may_name_folder("a/b?c#d"));
+        assert!(!is_folder_id("msgfolderroot"));
+        assert!(!is_folder_id("No-Such-Folder"));
+        assert!(!is_folder_id("Himalaya-Test-MS-A/Sub"));
+        assert!(!is_folder_id("a/b?c#d"));
+    }
+
+    /// A client over a Graph server answering `responses` in order, and
+    /// the requests it reads.
+    fn graph(responses: Vec<Vec<u8>>) -> (MsgraphClient, Arc<Mutex<Vec<String>>>) {
+        let (script, requests) = Script::new(responses);
+        let inner = MsgraphClientStd::new(script, "token", Default::default());
+        (MsgraphClient::over(inner), requests)
+    }
+
+    /// A 200 carrying `body` as JSON.
+    fn reply(body: Value) -> Vec<u8> {
+        ok("application/json", &body.to_string())
+    }
+
+    /// Graph's answer to a folder it knows none by.
+    fn missing() -> Vec<u8> {
+        let body = r#"{"error":{"code":"ErrorItemNotFound","message":"Not found."}}"#;
+        refused_with(404, body)
     }
 
     /// A folder named by no id, path nor role is `mailbox-not-found`,
@@ -373,24 +430,72 @@ mod tests {
     /// kept.
     #[test]
     fn a_missing_folder_is_coded() {
-        use io_msgraph::v1::client::MsgraphClientStd;
-
-        use crate::{
-            email::mailbox::MailboxIndex,
-            msgraph::client::MsgraphClient,
-            shared::http_script::{Script, refused},
-        };
-
-        let body = r#"{"error":{"code":"ErrorItemNotFound","message":"Not found."}}"#;
-        let (script, _) = Script::new(vec![refused(404, body)]);
-        let inner = MsgraphClientStd::new(script, "token", Default::default());
-        let mut client = MsgraphClient::over(inner);
-        client.folder_index = Some(MailboxIndex(Vec::new()));
+        let none = || reply(json!({"value": []}));
+        let (mut client, _) = graph(vec![none(), missing(), none()]);
 
         for name in ["No-Such-Folder", "AAMkADczZWY5NjZhLTY4NzMtNGM4OS1hZGZiAAA="] {
             let err = client.resolve_mailbox_id(name).unwrap_err();
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MailboxNotFound), "{name}: {err}");
         }
+    }
+
+    /// A path lists the folders leading to it alone: the top, then the
+    /// children of `Projets`, never those of a folder off the path, nor
+    /// the well-known folders, nor the folders again once resolved.
+    #[test]
+    fn a_path_walks_only_the_folders_leading_to_it() {
+        let top = json!({"value": [
+            {"id": "O", "displayName": "Other", "childFolderCount": 20},
+            {"id": "P", "displayName": "Projets", "childFolderCount": 1},
+        ]});
+        let children = json!({"value": [{"id": "A", "displayName": "Alpha"}]});
+        let (mut client, requests) = graph(vec![reply(top), reply(children)]);
+
+        assert_eq!(client.resolve_mailbox_id("Projets/Alpha").unwrap(), "A");
+        assert_eq!(client.resolve_mailbox_id("Projets/Alpha").unwrap(), "A");
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 2, "{requests:#?}");
+        assert!(requests[1].contains("/mailFolders/P/childFolders"));
+        assert!(!requests.iter().any(|r| r.contains("$batch")));
+    }
+
+    /// Two folders one path names, a top folder whose name holds the
+    /// delimiter and a nested one, are refused, naming both.
+    #[test]
+    fn a_path_two_folders_carry_is_refused() {
+        let top = json!({"value": [
+            {"id": "X", "displayName": "a/b"},
+            {"id": "Y", "displayName": "a", "childFolderCount": 1},
+        ]});
+        let children = json!({"value": [{"id": "Z", "displayName": "b"}]});
+        let (mut client, _) = graph(vec![reply(top), reply(children)]);
+
+        let err = client.resolve_mailbox_id("a/b").unwrap_err().to_string();
+        assert!(err.contains("X") && err.contains("Z"), "{err}");
+    }
+
+    /// A role no folder is named after is asked of its well-known folder,
+    /// one request, and a role the mailbox lacks names none.
+    #[test]
+    fn a_role_is_asked_of_its_well_known_folder() {
+        let top = json!({"value": [{"id": "I", "displayName": "Inbox"}]});
+        let sent = json!({"id": "S", "displayName": "Sent Items"});
+        let trash = json!({"id": "D", "displayName": "Deleted Items"});
+        let responses = vec![reply(top), reply(sent), reply(trash), missing()];
+        let (mut client, requests) = graph(responses);
+
+        assert_eq!(client.resolve_mailbox_id("sent").unwrap(), "S");
+        let trash = client.role_mailbox_id(&MailboxRole::Trash).unwrap();
+        assert_eq!(trash.as_deref(), Some("D"));
+        let archive = client.role_mailbox_id(&MailboxRole::Archive).unwrap();
+        assert_eq!(archive, None);
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 4, "{requests:#?}");
+        assert!(requests[1].contains("/mailFolders/sentitems"));
+        assert!(requests[2].contains("/mailFolders/deleteditems"));
+        assert!(requests[3].contains("/mailFolders/archive"));
     }
 }

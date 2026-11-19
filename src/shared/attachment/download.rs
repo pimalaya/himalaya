@@ -263,14 +263,17 @@ impl PartBytes {
     }
 }
 
-/// Strips path separators and parent traversals, so a hostile filename
-/// header cannot escape the download directory.
+/// Replaces path separators, control and bidirectional formatting
+/// characters, and strips parent traversals, so a hostile filename header
+/// neither escapes the download directory nor disguises its extension
+/// (pimdir STORAGE §18).
 fn sanitize(name: &str) -> String {
     let trimmed = name.trim();
     let cleaned: String = trimmed
         .chars()
         .map(|c| match c {
-            '/' | '\\' | '\0' => '_',
+            '/' | '\\' => '_',
+            c if c.is_control() || BIDI.contains(&c) => '_',
             _ => c,
         })
         .collect();
@@ -281,6 +284,12 @@ fn sanitize(name: &str) -> String {
         cleaned.to_string()
     }
 }
+
+/// The bidirectional formatting characters pimdir STORAGE §18 names.
+const BIDI: [char; 12] = [
+    '\u{061C}', '\u{200E}', '\u{200F}', '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}',
+    '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}',
+];
 
 /// The longest file name the common file systems take, in bytes.
 const NAME_MAX: usize = 255;
@@ -557,5 +566,16 @@ mod tests {
     #[test]
     fn strips_leading_dots() {
         assert_eq!(sanitize(".hidden"), "hidden");
+    }
+
+    /// A name a sender spells with control or bidirectional formatting
+    /// characters, `invoice<RLO>fdp.exe` showing as `invoiceexe.pdf`, is
+    /// saved with each replaced (pimdir STORAGE §18).
+    #[test]
+    fn replaces_control_and_bidi_characters() {
+        assert_eq!(sanitize("invoice\u{202E}fdp.exe"), "invoice_fdp.exe");
+        assert_eq!(sanitize("a\nb\tc\u{7F}.txt"), "a_b_c_.txt");
+        assert_eq!(sanitize("\u{2066}x\u{2069}\u{200F}"), "_x__");
+        assert_eq!(sanitize("\u{061C}\u{200E}.pdf"), "__.pdf");
     }
 }

@@ -108,7 +108,9 @@ fn no_trash(client: &EmailClient) -> anyhow::Error {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MessageDeleteOutput {
+    /// What became of the messages.
     action: DeleteAction,
+    /// How many messages were acted on.
     count: usize,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,

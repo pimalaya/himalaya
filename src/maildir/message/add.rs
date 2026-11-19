@@ -63,7 +63,9 @@ impl MaildirMessageAddCommand {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirMessageAddOutput {
+    /// The id the Maildir gave the message.
     id: String,
+    /// The path of the file holding it.
     path: PathBuf,
 }
 

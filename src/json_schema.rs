@@ -12,6 +12,8 @@
 
 #[cfg(any(backend, feature = "smtp"))]
 use pimalaya_cli::output::Bytes;
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+use pimalaya_cli::output::SavedOutput;
 use pimalaya_cli::{clap::commands::json_schema::JsonSchemaRegistry, error::ErrorReport};
 use schemars::JsonSchema;
 
@@ -33,8 +35,8 @@ use crate::shared::receipt::IdsReceipt;
 /// Each value describes the type the command hands to the printer, and
 /// `himalaya-error` the failure object every command prints instead,
 /// `himalaya-item-error` the error of one item in a result's `errors`. A
-/// command printing one of two types is described by both, through
-/// `OneOf`.
+/// command printing one of two types is described by both, through an
+/// enum naming each alternative.
 pub fn registry() -> JsonSchemaRegistry {
     let mut registry = JsonSchemaRegistry::new("himalaya", env!("CARGO_PKG_VERSION"));
 
@@ -117,7 +119,7 @@ pub fn registry() -> JsonSchemaRegistry {
         // NOTE: `message read --raw` prints the message as bytes.
         insert!(
             "himalaya-message-read",
-            OneOf<crate::shared::message::read::MessageReadOutput, Bytes>
+            ViewOrRaw<crate::shared::message::read::MessageReadOutput>
         );
         // NOTE: `message parse` prints the `message read` view, or under
         // `--part` the part `attachment download --stdout` prints.
@@ -133,21 +135,21 @@ pub fn registry() -> JsonSchemaRegistry {
         // sending, and the receipt of the save or the send otherwise.
         insert!(
             "himalaya-message-compose",
-            OneOf<
+            TemplateOrRoute<
                 crate::shared::message::handler::MessageTemplateOutput,
                 crate::shared::message::handler::MessageRouteOutput,
             >
         );
         insert!(
             "himalaya-message-reply",
-            OneOf<
+            TemplateOrRoute<
                 crate::shared::message::handler::MessageTemplateOutput,
                 crate::shared::message::handler::MessageRouteOutput,
             >
         );
         insert!(
             "himalaya-message-forward",
-            OneOf<
+            TemplateOrRoute<
                 crate::shared::message::handler::MessageTemplateOutput,
                 crate::shared::message::handler::MessageRouteOutput,
             >
@@ -302,7 +304,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         refusable!(
             "himalaya-gmail-messages-get",
-            OneOf<crate::gmail::messages::get::GmailMessageGetOutput, Bytes>
+            ViewOrRaw<crate::gmail::messages::get::GmailMessageGetOutput>
         );
         refusable!(
             "himalaya-gmail-drafts-list",
@@ -310,7 +312,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         refusable!(
             "himalaya-gmail-drafts-get",
-            OneOf<crate::gmail::drafts::get::GmailDraftGetOutput, Bytes>
+            ViewOrRaw<crate::gmail::drafts::get::GmailDraftGetOutput>
         );
         refusable!(
             "himalaya-gmail-drafts-create",
@@ -414,7 +416,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         refusable!(
             "himalaya-msgraph-messages-get",
-            OneOf<crate::msgraph::messages::get::MsgraphMessageGetOutput, Bytes>
+            ViewOrRaw<crate::msgraph::messages::get::MsgraphMessageGetOutput>
         );
         refusable!(
             "himalaya-msgraph-attachments-list",
@@ -517,7 +519,7 @@ pub fn registry() -> JsonSchemaRegistry {
         // NOTE: `pimdir search --threads` prints the threads instead.
         insert!(
             "himalaya-pimdir-search",
-            OneOf<
+            HitsOrThreads<
                 crate::pimdir::search::PimdirSearchOutput,
                 crate::pimdir::search::PimdirSearchThreadsOutput,
             >
@@ -526,7 +528,7 @@ pub fn registry() -> JsonSchemaRegistry {
         // or `--clear` prints the choice.
         insert!(
             "himalaya-pimdir-performer",
-            OneOf<
+            CandidatesOrChoice<
                 crate::pimdir::performer::PimdirPerformers,
                 crate::pimdir::performer::PimdirPerformerChosen,
             >
@@ -646,8 +648,6 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "gmail")]
     {
-        use pimalaya_cli::output::SavedOutput;
-
         use crate::gmail::settings;
 
         for key in [
@@ -683,10 +683,7 @@ pub fn registry() -> JsonSchemaRegistry {
 
         refusable!("himalaya-gmail-messages-batch-delete", IdsReceipt);
         refusable!("himalaya-gmail-messages-batch-modify", IdsReceipt);
-        refusable!(
-            "himalaya-gmail-attachments-get",
-            OneOf<Bytes, SavedOutput>
-        );
+        refusable!("himalaya-gmail-attachments-get", BytesOrSaved);
         // NOTE: a settings write prints the settings the server holds
         // after it, as the matching `get` does.
         refusable!(
@@ -713,8 +710,6 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "msgraph")]
     {
-        use pimalaya_cli::output::SavedOutput;
-
         for key in [
             "himalaya-msgraph-attachments-create",
             "himalaya-msgraph-attachments-delete",
@@ -737,10 +732,7 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-msgraph-messages-send",
             crate::msgraph::messages::send::MsgraphMessageSendOutput
         );
-        refusable!(
-            "himalaya-msgraph-attachments-get",
-            OneOf<Bytes, SavedOutput>
-        );
+        refusable!("himalaya-msgraph-attachments-get", BytesOrSaved);
     }
 
     #[cfg(feature = "maildir")]
@@ -792,14 +784,64 @@ pub fn registry() -> JsonSchemaRegistry {
     registry
 }
 
-/// The schema of a command printing one of two types, told apart by their
-/// keys.
+/// What a reading command prints: the item, or the message bytes.
+#[cfg(any(backend, feature = "smtp"))]
 #[derive(JsonSchema)]
 #[serde(untagged)]
 #[allow(dead_code)]
-enum OneOf<A, B> {
-    A(A),
-    B(B),
+enum ViewOrRaw<V> {
+    /// The item, as the command reads it.
+    View(V),
+    /// Under `--raw` (`--format raw` on Gmail), the RFC 5322 message.
+    Raw(Bytes),
+}
+
+/// What a composer prints under `--json`: the template, or the receipt
+/// of what it did with the message.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum TemplateOrRoute<T, R> {
+    /// Neither saving nor sending, the template to lay the message out.
+    Template(T),
+    /// Saving or sending, the receipt.
+    Route(R),
+}
+
+/// What a protocol attachment read prints: the bytes, or the file they
+/// were saved to.
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum BytesOrSaved {
+    /// Without `--output`, the bytes.
+    Bytes(Bytes),
+    /// Under `--output`, the file written.
+    Saved(SavedOutput),
+}
+
+/// What `pimdir search` prints: the matching messages, or their threads.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum HitsOrThreads<H, T> {
+    /// The matching messages.
+    Hits(H),
+    /// Under `--threads`, the threads holding them.
+    Threads(T),
+}
+
+/// What `pimdir performer` prints: the candidates, or the choice.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum CandidatesOrChoice<C, S> {
+    /// Without a source nor `--clear`, the sources able to perform the
+    /// intent.
+    Candidates(C),
+    /// With a source or `--clear`, the choice as recorded.
+    Choice(S),
 }
 
 #[cfg(test)]
