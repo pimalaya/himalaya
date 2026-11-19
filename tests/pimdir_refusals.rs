@@ -21,24 +21,40 @@ use tempfile::TempDir;
 
 const MAIL: &str = "message/rfc822";
 
-/// A store holding `imap/INBOX` for the account `work`, the contacts of
-/// the account `home`, and the configuration reaching it, `account` as
-/// its `pimdir.account`.
-fn account(dir: &Path, account: Option<&str>) -> PathBuf {
+/// A collection the fixture declares: its account, source, name and
+/// media type.
+type Collection = (&'static str, &'static str, &'static str, &'static str);
+
+/// `imap/INBOX` for the account `work` and the contacts of the account
+/// `home`.
+const WORK_AND_HOME: &[Collection] = &[
+    ("work", "imap", "imap/INBOX", MAIL),
+    ("home", "carddav", "carddav/contacts", "text/vcard"),
+];
+
+/// A store holding `collections` and the configuration reaching it,
+/// `account` as its `pimdir.account`.
+///
+/// Every handle stays open until the last collection is declared, so
+/// each open shares the owner lock the first took: a dropped lock may
+/// still be held by a child another test is spawning, its copy of the
+/// descriptor closed only at exec, and a reopen would find the store
+/// owned.
+fn account(dir: &Path, account: Option<&str>, collections: &[Collection]) -> PathBuf {
     let root = dir.join("store");
     fs::create_dir(&root).unwrap();
-    let store = PimdirStore::open(&root).unwrap();
-    store
-        .for_account("work")
-        .for_source("imap")
-        .ensure_collection("imap/INBOX", MAIL)
-        .unwrap();
-    let store = PimdirStore::open(&root).unwrap();
-    store
-        .for_account("home")
-        .for_source("carddav")
-        .ensure_collection("carddav/contacts", "text/vcard")
-        .unwrap();
+
+    let _held: Vec<_> = collections
+        .iter()
+        .map(|(account, source, collection, kind)| {
+            let store = PimdirStore::open(&root)
+                .unwrap()
+                .for_account(*account)
+                .for_source(*source);
+            store.ensure_collection(collection, kind).unwrap();
+            store
+        })
+        .collect();
 
     config(dir, &root, account)
 }
@@ -84,7 +100,7 @@ fn a_root_holding_no_store_is_uncreated() {
 #[test]
 fn the_refusals_of_a_store_carry_their_codes() {
     let dir = TempDir::new().unwrap();
-    let config = account(dir.path(), None);
+    let config = account(dir.path(), None, WORK_AND_HOME);
 
     let cases: [(&[&str], &str); 5] = [
         (&["envelope", "list", "-m", "Nope"], "mailbox-not-found"),
@@ -115,7 +131,7 @@ fn the_refusals_of_a_store_carry_their_codes() {
 #[test]
 fn the_account_is_the_one_holding_mail_or_refused() {
     let dir = TempDir::new().unwrap();
-    let config = account(dir.path(), None);
+    let config = account(dir.path(), None, WORK_AND_HOME);
     let home = config.parent().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
         .arg("-c")
@@ -132,19 +148,13 @@ fn the_account_is_the_one_holding_mail_or_refused() {
     assert!(stdout.contains("imap/INBOX"), "{stdout}");
 
     let dir = TempDir::new().unwrap();
-    let config = account(dir.path(), Some("zzz"));
+    let config = account(dir.path(), Some("zzz"), WORK_AND_HOME);
     let err = failure(&config, &["mailbox", "list"]);
     assert_eq!(err["code"], "store-account-unknown", "{err}");
 
     let dir = TempDir::new().unwrap();
-    let root = dir.path().join("store");
-    let config = account(dir.path(), None);
-    PimdirStore::open(&root)
-        .unwrap()
-        .for_account("home")
-        .for_source("imap")
-        .ensure_collection("imap/Home", MAIL)
-        .unwrap();
+    let collections = [WORK_AND_HOME, &[("home", "imap", "imap/Home", MAIL)]].concat();
+    let config = account(dir.path(), None, &collections);
     let err = failure(&config, &["mailbox", "list"]);
     assert_eq!(err["code"], "store-account-ambiguous", "{err}");
 }
