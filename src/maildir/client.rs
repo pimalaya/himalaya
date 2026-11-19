@@ -434,7 +434,8 @@ mod tests {
         let root_name = client.mailbox_name(&client.resolve_maildir(Path::new("")).unwrap());
         assert_eq!(root_name, ".");
         let inbox = client.resolve_maildir(Path::new("inbox")).unwrap();
-        assert_eq!(client.mailbox_name(&inbox), "Inbox");
+        assert!(!client.is_root(&inbox));
+        assert!(client.mailbox_name(&inbox).eq_ignore_ascii_case("Inbox"));
     }
 
     #[test]

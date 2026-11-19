@@ -4089,7 +4089,7 @@ mod tests {
         assert_eq!(page_end(Some(3), Some(50)), Some(150));
         assert_eq!(
             page_end(Some(u32::MAX), Some(u32::MAX)),
-            Some(u32::MAX as usize * u32::MAX as usize)
+            Some((u32::MAX as usize).saturating_mul(u32::MAX as usize))
         );
     }
 
