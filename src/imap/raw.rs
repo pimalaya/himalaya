@@ -26,9 +26,11 @@ use crate::{
 /// trailing one is appended when missing. The response is read until
 /// every tagged completion has arrived, possibly out of order.
 ///
-/// The text form prints every response as received. Under `--json`,
-/// untagged and continuation responses print as events, then the tagged
-/// completions as the result, each split into its parts. A response that
+/// The text form prints every response as received, one that is not
+/// UTF-8 as a line `undecoded (base64): ` followed by its exact octets
+/// in base64, never decoded lossily. Under `--json`, untagged and
+/// continuation responses print as events, then the tagged completions
+/// as the result, each split into its parts. A response that
 /// is not UTF-8, such as one carrying an 8-bit literal, prints as an
 /// event holding its exact octets in base64. A tagged NO or BAD is part
 /// of the result and exits 3, the server having answered.
@@ -90,7 +92,8 @@ impl ImapRawCommand {
 pub(crate) struct ImapRawOutput {
     /// One per command sent.
     completions: Vec<ImapCompletion>,
-    /// Every response as received, for the text form.
+    /// Every response as received, for the text form, one that is not
+    /// UTF-8 as its line in base64.
     #[serde(skip)]
     lines: Vec<String>,
     /// Whether a response that is not UTF-8 opens with a tag, a completion
@@ -122,10 +125,9 @@ fn split_reply(responses: &[Vec<u8>]) -> (Vec<ImapRawEvent>, ImapRawOutput) {
 
         let Ok(text) = str::from_utf8(bytes) else {
             unread |= !matches!(bytes.first(), Some(b'*' | b'+'));
-            lines.push(String::from_utf8_lossy(bytes).into_owned());
-            events.push(ImapRawEvent::Undecoded {
-                base64: base64::encode(response),
-            });
+            let base64 = base64::encode(response);
+            lines.push(format!("undecoded (base64): {base64}"));
+            events.push(ImapRawEvent::Undecoded { base64 });
             continue;
         };
 
@@ -205,7 +207,7 @@ impl fmt::Display for ImapRawEvent {
         match self {
             Self::Untagged { line, .. } | Self::Continuation { line, .. } => writeln!(f, "{line}"),
             Self::Unparsed { text } => writeln!(f, "{text}"),
-            Self::Undecoded { base64 } => writeln!(f, "{base64}"),
+            Self::Undecoded { base64 } => writeln!(f, "undecoded (base64): {base64}"),
         }
     }
 }
@@ -398,6 +400,26 @@ mod tests {
             serde_json::to_value(&output).unwrap(),
             json!({ "completions": [{ "tag": "A1", "status": "OK", "code": null, "text": "done" }] })
         );
+    }
+
+    /// The text form prints a response that is not UTF-8 as a line of its
+    /// own in base64, never decoded lossily.
+    #[test]
+    fn the_text_form_prints_an_8bit_response_in_base64() {
+        let fetch = b"* 1 FETCH (BODY[] {4}\r\nab\xe9c)\r\n";
+        let responses = framed(&[fetch, b"A1 OK done\r\n"]);
+        let (_, output) = split_reply(&responses);
+        let text = output.to_string();
+
+        assert!(!text.contains('\u{FFFD}'));
+
+        let mut lines = text.lines();
+        let line = lines.next().unwrap();
+        let data = line.strip_prefix("undecoded (base64): ").unwrap();
+
+        assert_eq!(base64::decode_strict(data).unwrap(), fetch);
+        assert_eq!(lines.next(), Some("A1 OK done"));
+        assert_eq!(lines.next(), None);
     }
 
     /// A tagged response that is not UTF-8 prints in base64 and marks the
