@@ -12,11 +12,7 @@ use pimalaya_cli::{columns::Columns, listing::Listing, printer::Printer, sanitiz
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{
-    account::context::Account,
-    backend::Backend,
-    pimdir::{client::PimdirClient, queue::list::PimdirQueueRefused},
-};
+use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirClient};
 
 /// Report what the local pimdir store holds of the account.
 ///
@@ -37,7 +33,7 @@ use crate::{
 ///
 /// JSON output: `{"account", "accounts", "mailboxes": [{"id", "name",
 /// "total", "hydrated", "queued"}], "parked": [{"row", "handle",
-/// "collection", "kind", "error"}], "refused": [{"collection", "itemId",
+/// "mailboxId", "kind", "error"}], "refused": [{"mailboxId", "itemId",
 /// "source", "reason", "refusedAt"}]}`, `kind` as the queue spells it.
 #[derive(Debug, Parser)]
 pub struct PimdirStatusCommand;
@@ -73,9 +69,8 @@ pub struct PimdirStatusOutput {
     /// Every action the sync engine parked in those mailboxes, in the
     /// order it was queued.
     pub parked: Vec<PimdirParkedStatus>,
-    /// Every refusal standing in those mailboxes, per message and source,
-    /// as `pimdir queue list` prints it.
-    pub refused: Vec<PimdirQueueRefused>,
+    /// Every refusal standing in those mailboxes, per message and source.
+    pub refused: Vec<PimdirRefusedStatus>,
 }
 
 /// One mailbox's row in a [`PimdirStatusOutput`].
@@ -106,13 +101,29 @@ pub struct PimdirParkedStatus {
     pub handle: String,
     /// The mailbox the action is queued on, as `mailbox list` prints its
     /// id.
-    pub collection: String,
+    pub mailbox_id: String,
     /// The action as the queue spells it: `add`, `submit`, `set-flags`,
     /// `move`, ...
     pub kind: String,
     /// Why the sync engine parked it, an unconfirmed row's beginning
     /// `unconfirmed: `.
     pub error: String,
+}
+
+/// One refused message in a [`PimdirStatusOutput`] (pimdir STORAGE §15.4).
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PimdirRefusedStatus {
+    /// The mailbox holding the message, as `mailbox list` prints its id.
+    pub mailbox_id: String,
+    /// The message, as `envelope list` prints its id.
+    pub item_id: String,
+    /// The source whose server refused the change.
+    pub source: String,
+    /// The text the server gave.
+    pub reason: String,
+    /// When the refusal was recorded, RFC 3339.
+    pub refused_at: String,
 }
 
 impl fmt::Display for PimdirStatusOutput {
@@ -155,7 +166,7 @@ impl fmt::Display for PimdirStatusOutput {
                     sanitize::text(&row.handle).into_owned(),
                     String::from(state),
                     sanitize::text(&row.kind).into_owned(),
-                    sanitize::text(&row.collection).into_owned(),
+                    sanitize::text(&row.mailbox_id).into_owned(),
                     sanitize::text(&row.error).into_owned(),
                 ]);
             }
@@ -171,7 +182,7 @@ impl fmt::Display for PimdirStatusOutput {
                     sanitize::text(&row.item_id).into_owned(),
                     String::from("refused"),
                     sanitize::text(&row.source).into_owned(),
-                    sanitize::text(&row.collection).into_owned(),
+                    sanitize::text(&row.mailbox_id).into_owned(),
                     sanitize::text(&row.reason).into_owned(),
                 ]);
             }
@@ -192,8 +203,8 @@ mod tests {
     const STORE: &str = "e2646df031cd876334410c4df14ebd86";
 
     /// The report prints the twins' keys, a parked row by its row and
-    /// handle, and the refusals in the shape `pimdir queue list` prints
-    /// them; the text lists each block after the mailboxes.
+    /// handle, a mailbox under `mailboxId` in parked and refused rows; the
+    /// text lists each block after the mailboxes.
     #[test]
     fn a_status_prints_mailboxes_parked_rows_and_refusals() {
         let output = PimdirStatusOutput {
@@ -210,12 +221,12 @@ mod tests {
             parked: vec![PimdirParkedStatus {
                 row: 3,
                 handle: format!("{STORE}.1.3"),
-                collection: "imap/INBOX".into(),
+                mailbox_id: "imap/INBOX".into(),
                 kind: "move".into(),
                 error: "conflict".into(),
             }],
-            refused: vec![PimdirQueueRefused {
-                collection: "imap/INBOX".into(),
+            refused: vec![PimdirRefusedStatus {
+                mailbox_id: "imap/INBOX".into(),
                 item_id: "9".into(),
                 source: "imap".into(),
                 reason: "NO [CANNOT] refused".into(),
@@ -238,12 +249,12 @@ mod tests {
                 "parked": [{
                     "row": 3,
                     "handle": format!("{STORE}.1.3"),
-                    "collection": "imap/INBOX",
+                    "mailboxId": "imap/INBOX",
                     "kind": "move",
                     "error": "conflict",
                 }],
                 "refused": [{
-                    "collection": "imap/INBOX",
+                    "mailboxId": "imap/INBOX",
                     "itemId": "9",
                     "source": "imap",
                     "reason": "NO [CANNOT] refused",

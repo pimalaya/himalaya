@@ -69,7 +69,9 @@ use crate::{
     pimdir::{
         client::{PimdirClient, handle},
         queue::list::{PimdirQueueRefused, PimdirQueueRow},
-        status::{PimdirMailboxStatus, PimdirParkedStatus, PimdirStatusOutput},
+        status::{
+            PimdirMailboxStatus, PimdirParkedStatus, PimdirRefusedStatus, PimdirStatusOutput,
+        },
     },
 };
 
@@ -1527,7 +1529,17 @@ impl PimdirClient {
 
         for collection in &collections {
             let id = collection.id.as_str();
-            refused.extend(self.refused_rows(id)?);
+            refused.extend(
+                self.refused_rows(id)?
+                    .into_iter()
+                    .map(|row| PimdirRefusedStatus {
+                        mailbox_id: row.collection,
+                        item_id: row.item_id,
+                        source: row.source,
+                        reason: row.reason,
+                        refused_at: row.refused_at,
+                    }),
+            );
 
             let total = self
                 .store
@@ -1571,7 +1583,7 @@ impl PimdirClient {
             .map(|parked| PimdirParkedStatus {
                 row: parked.id,
                 handle: handle(&identity, parked.id),
-                collection: parked.collection,
+                mailbox_id: parked.collection,
                 kind: parked.action,
                 error: parked.error,
             })
@@ -5109,7 +5121,7 @@ mod tests {
         assert_eq!(status.parked[0].row, row);
         assert_eq!(status.parked[0].handle, named.to_string());
         assert_eq!(status.parked[0].kind, "move");
-        assert_eq!(status.parked[0].collection, "imap/Drafts");
+        assert_eq!(status.parked[0].mailbox_id, "imap/Drafts");
         let drafts_status = &status.mailboxes[0];
         assert_eq!(drafts_status.id, "imap/Drafts");
         assert_eq!((drafts_status.hydrated, drafts_status.total), (1, 1));
