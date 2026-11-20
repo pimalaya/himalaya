@@ -73,7 +73,7 @@ pub struct PimdirStatusOutput {
     pub refused: Vec<PimdirRefusedStatus>,
 }
 
-/// One mailbox's row in a [`PimdirStatusOutput`].
+/// One mailbox of `pimdir status`, under its `mailboxes`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxStatus {
@@ -90,7 +90,7 @@ pub struct PimdirMailboxStatus {
     pub queued: u64,
 }
 
-/// One parked action in a [`PimdirStatusOutput`].
+/// One parked action of `pimdir status`, under its `parked`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirParkedStatus {
@@ -110,7 +110,8 @@ pub struct PimdirParkedStatus {
     pub error: String,
 }
 
-/// One refused message in a [`PimdirStatusOutput`] (pimdir STORAGE §15.4).
+/// One refused message of `pimdir status`, under its `refused` (pimdir
+/// STORAGE §15.4).
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirRefusedStatus {

@@ -851,6 +851,7 @@ enum CandidatesOrChoice<C, S> {
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
+    use serde_json::Value;
 
     use crate::{cli::Cli, json_schema::registry};
 
@@ -868,6 +869,44 @@ mod tests {
     fn every_command_is_described() {
         let problems = registry().check(&Cli::command(), SILENT);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Every description a schema carries, its `$defs` included, with the
+    /// path it sits at.
+    fn descriptions(path: String, value: &Value, found: &mut Vec<(String, String)>) {
+        match value {
+            Value::Object(map) => {
+                for (key, value) in map {
+                    match (key.as_str(), value) {
+                        ("description", Value::String(text)) => {
+                            found.push((path.clone(), text.clone()))
+                        }
+                        _ => descriptions(format!("{path}/{key}"), value, found),
+                    }
+                }
+            }
+            Value::Array(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    descriptions(format!("{path}/{i}"), item, found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn no_description_carries_a_doc_link() {
+        let mut found = Vec::new();
+        for (key, schema) in &registry().schemas {
+            descriptions(key.clone(), schema, &mut found);
+        }
+
+        let links: Vec<String> = found
+            .into_iter()
+            .filter(|(_, text)| text.contains("[`") || text.contains("`]"))
+            .map(|(path, text)| format!("{path}: {text}"))
+            .collect();
+        assert!(links.is_empty(), "{}", links.join("\n"));
     }
 
     #[cfg(any(backend, feature = "smtp"))]
