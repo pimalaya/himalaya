@@ -15,7 +15,7 @@ use crate::email::{address::Address, flag::Flag};
 ///
 /// The mbox cache stores it too, so the kebab-case keys it was written with
 /// before 3.0 stay readable through `alias`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Envelope {
     /// The identifier the backend knows the message by: an IMAP UID, a
@@ -137,14 +137,6 @@ fn strip_weekday(date: &str) -> &str {
 ///
 /// This is what makes [`Envelope::message_id`] comparable byte for byte
 /// whichever backend surfaced it.
-#[cfg(any(
-    feature = "imap",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "maildir",
-    feature = "mbox"
-))]
 pub fn normalize_message_id(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     let inner = trimmed
@@ -170,7 +162,6 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
 /// attachment ([`crate::shared::message::part::has_attachment`]); left
 /// `None` otherwise. The subject is read as the read view reads it, raw
 /// 8-bit bytes included.
-#[cfg(any(feature = "maildir", feature = "mbox"))]
 pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
     use chrono::TimeZone;
     use mime::{
@@ -307,7 +298,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, any(feature = "maildir", feature = "mbox")))]
+#[cfg(test)]
 mod subject_tests {
     use super::from_raw;
 

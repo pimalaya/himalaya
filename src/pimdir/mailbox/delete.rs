@@ -40,6 +40,7 @@ impl PimdirMailboxDeleteCommand {
         let deleted = client.delete_mailbox(&mailbox)?;
 
         printer.out(PimdirMailboxDeleteOutput {
+            id: deleted.mailbox.unwrap_or_else(|| mailbox.clone()),
             row: deleted.queue_id.id,
             handle: deleted.queue_id.to_string(),
             mailbox,
@@ -52,6 +53,8 @@ impl PimdirMailboxDeleteCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxDeleteOutput {
+    /// The id of the mailbox deleted.
+    pub id: String,
     /// The `collection-delete` row.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE

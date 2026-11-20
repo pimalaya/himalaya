@@ -44,6 +44,7 @@ impl PimdirMailboxCreateCommand {
         let created = client.create_mailbox(&self.name, parent.as_deref())?;
 
         printer.out(PimdirMailboxCreateOutput {
+            id: created.mailbox,
             row: created.queue_id.id,
             handle: created.queue_id.to_string(),
             name: self.name,
@@ -57,6 +58,9 @@ impl PimdirMailboxCreateCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxCreateOutput {
+    /// The new mailbox's id, `null` until the sync performing the row
+    /// brings the mailbox down.
+    pub id: Option<String>,
     /// The `collection-create` row.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE
@@ -95,6 +99,7 @@ mod tests {
     #[test]
     fn a_mailbox_at_the_top_prints_a_null_parent() {
         let output = PimdirMailboxCreateOutput {
+            id: None,
             row: 89,
             handle: "e2646df031cd876334410c4df14ebd86.1.89".into(),
             name: String::from("Projets"),
@@ -105,6 +110,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&output).unwrap(),
             json!({
+                "id": null,
                 "row": 89,
                 "handle": "e2646df031cd876334410c4df14ebd86.1.89",
                 "name": "Projets",
@@ -115,5 +121,6 @@ mod tests {
         let schema = output_schema::<PimdirMailboxCreateOutput>();
         let required = schema["required"].as_array().unwrap();
         assert!(required.contains(&Value::from("parent")), "{schema}");
+        assert!(required.contains(&Value::from("id")), "{schema}");
     }
 }

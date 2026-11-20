@@ -200,7 +200,7 @@ fn an_account_check_names_the_trust_of_each_transport() {
     let output = run(home.path(), &toml, &["account", "check"]);
     let json = printed(&output, 3);
     let row = |backend: &str| {
-        let rows = json["backends"].as_array().unwrap();
+        let rows = json["accounts"][0]["backends"].as_array().unwrap();
         rows.iter()
             .find(|row| row["backend"] == backend)
             .unwrap()
@@ -215,4 +215,33 @@ fn an_account_check_names_the_trust_of_each_transport() {
     assert_eq!(smtp["tls"]["provider"], "rustls", "{json}");
     assert_eq!(smtp["tls"]["clientCert"], Value::Null, "{json}");
     assert_eq!(row("maildir")["tls"], Value::Null, "{json}");
+}
+
+/// A cleartext connection names no TLS, `tls` printing `null` as for a
+/// local backend, while a STARTTLS upgrade names the build's defaults.
+#[cfg(all(feature = "imap", feature = "smtp"))]
+#[test]
+fn an_account_check_names_no_tls_over_a_cleartext_connection() {
+    let home = TempDir::new().unwrap();
+    let toml = "[accounts.a]\ndefault = true\n\
+                imap.server = \"imap://127.0.0.1:1\"\n\
+                smtp.server = \"smtp://127.0.0.1:1\"\n\
+                smtp.starttls = true\n";
+
+    let output = run(home.path(), toml, &["account", "check"]);
+    let json = printed(&output, 3);
+    let account = &json["accounts"][0];
+    assert_eq!(account["account"], "a", "{json}");
+
+    let backends = account["backends"].as_array().unwrap();
+    let row = |backend: &str| backends.iter().find(|row| row["backend"] == backend);
+
+    assert_eq!(row("imap").unwrap()["tls"], Value::Null, "{json}");
+    let defaults = serde_json::json!({
+        "provider": null,
+        "crypto": null,
+        "cert": null,
+        "clientCert": null,
+    });
+    assert_eq!(row("smtp").unwrap()["tls"], defaults, "{json}");
 }

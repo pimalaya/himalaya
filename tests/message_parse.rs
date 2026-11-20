@@ -321,13 +321,24 @@ fn the_view_and_parts_are_those_of_message_read() {
         let path = himalaya.eml(&format!("{id}.eml"), raw);
         let path = path.to_str().unwrap();
 
-        // NOTE: a read carries the message's id and etag beside the view,
-        // which a parsed file has none of.
         let read_json = ok(himalaya.run(&["-c", config, "--json", "message", "read", id]));
         let mut read_view: serde_json::Value = serde_json::from_slice(&read_json).unwrap();
         let read_view = read_view.as_object_mut().unwrap();
         assert_eq!(read_view.remove("id"), Some(serde_json::json!(id)));
         assert_eq!(read_view.remove("etag"), Some(serde_json::Value::Null));
+        for key in [
+            "messageId",
+            "inReplyTo",
+            "flags",
+            "subject",
+            "from",
+            "to",
+            "date",
+            "size",
+            "hasAttachment",
+        ] {
+            assert!(read_view.remove(key).is_some(), "{id}: {key}");
+        }
         let parse = ok(himalaya.run(&["--json", "message", "parse", path]));
         let parse: serde_json::Value = serde_json::from_slice(&parse).unwrap();
         assert_eq!(parse.as_object().unwrap(), read_view, "{id}");

@@ -15,7 +15,10 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
 use pimalaya_cli::{
-    error::CodedError, file::private_options, printer::Printer, sanitize::path_component,
+    error::CodedError,
+    file::private_options,
+    printer::Printer,
+    sanitize::{path_component, text},
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -92,7 +95,7 @@ impl AttachmentDownloadCommand {
         let part_id = self.stdout_part_id()?;
 
         let mailbox = self.mailbox.resolve(account);
-        let raw = client.get_message(&mailbox, &self.message_id, false)?;
+        let raw = client.get_message(&mailbox, &self.message_id, false)?.0;
         let message = part::parse(&raw)?;
 
         if let Some(id) = part_id {
@@ -174,7 +177,15 @@ pub enum AttachmentDownloadOutput {
 impl fmt::Display for AttachmentDownloadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Written(attachments) => attachments.fmt(f),
+            Self::Written(listing) if listing.attachments.is_empty() => listing.fmt(f),
+            Self::Written(listing) => {
+                for attachment in &listing.attachments {
+                    let path = attachment.path.as_deref().unwrap_or_default();
+                    let path = text(path);
+                    writeln!(f, "Saved {} bytes to {path}", attachment.size)?;
+                }
+                Ok(())
+            }
             Self::Part(part) => f.write_str(&part.data),
         }
     }

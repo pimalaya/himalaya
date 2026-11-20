@@ -75,9 +75,9 @@ impl PimdirMessageSendCommand {
         };
 
         printer.out(PimdirMessageSendOutput {
+            id: sent.staged.link_id,
             row: sent.staged.queue_id.id,
             handle: sent.staged.queue_id.to_string(),
-            message_id: sent.staged.message_id,
             copy: sent.carried,
             copy_row: copy_handle.as_ref().map(|copy| copy.id),
             copy_handle: copy_handle.map(|copy| copy.to_string()),
@@ -89,14 +89,14 @@ impl PimdirMessageSendCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMessageSendOutput {
+    /// The message's link id, the queue row's `linkId`.
+    pub id: String,
     /// The `submit` row the message waits in until the owner sends it, as
     /// `pimdir queue list` prints it.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE
     /// §4.5), which `pimdir queue show` and `cancel` take and check.
     pub handle: String,
-    /// The message's bare `Message-ID`.
-    pub message_id: String,
     /// Whether the `submit` row carries the copy, filed once sent.
     pub copy: bool,
     /// The row of the copy queued beside the send, for an owner that
@@ -111,7 +111,7 @@ impl fmt::Display for PimdirMessageSendOutput {
         write!(
             f,
             "Message {} queued for sending as row {} (handle {})",
-            sanitize::text(&self.message_id),
+            sanitize::text(&self.id),
             self.row,
             self.handle,
         )?;

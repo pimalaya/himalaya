@@ -356,6 +356,43 @@ fn a_page_reaching_the_last_message_names_no_next_page() {
     assert!(!text.contains("Next page:"), "{text}");
 }
 
+/// A page token a listing did not print is refused coded
+/// `page-token-invalid`, and a token beside `-p` is a refused command
+/// line, `-p` never silently ignored.
+#[test]
+fn a_bad_page_token_is_coded_and_conflicts_with_a_page_number() {
+    let dir = TempDir::new().unwrap();
+    let maildir = dir.path().join("maildir");
+    maildir_at(&maildir.join("A"));
+    fs::write(maildir.join("A/cur/one:2,S"), "Subject: one\n\nbody\n").unwrap();
+    let lines = maildir_lines(&maildir, "");
+
+    for verb in ["list", "search"] {
+        for token in ["abc", "0"] {
+            let args = ["envelope", verb, "-m", "A", "--page-token", token];
+            let (ok, out) = himalaya(dir.path(), &lines, &args);
+            assert!(!ok, "{out}");
+            assert_eq!(out["code"], "page-token-invalid", "{verb} {token}: {out}");
+        }
+
+        let args = [
+            "--json",
+            "envelope",
+            verb,
+            "-m",
+            "A",
+            "--page-token",
+            "2",
+            "-p",
+            "3",
+        ];
+        let output = run(dir.path(), &lines, &args);
+        assert_eq!(output.status.code(), Some(2), "{verb}");
+        let out: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(out["code"], "usage-invalid", "{verb}: {out}");
+    }
+}
+
 /// A Maildir file or an mbox message holding no header field is a
 /// `message-unreadable` entry of `errors`, never a row, and the listing
 /// exits 3, its readable messages listed.
@@ -404,9 +441,10 @@ fn a_message_holding_no_header_field_is_an_item_error() {
     }
 }
 
-/// A read carries the id it was given and an `etag`, `null` on a local
-/// store; an id the mailbox does not hold is `message-not-found`, on a
-/// Maildir as on an mbox; a UTC date prints `Z`.
+/// A read carries the row `envelope list` prints for the message, its id
+/// the one it was given, and an `etag`, `null` on a local store; an id
+/// the mailbox does not hold is `message-not-found`, on a Maildir as on
+/// an mbox; a UTC date prints `Z`.
 #[test]
 fn a_read_carries_its_id_and_an_unknown_one_is_not_found() {
     let dir = TempDir::new().unwrap();
@@ -421,15 +459,20 @@ fn a_read_carries_its_id_and_an_unknown_one_is_not_found() {
     fs::write(mbox.join("A"), utc).unwrap();
 
     for lines in [maildir_lines(&maildir, ""), mbox_lines(&mbox, "")] {
-        let (ok, out) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "A"]);
-        assert!(ok, "{out}");
-        let id = out["envelopes"][0]["id"].as_str().unwrap().to_owned();
+        let args = ["envelope", "list", "-m", "A", "--has-attachment"];
+        let (ok, list) = himalaya(dir.path(), &lines, &args);
+        assert!(ok, "{list}");
+        let row = &list["envelopes"][0];
+        let id = row["id"].as_str().unwrap().to_owned();
 
         let (ok, out) = himalaya(dir.path(), &lines, &["message", "read", "-m", "A", &id]);
         assert!(ok, "{out}");
         assert_eq!(out["id"], id.as_str(), "{out}");
         assert_eq!(out["etag"], Value::Null, "{out}");
         assert_eq!(out["headers"]["date"], "2024-01-01T10:00:00Z", "{out}");
+        for (key, value) in row.as_object().unwrap() {
+            assert_eq!(&out[key], value, "{key}: {out}");
+        }
 
         let (ok, out) = himalaya(dir.path(), &lines, &["message", "read", "-m", "A", "999"]);
         assert!(!ok, "{out}");

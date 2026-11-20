@@ -6,22 +6,21 @@
 
 #[cfg(feature = "mbox")]
 use std::fs::File;
-use std::{fmt, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 #[cfg(feature = "mbox")]
 use anyhow::bail;
 use clap::Parser;
 use pimalaya_cli::{
-    account::BackendCheck, error::PartialOutcome, fields::Fields, printer::Printer, sanitize,
+    account::{AccountCheck, AccountCheckOutput, BackendCheck, BackendCheckTls},
+    error::PartialOutcome,
+    printer::Printer,
 };
 use pimalaya_config::secret::SecretResolver;
 
 #[cfg(feature = "imap")]
 use crate::config::imap::ImapConfig;
-use schemars::JsonSchema;
-use serde::Serialize;
-
 use crate::{
     backend::Backend,
     cli::resolve_account,
@@ -33,8 +32,9 @@ use crate::{
 ///
 /// Every backend `--backend` allows is opened, which exercises the same
 /// handshake and authentication paths a real command takes. The report
-/// names each backend, whether it answered and, for a network one, the
-/// TLS it connected with: its own `tls` block over the account's.
+/// names each backend, whether it answered and, for a connection over
+/// TLS, the TLS it was configured with: its own `tls` block over the
+/// account's.
 ///
 /// The report is printed whole, each backend with its outcome and, when it
 /// failed, its code and why. A failed backend exits the command with
@@ -68,13 +68,8 @@ impl AccountCheckCommand {
             )),
             allow(unused_mut)
         )]
-        let mut report = AccountCheckReport {
-            account: name,
-            backends: Vec::new(),
-        };
+        let mut backends: Vec<BackendCheck<ErrorCode>> = Vec::new();
 
-        // NOTE: one resolver for the whole account, so a credential
-        // command several blocks name is spawned once.
         #[cfg_attr(
             not(any(
                 feature = "imap",
@@ -92,101 +87,117 @@ impl AccountCheckCommand {
         if backend.allows_imap()
             && let Some(imap_config) = &account_config.imap
         {
-            report.backends.push(
-                check("imap", connect_imap(imap_config, &mut resolver)).trusting(&imap_config.tls),
-            );
+            let result = connect_imap(imap_config, &mut resolver);
+            let encrypted = crate::imap::client::parse_imap_server(&imap_config.server)
+                .is_ok_and(|server| server.scheme() == "imaps" || imap_config.starttls);
+            backends.push(check(
+                "imap",
+                result,
+                tls_check(&imap_config.tls, encrypted),
+            ));
         }
 
         #[cfg(feature = "jmap")]
         if backend.allows_jmap()
             && let Some(jmap_config) = &account_config.jmap
         {
-            report.backends.push(
-                check("jmap", connect_jmap(jmap_config, &mut resolver)).trusting(&jmap_config.tls),
-            );
+            let result = connect_jmap(jmap_config, &mut resolver);
+            let encrypted = crate::jmap::client::parse_server_url(&jmap_config.server)
+                .is_ok_and(|server| server.scheme() == "https");
+            backends.push(check(
+                "jmap",
+                result,
+                tls_check(&jmap_config.tls, encrypted),
+            ));
         }
 
         #[cfg(feature = "gmail")]
         if backend.allows_gmail()
             && let Some(gmail_config) = &account_config.gmail
         {
-            report.backends.push(
-                check("gmail", connect_gmail(gmail_config, &mut resolver))
-                    .trusting(&gmail_config.tls),
-            );
+            let result = connect_gmail(gmail_config, &mut resolver);
+            backends.push(check("gmail", result, tls_check(&gmail_config.tls, true)));
         }
 
         #[cfg(feature = "msgraph")]
         if backend.allows_msgraph()
             && let Some(msgraph_config) = &account_config.msgraph
         {
-            report.backends.push(
-                check("msgraph", connect_msgraph(msgraph_config, &mut resolver))
-                    .trusting(&msgraph_config.tls),
-            );
+            let result = connect_msgraph(msgraph_config, &mut resolver);
+            backends.push(check(
+                "msgraph",
+                result,
+                tls_check(&msgraph_config.tls, true),
+            ));
         }
 
         #[cfg(feature = "maildir")]
         if backend.allows_maildir()
             && let Some(maildir_config) = &account_config.maildir
         {
-            report
-                .backends
-                .push(check("maildir", connect_maildir(maildir_config)));
+            backends.push(check("maildir", connect_maildir(maildir_config), None));
         }
 
         #[cfg(feature = "mbox")]
         if backend.allows_mbox()
             && let Some(mbox_config) = &account_config.mbox
         {
-            report
-                .backends
-                .push(check("mbox", connect_mbox(mbox_config)));
+            backends.push(check("mbox", connect_mbox(mbox_config), None));
         }
 
         #[cfg(feature = "pimdir")]
         if backend.allows_pimdir()
             && let Some(pimdir_config) = &account_config.pimdir
         {
-            report
-                .backends
-                .push(check("pimdir", connect_pimdir(pimdir_config)));
+            backends.push(check("pimdir", connect_pimdir(pimdir_config), None));
         }
 
         #[cfg(feature = "smtp")]
         if backend.allows_smtp()
             && let Some(smtp_config) = &account_config.smtp
         {
-            report.backends.push(
-                check("smtp", connect_smtp(smtp_config, &mut resolver)).trusting(&smtp_config.tls),
-            );
+            let result = connect_smtp(smtp_config, &mut resolver);
+            let encrypted = crate::smtp::client::parse_smtp_server(&smtp_config.server)
+                .is_ok_and(|server| server.scheme() == "smtps" || smtp_config.starttls);
+            backends.push(check(
+                "smtp",
+                result,
+                tls_check(&smtp_config.tls, encrypted),
+            ));
         }
 
         #[cfg(feature = "sieve")]
         if backend.allows_sieve()
             && let Some(sieve_config) = &account_config.sieve
         {
-            report.backends.push(
-                check("sieve", connect_sieve(sieve_config, &mut resolver))
-                    .trusting(&sieve_config.tls),
-            );
-        }
-
-        if report.backends.is_empty() {
-            return Err(account_config.no_backend_error(
-                &report.account,
-                backend,
-                Backend::COMPILED,
+            let result = connect_sieve(sieve_config, &mut resolver);
+            let encrypted = crate::sieve::client::parse_sieve_server(&sieve_config.server)
+                .is_ok_and(|server| {
+                    let starttls = sieve_config.starttls.unwrap_or(server.scheme() == "sieve");
+                    server.scheme() == "sieves" || starttls
+                });
+            backends.push(check(
+                "sieve",
+                result,
+                tls_check(&sieve_config.tls, encrypted),
             ));
         }
 
-        let failed = report.backends.iter().any(|row| !row.check.ok);
-        printer.out(report)?;
+        if backends.is_empty() {
+            return Err(account_config.no_backend_error(&name, backend, Backend::COMPILED));
+        }
 
-        // NOTE: the report names every backend's outcome, so a failed one
-        // ends the command with the partial-outcome status rather than a
-        // failure object.
-        if failed {
+        let output = AccountCheckOutput {
+            accounts: vec![AccountCheck {
+                account: name,
+                backends,
+            }],
+        };
+
+        let ok = output.ok();
+        printer.out(output)?;
+
+        if !ok {
             return Err(PartialOutcome::default().into());
         }
 
@@ -419,7 +430,7 @@ fn connect_sieve(
 }
 
 /// Folds a connection attempt to `backend` into its outcome, coded as a
-/// one-shot run codes its failure.
+/// one-shot run codes its failure, beside the TLS it went over.
 #[cfg(any(
     feature = "imap",
     feature = "jmap",
@@ -431,129 +442,49 @@ fn connect_sieve(
     feature = "smtp",
     feature = "sieve"
 ))]
-fn check(backend: &'static str, result: Result<()>) -> BackendCheckRow {
-    BackendCheckRow {
-        check: BackendCheck::new(backend, result.map_err(crate::error::coded)),
-        tls: None,
+fn check(
+    backend: &'static str,
+    result: Result<()>,
+    tls: Option<BackendCheckTls>,
+) -> BackendCheck<ErrorCode> {
+    let mut check = BackendCheck::new(backend, result.map_err(crate::error::coded));
+    check.tls = tls;
+    check
+}
+
+/// The TLS `tls` configures for an `encrypted` connection, each part
+/// `null` where the build's default answers; `null` for a cleartext one.
+#[cfg_attr(
+    not(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "smtp",
+        feature = "sieve"
+    )),
+    allow(dead_code)
+)]
+fn tls_check(tls: &TlsConfig, encrypted: bool) -> Option<BackendCheckTls> {
+    if !encrypted {
+        return None;
     }
-}
 
-/// The `account check` report: the account, then each backend checked.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct AccountCheckReport {
-    /// The account that was checked.
-    pub account: String,
-    /// One entry per backend the account declares and `--backend` allows.
-    pub backends: Vec<BackendCheckRow>,
-}
+    let provider = tls.provider.as_ref().map(|provider| match provider {
+        TlsProviderConfig::Rustls => "rustls",
+        TlsProviderConfig::NativeTls => "native-tls",
+    });
+    let crypto = tls.rustls.crypto.as_ref().map(|crypto| match crypto {
+        RustlsCryptoConfig::Aws => "aws",
+        RustlsCryptoConfig::Ring => "ring",
+    });
 
-impl fmt::Display for AccountCheckReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut fields = Fields::default();
-        fields.push("Account", sanitize::text(&self.account));
-
-        for row in &self.backends {
-            let mut outcome = match &row.check.error {
-                None => String::from("OK"),
-                Some(err) => format!("FAIL ({})", sanitize::text(err)),
-            };
-            if let Some(tls) = row.tls.as_ref().map(TlsTrust::to_string)
-                && !tls.is_empty()
-            {
-                outcome.push_str(&format!(", TLS {tls}"));
-            }
-            fields.push(row.check.backend, outcome);
-        }
-
-        write!(f, "{fields}")
-    }
-}
-
-/// The outcome of checking one backend, beside the TLS a network one
-/// connected with.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct BackendCheckRow {
-    #[serde(flatten)]
-    pub check: BackendCheck<ErrorCode>,
-    /// The TLS the connection used, its own `tls` block over the
-    /// account's; `null` for a local backend.
-    pub tls: Option<TlsTrust>,
-}
-
-impl BackendCheckRow {
-    /// The row naming the TLS `tls` resolved to.
-    #[cfg_attr(
-        not(any(
-            feature = "imap",
-            feature = "jmap",
-            feature = "gmail",
-            feature = "msgraph",
-            feature = "smtp",
-            feature = "sieve"
-        )),
-        allow(dead_code)
-    )]
-    fn trusting(self, tls: &TlsConfig) -> Self {
-        Self {
-            tls: Some(TlsTrust::from(tls)),
-            ..self
-        }
-    }
-}
-
-/// The trust of a TLS connection, as configured: `null` where the build's
-/// default answers.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TlsTrust {
-    /// The TLS implementation, `rustls` or `native-tls`; `null` for the
-    /// build's first.
-    pub provider: Option<String>,
-    /// The cryptographic provider of rustls, `aws` or `ring`; `null` for
-    /// the build's first.
-    pub crypto: Option<String>,
-    /// The PEM certificate trusted beside the platform's; `null` for the
-    /// platform's alone.
-    pub cert: Option<String>,
-    /// The PEM client certificate presented; `null` for none.
-    pub client_cert: Option<String>,
-}
-
-impl From<&TlsConfig> for TlsTrust {
-    fn from(tls: &TlsConfig) -> Self {
-        let provider = tls.provider.as_ref().map(|provider| match provider {
-            TlsProviderConfig::Rustls => "rustls",
-            TlsProviderConfig::NativeTls => "native-tls",
-        });
-        let crypto = tls.rustls.crypto.as_ref().map(|crypto| match crypto {
-            RustlsCryptoConfig::Aws => "aws",
-            RustlsCryptoConfig::Ring => "ring",
-        });
-
-        Self {
-            provider: provider.map(String::from),
-            crypto: crypto.map(String::from),
-            cert: tls.cert.as_ref().map(|cert| cert.display().to_string()),
-            client_cert: tls.client.as_ref().map(|c| c.cert.display().to_string()),
-        }
-    }
-}
-
-/// The configured parts, `native-tls, cert /etc/ca.pem`, empty when the
-/// build's defaults answer every one.
-impl fmt::Display for TlsTrust {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let parts = [
-            self.provider.clone(),
-            self.crypto.clone(),
-            self.cert.as_ref().map(|cert| format!("cert {cert}")),
-            self.client_cert
-                .as_ref()
-                .map(|cert| format!("client cert {cert}")),
-        ];
-        let parts: Vec<String> = parts.into_iter().flatten().collect();
-        write!(f, "{}", sanitize::text(&parts.join(", ")))
-    }
+    Some(BackendCheckTls {
+        provider: provider.map(String::from),
+        crypto: crypto.map(String::from),
+        cert: tls.cert.as_ref().map(|cert| cert.display().to_string()),
+        client_cert: tls.client.as_ref().map(|c| c.cert.display().to_string()),
+    })
 }
 
 #[cfg(all(test, feature = "pimdir"))]

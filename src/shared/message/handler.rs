@@ -18,6 +18,7 @@ use std::{
 };
 
 use anyhow::{Error, Result};
+use chrono::{DateTime, FixedOffset};
 use log::debug;
 use mime::{
     header::marker::{BCC, CC, FROM, SUBJECT, TO},
@@ -33,6 +34,7 @@ use crate::{
     capability::Capability,
     email::{
         address::Address,
+        envelope,
         flag::{Flag, IanaFlag},
     },
     error::{self, ItemError, partial_when, write_item_errors},
@@ -182,32 +184,7 @@ pub fn route_unprinted(
         save,
         send,
     )?;
-    let output = match outcome {
-        Outcome::Stdout => return Ok(None),
-        Outcome::Saved { id, sent } => MessageRouteOutput {
-            id,
-            saved: true,
-            sent,
-            queued,
-            errors: Vec::new(),
-        },
-        Outcome::Sent => MessageRouteOutput {
-            id: None,
-            saved: false,
-            sent: true,
-            queued,
-            errors: Vec::new(),
-        },
-        Outcome::Unsaved(err) => MessageRouteOutput {
-            id: None,
-            saved: false,
-            sent: true,
-            queued,
-            errors: vec![ItemError::new(None, &error::coded(err))],
-        },
-    };
-
-    Ok(Some(output))
+    Ok(MessageRouteOutput::new(outcome, queued))
 }
 
 /// The receipt of a saved or sent message.
@@ -219,7 +196,8 @@ pub struct MessageRouteOutput {
     pub id: Option<String>,
     /// Whether a copy was saved to a mailbox.
     pub saved: bool,
-    /// Whether the message was sent.
+    /// Whether the message was sent, `false` while a sync engine has its
+    /// send queued.
     pub sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
@@ -227,9 +205,36 @@ pub struct MessageRouteOutput {
     /// answered flag), `[]` when nothing did: the command then exits 3,
     /// and sending again would send twice.
     pub errors: Vec<ItemError>,
+    /// Whether a send was asked, done or queued, which the text form
+    /// names.
+    #[serde(skip)]
+    pub sending: bool,
 }
 
 impl MessageRouteOutput {
+    /// The receipt of `outcome`, its writes `queued` for a sync engine;
+    /// none for a message written to stdout.
+    pub fn new(outcome: Outcome, queued: bool) -> Option<Self> {
+        let (id, saved, sending, errors) = match outcome {
+            Outcome::Stdout => return None,
+            Outcome::Saved { id, sent } => (id, true, sent, Vec::new()),
+            Outcome::Sent => (None, false, true, Vec::new()),
+            Outcome::Unsaved(err) => {
+                let errors = vec![ItemError::new(None, &error::coded(err))];
+                (None, false, true, errors)
+            }
+        };
+
+        Some(Self {
+            id,
+            saved,
+            sent: sending && !queued,
+            queued,
+            errors,
+            sending,
+        })
+    }
+
     /// Prints the receipt, then ends the command with the partial-outcome
     /// status when something failed after the send.
     pub fn print(self, printer: &mut impl Printer) -> Result<()> {
@@ -241,7 +246,7 @@ impl MessageRouteOutput {
 
 impl fmt::Display for MessageRouteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let what = match (self.saved, self.sent) {
+        let what = match (self.saved, self.sending) {
             (true, true) => "saving and sending",
             (true, false) => "saving",
             _ => "sending",
@@ -285,6 +290,11 @@ pub struct MessageTemplateOutput {
     pub bcc: Vec<Address>,
     /// The decoded `Subject:`, `null` without one.
     pub subject: Option<String>,
+    /// The `Date:` the message carries, with its offset, `null` without
+    /// one.
+    pub date: Option<DateTime<FixedOffset>>,
+    /// The `Message-ID:` the message carries, bare, `null` without one.
+    pub message_id: Option<String>,
     /// The text body, its line breaks LF, as an editor shows them.
     pub body: String,
     /// The attached files, which ride along with the message: the template
@@ -310,6 +320,7 @@ impl MessageTemplateOutput {
     fn parse(raw: &[u8]) -> Result<Self> {
         let message = MimeCst::parse(raw);
         let root = &message.root;
+        let headers = envelope::from_raw(raw, false).unwrap_or_default();
 
         let mailboxes = |address: Option<MimeAddressList>| -> Vec<Address> {
             address
@@ -337,6 +348,8 @@ impl MessageTemplateOutput {
             cc: mailboxes(root.header::<CC>()),
             bcc: mailboxes(root.header::<BCC>()),
             subject: root.header::<SUBJECT>(),
+            date: headers.date,
+            message_id: headers.message_id,
             body,
             attachments,
         })
@@ -432,7 +445,8 @@ mod tests {
         assert!(text.contains(to), "{text}");
     }
 
-    /// A template without a sender prints `from` as `null`.
+    /// A template without a sender prints `from` as `null`, and its date
+    /// and Message-ID as `null` without the headers.
     #[test]
     fn a_template_without_a_sender_prints_null() {
         let raw = "To: a@example.org\r\n\r\nhi\r\n";
@@ -441,6 +455,21 @@ mod tests {
         let json = serde_json::to_value(&template).unwrap();
         assert_eq!(json["from"], serde_json::Value::Null);
         assert_eq!(json["subject"], serde_json::Value::Null);
+        assert_eq!(json["date"], serde_json::Value::Null);
+        assert_eq!(json["messageId"], serde_json::Value::Null);
+    }
+
+    /// The JSON template carries the date and the Message-ID the text form
+    /// prints in the composed message's headers.
+    #[test]
+    fn a_template_carries_the_date_and_message_id_of_the_message() {
+        let raw = "Date: Mon, 01 Jan 2024 10:00:00 +0100\r\n\
+                   Message-ID: <c1@example.org>\r\nTo: a@example.org\r\n\r\nhi\r\n";
+        let template = MessageTemplateOutput::parse(raw.as_bytes()).unwrap();
+
+        let json = serde_json::to_value(&template).unwrap();
+        assert_eq!(json["date"], "2024-01-01T10:00:00+01:00");
+        assert_eq!(json["messageId"], "c1@example.org");
     }
 
     #[test]

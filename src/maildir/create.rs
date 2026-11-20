@@ -45,10 +45,10 @@ impl MaildirMailboxCreateCommand {
         // Maildir under a second copy of it.
         let target = client.store.resolve(&name.as_str().into());
         refuse_existing(Path::new(target.as_str()), &name)?;
-        client.create_maildir(name.clone())?;
+        client.create_maildir(name)?;
 
         printer.out(IdReceipt {
-            id: name,
+            id: target.as_str().to_owned(),
             done: "Maildir successfully created",
         })
     }

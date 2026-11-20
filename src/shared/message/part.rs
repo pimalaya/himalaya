@@ -257,12 +257,6 @@ pub fn role(part: &MimeEntity) -> PartRole {
 /// The pimdir mark rule (STORAGE Annex A.1): a disposition other than
 /// `inline` marks (RFC 2183 §2.8); with none, a part marks unless text,
 /// multipart or named by a `Content-ID`. Protocol parts never mark.
-#[cfg(any(
-    feature = "imap",
-    feature = "maildir",
-    feature = "mbox",
-    feature = "pimdir"
-))]
 pub fn marks_attachment(
     mime: &str,
     disposition: Option<&[u8]>,
@@ -282,12 +276,6 @@ pub fn marks_attachment(
 /// Whether the child at 1-based `position` of a multipart of `subtype` is
 /// an RFC 1847 protocol part: the signature of a signed message, or any
 /// child of an encrypted one.
-#[cfg(any(
-    feature = "imap",
-    feature = "maildir",
-    feature = "mbox",
-    feature = "pimdir"
-))]
 pub fn is_protocol_part(subtype: &[u8], position: usize) -> bool {
     subtype.eq_ignore_ascii_case(b"encrypted")
         || (subtype.eq_ignore_ascii_case(b"signed") && position > 1)
@@ -310,13 +298,11 @@ pub fn media_type(kind: &[u8], subtype: &[u8]) -> String {
 ///
 /// The leaves are the ones [`leaves`] walks, a `message/rfc822` part
 /// being one, so the parts of an attached message are not read.
-#[cfg(any(feature = "maildir", feature = "mbox", feature = "pimdir"))]
 pub fn has_attachment(message: &MimeCst) -> bool {
     part_has_attachment(&message.root, false)
 }
 
 /// Whether a part, or a leaf under it, marks its message.
-#[cfg(any(feature = "maildir", feature = "mbox", feature = "pimdir"))]
 fn part_has_attachment(part: &MimeEntity, is_protocol: bool) -> bool {
     let MimeBodyNode::Multipart(multipart) = &part.body else {
         return marks_attachment(

@@ -5,9 +5,12 @@
 use std::fmt;
 
 use anyhow::Result;
-use clap::Parser;
-use io_imap::client::ImapClient as _;
-use pimalaya_cli::{error::PartialOutcome, printer::Printer};
+use clap::{Parser, error::ErrorKind};
+use io_imap::{client::ImapClient as _, rfc3501::raw::ImapRaw};
+use pimalaya_cli::{
+    error::{PartialOutcome, usage_error},
+    printer::Printer,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -41,15 +44,20 @@ pub struct ImapRawCommand {
 }
 
 impl ImapRawCommand {
+    /// Refuses commands given on the command line whose tags the
+    /// exchange cannot wait on, before the session opens.
+    pub fn check(&self) -> Result<()> {
+        if self.command.raw.is_empty() {
+            return Ok(());
+        }
+
+        tagged(self.command.parse()?)?;
+        Ok(())
+    }
+
     /// Sends the commands and prints the responses.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
-        let mut command = self.command.parse()?;
-
-        // NOTE: io-imap rejects an unterminated command, so the CRLF the
-        // caller may have left off the last one is appended.
-        if !command.ends_with('\n') {
-            command.push_str("\r\n");
-        }
+        let command = tagged(self.command.parse()?)?;
 
         let responses = client.raw(command.as_bytes())?;
         let (events, output) = split_reply(&responses);
@@ -83,6 +91,22 @@ impl ImapRawCommand {
 
         Ok(())
     }
+}
+
+/// `command` terminated by CRLF, the last one appended when missing,
+/// refused `usage-invalid` unless each of its commands carries a tag of
+/// its own.
+fn tagged(mut command: String) -> Result<String> {
+    if !command.ends_with('\n') {
+        command.push_str("\r\n");
+    }
+
+    if let Err(err) = ImapRaw::new(command.as_bytes()) {
+        let err = clap::Error::raw(ErrorKind::ValueValidation, format!("{err}\n"));
+        return Err(usage_error(&err));
+    }
+
+    Ok(command)
 }
 
 /// The result of `imap raw`: the tagged completions, in the order the

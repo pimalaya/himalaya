@@ -183,21 +183,6 @@ pub fn resolve_account(
     Ok((config, name, account_config))
 }
 
-/// Meets a bare `himalaya`: the help when a configuration exists, the
-/// missing configuration otherwise, which a person meets as the welcome.
-pub fn meet_bare_invocation(config_paths: &[PathBuf]) -> Result<()> {
-    // NOTE: a broken file counts as a configuration, its error left to
-    // the first command reading it.
-    if let Err(err) = Config::load(config_paths)
-        && err.is::<ConfigMissingError>()
-    {
-        return Err(err);
-    }
-
-    Cli::command().print_help()?;
-    Ok(())
-}
-
 /// The welcome a person meets when no configuration exists at `path`:
 /// the commands creating it from `sample`, the shipped sample
 /// configuration, or downloading it without one, then `envelope list`.
@@ -327,7 +312,7 @@ impl Command {
             Self::Envelope(cmd) => run_shared(
                 printer,
                 session,
-                cmd.capabilities()?,
+                cmd.capabilities(printer.is_json())?,
                 false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
@@ -363,12 +348,14 @@ impl Command {
             Self::Vacation(cmd) => run_vacation(printer, session, cmd),
 
             #[cfg(feature = "imap")]
-            Self::Imap(cmd) => account.run(
-                printer,
-                &mut session.imap,
-                build_imap_client,
-                |printer, account, client| cmd.execute(printer, account, client),
-            ),
+            Self::Imap(cmd) => cmd.check().and_then(|()| {
+                account.run(
+                    printer,
+                    &mut session.imap,
+                    build_imap_client,
+                    |printer, account, client| cmd.execute(printer, account, client),
+                )
+            }),
             #[cfg(feature = "jmap")]
             Self::Jmap(cmd) => account.run(
                 printer,

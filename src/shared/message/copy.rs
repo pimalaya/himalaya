@@ -23,6 +23,9 @@ use crate::{
 ///
 /// Both mailboxes are resolved through the account's aliases. Copying
 /// across accounts or backends is out of scope.
+///
+/// An id the mailbox does not hold is an entry of `errors`, the other
+/// messages still acted on; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct MessageCopyCommand {
     #[command(flatten)]

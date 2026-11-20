@@ -84,8 +84,9 @@ fn a_failed_account_check_prints_its_report_and_exits_3() {
 
     assert_eq!(output.status.code(), Some(3), "{stdout}");
     let json: Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(json["backends"][0]["backend"], "maildir", "{json}");
-    assert_eq!(json["backends"][0]["ok"], false, "{json}");
+    let backends = &json["accounts"][0]["backends"];
+    assert_eq!(backends[0]["backend"], "maildir", "{json}");
+    assert_eq!(backends[0]["ok"], false, "{json}");
 }
 
 /// A write given one id the mailbox holds and one it does not prints its

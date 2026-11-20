@@ -23,6 +23,9 @@ use crate::{
 };
 
 /// Remove flags from messages, keeping the ones not named.
+///
+/// An id the mailbox does not hold is an entry of `errors`, the other
+/// messages still flagged; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct FlagRemoveCommand {
     #[command(flatten)]

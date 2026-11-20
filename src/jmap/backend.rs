@@ -7,7 +7,7 @@
 //! having mapped human names up front with
 //! [`JmapClient::resolve_mailbox_id`], so nothing here resolves a name.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveTime, TimeDelta};
@@ -277,20 +277,27 @@ impl JmapClient {
         })
     }
 
-    /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the
-    /// blob id and the mailboxes holding the email, then `Blob/download`.
+    /// Fetches one message's raw RFC 5322 bytes and its flags: `Email/get`
+    /// for the blob id, the keywords and the mailboxes holding the email,
+    /// then `Blob/download`.
     ///
     /// The id names the email account-wide, so an email `mailbox` does not
     /// hold is not found, as on the backends whose ids are the mailbox's.
     /// The mailbox is resolved through the listing only when it is not
     /// one of the email's ids already.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(
+        &mut self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         let output = self.email_get(
             vec![id.to_string()],
             JmapEmailGetOptions {
                 properties: Some(vec![
                     JmapEmailProperty::BlobId,
                     JmapEmailProperty::MailboxIds,
+                    JmapEmailProperty::Keywords,
                 ]),
                 ..Default::default()
             },
@@ -317,6 +324,10 @@ impl JmapClient {
         let blob_id = email
             .blob_id
             .ok_or_else(|| anyhow!("Email/get response did not include a blobId"))?;
+        let keywords = email.keywords.unwrap_or_default().into_iter();
+        let mut flags: BTreeSet<Flag> = keywords
+            .filter_map(|(keyword, set)| set.then(|| Flag::from_raw(keyword)))
+            .collect();
 
         let (template, account_id) = {
             let session = self
@@ -338,10 +349,11 @@ impl JmapClient {
         // separate `Email/set` here.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
+            flags.insert(seen.clone());
             self.store_keywords(&[id], &[seen], FlagOp::Add)?;
         }
 
-        Ok(raw)
+        Ok((raw, flags))
     }
 
     /// Uploads `raw` as a blob then imports it into `mailbox` with the
@@ -2075,11 +2087,14 @@ mod tests {
             let code = pimalaya_cli::error::code_of::<ErrorCode>(&err);
             assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
             assert!(err.to_string().contains("`sent`"), "{err}");
-            assert_eq!(calls[0][1]["properties"], json!(["blobId", "mailboxIds"]));
+            assert_eq!(
+                calls[0][1]["properties"],
+                json!(["blobId", "mailboxIds", "keywords"])
+            );
 
             let (url, server) = serve(vec![inbox_email()]);
             let mut client = client_at(&url);
-            let raw = client.get_message("I", "E1", false).unwrap();
+            let (raw, _) = client.get_message("I", "E1", false).unwrap();
             drop(client);
             server.join().unwrap();
             assert!(String::from_utf8(raw).unwrap().contains("/download/A/B1"));

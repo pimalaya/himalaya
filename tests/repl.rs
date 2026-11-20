@@ -145,10 +145,8 @@ fn a_version_line_prints_the_version() {
     let dir = TempDir::new().unwrap();
     let version = env!("CARGO_PKG_VERSION");
 
-    // The short version, then the long one after a command, named after
-    // the command as the command line names it.
     let (stdout, stderr) = run(dir.path(), &[], "-V\nenvelope list --version\n");
-    let expected = format!("himalaya {version}\nhimalaya-envelope-list v{version} ");
+    let expected = format!("himalaya {version}\nhimalaya v{version} ");
     assert!(stdout.starts_with(&expected), "{stdout}{stderr}");
     assert!(stdout.contains("\nbuild: "), "{stdout}");
 

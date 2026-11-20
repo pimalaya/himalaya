@@ -18,12 +18,6 @@ use mime::{
 
 /// Parses the header block of a raw message alone, its body left
 /// unsplit: what reading a field costs.
-#[cfg(any(
-    feature = "imap",
-    feature = "gmail",
-    feature = "maildir",
-    feature = "mbox"
-))]
 pub fn parse_headers(raw: &[u8]) -> mime::tree::cst::MimeCst<'_> {
     use mime::tree::{cst::MimeCst, parse::MimeParseOptions};
 

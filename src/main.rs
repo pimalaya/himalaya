@@ -7,19 +7,21 @@
 use std::process;
 
 use anyhow::Result;
+use clap::CommandFactory;
 use himalaya::{
     cli::{self, Cli, Command},
+    config::Config,
     error::{self, ErrorCode},
     session::{Session, SessionAccount},
 };
 use pimalaya_cli::{
-    clap::{args::LogFlags, parse},
+    clap::{args::LogFlags, meet_bare_invocation, parse},
     error::{EXIT_FAILURE, ErrorReport},
     log::Logger,
     printer::StdoutPrinter,
     welcome::{is_wanted, shipped_sample},
 };
-use pimalaya_config::toml::ConfigMissingError;
+use pimalaya_config::toml::{ConfigMissingError, TomlConfig};
 use simd_cpu::SimdCpu;
 
 fn main() {
@@ -63,7 +65,13 @@ fn execute(
     Logger::try_init(log)?;
 
     let Some(cmd) = cmd else {
-        return cli::meet_bare_invocation(account.config_paths);
+        let paths = account.config_paths;
+        let missing = || {
+            Config::load(paths)
+                .err()
+                .filter(|err| err.is::<ConfigMissingError>())
+        };
+        return meet_bare_invocation(&*printer, Cli::command(), missing);
     };
 
     #[cfg_attr(

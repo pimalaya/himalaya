@@ -27,6 +27,9 @@ use crate::{
 ///
 /// On an IMAP server without UIDPLUS, removing from the trash only flags
 /// the messages `\Deleted`, and a later expunge reclaims them.
+///
+/// An id the mailbox does not hold is an entry of `errors`, the other
+/// messages still acted on; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct MessageDeleteCommand {
     #[command(flatten)]
@@ -68,20 +71,11 @@ impl MessageDeleteCommand {
             } else {
                 DeleteAction::Flagged
             };
-            MessageDeleteOutput {
-                action,
-                count,
-                queued,
-                errors: outcome.errors,
-            }
+            MessageDeleteOutput::new(action, count, &ids, queued, outcome.errors)
         } else {
             let outcome = client.move_messages(&current_id, &trash_id, &ids)?;
-            MessageDeleteOutput {
-                action: DeleteAction::MovedToTrash,
-                count: outcome.value,
-                queued,
-                errors: outcome.errors,
-            }
+            let action = DeleteAction::MovedToTrash;
+            MessageDeleteOutput::new(action, outcome.value, &ids, queued, outcome.errors)
         };
 
         printer.out(&output)?;
@@ -112,10 +106,39 @@ pub(crate) struct MessageDeleteOutput {
     action: DeleteAction,
     /// How many messages were acted on.
     count: usize,
+    /// The ids of the messages acted on, as given and in that order, those
+    /// of `errors` left out.
+    ids: Vec<String>,
     /// Whether a sync engine applies the write later rather than now.
     queued: bool,
     /// The error of each message not acted on, in the order given.
     errors: Vec<ItemError>,
+}
+
+impl MessageDeleteOutput {
+    /// The output of `action` on `count` of `given`, the ids `errors`
+    /// names left out of `ids`.
+    fn new(
+        action: DeleteAction,
+        count: usize,
+        given: &[&str],
+        queued: bool,
+        errors: Vec<ItemError>,
+    ) -> Self {
+        let failed = |id: &&str| errors.iter().any(|err| err.id.as_deref() == Some(*id));
+        let ids = given
+            .iter()
+            .filter(|id| !failed(id))
+            .map(ToString::to_string);
+
+        Self {
+            action,
+            count,
+            ids: ids.collect(),
+            queued,
+            errors,
+        }
+    }
 }
 
 /// What `message delete` did to the messages it was given.
@@ -176,6 +199,7 @@ mod tests {
         MessageDeleteOutput {
             action: DeleteAction::MovedToTrash,
             count: 2,
+            ids: vec!["1".into(), "2".into()],
             queued,
             errors: Vec::new(),
         }
@@ -196,7 +220,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&queued).unwrap(),
-            r#"{"action":"moved-to-trash","count":2,"queued":true,"errors":[]}"#
+            r#"{"action":"moved-to-trash","count":2,"ids":["1","2"],"queued":true,"errors":[]}"#
         );
     }
 

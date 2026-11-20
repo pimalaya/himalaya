@@ -14,29 +14,39 @@ use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::pimdir::client::PimdirClient;
+use crate::pimdir::{
+    client::{PimdirClient, row_not_found, store_reset},
+    queue::list::PimdirQueueRow,
+};
 
 /// Show where one queue row stands, by the id `pimdir message add`,
 /// `pimdir message send` or `pimdir mailbox create`, `rename` or `delete`
 /// printed.
 ///
-/// A row is `pending` until the sync engine applies it, `parked` when the
-/// engine gave up on it (with why), `unconfirmed` when the engine sent its
-/// request and cannot tell whether it took effect (a send or a mailbox
-/// change that may have happened: it waits for the engine to confirm it,
-/// or for a cancellation), and `applied` once done, a message sent or a
-/// mailbox created, renamed or deleted included, with the id of the
-/// message it acted on (the one an add created). An applied row lists the
-/// refusals standing on that message: a server that refused for good the
-/// change the row led to, with its reason, held until the message is
-/// changed again or removed. The store keeps what became of an applied row
-/// for seven days, and while a refusal stands on its message, under the
-/// mailbox it was queued on, or under none once that mailbox is gone; past
-/// that, and for a cancelled row, the state is `unknown`.
+/// A row still queued prints as `pimdir queue list` prints it, then where
+/// it stands. A row is `pending` until the sync engine applies it, `parked`
+/// when the engine gave up on it (with why), `unconfirmed` when the engine
+/// sent its request and cannot tell whether it took effect (a send or a
+/// mailbox change that may have happened: it waits for the engine to
+/// confirm it, or for a cancellation), and `applied` once done, a message
+/// sent or a mailbox created, renamed or deleted included, with the id of
+/// the message it acted on (the one an add created) as `itemId`. An applied
+/// row lists the refusals standing on that message: a server that refused
+/// for good the change the row led to, with its reason, held until the
+/// message is changed again or removed. The store keeps what became of an
+/// applied row for seven days, and while a refusal stands on its message,
+/// under the mailbox it was queued on, or under none once that mailbox is
+/// gone.
 ///
-/// JSON output: `{"row", "handle", "state", "collection", "kind",
-/// "attempts", "error", "appliedAt", "seq", "refusals": [{"collection",
-/// "source", "reason", "refusedAt"}]}`.
+/// A row the account's queue does not hold, cancelled or applied long ago,
+/// fails coded `row-not-found`; a handle another store answered, a copy
+/// restored since, fails coded `store-reset`.
+///
+/// JSON output: the row as `pimdir queue list` prints it, `{"row",
+/// "handle", "kind", "collection", "linkId", "itemId", "producer",
+/// "queuedAt", "attempts", "unconfirmed", "error", "subject"}`, each `null`
+/// that an applied row no longer carries, then `{"state", "appliedAt",
+/// "refusals": [{"collection", "source", "reason", "refusedAt"}]}`.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueShowCommand {
     /// The handle of the queue row, as a receipt prints it, or its bare
@@ -50,7 +60,8 @@ impl PimdirQueueShowCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut PimdirClient) -> Result<()> {
         let status = client.queue_row(&self.id)?;
         let handle = client.named(&self.id)?;
-        printer.out(PimdirQueueShowOutput::new(&handle, status))
+        let listed = client.listed_row(&handle, &status)?;
+        printer.out(PimdirQueueShowOutput::new(&handle, status, listed)?)
     }
 }
 
@@ -67,17 +78,13 @@ pub enum PimdirQueueState {
     /// cancellation; `error` holds what the engine recorded.
     Unconfirmed,
     /// Applied or performed by the sync engine (a message sent, a mailbox
-    /// created, renamed or deleted); `seq` is the message it acted on, and
-    /// `refusals` the servers that refused the change it led to.
+    /// created, renamed or deleted); `itemId` is the message it acted on,
+    /// and `refusals` the servers that refused the change it led to.
     Applied,
-    /// Neither queued nor known applied: cancelled, or applied long ago.
-    Unknown,
-    /// The store is not the one the row was queued in, a copy restored
-    /// since, where the id may name another row: nothing is read of it.
-    Reset,
 }
 
-/// The `pimdir queue show` output.
+/// The `pimdir queue show` output: the row `pimdir queue list` prints,
+/// then what only a read carries.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueShowOutput {
@@ -87,25 +94,38 @@ pub struct PimdirQueueShowOutput {
     /// §4.5): the handle given, or the bare id given named under this
     /// store's identity.
     pub handle: String,
-    /// Where it stands.
-    pub state: PimdirQueueState,
-    /// The collection it is anchored on: `null` when unknown, and for an
-    /// applied row whose mailbox is gone since.
-    pub collection: Option<String>,
-    /// The action kind (`add`, `submit`…), while queued.
+    /// The row's action as the store holds it, `null` once applied.
     pub kind: Option<String>,
-    /// Apply attempts so far, while queued.
-    pub attempts: Option<i64>,
+    /// The mailbox the row is queued on: `null` for an applied row whose
+    /// mailbox is gone since.
+    pub collection: Option<String>,
+    /// The link id of the message the row creates, `null` when it creates
+    /// none or is applied.
+    pub link_id: Option<String>,
+    /// The id of the stored message the row addresses, or of the one an
+    /// applied row acted on (the one an add created), as `envelope list`
+    /// prints it; `null` when there is none.
+    pub item_id: Option<String>,
+    /// The process that staged the row, `null` once applied.
+    pub producer: Option<String>,
+    /// When the row was appended, `null` once applied.
+    pub queued_at: Option<String>,
+    /// How many times the sync engine tried the row, `null` once applied.
+    pub attempts: Option<u64>,
+    /// Whether the row's outcome is unknown.
+    pub unconfirmed: bool,
     /// Why the row was parked, or what the sync engine recorded of an
     /// unconfirmed one.
     pub error: Option<String>,
+    /// The subject of the body the row pins, else of the message it
+    /// addresses, `null` when there is none to read or once applied.
+    pub subject: Option<String>,
+    /// Where it stands.
+    pub state: PimdirQueueState,
     /// When the row was applied, RFC 3339.
     pub applied_at: Option<String>,
-    /// The id of the message an applied row acted on (the one an add
-    /// created), as `envelope list` prints it.
-    pub seq: Option<i64>,
-    /// The refusals standing on that message, empty but for an applied
-    /// row.
+    /// The refusals standing on the message an applied row acted on, empty
+    /// but for an applied row.
     pub refusals: Vec<PimdirQueueRefusal>,
 }
 
@@ -138,56 +158,89 @@ impl From<PimdirReceiptRefusal> for PimdirQueueRefusal {
 }
 
 impl PimdirQueueShowOutput {
-    /// Projects io-pimdir's status of the row `handle` names.
-    pub fn new(handle: &PimdirActionHandle, status: PimdirActionStatus) -> Self {
+    /// Projects io-pimdir's status of the row `handle` names over
+    /// `listed`, the row `pimdir queue list` prints while it is queued.
+    ///
+    /// A row neither queued nor known applied fails `row-not-found`, and
+    /// one of another store `store-reset`.
+    pub fn new(
+        handle: &PimdirActionHandle,
+        status: PimdirActionStatus,
+        listed: Option<PimdirQueueRow>,
+    ) -> Result<Self> {
         let row = Self {
             row: handle.id,
             handle: handle.to_string(),
-            state: PimdirQueueState::Unknown,
-            collection: None,
             kind: None,
+            collection: None,
+            link_id: None,
+            item_id: None,
+            producer: None,
+            queued_at: None,
             attempts: None,
+            unconfirmed: false,
             error: None,
+            subject: None,
+            state: PimdirQueueState::Pending,
             applied_at: None,
-            seq: None,
             refusals: Vec::new(),
         };
 
-        match status {
+        let row = match listed {
+            Some(listed) => Self {
+                kind: Some(listed.kind),
+                collection: Some(listed.collection),
+                link_id: listed.link_id,
+                item_id: listed.item_id,
+                producer: Some(listed.producer),
+                queued_at: Some(listed.queued_at),
+                attempts: Some(listed.attempts),
+                unconfirmed: listed.unconfirmed,
+                error: listed.error,
+                subject: listed.subject,
+                ..row
+            },
+            None => row,
+        };
+
+        let attempts = |attempts: i64| Some(u64::try_from(attempts).unwrap_or_default());
+
+        Ok(match status {
             PimdirActionStatus::Pending {
                 collection,
                 kind,
-                attempts,
+                attempts: tried,
             } => Self {
                 state: PimdirQueueState::Pending,
                 collection: Some(collection),
                 kind: Some(kind),
-                attempts: Some(attempts),
+                attempts: attempts(tried),
                 ..row
             },
             PimdirActionStatus::Parked {
                 collection,
                 kind,
-                attempts,
+                attempts: tried,
                 error,
             } => Self {
                 state: PimdirQueueState::Parked,
                 collection: Some(collection),
                 kind: Some(kind),
-                attempts: Some(attempts),
+                attempts: attempts(tried),
                 error: Some(error),
                 ..row
             },
             PimdirActionStatus::Unconfirmed {
                 collection,
                 kind,
-                attempts,
+                attempts: tried,
                 detail,
             } => Self {
                 state: PimdirQueueState::Unconfirmed,
                 collection: Some(collection),
                 kind: Some(kind),
-                attempts: Some(attempts),
+                attempts: attempts(tried),
+                unconfirmed: true,
                 error: Some(detail),
                 ..row
             },
@@ -199,17 +252,14 @@ impl PimdirQueueShowOutput {
             } => Self {
                 state: PimdirQueueState::Applied,
                 collection,
+                item_id: seq.map(|seq| seq.to_string()),
                 applied_at: Some(applied_at),
-                seq,
                 refusals: refusals.into_iter().map(Into::into).collect(),
                 ..row
             },
-            PimdirActionStatus::Unknown => row,
-            PimdirActionStatus::Reset => Self {
-                state: PimdirQueueState::Reset,
-                ..row
-            },
-        }
+            PimdirActionStatus::Unknown => return Err(row_not_found(handle)),
+            PimdirActionStatus::Reset => return Err(store_reset(handle)),
+        })
     }
 }
 
@@ -240,8 +290,8 @@ impl fmt::Display for PimdirQueueShowOutput {
                     Some(_) => write!(f, "Row {id} was applied in {collection}")?,
                     None => write!(f, "Row {id} was applied in a mailbox deleted since")?,
                 }
-                if let Some(seq) = self.seq {
-                    write!(f, ", on message {seq}")?;
+                if let Some(item) = &self.item_id {
+                    write!(f, ", on message {}", sanitize::text(item))?;
                 }
                 writeln!(f)?;
                 for refusal in &self.refusals {
@@ -256,15 +306,6 @@ impl fmt::Display for PimdirQueueShowOutput {
                 }
                 Ok(())
             }
-            PimdirQueueState::Unknown => writeln!(
-                f,
-                "Row {id} is neither queued nor known applied: cancelled, or applied long ago"
-            ),
-            PimdirQueueState::Reset => writeln!(
-                f,
-                "Row {id} was queued in another store: a copy restored since, where this id \
-                 may name another row"
-            ),
         }
     }
 }
@@ -272,8 +313,9 @@ impl fmt::Display for PimdirQueueShowOutput {
 #[cfg(test)]
 mod tests {
     use io_pimdir::codec::PimdirStoreIdentity;
+    use pimalaya_cli::error::code_of;
 
-    use super::*;
+    use crate::{error::ErrorCode, pimdir::queue::show::*};
 
     const STORE: &str = "e2646df031cd876334410c4df14ebd86";
 
@@ -289,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn an_applied_add_prints_its_seq() {
+    fn an_applied_add_prints_the_message_it_created() {
         let row = PimdirQueueShowOutput::new(
             &handle(12),
             PimdirActionStatus::Applied {
@@ -298,23 +340,64 @@ mod tests {
                 seq: Some(42),
                 refusals: Vec::new(),
             },
-        );
+            None,
+        )
+        .unwrap();
         let json = serde_json::to_value(&row).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
                 "row": 12,
                 "handle": format!("{STORE}.1.12"),
-                "state": "applied",
-                "collection": "imap/Drafts",
                 "kind": null,
+                "collection": "imap/Drafts",
+                "linkId": null,
+                "itemId": "42",
+                "producer": null,
+                "queuedAt": null,
                 "attempts": null,
+                "unconfirmed": false,
                 "error": null,
+                "subject": null,
+                "state": "applied",
                 "appliedAt": "2026-10-04T20:00:00Z",
-                "seq": 42,
                 "refusals": [],
             })
         );
+    }
+
+    /// A row still queued prints the keys `pimdir queue list` prints for
+    /// it, then where it stands.
+    #[test]
+    fn a_queued_row_prints_its_list_row() {
+        let listed = PimdirQueueRow {
+            row: 3,
+            handle: format!("{STORE}.1.3"),
+            kind: "set-flags".into(),
+            collection: "imap/INBOX".into(),
+            link_id: None,
+            item_id: Some("7".into()),
+            producer: "himalaya".into(),
+            queued_at: "2026-11-15T09:00:00Z".into(),
+            attempts: 0,
+            unconfirmed: false,
+            error: None,
+            subject: Some("Report".into()),
+        };
+        let status = PimdirActionStatus::Pending {
+            collection: "imap/INBOX".into(),
+            kind: "set-flags".into(),
+            attempts: 0,
+        };
+
+        let row = PimdirQueueShowOutput::new(&handle(3), status, Some(listed.clone())).unwrap();
+        let json = serde_json::to_value(&row).unwrap();
+        let listed = serde_json::to_value(&listed).unwrap();
+
+        for (key, value) in listed.as_object().unwrap() {
+            assert_eq!(&json[key], value, "{key}");
+        }
+        assert_eq!(json["state"], "pending");
     }
 
     /// An applied row whose change a server refused for good shows applied,
@@ -335,7 +418,9 @@ mod tests {
                     refused_at: "2026-11-15T20:05:00.000Z".into(),
                 }],
             },
-        );
+            None,
+        )
+        .unwrap();
 
         let json = serde_json::to_value(&row).unwrap();
         assert_eq!(json["state"], "applied");
@@ -371,10 +456,13 @@ mod tests {
                 attempts: 1,
                 detail: "connection lost after DATA".into(),
             },
-        );
+            None,
+        )
+        .unwrap();
 
         let json = serde_json::to_value(&row).unwrap();
         assert_eq!(json["state"], "unconfirmed");
+        assert_eq!(json["unconfirmed"], true);
         assert_eq!(json["kind"], "submit");
         assert_eq!(json["error"], "connection lost after DATA");
 
@@ -396,7 +484,9 @@ mod tests {
                 seq: None,
                 refusals: Vec::new(),
             },
-        );
+            None,
+        )
+        .unwrap();
 
         let json = serde_json::to_value(&row).unwrap();
         assert_eq!(json["state"], "applied");
@@ -404,27 +494,16 @@ mod tests {
         assert!(row.to_string().contains("deleted since"), "{row}");
     }
 
+    /// A row the queue does not hold is no state but a failure, and a
+    /// handle of another store fails apart.
     #[test]
-    fn an_unknown_row_prints_its_id_and_state() {
-        let json = serde_json::to_value(PimdirQueueShowOutput::new(
-            &handle(7),
-            PimdirActionStatus::Unknown,
-        ))
-        .unwrap();
-        assert_eq!(
-            json,
-            serde_json::json!({
-                "row": 7,
-                "handle": format!("{STORE}.1.7"),
-                "state": "unknown",
-                "collection": null,
-                "kind": null,
-                "attempts": null,
-                "error": null,
-                "appliedAt": null,
-                "seq": null,
-                "refusals": [],
-            })
-        );
+    fn an_unknown_row_is_not_found() {
+        let unknown = PimdirActionStatus::Unknown;
+        let err = PimdirQueueShowOutput::new(&handle(7), unknown, None).unwrap_err();
+        assert_eq!(code_of(&err), Some(ErrorCode::RowNotFound), "{err}");
+
+        let reset = PimdirActionStatus::Reset;
+        let err = PimdirQueueShowOutput::new(&handle(7), reset, None).unwrap_err();
+        assert_eq!(code_of(&err), Some(ErrorCode::StoreReset), "{err}");
     }
 }

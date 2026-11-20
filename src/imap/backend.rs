@@ -426,9 +426,15 @@ impl ImapClient {
         Ok(found_uids(ids, &present))
     }
 
-    /// Fetches one message's raw RFC 5322 bytes, marking it seen only
-    /// when asked, the mailbox named by role as a listing names it.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    /// Fetches one message's raw RFC 5322 bytes and its flags, marking it
+    /// seen only when asked, the mailbox named by role as a listing names
+    /// it.
+    pub fn get_message(
+        &mut self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         let mailbox = self.resolve_mailbox_id(mailbox)?;
         let mailbox = mailbox.as_str();
         let sequence_set = parse_uids(&[id])?;
@@ -437,12 +443,14 @@ impl ImapClient {
 
         // NOTE: `BODY[]` sets `\Seen` server-side as a side effect, so
         // `--seen` costs no extra round trip where `BODY.PEEK[]` does not.
-        let item_names =
-            MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
+        let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
+            MessageDataItemName::Flags,
+            MessageDataItemName::BodyExt {
                 section: None,
                 partial: None,
                 peek: !seen,
-            }]);
+            },
+        ]);
         let output = self.fetch(
             sequence_set,
             item_names,
@@ -455,16 +463,27 @@ impl ImapClient {
         let data = output_data("FETCH", output);
         let found = !data.is_empty();
 
-        let body = data
-            .into_values()
-            .flat_map(|items| items.into_inner().into_iter())
-            .find_map(|item| match item {
-                MessageDataItem::BodyExt { data, .. } => data.0.map(|d| d.as_ref().to_vec()),
-                _ => None,
-            });
+        let mut body = None;
+        let mut flags = BTreeSet::new();
+
+        for item in data.into_values().flat_map(|items| items.into_inner()) {
+            match item {
+                MessageDataItem::BodyExt { data, .. } if body.is_none() => {
+                    body = data.0.map(|d| d.as_ref().to_vec());
+                }
+                MessageDataItem::Flags(fs) => {
+                    flags = fs.into_iter().filter_map(flag_from_fetch).collect();
+                }
+                _ => {}
+            }
+        }
+
+        if seen {
+            flags.insert(Flag::from_iana(IanaFlag::Seen));
+        }
 
         match body {
-            Some(body) => Ok(body),
+            Some(body) => Ok((body, flags)),
             None if unreadable => {
                 let message = format!(
                     "Cannot read message `{id}` of mailbox `{mailbox}`: its FETCH response does not decode"

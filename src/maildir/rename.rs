@@ -65,10 +65,10 @@ impl MaildirMailboxRenameCommand {
         // root, so the root-relative names go through: absolute paths
         // would work under a second copy of the root.
         let from = client.relative_name(&maildir);
-        client.rename_maildir(from, to.clone())?;
+        client.rename_maildir(from, to)?;
 
         printer.out(IdReceipt {
-            id: to,
+            id: target.as_str().to_owned(),
             done: "Maildir successfully renamed",
         })
     }

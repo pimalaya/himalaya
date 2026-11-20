@@ -398,9 +398,8 @@ pub fn write_item_errors(
     lines.write_after(f)
 }
 
-/// The refusal of a pimdir page token the command did not print, under
+/// The refusal of a page token the command did not print, under
 /// `page-token-invalid`.
-#[cfg(feature = "pimdir")]
 pub fn page_token_invalid(token: &str) -> Error {
     let message = format!("Invalid page token `{token}`: pass a `nextPage` value as printed");
     CodedError::new(ErrorCode::PageTokenInvalid, message).into()

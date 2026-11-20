@@ -4,8 +4,6 @@
 
 use serde::Deserialize;
 
-use crate::config::PLAIN_TEXT;
-
 /// Envelope-level rendering options.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -29,39 +27,24 @@ pub struct EnvelopeListConfig {
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
     pub page_size: Option<u32>,
-    /// The v2 `envelope.list.table` table, refused by name.
-    #[serde(default, rename = "table")]
-    _table: Option<EnvelopeTableRemoved>,
-}
-
-pimalaya_config::removed_key! {
-    /// The v2 `envelope.list.table` table, at the top level or in an
-    /// account.
-    pub EnvelopeTableRemoved: Table {
-        name: "envelope.list.table",
-        why: PLAIN_TEXT,
-        instead: "delete it",
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
 
-    /// The v2 `envelope.list.table` block is refused by name, pointing at
-    /// the migration guide, at the root and in an account, while
-    /// `envelope.list` still refuses an unknown key of its own, and a
-    /// `mailbox` colour key stays refused.
+    /// The v2 `envelope.list.table` block is an unknown key like any
+    /// other, at the root and in an account, as is an unknown key of
+    /// `envelope.list` and a `mailbox` colour key.
     #[test]
-    fn envelope_table_is_refused_naming_migration() {
+    fn envelope_table_is_an_unknown_key() {
         let root = "[envelope.list.table]\nunseen-char = \"N\"\n[accounts.example]\n";
         let account = "[accounts.example]\nenvelope.list.table.flagged-char = \"F\"\n";
 
         for toml in [root, account] {
             let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-            let sentence = "The `envelope.list.table` table is removed, the output being \
-                            plain text: delete it, see MIGRATION.md";
-            assert!(err.contains(sentence), "{err}");
+            assert!(err.contains("unknown field `table`"), "{err}");
+            assert!(!err.contains("MIGRATION.md"), "{err}");
         }
 
         let toml = "[accounts.example]\nenvelope.list.datetime-fnt = \"%F\"\n";

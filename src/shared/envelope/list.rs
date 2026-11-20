@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeSet, fmt};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
 use pimalaya_cli::{
@@ -25,13 +25,16 @@ use crate::{
         flag::Flag,
         outcome::Outcome,
     },
-    error::{ItemError, partial_when},
+    error::{ItemError, page_token_invalid, partial_when},
     shared::{client::EmailClient, mailbox::arg::MailboxArg},
 };
 
 /// List the envelopes of a mailbox, most recent first.
 ///
 /// `envelope search` is the same listing with a filter and a sort.
+///
+/// A message the listing cannot read is an entry of `errors`, the rest
+/// of the page still listed; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct EnvelopeListCommand {
     #[command(flatten)]
@@ -39,7 +42,7 @@ pub struct EnvelopeListCommand {
     /// Page number, starting at 1, which holds the most recent
     /// envelopes.
     #[arg(long, short = 'p')]
-    #[arg(value_name = "N", default_value = "1")]
+    #[arg(value_name = "N", default_value = "1", conflicts_with = "page_token")]
     #[arg(value_parser = clap::value_parser!(u32).range(1..))]
     pub page: u32,
     /// Maximum number of envelopes per page.
@@ -74,7 +77,7 @@ impl EnvelopeListCommand {
                 .parse()
                 .ok()
                 .filter(|page: &u32| *page > 0)
-                .with_context(|| format!("Invalid page token {token}"))?,
+                .ok_or_else(|| page_token_invalid(token))?,
             None => self.page,
         };
         let page_size = self

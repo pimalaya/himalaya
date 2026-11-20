@@ -151,10 +151,9 @@ impl AccountConfig {
     /// The error of account `name` where nothing matches `backend`, the
     /// caller being able to use `supported` alone.
     ///
-    /// Names the v1 `backend` table or the removed `m2dir` block when
-    /// present, it being the likely cause. A `--backend` naming a block the
-    /// account lacks is refused under `capability-missing`, as the resolver
-    /// refuses a verb the filter leaves unserved.
+    /// A `--backend` naming a block the account lacks is refused under
+    /// `capability-missing`, as the resolver refuses a verb the filter
+    /// leaves unserved.
     pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
         // NOTE: a block of a backend this build leaves out loads, so one
         // file serves every build; using it names the cargo feature.
@@ -188,16 +187,6 @@ impl AccountConfig {
                 (reason, false)
             }
             backend => (format!("Account `{name}` has no `{backend}` block"), true),
-        };
-
-        let reason = if self.backend.is_some() {
-            format!("{reason}: its v1 `backend` table is ignored since v2, see MIGRATION.md")
-        } else if self.m2dir.is_some() {
-            format!(
-                "{reason}: its `m2dir` block is ignored since v3 removed m2dir, see MIGRATION.md"
-            )
-        } else {
-            reason
         };
 
         if missing {

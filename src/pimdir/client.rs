@@ -427,7 +427,7 @@ pub fn uncancellable(handle: &PimdirActionHandle, status: &PimdirActionStatus) -
 
 /// The refusal of a handle another store answered, a copy restored since,
 /// whose row id may name another row of this one.
-fn store_reset(handle: &PimdirActionHandle) -> anyhow::Error {
+pub(crate) fn store_reset(handle: &PimdirActionHandle) -> anyhow::Error {
     let message = format!(
         "Row {handle} was queued in another pimdir store than this one, a copy \
          restored since: nothing was done with the row"
@@ -436,7 +436,7 @@ fn store_reset(handle: &PimdirActionHandle) -> anyhow::Error {
 }
 
 /// The refusal of a queue row the account's queue does not hold.
-fn row_not_found(handle: &PimdirActionHandle) -> anyhow::Error {
+pub(crate) fn row_not_found(handle: &PimdirActionHandle) -> anyhow::Error {
     let message = format!(
         "No queued action with row {handle} in this account's queue; it may have been synced already"
     );

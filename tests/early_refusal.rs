@@ -42,6 +42,8 @@ fn a_value_the_command_refuses_is_refused_before_the_session() {
     for args in [
         &["imap", "fetch", "-m", "INBOX", "abc"][..],
         &["imap", "store", "abc", "-f", "\\Seen"],
+        &["imap", "raw", "--", "NOOP"],
+        &["imap", "raw", "--", "a1 NOOP\\na1 NOOP"],
         &["smtp", "send", "-f", "t@example.org", "-t", "b@example.org"],
         &[
             "smtp",

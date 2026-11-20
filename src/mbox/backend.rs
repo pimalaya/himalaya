@@ -278,32 +278,43 @@ impl MboxClient {
         Ok(())
     }
 
-    /// Reads one message's raw RFC 5322 bytes, unquoted, from `mailbox`,
-    /// without the fields the store owns: the flag fields, which the
-    /// flags render, Thunderbird's status fields, and the `Content-Length`
-    /// of the mboxcl variants.
+    /// Reads one message's raw RFC 5322 bytes, unquoted, and its flags
+    /// from `mailbox`, the bytes without the fields the store owns: the
+    /// flag fields, which the flags render, Thunderbird's status fields,
+    /// and the `Content-Length` of the mboxcl variants.
     ///
     /// An index another client made stale is rebuilt and the read tried
     /// once more.
-    pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(
+        &self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         let path = self.open_mbox(mailbox)?;
         let (index, _) = self.index(&path, false)?;
+        let flags_of = |entry: &MboxEntry| -> BTreeSet<Flag> {
+            entry.flags.iter().filter_map(flag_from_mbox).collect()
+        };
 
-        let contents = match self.read(&path, find(&index, id, &path)?) {
+        let entry = find(&index, id, &path)?;
+        let (contents, mut flags) = match self.read(&path, entry) {
             Err(err) if is_stale(&err) => {
                 let (index, _) = self.index(&path, true)?;
-                self.read(&path, find(&index, id, &path)?)?
+                let entry = find(&index, id, &path)?;
+                (self.read(&path, entry)?, flags_of(entry))
             }
-            result => result?,
+            result => (result?, flags_of(entry)),
         };
         let contents = strip_store_fields(&contents, self.format.has_content_length());
 
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
+            flags.insert(seen.clone());
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
         }
 
-        Ok(contents)
+        Ok((contents, flags))
     }
 
     /// Appends `raw` to `mailbox` with `flags`, returning its id.
@@ -1056,7 +1067,7 @@ mod tests {
             ];
             let id = client.add_message("A", &flags, MESSAGE.to_vec()).unwrap();
 
-            assert_eq!(client.get_message("A", &id, false).unwrap(), MESSAGE);
+            assert_eq!(client.get_message("A", &id, false).unwrap().0, MESSAGE);
         }
     }
 
@@ -1374,7 +1385,7 @@ mod tests {
             .id
             .clone();
 
-        assert_eq!(client.get_message("T", &id, false).unwrap(), MESSAGE);
+        assert_eq!(client.get_message("T", &id, false).unwrap().0, MESSAGE);
 
         let seen = [Flag::from_iana(IanaFlag::Seen)];
         client

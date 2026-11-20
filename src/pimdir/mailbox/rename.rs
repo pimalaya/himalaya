@@ -43,6 +43,7 @@ impl PimdirMailboxRenameCommand {
         let renamed = client.rename_mailbox(&mailbox, &self.name)?;
 
         printer.out(PimdirMailboxRenameOutput {
+            id: renamed.mailbox.unwrap_or_else(|| mailbox.clone()),
             row: renamed.queue_id.id,
             handle: renamed.queue_id.to_string(),
             mailbox,
@@ -56,6 +57,9 @@ impl PimdirMailboxRenameCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirMailboxRenameOutput {
+    /// The id of the mailbox renamed, which it keeps until the sync
+    /// performing the row brings the new name down.
+    pub id: String,
     /// The `collection-rename` row.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE

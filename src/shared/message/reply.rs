@@ -138,7 +138,7 @@ impl MessageReplyCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let source = client.get_message(&mailbox, &self.id, false)?;
+        let source = client.get_message(&mailbox, &self.id, false)?.0;
 
         let (from, from_name) = account.resolve_from(self.from.as_deref());
         let own: Vec<&str> = account

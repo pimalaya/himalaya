@@ -23,6 +23,9 @@ use crate::{
 };
 
 /// Add flags to messages, keeping the ones already set.
+///
+/// An id the mailbox does not hold is an entry of `errors`, the other
+/// messages still flagged; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct FlagAddCommand {
     #[command(flatten)]

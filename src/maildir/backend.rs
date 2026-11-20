@@ -6,7 +6,11 @@
 //! Each method takes and returns the CLI's own [`crate::email`] types, so
 //! the work here is converting between those and io-maildir's.
 
-use std::{collections::HashSet, fs, path::Path};
+use std::{
+    collections::{BTreeSet, HashSet},
+    fs,
+    path::Path,
+};
 
 use crate::{
     email::{
@@ -213,8 +217,14 @@ impl MaildirClient {
         })
     }
 
-    /// Reads one message's raw RFC 5322 bytes from `mailbox`.
-    pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    /// Reads one message's raw RFC 5322 bytes and its flags from
+    /// `mailbox`.
+    pub fn get_message(
+        &self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entry = match self.get(maildir.clone(), id) {
             Ok(entry) => entry,
@@ -229,15 +239,17 @@ impl MaildirClient {
             Err(err) => return Err(err.into()),
         };
         let raw = entry.contents().to_vec();
+        let mut flags: BTreeSet<Flag> = entry.flags().iter().map(flag_from_maildir).collect();
 
         // NOTE: reading the file never renames it, so `--seen` costs the
         // rename that adds the `S` flag.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
+            flags.insert(seen.clone());
             self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
         }
 
-        Ok(raw)
+        Ok((raw, flags))
     }
 
     /// Stores `raw` under `mailbox`'s `cur/` with `flags`, returning the

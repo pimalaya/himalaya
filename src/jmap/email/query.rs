@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use io_jmap::{
     rfc8620::filter::JmapFilter,
@@ -26,7 +26,7 @@ use serde_json::{Map, Value};
 use crate::{
     account::context::Account,
     backend::Backend,
-    error::{ErrorCode, ItemError, partial_when},
+    error::{ErrorCode, ItemError, page_token_invalid, partial_when},
     jmap::{
         backend::{envelope_from, not_found_errors, parse_rfc3339, query_page_follows},
         client::JmapClient,
@@ -90,6 +90,7 @@ pub struct JmapEmailQueryCommand {
     pub page_size: u64,
     /// Page index, starting from 1.
     #[arg(long, short, value_name = "N", default_value = "1")]
+    #[arg(conflicts_with = "page_token")]
     pub page: u64,
     #[command(flatten)]
     pub page_token: PageTokenArg,
@@ -109,7 +110,7 @@ impl JmapEmailQueryCommand {
                 .parse()
                 .ok()
                 .filter(|page: &u64| *page > 0)
-                .with_context(|| format!("Invalid page token {token}"))?,
+                .ok_or_else(|| page_token_invalid(token))?,
             None => self.page.max(1),
         };
 

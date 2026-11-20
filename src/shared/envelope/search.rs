@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use ariadne::{Config, IndexType, Label, Report, ReportKind, Source};
 use chumsky::error::{Rich, RichPattern, RichReason};
 use clap::Parser;
@@ -19,7 +19,7 @@ use crate::{
         outcome::Outcome,
         search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
     },
-    error::{ErrorCode, partial_when},
+    error::{ErrorCode, page_token_invalid, partial_when},
     shared::{client::EmailClient, envelope::list::EnvelopeListOutput, mailbox::arg::MailboxArg},
 };
 
@@ -37,13 +37,16 @@ use crate::{
 /// A clause the backend cannot search is refused with `search-unsupported`,
 /// never dropped: every flag and header on Microsoft Graph, `flag answered` and keywords
 /// on Gmail, `attachment` on IMAP.
+///
+/// A message the listing cannot read is an entry of `errors`, the rest
+/// of the page still listed; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct EnvelopeSearchCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
     /// Page number, starting at 1.
     #[arg(long, short = 'p')]
-    #[arg(value_name = "N", default_value = "1")]
+    #[arg(value_name = "N", default_value = "1", conflicts_with = "page_token")]
     #[arg(value_parser = clap::value_parser!(u32).range(1..))]
     pub page: u32,
     /// Maximum number of envelopes per page.
@@ -112,11 +115,13 @@ pub struct EnvelopeSearchCommand {
 
 impl EnvelopeSearchCommand {
     /// What the search reaches: `envelope.search` and the options its
-    /// query uses, a query that does not parse failing here already.
-    pub fn capabilities(&self) -> Result<Vec<Capability>> {
+    /// query uses, a query that does not parse failing here already, its
+    /// error one line under `json`.
+    pub fn capabilities(&self, json: bool) -> Result<Vec<Capability>> {
         let mut capabilities = vec![Capability::EnvelopeSearch];
+        let text = query_text(self.query.as_deref());
 
-        if let Some(query) = parse_query(query_text(self.query.as_deref()).as_deref())? {
+        if let Some(query) = parse_query(text.as_deref(), json)? {
             capabilities.extend(query.options().into_iter().map(Capability::Search));
         }
 
@@ -135,7 +140,7 @@ impl EnvelopeSearchCommand {
                 .parse()
                 .ok()
                 .filter(|page: &u32| *page > 0)
-                .with_context(|| format!("Invalid page token {token}"))?,
+                .ok_or_else(|| page_token_invalid(token))?,
             None => self.page,
         };
         let page_size = self
@@ -144,7 +149,7 @@ impl EnvelopeSearchCommand {
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account);
         let text = query_text(self.query.as_deref());
-        let query = parse_query(text.as_deref())?;
+        let query = parse_query(text.as_deref(), printer.is_json())?;
 
         let Outcome {
             value: EnvelopePage { envelopes, more },
@@ -190,7 +195,10 @@ fn query_text(words: Option<&[String]>) -> Option<String> {
 }
 
 /// Parses the query text, `None` standing for no query.
-fn parse_query(text: Option<&str>) -> Result<Option<SearchEmailsQuery>> {
+///
+/// A query that does not parse fails `search-invalid`: in plain output the
+/// fault is drawn over the query, under `json` its message is one line.
+fn parse_query(text: Option<&str>, json: bool) -> Result<Option<SearchEmailsQuery>> {
     let Some(text) = text else {
         return Ok(None);
     };
@@ -198,7 +206,11 @@ fn parse_query(text: Option<&str>) -> Result<Option<SearchEmailsQuery>> {
     match text.parse::<SearchEmailsQuery>() {
         Ok(query) => Ok(Some(query)),
         Err(err) => {
-            Err(CodedError::new(ErrorCode::SearchInvalid, render_query_parse_error(&err)).into())
+            let message = match json {
+                true => query_parse_error_line(&err),
+                false => render_query_parse_error(&err),
+            };
+            Err(CodedError::new(ErrorCode::SearchInvalid, message).into())
         }
     }
 }
@@ -239,6 +251,21 @@ fn render_query_parse_error(err: &SearchQueryError) -> String {
         Some(rendered) => rendered.to_owned(),
         None => rendered.into_owned(),
     }
+}
+
+/// A parse error as one line: the error, then each inner one with its
+/// byte span in the query and what was expected there.
+fn query_parse_error_line(err: &SearchQueryError) -> String {
+    let SearchQueryError::ParseError(errs, src) = err;
+    let mut line = err.to_string();
+
+    for inner in errs {
+        let range = word_range(src, inner.span().into_range());
+        let what = describe(inner, src);
+        line.push_str(&format!("; at {}..{}, {what}", range.start, range.end));
+    }
+
+    line
 }
 
 /// Widens an error span to the whole word it starts, up to the next space
@@ -293,7 +320,7 @@ mod tests {
 
     use clap::CommandFactory;
 
-    use super::{EnvelopeSearchCommand, render_query_parse_error};
+    use super::{EnvelopeSearchCommand, query_parse_error_line, render_query_parse_error};
 
     fn render(query: &str) -> String {
         let err = query.parse::<SearchEmailsQuery>().unwrap_err();
@@ -314,6 +341,20 @@ mod tests {
             rendered.contains("found `size`, expected `date`, `from`, `to` or `subject`"),
             "{rendered}",
         );
+    }
+
+    /// Under JSON the error is one line, no diagram drawn over the query.
+    #[test]
+    fn a_refused_query_is_one_line_under_json() {
+        let err = "from alice order by size".parse::<SearchEmailsQuery>();
+        let line = query_parse_error_line(&err.unwrap_err());
+
+        assert!(!line.contains('\n'), "{line}");
+        assert!(
+            line.starts_with("Cannot parse search query `from alice order by size`; at 20..24, "),
+            "{line}"
+        );
+        assert!(line.contains("found `size`, expected"), "{line}");
     }
 
     #[test]

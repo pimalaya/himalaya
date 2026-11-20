@@ -102,7 +102,7 @@ pub fn registry() -> JsonSchemaRegistry {
         );
         insert!(
             "himalaya-message-add",
-            crate::shared::message::add::MessageAddOutput
+            crate::shared::message::handler::MessageRouteOutput
         );
         insert!(
             "himalaya-message-copy",
@@ -180,7 +180,7 @@ pub fn registry() -> JsonSchemaRegistry {
     );
     insert!(
         "himalaya-account-check",
-        crate::account::check::AccountCheckReport
+        pimalaya_cli::account::AccountCheckOutput<crate::error::ErrorCode>
     );
     insert!(
         "himalaya-account-capability",

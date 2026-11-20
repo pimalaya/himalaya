@@ -126,9 +126,13 @@ const TOOLS: &[McpTool] = &[
 /// one as seen.
 const WRITE_ARGS: &[&str] = &["save", "seen"];
 
-/// The arguments turning a tool into one that sends mail, listed only
-/// under `--allow-send`.
-const SEND_ARGS: &[&str] = &["send"];
+/// The arguments turning a tool into one that sends mail, or saying how
+/// it sends, listed only under `--allow-send`.
+const SEND_ARGS: &[&str] = &["send", "no-save"];
+
+/// The words a sending tool runs with under `--allow-send` alone: filing
+/// the copy `message.send.save-copy` configures is a write.
+const NO_COPY: &[&str] = &["--no-save"];
 
 /// The server-only arguments of the composers: the attachments given
 /// inline, which `--attach` takes as paths.
@@ -174,9 +178,12 @@ pub struct McpCommand {
     /// List the tools that send mail too.
     ///
     /// Adds `message_send`, `vacation_set`, an auto-reply answering mail,
-    /// and the `send` argument of the composers and of `message_add`. An
-    /// agent reading mail can be told by a message to send mail, so
-    /// sending is never on by default.
+    /// and the `send` and `no-save` arguments of the composers and of
+    /// `message_add`. An agent reading mail can be told by a message to
+    /// send mail, so sending is never on by default. Without
+    /// `--allow-write`, a send keeps no copy, `message.send.save-copy`
+    /// aside, filing one being a write, but where the transport files
+    /// every message it sends itself.
     #[arg(long)]
     pub allow_send: bool,
     /// Largest attachment a tool takes or reads, in bytes.
@@ -384,6 +391,10 @@ impl McpToolSpec {
                 || (WRITE_ARGS.contains(&name) && !allow_write)
         };
 
+        let no_copy = allow_send
+            && !allow_write
+            && resolution.is_none_or(|resolution| resolution.require_no_copy().is_ok());
+
         for tool in TOOLS {
             let listed = match tool.kind {
                 McpToolKind::Read => true,
@@ -415,11 +426,19 @@ impl McpToolSpec {
                 continue;
             };
 
+            let sends_copy = cmd
+                .get_arguments()
+                .any(|arg| arg.get_long() == Some("no-save"));
+            let fixed = match tool.fixed {
+                [] if no_copy && sends_copy => NO_COPY,
+                fixed => fixed,
+            };
+
             let grammar = Grammar::new(&[tool.group, tool.leaf], cmd)
                 .retain(|name| {
                     !gated(name) && !tool.without.contains(&name) && !unserved.contains(&name)
                 })
-                .fixed(tool.fixed)
+                .fixed(fixed)
                 .one(tool.one);
 
             let grammar = tool.describe.iter().fold(grammar, |grammar, (name, text)| {
@@ -450,8 +469,8 @@ impl McpToolSpec {
                 description.push_str(&search_options(resolution));
             }
 
-            if !tool.fixed.is_empty() {
-                description.push_str(&format!("\n\nAlways run with `{}`.", tool.fixed.join(" ")));
+            if !fixed.is_empty() {
+                description.push_str(&format!("\n\nAlways run with `{}`.", fixed.join(" ")));
             }
 
             if tool.part {

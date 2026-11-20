@@ -36,10 +36,10 @@ impl MaildirMailboxDeleteCommand {
         // the root-relative name goes through: the absolute path would
         // land under a second copy of the root.
         let name = client.relative_name(&maildir);
-        client.delete_maildir(name.clone())?;
+        client.delete_maildir(name)?;
 
         printer.out(IdReceipt {
-            id: name,
+            id: maildir.path().to_string(),
             done: "Maildir successfully deleted",
         })
     }

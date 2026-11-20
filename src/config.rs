@@ -84,18 +84,6 @@ pub struct Config {
     /// himalaya-tui's own keys, which the file shares with it.
     #[serde(default)]
     pub tui: Option<IgnoredAny>,
-    /// The v2 `table` table, refused by name.
-    #[serde(default, rename = "table")]
-    pub v2_table: Option<TableRemoved>,
-    /// The v2 `attachment` table, refused by name.
-    #[serde(default, rename = "attachment")]
-    pub v2_attachment: Option<AttachmentRemoved>,
-    /// The v2 `account` table, refused by name.
-    #[serde(default, rename = "account")]
-    pub v2_account: Option<AccountRemoved>,
-    /// The v1 `folder` table, refused by name.
-    #[serde(default, rename = "folder")]
-    pub v1_folder: Option<FolderRemoved>,
 }
 
 impl TomlConfig for Config {
@@ -239,58 +227,9 @@ pub struct AccountConfig {
     pub smtp: Option<SmtpConfig>,
     /// The ManageSieve endpoint of this account.
     pub sieve: Option<SieveConfig>,
-    /// The v1 `backend` table, kept only to point at MIGRATION.md.
-    #[serde(default)]
-    pub backend: Option<IgnoredAny>,
-    /// The `m2dir` block, whose backend was removed, kept only to point
-    /// at MIGRATION.md.
-    #[serde(default)]
-    pub m2dir: Option<IgnoredAny>,
     /// himalaya-tui's own keys of this account.
     #[serde(default)]
     pub tui: Option<IgnoredAny>,
-    /// The v2 `table` table, refused by name.
-    #[serde(default, rename = "table")]
-    pub v2_table: Option<TableRemoved>,
-    /// The v2 `attachment` table, refused by name.
-    #[serde(default, rename = "attachment")]
-    pub v2_attachment: Option<AttachmentRemoved>,
-    /// The v1 `folder` table, refused by name.
-    #[serde(default, rename = "folder")]
-    pub v1_folder: Option<FolderRemoved>,
-}
-
-/// Why v3 removed the tables of its table layouts and colours.
-pub(crate) const PLAIN_TEXT: &str = "the output being plain text";
-
-pimalaya_config::removed_key! {
-    /// The v2 `table` table, at the top level or in an account.
-    pub TableRemoved: Table {
-        name: "table",
-        why: PLAIN_TEXT,
-        instead: "delete it",
-    }
-
-    /// The v2 `attachment` table, at the top level or in an account.
-    pub AttachmentRemoved: Table {
-        name: "attachment",
-        why: PLAIN_TEXT,
-        instead: "delete it",
-    }
-
-    /// The v2 top-level `account` table.
-    pub AccountRemoved: Table {
-        name: "account",
-        why: PLAIN_TEXT,
-        instead: "delete it",
-    }
-
-    /// The v1 `folder` table, at the top level or in an account.
-    pub FolderRemoved: Table {
-        name: "folder",
-        why: "v2 renaming it `mailbox`",
-        instead: "move `folder.alias` to `mailbox.alias` and delete the rest",
-    }
 }
 
 #[cfg(test)]
@@ -300,7 +239,7 @@ mod tests {
     use pimalaya_config::toml::AccountError;
     use tempfile::NamedTempFile;
 
-    use crate::{backend::Backend, config::*};
+    use crate::config::*;
 
     /// Run after run the map order changes, so the error has to come
     /// whichever default the iteration would have met first.
@@ -325,19 +264,18 @@ mod tests {
         assert_eq!(name, "spare");
     }
 
-    /// An `m2dir` block loads as if absent, whatever it holds, and the
-    /// error of an account left with no backend names its removal.
+    /// The blocks of a removed backend (`m2dir`) and the v1 `backend`
+    /// table are unknown keys like any other, refused rather than ignored.
     #[test]
-    fn m2dir_block_names_its_removal() {
-        let toml =
-            "[accounts.example]\ndefault = true\nm2dir.root = \"~/Mail\"\nm2dir.unknown = true\n";
-        let mut config: Config = toml::from_str(toml).unwrap();
-        let (name, account) = config.take_account(None).unwrap();
-
-        let err = account.no_backend_error(&name, Backend::Auto, &[]);
-        let err = err.to_string();
-        assert!(err.contains("`m2dir` block is ignored"), "{err}");
-        assert!(err.contains("MIGRATION.md"), "{err}");
+    fn a_removed_backend_block_is_an_unknown_key() {
+        for (key, line) in [
+            ("m2dir", "m2dir.root = \"~/Mail\"\n"),
+            ("backend", "backend.type = \"imap\"\n"),
+        ] {
+            let toml = format!("[accounts.example]\nmaildir.root = \"~/Mail\"\n{line}");
+            let err = toml::from_str::<Config>(&toml).unwrap_err().to_string();
+            assert!(err.contains(&format!("unknown field `{key}`")), "{err}");
+        }
     }
 
     /// A block of a backend the build leaves out loads, and using it
@@ -345,6 +283,8 @@ mod tests {
     #[cfg(not(feature = "mbox"))]
     #[test]
     fn a_backend_left_out_of_the_build_names_its_feature() {
+        use crate::backend::Backend;
+
         let toml = "[accounts.example]\ndefault = true\nmbox.root = \"~/mbox\"\n";
         let mut config: Config = toml::from_str(toml).unwrap();
         let (name, account) = config.take_account(None).unwrap();
@@ -386,50 +326,31 @@ mod tests {
         assert!(err.contains("unknown field `tuix`"), "{err}");
     }
 
-    /// The v2 tables Himalaya v3 dropped are refused by name in the
-    /// family's sentence, pointing at the migration guide, at the root
-    /// and in an account.
+    /// The tables earlier versions read (`table`, `attachment`, `folder`,
+    /// the top-level `account`) are unknown keys like any other, at the
+    /// root and in an account, refused in serde's words alone.
     #[test]
-    fn the_v2_blocks_are_refused_naming_migration() {
-        let blocks = [
+    fn the_tables_of_earlier_versions_are_unknown_keys() {
+        let lines = [
             ("table", "table.preset = \"x\"\n"),
             ("attachment", "attachment.list.table.id-color = \"red\"\n"),
+            ("folder", "folder.alias.inbox = \"INBOX\"\n"),
         ];
 
-        for (block, line) in blocks {
+        for (key, line) in lines {
             let root = format!("{line}[accounts.example]\n");
             let account = format!("[accounts.example]\n{line}");
 
             for toml in [root, account] {
                 let err = toml::from_str::<Config>(&toml).unwrap_err().to_string();
-                let sentence = format!(
-                    "The `{block}` table is removed, the output being plain text: delete it, see MIGRATION.md"
-                );
-                assert!(err.contains(&sentence), "{err}");
+                assert!(err.contains(&format!("unknown field `{key}`")), "{err}");
+                assert!(!err.contains("MIGRATION.md"), "{err}");
             }
         }
 
         let toml = "account.list.table.name-color = \"red\"\n[accounts.example]\n";
         let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-        assert!(err.contains("The `account` table is removed"), "{err}");
-        assert!(err.contains("MIGRATION.md"), "{err}");
-    }
-
-    /// The v1 `folder` table, which v2 renamed `mailbox`, is refused by
-    /// name, naming `mailbox.alias` and the migration guide, where serde
-    /// answered an unknown field.
-    #[test]
-    fn the_v1_folder_table_names_mailbox_alias() {
-        let root = "folder.alias.inbox = \"INBOX\"\n[accounts.example]\n";
-        let account = "[accounts.example]\nfolder.alias.inbox = \"INBOX\"\n";
-
-        for toml in [root, account] {
-            let err = toml::from_str::<Config>(toml).unwrap_err().to_string();
-            let sentence = "The `folder` table is removed, v2 renaming it `mailbox`: move \
-                            `folder.alias` to `mailbox.alias` and delete the rest, see \
-                            MIGRATION.md";
-            assert!(err.contains(sentence), "{err}");
-        }
+        assert!(err.contains("unknown field `account`"), "{err}");
     }
 
     /// The rest of a v1 `[message]` table is refused as unknown keys.

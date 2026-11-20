@@ -3,24 +3,19 @@
 //! The `message add` command, appending a raw RFC 5322 message to a
 //! mailbox.
 
-use std::fmt;
-
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
-use schemars::JsonSchema;
-use serde::Serialize;
 
 use crate::{
     account::context::Account,
     email::flag::Flag,
-    error::{self, ItemError, partial_when, write_item_errors},
     shared::{
         client::EmailClient,
         flag::arg::FlagArg,
         message::{
             arg::MessageArg,
-            handler::{self, Outcome},
+            handler::{self, MessageRouteOutput},
         },
     },
 };
@@ -60,93 +55,39 @@ impl MessageAddCommand {
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let queued = client.queues_writes();
         let outcome = handler::apply(account, client, raw, &flags, Some(&self.mailbox), self.send)?;
-        let output = match outcome {
-            Outcome::Saved { id, sent } => MessageAddOutput {
-                id,
-                sent,
-                queued,
-                errors: Vec::new(),
-            },
-            Outcome::Unsaved(err) => MessageAddOutput {
-                id: None,
-                sent: true,
-                queued,
-                errors: vec![ItemError::new(None, &error::coded(err))],
-            },
-            Outcome::Stdout | Outcome::Sent => {
-                unreachable!("--mailbox is mandatory: handler::apply saves, or sends and fails")
-            }
+
+        let Some(output) = MessageRouteOutput::new(outcome, queued) else {
+            unreachable!("--mailbox is mandatory: handler::apply saves, or sends and fails")
         };
 
-        let partial = partial_when(&output.errors);
-        printer.out(output)?;
-        partial
-    }
-}
-
-/// The `message add` output, naming the message that was appended.
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MessageAddOutput {
-    /// The id of the message added, `null` when the backend gives none.
-    id: Option<String>,
-    /// Whether the message was sent too (`--send`).
-    sent: bool,
-    /// Whether a sync engine applies the write later rather than now.
-    queued: bool,
-    /// What failed after the message went out with `--send` (its copy),
-    /// `[]` when nothing did: the command then exits 3, and sending
-    /// again would send twice.
-    errors: Vec<ItemError>,
-}
-
-impl fmt::Display for MessageAddOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !self.errors.is_empty() {
-            writeln!(f, "Message successfully sent, not added")?;
-            return write_item_errors(f, &self.errors);
-        }
-
-        if self.queued {
-            let suffix = if self.sent { " and sending" } else { "" };
-            return match &self.id {
-                Some(id) => writeln!(f, "Message {id} queued for adding{suffix}"),
-                None => writeln!(f, "Message queued for adding{suffix}"),
-            };
-        }
-
-        let suffix = if self.sent { " and sent" } else { "" };
-        match &self.id {
-            Some(id) => writeln!(f, "Message {id} successfully added{suffix}"),
-            None => writeln!(f, "Message successfully added{suffix}, id unavailable"),
-        }
+        output.print(printer)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::shared::message::add::MessageAddOutput;
+    use crate::shared::message::handler::{MessageRouteOutput, Outcome};
 
+    /// A queued add carries the receipt keys of every send and save, its
+    /// send not done yet.
     #[test]
     fn a_queued_add_says_it_is_queued() {
-        let output = |queued| MessageAddOutput {
-            id: Some("d1@x.org".into()),
-            sent: true,
-            queued,
-            errors: Vec::new(),
+        let output = |queued| {
+            let id = Some("d1@x.org".into());
+            MessageRouteOutput::new(Outcome::Saved { id, sent: true }, queued).unwrap()
         };
 
         assert_eq!(
             output(true).to_string(),
-            "Message d1@x.org queued for adding and sending\n"
+            "Message queued for saving and sending\n"
         );
         assert_eq!(
             output(false).to_string(),
-            "Message d1@x.org successfully added and sent\n"
+            "Message d1@x.org successfully saved and sent\n"
         );
         assert_eq!(
             serde_json::to_string(&output(true)).unwrap(),
-            r#"{"id":"d1@x.org","sent":true,"queued":true,"errors":[]}"#
+            r#"{"id":"d1@x.org","saved":true,"sent":false,"queued":true,"errors":[]}"#
         );
     }
 }

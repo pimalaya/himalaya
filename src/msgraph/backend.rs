@@ -491,16 +491,22 @@ impl MsgraphClient {
 
     /// Fetches one message's raw RFC 5322 bytes via
     /// `GET /messages/{id}/$value`, once `GET /messages/{id}` found it in
-    /// the folder `mailbox`.
+    /// the folder `mailbox` and read its flags.
     ///
     /// The id names the message account-wide, so a message of another
     /// folder is not found, as on the backends whose ids are the
     /// mailbox's. `$value` carries no property, so its `parentFolderId`
     /// costs a request of its own. The mailbox is resolved through the
     /// folder listing only when it is not that folder id already.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(
+        &mut self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
+        let select = "id,parentFolderId,isRead,isDraft,importance,flag,categories";
         let message = self
-            .message_get(id, Some("id,parentFolderId"), None)
+            .message_get(id, Some(select), None)
             .map_err(|err| read_error(id, err))?
             .response;
         let folder = message.parent_folder_id.as_deref();
@@ -514,15 +520,17 @@ impl MsgraphClient {
             .message_get_raw(id)
             .map_err(|err| read_error(id, err))?
             .response;
+        let mut flags = flags_from_message(&message);
 
         // NOTE: fetching `$value` never changes read state, so `--seen`
         // costs a separate PATCH setting `isRead`.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
+            flags.insert(seen.clone());
             self.message_update(id, &flag_patch(&[seen], FlagOp::Add))?;
         }
 
-        Ok(raw)
+        Ok((raw, flags))
     }
 
     /// Copies the messages of `ids` the folder `from` holds into `to`
@@ -1601,7 +1609,7 @@ mod read_tests {
         );
 
         let (mut client, requests) = graph(vec![message(), ok("text/plain", RAW)]);
-        let raw = client.get_message("I", "m1", false).unwrap();
+        let (raw, _) = client.get_message("I", "m1", false).unwrap();
         assert_eq!(raw, RAW.as_bytes());
         assert_eq!(requests.lock().unwrap().len(), 2);
     }

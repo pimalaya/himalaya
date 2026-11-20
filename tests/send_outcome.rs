@@ -203,3 +203,65 @@ fn a_refused_smtp_send_is_the_result() {
     assert_eq!(refusal["code"], 550, "{result}");
     assert_eq!(refusal["text"], "5.1.1 No such user", "{result}");
 }
+
+/// The files a Maildir folder holds, wherever it holds them.
+fn held(folder: &Path) -> usize {
+    ["cur", "new"]
+        .iter()
+        .map(|sub| fs::read_dir(folder.join(sub)).unwrap().count())
+        .sum()
+}
+
+/// An MCP server allowed to send but not to write keeps no copy of what
+/// it sends, whatever `message.send.save-copy` says, filing a copy being
+/// a write; allowed to write too, it keeps the configured one.
+#[test]
+fn an_mcp_send_files_no_copy_unless_writes_are_allowed() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let sent = dir.path().join("root/Sent");
+    for sub in ["cur", "new", "tmp"] {
+        fs::create_dir_all(sent.join(sub)).unwrap();
+    }
+    let mut lines = fs::read_to_string(&config).unwrap();
+    lines.push_str("message.send.save-copy = \"Sent\"\n");
+    fs::write(&config, lines).unwrap();
+
+    let send = |flags: &[&str]| {
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": { "name": "message_send", "arguments": { "message": MESSAGE } },
+        });
+        let mut child = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+            .args(["-c", config.to_str().unwrap(), "mcp"])
+            .args(flags)
+            .env("HOME", dir.path())
+            .env("XDG_CONFIG_HOME", dir.path())
+            .env_remove("XDG_CONFIG_DIRS")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(format!("{request}\n").as_bytes()).unwrap();
+        drop(stdin);
+        let output = child.wait_with_output().unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        let response: Value = serde_json::from_str(stdout.trim()).unwrap();
+        let result = response["result"].clone();
+        assert_ne!(result["isError"], true, "{flags:?}: {response}");
+        result["structuredContent"].clone()
+    };
+
+    let receipt = send(&["--allow-send"]);
+    assert_eq!(receipt["sent"], true, "{receipt}");
+    assert_eq!(receipt["saved"], false, "{receipt}");
+    assert_eq!(held(&sent), 0);
+
+    let receipt = send(&["--allow-send", "--allow-write"]);
+    assert_eq!(receipt["saved"], true, "{receipt}");
+    assert_eq!(held(&sent), 1);
+}

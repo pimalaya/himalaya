@@ -66,6 +66,15 @@ pub enum ImapCommand {
 }
 
 impl ImapCommand {
+    /// Refuses, as clap would, a command line the grammar lets through but
+    /// the command cannot run, before the session opens.
+    pub fn check(&self) -> Result<()> {
+        match self {
+            Self::Raw(cmd) => cmd.check(),
+            _ => Ok(()),
+        }
+    }
+
     /// Runs the subcommand against the account's IMAP session.
     pub fn execute(
         self,

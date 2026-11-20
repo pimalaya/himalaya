@@ -102,7 +102,7 @@ fn the_refusals_of_a_store_carry_their_codes() {
     let dir = TempDir::new().unwrap();
     let config = account(dir.path(), None, WORK_AND_HOME);
 
-    let cases: [(&[&str], &str); 5] = [
+    let cases: [(&[&str], &str); 9] = [
         (&["envelope", "list", "-m", "Nope"], "mailbox-not-found"),
         (
             &["message", "read", "-m", "imap/INBOX", "abc"],
@@ -113,6 +113,19 @@ fn the_refusals_of_a_store_carry_their_codes() {
             "row-not-found",
         ),
         (&["pimdir", "queue", "cancel", "999"], "row-not-found"),
+        (&["pimdir", "queue", "show", "999"], "row-not-found"),
+        (
+            &["pimdir", "mailbox", "create", "imap/New"],
+            "capability-missing",
+        ),
+        (
+            &["pimdir", "mailbox", "rename", "imap/INBOX", "Old"],
+            "capability-missing",
+        ),
+        (
+            &["pimdir", "mailbox", "delete", "imap/INBOX"],
+            "capability-missing",
+        ),
         (
             &["pimdir", "search", "--page-token", "zzz", "hi"],
             "page-token-invalid",

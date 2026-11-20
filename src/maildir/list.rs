@@ -43,6 +43,7 @@ impl MaildirMailboxListCommand {
                 .maildirs
                 .into_iter()
                 .map(|maildir| MaildirRow {
+                    id: maildir.path().to_string(),
                     name: client.mailbox_name(&maildir),
                     path: PathBuf::from(maildir.path().as_str()),
                 })
@@ -84,6 +85,8 @@ impl fmt::Display for MaildirListOutput {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirRow {
+    /// Its id, the one the unified `mailbox` commands print and take.
+    pub id: String,
     /// The Maildir name, relative to the store root.
     pub name: String,
     /// Its filesystem path.

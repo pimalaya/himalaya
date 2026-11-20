@@ -51,7 +51,7 @@ impl AttachmentListCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let raw = client.get_message(&mailbox, &self.message_id, false)?;
+        let raw = client.get_message(&mailbox, &self.message_id, false)?.0;
 
         let message = part::parse(&raw)?;
 

@@ -290,6 +290,19 @@ fn write_and_send_tools_under_their_flags() {
     assert!(tool(&responses[0], "vacation_get").is_none());
     assert!(compose["inputSchema"]["properties"].get("send").is_some());
     assert!(compose["inputSchema"]["properties"].get("save").is_none());
+    for name in ["message_compose", "message_send"] {
+        let sender = tool(&responses[0], name).unwrap();
+        assert!(sender["inputSchema"]["properties"].get("no-save").is_none());
+        let description = sender["description"].as_str().unwrap();
+        assert!(
+            description.contains("Always run with `--no-save`"),
+            "{name}"
+        );
+    }
+
+    let responses = serve(&config, &["--allow-send", "--allow-write"], &[list(1)]);
+    let send = tool(&responses[0], "message_send").unwrap();
+    assert!(send["inputSchema"]["properties"].get("no-save").is_some());
 }
 
 #[test]

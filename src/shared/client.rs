@@ -16,6 +16,8 @@
 // use its parameters, the resolver refusing the verb before any runs.
 #![cfg_attr(not(backend), allow(unused_variables))]
 
+use std::collections::BTreeSet;
+
 use anyhow::{Result, anyhow, bail};
 use pimalaya_config::secret::SecretResolver;
 
@@ -443,14 +445,19 @@ impl EmailClient {
         Ok(outcome.sorted_by(ids))
     }
 
-    /// Fetches one message's raw RFC 5322 bytes, marking it seen when
-    /// asked.
+    /// Fetches one message's raw RFC 5322 bytes and its flags, marking
+    /// it seen when asked.
     ///
     /// IMAP folds the flag into the fetch itself, where the other
     /// backends issue a separate update. Each adapter resolves the
     /// mailbox itself, JMAP, Gmail and Graph only when the message is not
     /// where it was named.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(
+        &mut self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.get_message(mailbox, id, seen),
@@ -509,7 +516,7 @@ impl EmailClient {
             #[cfg(feature = "pimdir")]
             BackendClient::Pimdir(client) => client
                 .add_message(mailbox, flags, raw)
-                .map(|staged| Some(staged.message_id)),
+                .map(|staged| Some(staged.link_id)),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "msgraph")]

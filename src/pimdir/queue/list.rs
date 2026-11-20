@@ -1,8 +1,8 @@
 //! # pimdir queue list
 //!
-//! The `pimdir queue list` command, listing the creations and sends staged
-//! in the account, the rows parked there and the refusals standing, or
-//! those of one mailbox.
+//! The `pimdir queue list` command, listing the rows queued in the
+//! account, the rows parked there and the refusals standing, or those of
+//! one mailbox.
 
 use std::fmt;
 
@@ -12,35 +12,44 @@ use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirClient};
+use crate::{
+    account::context::Account,
+    backend::Backend,
+    error::{ItemError, partial_when, write_item_errors},
+    pimdir::client::PimdirClient,
+};
 
-/// List the messages staged for creation or sending in the account.
+/// List the rows queued in the account for the sync engine.
 ///
-/// A saved message waits in the queue until the sync engine applies it and
-/// has no id until then, so `envelope list` cannot show it. A sent message
-/// waits there until the store's owner sends it, filed under the mailbox it
-/// was saved to or the account's sent alias. This is where both show: the
-/// row handle to cancel one by, when it was queued, its kind (`add` or
-/// `submit`) and its subject. The whole account is listed, mailbox by
-/// mailbox, unless `--mailbox` names one.
+/// Every write to a pimdir store waits in its queue until the sync engine
+/// applies it: a saved message, which has no id until then, so `envelope
+/// list` cannot show it, a sent message, until the store's owner sends it,
+/// a flag change, a move, a deletion, a mailbox creation, renaming or
+/// deletion. Each row lists with the handle to cancel it by, when it was
+/// queued, its kind (`add`, `submit`, `set-flags`, `move`,
+/// `collection-create`...) and its subject. The whole account is listed,
+/// mailbox by mailbox, unless `--mailbox` names one.
 ///
-/// Staged flags, moves and deletions need no such view, addressing messages
-/// that already exist. A row of any kind the sync engine parked, refusing to
-/// apply it without an operator, is listed `parked` with why: cancel it, or
-/// fix what parked it. A move or a deletion of a message a sync left in
-/// conflict parks so, listed in the mailbox the message stays in. One the
-/// engine sent without learning its outcome is listed `unconfirmed`
-/// instead: it may have taken effect. A message a server refused for good
-/// the change it was synced with is listed `refused` last, with its source
-/// and reason: the store applied the change, and the sync engine holds it
-/// until the message changes again or is removed (pimdir STORAGE §15.4).
+/// A row of any kind the sync engine parked, refusing to apply it without
+/// an operator, is listed `parked` with why: cancel it, or fix what parked
+/// it. A move or a deletion of a message a sync left in conflict parks
+/// so, listed in the mailbox the message stays in. One the engine sent
+/// without learning its outcome is listed `unconfirmed` instead: it may
+/// have taken effect. A message a server refused for good the change it
+/// was synced with is listed `refused` last, with its source and reason:
+/// the store applied the change, and the sync engine holds it until the
+/// message changes again or is removed (pimdir STORAGE §15.4).
 ///
-/// JSON output: `{"messages": [<row>], "parked": [<row>], "refused":
-/// [{"collection", "itemId", "source", "reason", "refusedAt"}]}`, each row,
-/// pending or parked, `{"row", "handle", "kind", "collection", "linkId",
-/// "itemId", "producer", "queuedAt", "attempts", "unconfirmed", "error",
-/// "subject"}`, as every Pimalaya program prints a queue row, plus the
-/// row's handle.
+/// A mailbox holding a row whose payload does not decode lists none of
+/// its pending rows: it is an entry of `errors` instead, and the command
+/// exits 3.
+///
+/// JSON output: `{"actions": [<row>], "parked": [<row>], "errors":
+/// [<item error>], "refused": [{"collection", "itemId", "source",
+/// "reason", "refusedAt"}]}`, each row, pending or parked, `{"row",
+/// "handle", "kind", "collection", "linkId", "itemId", "producer",
+/// "queuedAt", "attempts", "unconfirmed", "error", "subject"}`, as every
+/// Pimalaya program prints a queue row.
 #[derive(Debug, Parser)]
 pub struct PimdirQueueListCommand {
     /// The one mailbox to list, a name, alias, role or id; the whole
@@ -50,9 +59,8 @@ pub struct PimdirQueueListCommand {
 }
 
 impl PimdirQueueListCommand {
-    /// Lists the creations and sends staged in the account, or in the one
-    /// mailbox named, the rows parked there and the refusals standing,
-    /// and prints them.
+    /// Lists the rows queued in the account, or in the one mailbox named,
+    /// the rows parked there and the refusals standing, and prints them.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -67,18 +75,23 @@ impl PimdirQueueListCommand {
         let mut output = PimdirQueueListOutput {
             account: account.name().to_string(),
             mailbox: self.mailbox.as_ref().and(mailboxes.first().cloned()),
-            messages: Vec::new(),
+            actions: Vec::new(),
             parked: Vec::new(),
+            errors: Vec::new(),
             refused: Vec::new(),
         };
 
         for mailbox in &mailboxes {
-            output.messages.extend(client.queued_rows(mailbox)?);
+            let queued = client.queued_rows(mailbox)?;
+            output.actions.extend(queued.value);
+            output.errors.extend(queued.errors);
             output.parked.extend(client.parked_rows(mailbox)?);
             output.refused.extend(client.refused_rows(mailbox)?);
         }
 
-        printer.out(output)
+        let partial = partial_when(&output.errors);
+        printer.out(output)?;
+        partial
     }
 }
 
@@ -101,8 +114,8 @@ pub struct PimdirQueueRow {
     pub kind: String,
     /// The mailbox the row is queued on, as `mailbox list` prints its id.
     pub collection: String,
-    /// The link id of the message the row creates, the bare `Message-ID`
-    /// `message add` printed, `null` when the row creates none.
+    /// The link id of the message the row creates, the `id` its write's
+    /// receipt printed, `null` when the row creates none.
     pub link_id: Option<String>,
     /// The id of the stored message the row addresses (a flag change, a
     /// move, a copy, a removal), as `envelope list` prints it, `null` when
@@ -136,10 +149,13 @@ pub struct PimdirQueueListOutput {
     /// account.
     #[serde(skip)]
     pub mailbox: Option<String>,
-    /// The creations and sends staged, mailbox by mailbox.
-    pub messages: Vec<PimdirQueueRow>,
+    /// The pending rows, any kind, mailbox by mailbox.
+    pub actions: Vec<PimdirQueueRow>,
     /// The parked rows, any kind, mailbox by mailbox.
     pub parked: Vec<PimdirQueueRow>,
+    /// The mailboxes whose pending rows could not be read, a row not
+    /// decoding, `[]` when none: the command then exits 3.
+    pub errors: Vec<ItemError>,
     /// The refusals standing, per message and source.
     pub refused: Vec<PimdirQueueRefused>,
 }
@@ -169,7 +185,7 @@ impl fmt::Display for PimdirQueueListOutput {
             listing.head("Mailbox", mailbox);
         }
 
-        for queued in &self.messages {
+        for queued in &self.actions {
             let what = queued.subject.as_deref().or(queued.item_id.as_deref());
             listing.items.push(cells(queued, "queued", what));
         }
@@ -195,12 +211,13 @@ impl fmt::Display for PimdirQueueListOutput {
             ]);
         }
 
-        if !self.messages.is_empty() || !self.parked.is_empty() {
+        if !self.actions.is_empty() || !self.parked.is_empty() {
             let cancel = String::from("himalaya pimdir queue cancel <ROW>");
             listing.header.push(("Cancel", cancel));
         }
 
-        write!(f, "{listing}")
+        write!(f, "{listing}")?;
+        write_item_errors(f, &self.errors)
     }
 }
 
@@ -250,7 +267,7 @@ mod tests {
         let output = PimdirQueueListOutput {
             account: "perso".into(),
             mailbox: Some("imap/Sent".into()),
-            messages: vec![
+            actions: vec![
                 PimdirQueueRow {
                     link_id: Some("d1@x.org".into()),
                     subject: Some("hi".into()),
@@ -266,6 +283,7 @@ mod tests {
                 subject: Some("Report".into()),
                 ..row(2, "move")
             }],
+            errors: Vec::new(),
             refused: vec![PimdirQueueRefused {
                 collection: "imap/Sent".into(),
                 item_id: "9".into(),
@@ -277,7 +295,7 @@ mod tests {
 
         let json = serde_json::to_value(&output).unwrap();
         assert_eq!(
-            json["messages"][1],
+            json["actions"][1],
             json!({
                 "row": 4,
                 "handle": format!("{STORE}.1.4"),
@@ -295,7 +313,7 @@ mod tests {
         );
         let parked = json["parked"][0].as_object().unwrap();
         let keys: Vec<&str> = parked.keys().map(String::as_str).collect();
-        let pending = json["messages"][0].as_object().unwrap();
+        let pending = json["actions"][0].as_object().unwrap();
         assert_eq!(keys, pending.keys().map(String::as_str).collect::<Vec<_>>());
         assert_eq!(parked["itemId"], "7");
 

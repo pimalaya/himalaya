@@ -29,11 +29,11 @@ pub enum EnvelopeCommand {
 
 impl EnvelopeCommand {
     /// The capabilities the subcommand reaches, checked before any
-    /// connection.
-    pub fn capabilities(&self) -> Result<Vec<Capability>> {
+    /// connection, a refusal one line under `json`.
+    pub fn capabilities(&self, json: bool) -> Result<Vec<Capability>> {
         match self {
             Self::List(_) => Ok(vec![Capability::EnvelopeList]),
-            Self::Search(cmd) => cmd.capabilities(),
+            Self::Search(cmd) => cmd.capabilities(json),
         }
     }
 

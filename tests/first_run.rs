@@ -77,6 +77,20 @@ fn a_bare_invocation_without_configuration_names_the_missing_path() {
     assert!(!stderr.contains("Welcome"), "{stderr}");
 }
 
+/// A JSON caller never gets the help: a bare run is a refused command
+/// line, whether a configuration exists or not.
+#[test]
+fn a_bare_invocation_under_json_is_refused_as_usage_invalid() {
+    for toml in [Some("[accounts.a]\ndefault = true\n"), None] {
+        let (home, path) = home(toml);
+        let output = run(home.path(), &["--json", "-c", path.to_str().unwrap()]);
+
+        assert_eq!(output.status.code(), Some(2), "{}", text(&output.stdout));
+        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(json["code"], "usage-invalid", "{json}");
+    }
+}
+
 #[test]
 fn a_json_caller_gets_the_missing_configuration_as_the_failure_object() {
     let (home, path) = home(None);

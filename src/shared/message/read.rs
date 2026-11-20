@@ -20,7 +20,10 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::address::Address,
+    email::{
+        address::Address,
+        envelope::{self, Envelope},
+    },
     shared::{
         client::EmailClient,
         mailbox::arg::MailboxArg,
@@ -44,10 +47,11 @@ use crate::{
 /// The `[ID]` prefixing a summary is the part's position in the message,
 /// the same id `attachment list` reports and `attachment download` takes.
 ///
-/// `--json` prints the message's id and etag beside a view of it, the
-/// same whatever the backend: its headers decoded, its text and HTML
-/// bodies decoded to UTF-8, and every leaf part with its id, role (body,
-/// inline or attachment), type, file name and size. `--raw` dumps the
+/// `--json` prints the row `envelope list` prints for the message and its
+/// etag beside a view of it, the same whatever the backend: its headers
+/// decoded, its text and HTML bodies decoded to UTF-8, and every leaf part
+/// with its id, role (body, inline or attachment), type, file name and
+/// size. `--raw` dumps the
 /// original RFC 5322 bytes instead. Plain output replaces terminal
 /// control and bidi characters, retaining body tabs and newlines. JSON
 /// and raw output keep their contents.
@@ -83,7 +87,7 @@ impl MessageReadCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account);
-        let raw = client.get_message(&mailbox, &self.id, self.seen)?;
+        let (raw, flags) = client.get_message(&mailbox, &self.id, self.seen)?;
 
         if self.raw {
             return printer.out_bytes(Bytes {
@@ -92,21 +96,33 @@ impl MessageReadCommand {
             });
         }
 
-        printer.out(MessageReadOutput {
+        let view = MessageReadView::from_raw(&raw)?;
+        let envelope = Envelope {
             id: self.id,
+            flags,
+            ..envelope::from_raw(&raw, true).unwrap_or_else(|| Envelope {
+                size: Some(raw.len() as u64),
+                ..Default::default()
+            })
+        };
+
+        printer.out(MessageReadOutput {
+            envelope,
             etag: None,
-            view: MessageReadView::from_raw(&raw)?,
+            view,
         })
     }
 }
 
-/// The `message read` output: under `--json` the message's id and etag
-/// beside its view; as text the view alone.
+/// The `message read` output: under `--json` the row `envelope list`
+/// prints for the message, then its etag and its view; as text the view
+/// alone.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageReadOutput {
-    /// The id of the message read, as the command took it.
-    pub id: String,
+    /// The message's row, its id as the command took it.
+    #[serde(flatten)]
+    pub envelope: Envelope,
     /// The version of the message, always `null`: a message's body never
     /// changes, and no write takes a version to match.
     pub etag: Option<String>,

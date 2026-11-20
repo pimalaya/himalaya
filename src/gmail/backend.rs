@@ -303,13 +303,18 @@ impl GmailClient {
     }
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
-    /// (format=RAW), base64url-decoded, with the labels it carries.
+    /// (format=RAW), base64url-decoded, with the flags its labels carry.
     ///
     /// The id names the message account-wide, so a message not carrying
     /// the `mailbox` label is not found, as on the backends whose ids are
     /// the mailbox's. The mailbox is resolved through the label listing
     /// only when it is not one of the message's labels already.
-    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+    pub fn get_message(
+        &mut self,
+        mailbox: &str,
+        id: &str,
+        seen: bool,
+    ) -> Result<(Vec<u8>, BTreeSet<Flag>)> {
         let message = match self.message_get(id, GmailMessageFormat::Raw, &[]) {
             Ok(output) => output.response,
             Err(GmailClientStdError::Send(err)) if err.api().is_some_and(is_unknown_id) => {
@@ -328,16 +333,18 @@ impl GmailClient {
             .ok_or_else(|| anyhow!("Gmail message has no raw payload"))?;
         let raw = decode_raw(&raw)
             .map_err(|err| anyhow!("Gmail raw message could not be decoded: {err}"))?;
+        let mut flags = flags_from_labels(&message.label_ids);
 
         // NOTE: `messages.get` never changes read state, so `--seen` costs
         // a separate `messages.modify` removing the `UNREAD` label.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
+            flags.insert(seen.clone());
             let (add, remove) = label_patch(&[seen], FlagOp::Add);
             self.message_modify(id, &add, &remove)?;
         }
 
-        Ok(raw)
+        Ok((raw, flags))
     }
 
     /// Appends a raw message under the `mailbox` label through
@@ -1469,7 +1476,7 @@ mod script_tests {
         assert!(requests.lock().unwrap()[0].contains("format=RAW"));
 
         let (mut client, requests) = gmail(vec![inbox_message()]);
-        let raw = client.get_message("INBOX", "m1", false).unwrap();
+        let (raw, _) = client.get_message("INBOX", "m1", false).unwrap();
         assert_eq!(raw, b"Subject: hi\r\n\r\nbody\r\n");
         assert_eq!(requests.lock().unwrap().len(), 1);
     }

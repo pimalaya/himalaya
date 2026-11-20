@@ -81,11 +81,17 @@ pub fn json_failure(out: &Output, refusal: &str) -> Value {
     error
 }
 
-/// The `account check` report a `--json` run printed, failing unless it
-/// exited with 3, the partial outcome, and every backend it names
-/// failed, `refusal` among their messages.
+/// The one account of the `account check` report a `--json` run printed,
+/// failing unless it exited with 3, the partial outcome, and every
+/// backend it names failed, `refusal` among their messages.
 pub fn json_check_failure(out: &Output, refusal: &str) -> Value {
     let report = json(out, 3);
+    assert_eq!(
+        report["accounts"].as_array().map(Vec::len),
+        Some(1),
+        "{report}"
+    );
+    let report = report["accounts"][0].clone();
     let backends = report["backends"].as_array().unwrap();
     assert!(!backends.is_empty(), "{report}");
 
