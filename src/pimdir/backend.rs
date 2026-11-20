@@ -17,7 +17,10 @@
 //! would guess at the sync's convention rather than look it up, and
 //! `mailbox.alias` is how a user avoids typing it.
 
-use std::{collections::BTreeSet, ops::ControlFlow};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::ControlFlow,
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
@@ -271,11 +274,7 @@ impl PimdirClient {
         let collections = self.mail_collections()?;
 
         let unread = if with_counts {
-            let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
-            self.store
-                .count_unread(&ids, None, None)
-                .map_err(pimdir_error)
-                .context("Count unread pimdir mail")?
+            self.count_unread(&collections)?
         } else {
             Default::default()
         };
@@ -315,12 +314,7 @@ impl PimdirClient {
     /// exhaustive. A store its owner has not reconciled yet has none.
     pub fn list_covered_mailboxes(&mut self) -> Result<Vec<PimdirCoveredMailbox>> {
         let collections = self.mail_collections()?;
-        let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
-        let unread = self
-            .store
-            .count_unread(&ids, None, None)
-            .map_err(pimdir_error)
-            .context("Count unread pimdir mail")?;
+        let unread = self.count_unread(&collections)?;
 
         let mut mailboxes = Vec::new();
         for collection in collections {
@@ -350,6 +344,42 @@ impl PimdirClient {
         }
         mailboxes.sort_by(|a, b| a.mailbox.id.cmp(&b.mailbox.id));
         Ok(mailboxes)
+    }
+
+    /// The unread mail of each collection as the overlaying reader lists
+    /// it: the store's unread count, which reads committed rows only, where
+    /// no queued action changes what the mailbox shows
+    /// (`PimdirReader::overlay_quiet`), else its items walked and those
+    /// without `\Seen` counted, as that count reads them.
+    fn count_unread(&self, collections: &[PimdirCollection]) -> Result<BTreeMap<String, u64>> {
+        let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
+        let mut unread = self
+            .store
+            .count_unread(&ids, None, None)
+            .map_err(pimdir_error)
+            .context("Count unread pimdir mail")?;
+
+        for id in ids {
+            let quiet = self
+                .store
+                .overlay_quiet(id)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Read the queue of `{id}`"))?;
+            if quiet {
+                continue;
+            }
+
+            let mut count = 0;
+            self.walk(id, None, false, SCAN_BATCH, |item| {
+                if !item.flags.contains("\\Seen") {
+                    count += 1;
+                }
+                ControlFlow::Continue(SCAN_BATCH)
+            })?;
+            unread.insert(id.to_owned(), count);
+        }
+
+        Ok(unread)
     }
 
     /// Lists envelopes from `mailbox`, built from the stored summaries (no
@@ -3925,6 +3955,80 @@ mod tests {
             .unwrap();
         assert!(!client.store.overlay_quiet("imap/Work").unwrap());
         assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
+    }
+
+    /// The counts of a store spelling `\Seen` one way only, the store's
+    /// unread count reading that spelling alone.
+    #[test]
+    fn mailbox_counts_read_the_queue_as_the_listing_does() {
+        let dir = tempfile::tempdir().unwrap();
+        let canonical = |prefix: &str, n: usize| -> Vec<Seeded> {
+            mails(prefix, n)
+                .into_iter()
+                .filter(|mail| !mail.flags.contains("\\seen"))
+                .collect()
+        };
+        seed(dir.path(), "imap/INBOX", &canonical("in", 60));
+        seed(dir.path(), "imap/Archive", &canonical("ar", 20));
+        seed(dir.path(), "imap/Work", &canonical("wo", 5));
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+
+        let unread: Vec<String> = client
+            .list_envelopes("imap/INBOX", None, None, false)
+            .unwrap()
+            .into_iter()
+            .filter(|envelope| envelope.flags.is_empty())
+            .map(|envelope| envelope.id)
+            .filter(|id| client.read_flags("imap/INBOX", id).unwrap().is_some())
+            .take(4)
+            .collect();
+        let unread: Vec<&str> = unread.iter().map(String::as_str).collect();
+        let seen = [Flag::from_iana(IanaFlag::Seen)];
+        client
+            .store_flags("imap/INBOX", &unread[..2], &seen, FlagOp::Add)
+            .unwrap();
+        client
+            .move_messages("imap/INBOX", "imap/Archive", &unread[2..])
+            .unwrap();
+
+        let listed = |client: &mut PimdirClient, mailbox: &str| {
+            let envelopes = client.list_envelopes(mailbox, None, None, false).unwrap();
+            let unread = envelopes
+                .iter()
+                .filter(|envelope| {
+                    !envelope
+                        .flags
+                        .iter()
+                        .any(|f| f.iana() == Some(IanaFlag::Seen))
+                })
+                .count() as u64;
+            (Some(envelopes.len() as u64), Some(unread))
+        };
+        let expected: Vec<_> = ["imap/Archive", "imap/INBOX", "imap/Work"]
+            .into_iter()
+            .map(|mailbox| (mailbox.to_owned(), listed(&mut client, mailbox)))
+            .collect();
+
+        let counted: Vec<_> = client
+            .list_mailboxes(true)
+            .unwrap()
+            .into_iter()
+            .map(|mailbox| (mailbox.id, (mailbox.total, mailbox.unread)))
+            .collect();
+        assert_eq!(counted, expected);
+
+        let covered: Vec<_> = client
+            .list_covered_mailboxes()
+            .unwrap()
+            .into_iter()
+            .map(|covered| covered.mailbox)
+            .map(|mailbox| (mailbox.id, (mailbox.total, mailbox.unread)))
+            .collect();
+        assert_eq!(covered, expected);
     }
 
     /// A row filed under another key than its date sends the search back
