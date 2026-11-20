@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a606fa3ba5f6f559d53683cb7fc017dc9df41d5fca83b98fb916ae1e3fb1aec2"
+checksum = "4a108bdc09a5130dd4b4aacd4ea9b56332d26a079705d5847689c0fda88db775"
 dependencies = [
  "blake3",
  "encoding_rs",
