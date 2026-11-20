@@ -871,9 +871,9 @@ dependencies = [
 
 [[package]]
 name = "ical-rs"
-version = "0.7.1"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e390dd6dbfc13b572c448002e57878c151204010b8249c4d3e0d2b758d734cf"
+checksum = "87c99e9e61b28da43ab66a0c676ba4678b3060cd4ba6690e6295f5e0085b6496"
 dependencies = [
  "jiff",
  "jiff-tzdb",
@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.18.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a108bdc09a5130dd4b4aacd4ea9b56332d26a079705d5847689c0fda88db775"
+checksum = "478fe68c04b2021b226818ca07ce43b1d875786a9e974ea77a0c142ecbf7c445"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1384,9 +1384,9 @@ checksum = "d5848f5a9e8117cf94f2f90faac24a87ff81600ff8628c1e3deaab572e76bfa1"
 
 [[package]]
 name = "mime-rs"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64fab22816df54ec4d6650ed93ac149d33b2844315959c2f4aa773b721482ccc"
+checksum = "848722f8fb6e2c7f164f23470d9618d25ae5f33dda3c85982b5a5093f10603e8"
 dependencies = [
  "base64-codec",
  "encoding_rs",
@@ -2449,9 +2449,9 @@ checksum = "3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6"
 
 [[package]]
 name = "vcard-rs"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4e9d3a6221632badbdc1b7fa9bb8518386ff0b5dfd12eacfcbcec88db38884d"
+checksum = "7e0bf98fed3a46522c7893facb4f2b133945e829f4965a2afecb0207b255eaee"
 dependencies = [
  "memchr",
 ]

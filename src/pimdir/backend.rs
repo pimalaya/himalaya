@@ -3066,7 +3066,7 @@ mod tests {
     fn a_store_of_another_draft_is_refused_saying_which_is_earlier() {
         for (version, asks) in [
             ("storage-draft-11", "move its directory aside"),
-            ("storage-draft-15", "upgrade himalaya"),
+            ("storage-draft-16", "upgrade himalaya"),
         ] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
