@@ -775,7 +775,6 @@ dependencies = [
  "ariadne",
  "base64-codec",
  "chrono",
- "chumsky",
  "clap",
  "dirs",
  "gethostname",
@@ -1106,8 +1105,7 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4f11c48d2a4482bda9e9c0ac7924af6b9b3791ba45d233618282b546a255557"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=dc19b8dba1a5fd9f68925e2be58d0f95dab5a22e#dc19b8dba1a5fd9f68925e2be58d0f95dab5a22e"
 dependencies = [
  "blake3",
  "encoding_rs",

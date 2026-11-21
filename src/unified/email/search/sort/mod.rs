@@ -1,7 +1,7 @@
 //! # Search sort
 //!
-//! The sort half of a search query: its AST, the grammar parsing one
-//! from a string, and its client-side evaluation.
+//! The sort half of a search query: its chain, and its client-side
+//! evaluation.
 
 #[cfg(any(
     feature = "gmail",
@@ -11,5 +11,4 @@
     feature = "msgraph"
 ))]
 pub mod eval;
-pub mod parser;
 pub mod query;

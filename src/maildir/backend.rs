@@ -20,7 +20,7 @@ use crate::{
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         outcome::Outcome,
-        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
+        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
 };
 use anyhow::{Result, bail};
@@ -137,7 +137,6 @@ impl MaildirClient {
     ) -> Result<Outcome<EnvelopePage>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entries: Vec<_> = self.list_entries(maildir.clone())?.into_iter().collect();
-        let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = Vec::new();
         let mut headerless = Vec::new();
 
@@ -146,8 +145,8 @@ impl MaildirClient {
                 headerless.push(full.id().unwrap_or_default().to_owned());
                 return;
             };
-            let keep = match filter {
-                Some(filter) => eval::matches_filter(&envelope, None, full.contents(), filter),
+            let keep = match query {
+                Some(query) => query.matches(full.contents(), &envelope.flags),
                 None => true,
             };
             if keep {

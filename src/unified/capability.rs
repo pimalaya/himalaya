@@ -22,6 +22,7 @@
 use std::fmt;
 
 use anyhow::Result;
+use io_pimdir::search::query::PimdirQueryPredicate;
 use pimalaya_cli::{capability::CapabilityLevel, error::CodedError};
 
 use crate::{config::AccountConfig, error::ErrorCode, unified::backend::Backend};
@@ -81,52 +82,98 @@ pub enum Capability {
     Vacation,
 }
 
-/// A clause or sort key of the unified search query, an option of
+/// A field or an order of the unified search query, an option of
 /// `envelope.search`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SearchOption {
-    Date,
-    After,
-    Before,
+    Text,
+    Title,
+    Body,
     From,
     To,
     Cc,
     Bcc,
-    Address,
-    Subject,
-    Body,
-    Flag,
-    Attachment,
-    MessageId,
-    SortDate,
-    SortFrom,
-    SortTo,
-    SortSubject,
+    With,
+    IsRead,
+    IsFlagged,
+    IsAnswered,
+    IsDraft,
+    Tag,
+    HasAttachment,
+    Date,
+    DateInstant,
+    Mid,
+    SortNewestFirst,
+    SortOldestFirst,
+    SortTitle,
+    SortSender,
+    SortRelevance,
 }
 
 impl SearchOption {
-    /// The option as the query language spells it, `order by` keys
-    /// prefixed `sort.`.
+    /// Every option, in the order the help lists them.
+    pub const ALL: [Self; 22] = [
+        Self::Text,
+        Self::Title,
+        Self::Body,
+        Self::From,
+        Self::To,
+        Self::Cc,
+        Self::Bcc,
+        Self::With,
+        Self::IsRead,
+        Self::IsFlagged,
+        Self::IsAnswered,
+        Self::IsDraft,
+        Self::Tag,
+        Self::HasAttachment,
+        Self::Date,
+        Self::DateInstant,
+        Self::Mid,
+        Self::SortNewestFirst,
+        Self::SortOldestFirst,
+        Self::SortTitle,
+        Self::SortSender,
+        Self::SortRelevance,
+    ];
+
+    /// The option as io-pimdir names the predicate
+    /// (`PimdirQueryPredicate::name`), the orders prefixed `sort.`.
     pub const fn word(self) -> &'static str {
         match self {
-            Self::Date => "date",
-            Self::After => "after",
-            Self::Before => "before",
+            Self::Text => "text",
+            Self::Title => "title",
+            Self::Body => "body",
             Self::From => "from",
             Self::To => "to",
             Self::Cc => "cc",
             Self::Bcc => "bcc",
-            Self::Address => "address",
-            Self::Subject => "subject",
-            Self::Body => "body",
-            Self::Flag => "flag",
-            Self::Attachment => "attachment",
-            Self::MessageId => "message-id",
-            Self::SortDate => "sort.date",
-            Self::SortFrom => "sort.from",
-            Self::SortTo => "sort.to",
-            Self::SortSubject => "sort.subject",
+            Self::With => "with",
+            Self::IsRead => "is.read",
+            Self::IsFlagged => "is.flagged",
+            Self::IsAnswered => "is.answered",
+            Self::IsDraft => "is.draft",
+            Self::Tag => "tag",
+            Self::HasAttachment => "has.attachment",
+            Self::Date => "date",
+            Self::DateInstant => "date.instant",
+            Self::Mid => "mid",
+            Self::SortNewestFirst => "sort.newest-first",
+            Self::SortOldestFirst => "sort.oldest-first",
+            Self::SortTitle => "sort.title",
+            Self::SortSender => "sort.sender",
+            Self::SortRelevance => "sort.relevance",
         }
+    }
+
+    /// The option a query term asks, `None` for a field no mail backend
+    /// serves (`kind:`, `status:`, `person:`, `location:`, ...).
+    pub fn of(predicate: &PimdirQueryPredicate) -> Option<Self> {
+        let name = predicate.name();
+        Self::ALL
+            .into_iter()
+            .take(17)
+            .find(|option| option.word() == name)
     }
 }
 
@@ -584,12 +631,6 @@ macro_rules! storage_rows {
             (C::MessageMove, Full),
             (C::FlagsSeen, Full),
             (C::FlagsFlagged, Full),
-            (C::Search(O::From), Full),
-            (C::Search(O::To), Full),
-            (C::Search(O::Cc), Full),
-            (C::Search(O::Bcc), Full),
-            (C::Search(O::Address), Full),
-            (C::Search(O::Subject), Full),
             $($row),*
         ]
     };
@@ -597,6 +638,42 @@ macro_rules! storage_rows {
 
 /// IMAP (RFC 3501).
 const IMAP: &[Row] = storage_rows![
+    (C::Search(O::Text), Partial(SUBSTRING)),
+    (C::Search(O::Title), Partial(SUBSTRING)),
+    (C::Search(O::Body), Partial(SUBSTRING)),
+    (C::Search(O::From), Partial(SUBSTRING)),
+    (C::Search(O::To), Partial(SUBSTRING)),
+    (C::Search(O::Cc), Partial(SUBSTRING)),
+    (C::Search(O::Bcc), Partial(SUBSTRING)),
+    (C::Search(O::With), Partial(SUBSTRING)),
+    (C::Search(O::IsRead), Full),
+    (C::Search(O::IsFlagged), Full),
+    (C::Search(O::IsAnswered), Full),
+    (C::Search(O::IsDraft), Full),
+    (C::Search(O::Tag), Full),
+    (
+        C::Search(O::HasAttachment),
+        Not("IMAP SEARCH has no attachment key")
+    ),
+    (C::Search(O::Date), Full),
+    (
+        C::Search(O::DateInstant),
+        Partial("on the chain of `and` from the root alone, the server comparing days")
+    ),
+    (
+        C::Search(O::Mid),
+        Partial(
+            "exact on the chain of `and` from the root, a substring match under `or` and `not`"
+        )
+    ),
+    (C::Search(O::SortNewestFirst), Full),
+    (C::Search(O::SortOldestFirst), Full),
+    (C::Search(O::SortTitle), Full),
+    (
+        C::Search(O::SortSender),
+        Partial("by the mailbox of the first `From:` address (RFC 5256)")
+    ),
+    (C::Search(O::SortRelevance), Not(NO_RANK)),
     (
         C::EnvelopeSearch,
         Partial(
@@ -628,29 +705,35 @@ const IMAP: &[Row] = storage_rows![
     ),
     (C::FlagsAnswered, Full),
     (C::FlagsDraft, Full),
-    (C::Search(O::Date), Full),
-    (C::Search(O::After), Full),
-    (C::Search(O::Before), Full),
-    (C::Search(O::Body), Full),
-    (C::Search(O::Flag), Full),
-    (
-        C::Search(O::Attachment),
-        Not("IMAP SEARCH has no attachment key")
-    ),
-    (
-        C::Search(O::MessageId),
-        Partial(
-            "exact on the chain of `and` from the root, a substring match under `or` and `not`"
-        )
-    ),
-    (C::Search(O::SortDate), Full),
-    (C::Search(O::SortFrom), Full),
-    (C::Search(O::SortTo), Full),
-    (C::Search(O::SortSubject), Full),
 ];
 
 /// JMAP (RFC 8620, RFC 8621).
 const JMAP: &[Row] = storage_rows![
+    (C::Search(O::Text), Partial(JMAP_TEXT)),
+    (C::Search(O::Title), Partial(JMAP_TEXT)),
+    (C::Search(O::Body), Partial(JMAP_TEXT)),
+    (C::Search(O::From), Partial(JMAP_TEXT)),
+    (C::Search(O::To), Partial(JMAP_TEXT)),
+    (C::Search(O::Cc), Partial(JMAP_TEXT)),
+    (C::Search(O::Bcc), Partial(JMAP_TEXT)),
+    (C::Search(O::With), Partial(JMAP_TEXT)),
+    (C::Search(O::IsRead), Full),
+    (C::Search(O::IsFlagged), Full),
+    (C::Search(O::IsAnswered), Full),
+    (C::Search(O::IsDraft), Full),
+    (C::Search(O::Tag), Full),
+    (C::Search(O::HasAttachment), Full),
+    (C::Search(O::Date), Partial(JMAP_DATE)),
+    (C::Search(O::DateInstant), Partial(JMAP_DATE)),
+    (
+        C::Search(O::Mid),
+        Not("io-jmap has no `header` condition yet")
+    ),
+    (C::Search(O::SortNewestFirst), Full),
+    (C::Search(O::SortOldestFirst), Full),
+    (C::Search(O::SortTitle), Full),
+    (C::Search(O::SortSender), Full),
+    (C::Search(O::SortRelevance), Not(NO_RANK)),
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
     (
@@ -677,20 +760,6 @@ const JMAP: &[Row] = storage_rows![
     (C::MessageTrash, Full),
     (C::FlagsAnswered, Full),
     (C::FlagsDraft, Full),
-    (C::Search(O::Date), Partial(JMAP_DATE)),
-    (C::Search(O::After), Partial(JMAP_DATE)),
-    (C::Search(O::Before), Partial(JMAP_DATE)),
-    (C::Search(O::Body), Full),
-    (C::Search(O::Flag), Full),
-    (C::Search(O::Attachment), Full),
-    (
-        C::Search(O::MessageId),
-        Not("io-jmap has no `header` condition yet")
-    ),
-    (C::Search(O::SortDate), Full),
-    (C::Search(O::SortFrom), Full),
-    (C::Search(O::SortTo), Full),
-    (C::Search(O::SortSubject), Full),
     (
         C::Submit,
         Server("needs `urn:ietf:params:jmap:submission` in the session (RFC 8621 section 7)")
@@ -701,8 +770,52 @@ const JMAP: &[Row] = storage_rows![
 /// Where JMAP's date clauses differ.
 const JMAP_DATE: &str = "under `or` or `not`, compared with the received date rather than `Date:`";
 
+/// Where a server matching substrings differs from the words pimdir SEARCH
+/// matches (§8.5).
+const SUBSTRING: &str = "a substring as the server matches it, where the query matches whole words; RFC 3501 asks for a case-insensitive substring, some servers (Cyrus, Fastmail) match whole words";
+
+/// Where JMAP's text conditions differ.
+const JMAP_TEXT: &str = "text as the server defines `text` and the header conditions (RFC 8621 section 4.4.1), often a substring";
+
+/// Why Graph answers no flag.
+const GRAPH_FLAG: &str = "KQL has no flag property, and Graph takes no `$filter` beside `$search`";
+
+/// Why a backend answers no relevance order.
+const NO_RANK: &str = "no ranking without an index; a pimdir store's index ranks";
+
 /// Gmail.
 const GMAIL: &[Row] = storage_rows![
+    (C::Search(O::Text), Full),
+    (C::Search(O::Title), Full),
+    (
+        C::Search(O::Body),
+        Partial("a word anywhere in the message, headers included")
+    ),
+    (C::Search(O::From), Full),
+    (C::Search(O::To), Full),
+    (C::Search(O::Cc), Full),
+    (C::Search(O::Bcc), Full),
+    (C::Search(O::With), Full),
+    (C::Search(O::IsRead), Full),
+    (C::Search(O::IsFlagged), Full),
+    (C::Search(O::IsAnswered), Not("Gmail has no label for it")),
+    (C::Search(O::IsDraft), Full),
+    (
+        C::Search(O::Tag),
+        Partial("`$Important` and `$Junk` only, as labels")
+    ),
+    (
+        C::Search(O::HasAttachment),
+        Partial("Gmail's `has:attachment`, which counts inline images too")
+    ),
+    (C::Search(O::Date), Partial(GMAIL_DATE)),
+    (C::Search(O::DateInstant), Partial(GMAIL_DATE)),
+    (C::Search(O::Mid), Full),
+    (C::Search(O::SortNewestFirst), Partial(PAGE_SORT)),
+    (C::Search(O::SortOldestFirst), Partial(PAGE_SORT)),
+    (C::Search(O::SortTitle), Partial(PAGE_SORT)),
+    (C::Search(O::SortSender), Partial(PAGE_SORT)),
+    (C::Search(O::SortRelevance), Not(NO_RANK)),
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
     (
@@ -735,26 +848,6 @@ const GMAIL: &[Row] = storage_rows![
             "Gmail applies `DRAFT` itself and refuses it from a client; `gmail drafts` makes a draft"
         )
     ),
-    (C::Search(O::Date), Partial(GMAIL_DATE)),
-    (C::Search(O::After), Partial(GMAIL_DATE)),
-    (C::Search(O::Before), Partial(GMAIL_DATE)),
-    (
-        C::Search(O::Body),
-        Partial("a word anywhere in the message, headers included")
-    ),
-    (
-        C::Search(O::Flag),
-        Partial("`seen`, `flagged`, `draft`, `important` and `junk` only")
-    ),
-    (
-        C::Search(O::Attachment),
-        Partial("Gmail's `has:attachment`, which counts inline images too")
-    ),
-    (C::Search(O::MessageId), Full),
-    (C::Search(O::SortDate), Partial(PAGE_SORT)),
-    (C::Search(O::SortFrom), Partial(PAGE_SORT)),
-    (C::Search(O::SortTo), Partial(PAGE_SORT)),
-    (C::Search(O::SortSubject), Partial(PAGE_SORT)),
     (C::Submit, Full),
     (C::SubmitCopy, Full),
 ];
@@ -764,6 +857,31 @@ const GMAIL_DATE: &str = "compared with the received date, in UTC days, rather t
 
 /// Microsoft Graph.
 const MSGRAPH: &[Row] = storage_rows![
+    (C::Search(O::Text), Full),
+    (C::Search(O::Title), Full),
+    (C::Search(O::Body), Full),
+    (C::Search(O::From), Full),
+    (C::Search(O::To), Full),
+    (C::Search(O::Cc), Full),
+    (C::Search(O::Bcc), Full),
+    (C::Search(O::With), Full),
+    (C::Search(O::IsRead), Not(GRAPH_FLAG)),
+    (C::Search(O::IsFlagged), Not(GRAPH_FLAG)),
+    (C::Search(O::IsAnswered), Not(GRAPH_FLAG)),
+    (C::Search(O::IsDraft), Not(GRAPH_FLAG)),
+    (C::Search(O::Tag), Not(GRAPH_FLAG)),
+    (C::Search(O::HasAttachment), Full),
+    (C::Search(O::Date), Full),
+    (C::Search(O::DateInstant), Not("KQL compares days")),
+    (
+        C::Search(O::Mid),
+        Partial("alone, Graph taking no `$filter` beside `$search`")
+    ),
+    (C::Search(O::SortNewestFirst), Partial(PAGE_SORT)),
+    (C::Search(O::SortOldestFirst), Partial(PAGE_SORT)),
+    (C::Search(O::SortTitle), Partial(PAGE_SORT)),
+    (C::Search(O::SortSender), Partial(PAGE_SORT)),
+    (C::Search(O::SortRelevance), Not(NO_RANK)),
     (
         C::MailboxCreate,
         Partial("under `--parent`, created at the top then moved under it, two requests")
@@ -798,23 +916,6 @@ const MSGRAPH: &[Row] = storage_rows![
     (C::MessageTrash, Full),
     (C::FlagsAnswered, Not("Graph has no field for it")),
     (C::FlagsDraft, Not("Graph's `isDraft` is read-only")),
-    (C::Search(O::Date), Full),
-    (C::Search(O::After), Full),
-    (C::Search(O::Before), Full),
-    (C::Search(O::Body), Full),
-    (
-        C::Search(O::Flag),
-        Not("KQL has no flag property, and Graph takes no `$filter` beside `$search`")
-    ),
-    (C::Search(O::Attachment), Full),
-    (
-        C::Search(O::MessageId),
-        Partial("alone, Graph taking no `$filter` beside `$search`")
-    ),
-    (C::Search(O::SortDate), Partial(PAGE_SORT)),
-    (C::Search(O::SortFrom), Partial(PAGE_SORT)),
-    (C::Search(O::SortTo), Partial(PAGE_SORT)),
-    (C::Search(O::SortSubject), Partial(PAGE_SORT)),
     (C::Submit, Full),
     (
         C::SubmitCopy,
@@ -829,6 +930,28 @@ const MSGRAPH: &[Row] = storage_rows![
 macro_rules! local_rows {
     ($($row:expr),* $(,)?) => {
         storage_rows![
+            (C::Search(O::Text), Full),
+            (C::Search(O::Title), Full),
+            (C::Search(O::Body), Full),
+            (C::Search(O::From), Full),
+            (C::Search(O::To), Full),
+            (C::Search(O::Cc), Full),
+            (C::Search(O::Bcc), Full),
+            (C::Search(O::With), Full),
+            (C::Search(O::IsRead), Full),
+            (C::Search(O::IsFlagged), Full),
+            (C::Search(O::IsAnswered), Full),
+            (C::Search(O::IsDraft), Full),
+            (C::Search(O::Tag), Full),
+            (C::Search(O::HasAttachment), Full),
+            (C::Search(O::Date), Full),
+            (C::Search(O::DateInstant), Full),
+            (C::Search(O::Mid), Full),
+            (C::Search(O::SortNewestFirst), Full),
+            (C::Search(O::SortOldestFirst), Full),
+            (C::Search(O::SortTitle), Full),
+            (C::Search(O::SortSender), Full),
+            (C::Search(O::SortRelevance), Not(NO_RANK)),
             (C::EnvelopeSearch, Full),
             (C::MessageAdd, Full),
             (C::MessageCopy, Full),
@@ -836,17 +959,6 @@ macro_rules! local_rows {
             (C::MessageTrash, Partial(TRASH_ALIAS)),
             (C::FlagsAnswered, Full),
             (C::FlagsDraft, Full),
-            (C::Search(O::Date), Full),
-            (C::Search(O::After), Full),
-            (C::Search(O::Before), Full),
-            (C::Search(O::Body), Full),
-            (C::Search(O::Flag), Full),
-            (C::Search(O::Attachment), Full),
-            (C::Search(O::MessageId), Full),
-            (C::Search(O::SortDate), Full),
-            (C::Search(O::SortFrom), Full),
-            (C::Search(O::SortTo), Full),
-            (C::Search(O::SortSubject), Full),
             $($row),*
         ]
     };
@@ -886,6 +998,28 @@ const MBOX: &[Row] = local_rows![
 /// pimdir: reads answered locally, writes queued for the sync engine, which
 /// refuses one no source performs (`unsupported`, `no-performer`).
 const PIMDIR: &[Row] = storage_rows![
+    (C::Search(O::Text), Full),
+    (C::Search(O::Title), Full),
+    (C::Search(O::Body), Full),
+    (C::Search(O::From), Full),
+    (C::Search(O::To), Full),
+    (C::Search(O::Cc), Full),
+    (C::Search(O::Bcc), Full),
+    (C::Search(O::With), Full),
+    (C::Search(O::IsRead), Full),
+    (C::Search(O::IsFlagged), Full),
+    (C::Search(O::IsAnswered), Full),
+    (C::Search(O::IsDraft), Full),
+    (C::Search(O::Tag), Full),
+    (C::Search(O::HasAttachment), Full),
+    (C::Search(O::Date), Full),
+    (C::Search(O::DateInstant), Full),
+    (C::Search(O::Mid), Full),
+    (C::Search(O::SortNewestFirst), Full),
+    (C::Search(O::SortOldestFirst), Full),
+    (C::Search(O::SortTitle), Full),
+    (C::Search(O::SortSender), Full),
+    (C::Search(O::SortRelevance), Not(NO_RANK)),
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
     (C::MailboxDelete, Full),
@@ -899,20 +1033,6 @@ const PIMDIR: &[Row] = storage_rows![
     (C::MessageTrash, Full),
     (C::FlagsAnswered, Full),
     (C::FlagsDraft, Full),
-    (C::Search(O::Date), Full),
-    (C::Search(O::After), Full),
-    (C::Search(O::Before), Full),
-    (
-        C::Search(O::Body),
-        Partial("a message whose body is not local matches no body clause")
-    ),
-    (C::Search(O::Flag), Full),
-    (C::Search(O::Attachment), Full),
-    (C::Search(O::MessageId), Full),
-    (C::Search(O::SortDate), Full),
-    (C::Search(O::SortFrom), Full),
-    (C::Search(O::SortTo), Full),
-    (C::Search(O::SortSubject), Full),
     (C::Submit, Full),
     (C::SubmitCopy, Full),
 ];
@@ -981,23 +1101,28 @@ const FLAGS: &[Capability] = &[
 /// `envelope search` and the options of its query.
 const SEARCH: &[Capability] = &[
     C::EnvelopeSearch,
-    C::Search(O::Date),
-    C::Search(O::After),
-    C::Search(O::Before),
+    C::Search(O::Text),
+    C::Search(O::Title),
+    C::Search(O::Body),
     C::Search(O::From),
     C::Search(O::To),
     C::Search(O::Cc),
     C::Search(O::Bcc),
-    C::Search(O::Address),
-    C::Search(O::Subject),
-    C::Search(O::Body),
-    C::Search(O::Flag),
-    C::Search(O::Attachment),
-    C::Search(O::MessageId),
-    C::Search(O::SortDate),
-    C::Search(O::SortFrom),
-    C::Search(O::SortTo),
-    C::Search(O::SortSubject),
+    C::Search(O::With),
+    C::Search(O::IsRead),
+    C::Search(O::IsFlagged),
+    C::Search(O::IsAnswered),
+    C::Search(O::IsDraft),
+    C::Search(O::Tag),
+    C::Search(O::HasAttachment),
+    C::Search(O::Date),
+    C::Search(O::DateInstant),
+    C::Search(O::Mid),
+    C::Search(O::SortNewestFirst),
+    C::Search(O::SortOldestFirst),
+    C::Search(O::SortTitle),
+    C::Search(O::SortSender),
+    C::Search(O::SortRelevance),
 ];
 
 /// Every unified leaf reaching a transport.
@@ -1195,8 +1320,11 @@ mod tests {
     fn a_name_follows_pimdirs_grammar_without_the_domain_word() {
         assert_eq!(C::MessageMove.name(), "message.move");
         assert_eq!(C::FlagsAnswered.name(), "flags.answered");
-        assert_eq!(C::Search(O::MessageId).name(), "envelope.search.message-id");
-        assert_eq!(C::Search(O::SortDate).name(), "envelope.search.sort.date");
+        assert_eq!(C::Search(O::Mid).name(), "envelope.search.mid");
+        assert_eq!(
+            C::Search(O::SortNewestFirst).name(),
+            "envelope.search.sort.newest-first"
+        );
     }
 }
 

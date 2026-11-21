@@ -1,7 +1,6 @@
 //! # Search filter
 //!
-//! The filter half of a search query: its AST, and the grammar parsing
-//! one from a string.
+//! The filter half of a search query: the tree the server translations
+//! read, lowered from a pimdir SEARCH §8 query.
 
-pub mod parser;
 pub mod query;

@@ -53,7 +53,7 @@ use crate::{
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         outcome::Outcome,
-        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
+        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
 };
 
@@ -180,14 +180,12 @@ impl MboxClient {
         _with_attachment: bool,
     ) -> Result<Outcome<EnvelopePage>> {
         let path = self.open_mbox(mailbox)?;
-        let filter = query.and_then(|q| q.filter.as_ref());
-        let mut keep = |envelope: &Envelope, contents: Option<&[u8]>| match (filter, contents) {
-            (Some(filter), Some(contents)) => {
-                eval::matches_filter(envelope, None, contents, filter)
-            }
+        let searched = query.filter(|query| query.query.is_some());
+        let mut keep = |envelope: &Envelope, contents: Option<&[u8]>| match (searched, contents) {
+            (Some(query), Some(contents)) => query.matches(contents, &envelope.flags),
             _ => true,
         };
-        let (mut hits, errors) = self.envelopes(&path, filter.is_some(), &mut keep)?;
+        let (mut hits, errors) = self.envelopes(&path, searched.is_some(), &mut keep)?;
 
         sort_envelopes(&mut hits, query.and_then(|q| q.sort.as_deref()));
 
@@ -1231,7 +1229,7 @@ mod tests {
         index.entries[0].len -= 1;
         cache.save(client.cache_dir.as_deref(), &path);
 
-        let query = "body body".parse::<SearchEmailsQuery>().unwrap();
+        let query = "body:body".parse::<SearchEmailsQuery>().unwrap();
         let hits = client.search_envelopes("A", Some(&query), None, None, false);
         assert_eq!(hits.unwrap().value.envelopes.len(), 2);
     }

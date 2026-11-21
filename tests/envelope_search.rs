@@ -1,8 +1,8 @@
 //! # Envelope search
 //!
 //! `envelope search` run as the built binary against a Maildir, asserting
-//! the copy, any-address, `before` and attachment clauses on the unified
-//! client-side evaluator, and that a malformed query fails with the code
+//! the `cc:`, `with:`, `date:`, `has:attachment` and `mid:` terms on
+//! io-pimdir's mail matcher, and that a refused query fails with the code
 //! `search-invalid`.
 
 #![cfg(all(backend, feature = "maildir"))]
@@ -109,29 +109,29 @@ fn new_clauses_select_their_messages() {
     let config = account(dir.path());
     let home = dir.path();
 
-    assert_eq!(subjects(&config, home, &["cc", "carol"]), ["Copied"]);
-    assert_eq!(subjects(&config, home, &["address", "dave"]), ["Attached"]);
-    assert_eq!(subjects(&config, home, &["address", "carol"]), ["Copied"]);
+    assert_eq!(subjects(&config, home, &["cc:carol"]), ["Copied"]);
+    assert_eq!(subjects(&config, home, &["with:dave"]), ["Attached"]);
+    assert_eq!(subjects(&config, home, &["with:carol"]), ["Copied"]);
     assert_eq!(
-        subjects(&config, home, &["before", "2026-04-01"]),
+        subjects(&config, home, &["date:..2026-03-31"]),
         ["Copied"]
     );
-    assert_eq!(subjects(&config, home, &["attachment"]), ["Attached"]);
-    assert_eq!(subjects(&config, home, &["not", "attachment"]), ["Copied"]);
+    assert_eq!(subjects(&config, home, &["has:attachment"]), ["Attached"]);
+    assert_eq!(subjects(&config, home, &["not", "has:attachment"]), ["Copied"]);
     assert_eq!(
-        subjects(&config, home, &["message-id", "copied-123@example.org"]),
+        subjects(&config, home, &["mid:copied-123@example.org"]),
         ["Copied"]
     );
     assert_eq!(
-        subjects(&config, home, &["message-id", "<attached-456@example.org>"]),
+        subjects(&config, home, &["mid:<attached-456@example.org>"]),
         ["Attached"]
     );
-    assert!(subjects(&config, home, &["message-id", "copied-123"]).is_empty());
+    assert!(subjects(&config, home, &["mid:copied-123"]).is_empty());
     assert_eq!(
         subjects(
             &config,
             home,
-            &["not", "message-id", "copied-123@example.org"]
+            &["not", "mid:copied-123@example.org"]
         ),
         ["Attached"]
     );
@@ -141,7 +141,7 @@ fn new_clauses_select_their_messages() {
 fn a_malformed_query_is_refused_with_its_code() {
     let dir = TempDir::new().unwrap();
     let config = account(dir.path());
-    let (ok, json) = search(&config, dir.path(), &["cc"]);
+    let (ok, json) = search(&config, dir.path(), &["cc:"]);
 
     assert!(!ok);
     assert_eq!(json["code"], "search-invalid", "{json}");

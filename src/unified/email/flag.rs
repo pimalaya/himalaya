@@ -115,6 +115,16 @@ impl Flag {
         &self.raw
     }
 
+    /// The flag as the store standard spells it: an IANA keyword in its
+    /// canonical form, any other as written.
+    #[cfg(any(feature = "maildir", feature = "mbox"))]
+    pub fn canonical(&self) -> &str {
+        match self.iana {
+            Some(iana) => canonical_raw(iana),
+            None => &self.raw,
+        }
+    }
+
     /// The IANA classification, `None` for a custom keyword.
     #[cfg(any(
         feature = "imap",

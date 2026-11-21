@@ -179,9 +179,9 @@ fn a_send_only_account_refuses_the_storage_verbs() {
 fn imap_refuses_an_attachment_clause_before_connecting() {
     refused(
         IMAP,
-        &["envelope", "search", "attachment"],
+        &["envelope", "search", "has:attachment"],
         "search-unsupported",
-        "attachment",
+        "has.attachment",
     );
 }
 
@@ -189,9 +189,9 @@ fn imap_refuses_an_attachment_clause_before_connecting() {
 fn jmap_refuses_a_message_id_clause_before_connecting() {
     refused(
         JMAP,
-        &["envelope", "search", "message-id", "<id@example.org>"],
+        &["envelope", "search", "mid:<id@example.org>"],
         "search-unsupported",
-        "message-id",
+        "Cannot search `mid`",
     );
 }
 

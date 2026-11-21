@@ -109,12 +109,39 @@ What a script or a frontend reads off `--json` and the text output changes, and 
 - **`message read --seen` on pimdir fails when the flag cannot be staged**, as on every other backend, carrying the cause's code (`unsupported`, `store-busy`), where it read the message unseen and exited 0.
 - **A value a protocol command refuses itself exits 2 before connecting**, coded `usage-invalid`: an `imap fetch|store|copy|move` sequence set that is none, `jmap submission create` given one of `--mail-from` and `--rcpt-to`, `msgraph messages update` naming no change, an unknown method on `gmail request` and `msgraph request`, `smtp send --notify never,…`, and an `imap raw` command given on the command line without a tag of its own (`imap raw -- NOOP`). They exited 1, uncoded, after the password command ran and the session opened.
 
+### The search query is pimdir's
+
+`envelope search` reads the pimdir SEARCH query language, the one `pimdir search`, Calendula and Cardamum read, and its order is `--sort`. Every v2 query has to be rewritten:
+
+| v2 | v3 |
+| --- | --- |
+| `from alice` | `from:alice` |
+| `to bob`, `cc carol`, `bcc dave` | `to:bob`, `cc:carol`, `bcc:dave` |
+| `address eve` | `with:eve` |
+| `subject "weekly report"` | `subject:"weekly report"` |
+| `body invoice` | `body:invoice`, or `invoice` for the whole message |
+| `flag seen`, `not flag seen` | `is:read`, `is:unread` |
+| `flag flagged`, `flag answered`, `flag draft` | `is:flagged`, `is:answered`, `is:draft` |
+| `flag <keyword>` | `tag:<keyword>` |
+| `attachment` | `has:attachment` |
+| `message-id <id>` | `mid:<id>` |
+| `date 2026-11-14` | `date:2026-11-14` |
+| `after 2026-11-14` | `date:2026-11-15..` (`after` was strict) |
+| `before 2026-11-14` | `date:..2026-11-13` (`before` was strict) |
+| `after 2 days ago`, `after 5 hours ago` | `date:2d`, `date:5h` |
+| `a and b`, `a or b`, `not a` | `a b`, `a or b`, `not a` or `-a` |
+| `order by date desc` | `--sort newest-first` |
+| `order by date asc`, `order by date` | `--sort oldest-first` |
+| `order by subject` | `--sort title` |
+| `order by from` | `--sort sender` |
+| `order by to`, a descending subject or sender | none: no backend orders by recipient, and an order has one direction |
+
+Text matches whole words on Maildir, mbox and pimdir, where v2 matched a substring: `subject:repo` no longer finds `report`, `subject:repo*` does. A field outside mail (`status:`, `person:`, `kind:contact`, ...) fails with `search-unsupported`. The capability options of `envelope.search` take the predicate names: `envelope.search.message-id` is `envelope.search.mid`, `envelope.search.sort.date` is `envelope.search.sort.newest-first` and `sort.oldest-first`. `pimdir search --sort date|name` is `--sort newest-first|title`.
+
 ### Search results that change
 
 - **Gmail dates are UTC days.** `after 2026-09-08` used to keep that day's mail and `date 2026-09-08` two days, Gmail reading a bare date as midnight in PST.
 - **JMAP date clauses under `not` or `or`** read the server's received date; `not after 2026-01-01` used to list nothing.
-- **The query grammar is stricter.** `order by` is two words outside any pattern, so a quoted or escaped pattern holding them stays a pattern, and an empty `order by` is refused; a bare `"` cannot open an unquoted pattern, a quote left unterminated is refused rather than read as a character, and `\"` escapes one inside a pattern. A query that parsed by accident now fails with `search-invalid`.
-- **A search date writes its year in four digits.** `after 15-11-26` is refused with `search-invalid`, where it searched after the year 15: write `after 2026-11-15` or `after 15-11-2026`.
 
 ### Commands that act differently
 

@@ -147,9 +147,13 @@ impl PimdirSearchCommand {
 pub enum PimdirSearchSortArg {
     /// Newest first.
     #[default]
-    Date,
+    NewestFirst,
+    /// Oldest first.
+    OldestFirst,
     /// By subject, A to Z.
-    Name,
+    Title,
+    /// By sender, A to Z.
+    Sender,
     /// Best match first, the messages no word ranks by date after.
     Relevance,
 }
@@ -157,8 +161,10 @@ pub enum PimdirSearchSortArg {
 impl From<PimdirSearchSortArg> for PimdirSearchSort {
     fn from(sort: PimdirSearchSortArg) -> Self {
         match sort {
-            PimdirSearchSortArg::Date => Self::Date,
-            PimdirSearchSortArg::Name => Self::Name,
+            PimdirSearchSortArg::NewestFirst => Self::NewestFirst,
+            PimdirSearchSortArg::OldestFirst => Self::OldestFirst,
+            PimdirSearchSortArg::Title => Self::Title,
+            PimdirSearchSortArg::Sender => Self::Sender,
             PimdirSearchSortArg::Relevance => Self::Relevance,
         }
     }
@@ -315,11 +321,7 @@ impl PimdirSearchPlace {
     /// The FNV-1a hash of the account, the query, the order and the
     /// listing, which a page token starts with.
     fn fingerprint(&self) -> String {
-        let sort = match self.sort {
-            PimdirSearchSortArg::Date => "date",
-            PimdirSearchSortArg::Name => "name",
-            PimdirSearchSortArg::Relevance => "relevance",
-        };
+        let sort = PimdirSearchSort::from(self.sort).as_str();
         let threads = if self.threads { "threads" } else { "hits" };
         let parts = [self.account.as_str(), &self.query, sort, threads];
         let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -388,7 +390,7 @@ mod tests {
             place: PimdirSearchPlace {
                 account: String::from("work"),
                 query: String::from("report"),
-                sort: PimdirSearchSortArg::Date,
+                sort: PimdirSearchSortArg::NewestFirst,
                 threads: false,
             },
             style: PimdirListStyle {
@@ -484,7 +486,7 @@ Error:  9  message-unreadable  Read message `9`
                 ..place.clone()
             },
             PimdirSearchPlace {
-                sort: PimdirSearchSortArg::Name,
+                sort: PimdirSearchSortArg::Title,
                 ..place.clone()
             },
             PimdirSearchPlace {

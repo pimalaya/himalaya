@@ -273,7 +273,7 @@ fn a_token_of_another_query_is_refused() {
 
     let others: [&[&str]; 3] = [
         &["from:a@x.test"],
-        &["--sort", "name", "report"],
+        &["--sort", "title", "report"],
         &["--threads", "report"],
     ];
 

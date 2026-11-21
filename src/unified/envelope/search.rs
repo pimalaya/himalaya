@@ -1,15 +1,14 @@
 //! # Envelope search
 //!
-//! The `envelope search` command, listing a mailbox through the unified
-//! filter and sort query.
+//! The `envelope search` command, listing a mailbox through the pimdir
+//! SEARCH query language (§8) and an order.
 
-use std::ops::Range;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
-use ariadne::{Config, IndexType, Label, Report, ReportKind, Source};
-use chumsky::error::{Rich, RichPattern, RichReason};
 use clap::Parser;
-use pimalaya_cli::{clap::args::PageTokenArg, error::CodedError, printer::Printer};
+use jiff::tz::TimeZone;
+use pimalaya_cli::{clap::args::PageTokenArg, printer::Printer};
 
 use crate::{
     account::context::Account,
@@ -20,27 +19,23 @@ use crate::{
         email::{
             envelope::EnvelopePage,
             outcome::Outcome,
-            search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
+            search::query::{self, SearchEmailsOrder, SearchEmailsQuery},
         },
         envelope::list::EnvelopeListOutput,
         mailbox::arg::MailboxArg,
     },
 };
 
-/// Search the envelopes of a mailbox with the unified query language.
+/// Search the envelopes of a mailbox with the pimdir query language.
 ///
-/// A date clause reads the `Date:` header, the sent-at, but where the
-/// server compares the received date: on Gmail, and on JMAP under `or`
-/// or `not` (on the chain of `and` from the root, JMAP re-checks the
-/// sent date). A text clause is
-/// matched as the backend matches text: a case-insensitive substring on
-/// Maildir, mbox and pimdir, as the server matches it on IMAP (RFC
-/// 3501 asks for a substring, some servers match whole words), whole words
-/// over the whole message on Gmail, KQL terms on Microsoft Graph, and as the
-/// server defines it on JMAP.
-/// A clause the backend cannot search is refused with `search-unsupported`,
-/// never dropped: every flag and header on Microsoft Graph, `flag answered` and keywords
-/// on Gmail, `attachment` on IMAP.
+/// The query is pimdir SEARCH §8, the language `pimdir search`, Calendula
+/// and Cardamum read: `from:alice date:2026-11.. is:unread "weekly sync"`.
+/// A text term is matched as the backend matches text: whole words on
+/// Maildir, mbox, pimdir, Gmail and Microsoft Graph, a substring on IMAP
+/// and JMAP. A date reads the `Date:` header, the sent-at, but where the
+/// server compares the received date: on Gmail, and on JMAP under `or` or
+/// `not`. A field the backend cannot search is refused with
+/// `search-unsupported`, never dropped.
 ///
 /// A message the listing cannot read is an entry of `errors`, the rest
 /// of the page still listed; the command then exits 3.
@@ -69,65 +64,46 @@ pub struct EnvelopeSearchCommand {
     /// costs one extra lookup per envelope.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
-    /// Query: date, after, before, from, to, cc, bcc, address, subject, body,
-    /// flag, attachment, message-id; and, or, not, ( ); order by. See --help.
+    /// The order of the envelopes, the backend's own when omitted.
+    #[arg(long, value_enum, value_name = "ORDER")]
+    pub sort: Option<SearchEmailsOrder>,
+    /// Query, pimdir SEARCH §8: words and `field:value` terms, `or`,
+    /// `not`, `-`, `( )` and "phrases". See --help.
     ///
-    /// Clauses:
+    /// Fields:
     ///
-    /// - `date <day>`: sent on that day;
+    /// - `subject:`, `body:`: the subject, a text body; a bare word or
+    ///   phrase searches the whole message;
     ///
-    /// - `after <date>`, `before <date>`: sent strictly after, strictly
-    ///   before that day or that instant, to the second;
+    /// - `from:`, `to:`, `cc:`, `bcc:`, `with:` (any of the four): a name,
+    ///   an address, or `@domain`;
     ///
-    /// - `from <pattern>`, `to <pattern>`, `cc <pattern>`, `bcc <pattern>`:
-    ///   that header holds the pattern, in a name or an address;
+    /// - `is:unread`, `is:read`, `is:flagged`, `is:answered`, `is:draft`,
+    ///   `tag:<keyword>`: the flags;
     ///
-    /// - `address <pattern>`: any of those four headers holds it;
+    /// - `has:attachment`: holding an attachment;
     ///
-    /// - `subject <pattern>`, `body <pattern>`: the subject, a text body;
+    /// - `date:`: a day `2026-11-14`, a month `2026-11`, a year, `today`,
+    ///   `yesterday`, an instant `2026-11-14T09:30` (seconds and offset
+    ///   optional), an amount back from now `30min`, `5h`, `3d`, `2w`,
+    ///   `1mo`, `1y`, or a range `a..b`, either side open;
     ///
-    /// - `flag <name>`: carrying the flag, `seen`, `answered`, `flagged`,
-    ///   `draft` or a keyword;
+    /// - `mid:`: the message whose `Message-ID:` is the id, its angle
+    ///   brackets optional.
     ///
-    /// - `attachment`: holding an attachment;
-    ///
-    /// - `message-id <id>`: the message whose `Message-ID:` is the id, its
-    ///   angle brackets optional.
-    ///
-    /// A day is `2026-11-14`, `2026/11/14`, `14-11-2026` or `14/11/2026`,
-    /// its year in four digits, `today`, `yesterday`, or
-    /// `<n> day|week|month|year[s] ago`, counted back in calendar terms:
-    /// `after 2 days ago`. An instant is `<n> minute|hour[s] ago`, as in
-    /// `before 5 hours ago`, or an RFC 3339 date-time, its seconds and
-    /// offset optional: `after 2026-11-14T09:30`. Days and instants with no
-    /// offset are read in the local zone (`TZ`, then the system's). IMAP
-    /// serves an instant on the chain of `and` from the root alone,
-    /// Microsoft Graph none.
-    ///
-    /// A pattern holding spaces is quoted, `"weekly report"`, or its spaces
-    /// are escaped, `weekly\ report`.
-    ///
-    /// Clauses join with `not`, `and` and `or`, binding in that order, and
-    /// group with parentheses: `from alice and (subject report or
-    /// attachment)`.
-    ///
-    /// The sort comes last, `order by <date|from|to|subject> [asc|desc]...`,
-    /// several keys applying left to right: `from alice order by date desc`.
+    /// Days and instants with no offset are read in the local zone (`TZ`,
+    /// then the system's). A trailing `*` makes a word a prefix.
     #[arg(value_name = "QUERY")]
     pub query: Option<Vec<String>>,
 }
 
 impl EnvelopeSearchCommand {
-    /// `envelope.search` and the options its query uses; an unparsable
-    /// query fails here already, its error one line under `json`.
+    /// `envelope.search` and the options its query and order use; a
+    /// refused query fails here already, its error one line under `json`.
     pub fn capabilities(&self, json: bool) -> Result<Vec<Capability>> {
         let mut capabilities = vec![Capability::EnvelopeSearch];
-        let text = query_text(self.query.as_deref());
-
-        if let Some(query) = parse_query(text.as_deref(), json)? {
-            capabilities.extend(query.options().into_iter().map(Capability::Search));
-        }
-
+        let query = self.search_query(json)?;
+        capabilities.extend(query.options().into_iter().map(Capability::Search));
         Ok(capabilities)
     }
 
@@ -151,15 +127,15 @@ impl EnvelopeSearchCommand {
             .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account);
+        let query = self.search_query(printer.is_json())?;
         let text = query_text(self.query.as_deref());
-        let query = parse_query(text.as_deref(), printer.is_json())?;
 
         let Outcome {
             value: EnvelopePage { envelopes, more },
             errors,
         } = client.search_envelopes(
             &mailbox,
-            query.as_ref(),
+            Some(&query),
             Some(page),
             page_size,
             self.has_attachment,
@@ -187,6 +163,19 @@ impl EnvelopeSearchCommand {
         printer.out(&output)?;
         partial_when(&output.errors)
     }
+
+    /// The query and the order, lowered, read against the clock and the
+    /// local zone.
+    fn search_query(&self, json: bool) -> Result<SearchEmailsQuery> {
+        let query = match query_text(self.query.as_deref()) {
+            Some(text) => Some(query::parse(&[text], json, ErrorCode::SearchInvalid)?),
+            None => None,
+        };
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_secs() as i64);
+        SearchEmailsQuery::new(query, self.sort, now, TimeZone::system())
+    }
 }
 
 /// Joins the trailing positional into the query text, `None` when it is
@@ -197,200 +186,77 @@ fn query_text(words: Option<&[String]>) -> Option<String> {
     Some(trimmed.to_owned()).filter(|text| !text.is_empty())
 }
 
-/// Parses the query text, `None` standing for no query.
-///
-/// A query that does not parse fails `search-invalid`: in plain output the
-/// fault is drawn over the query, under `json` its message is one line.
-fn parse_query(text: Option<&str>, json: bool) -> Result<Option<SearchEmailsQuery>> {
-    let Some(text) = text else {
-        return Ok(None);
-    };
-
-    match text.parse::<SearchEmailsQuery>() {
-        Ok(query) => Ok(Some(query)),
-        Err(err) => {
-            let message = match json {
-                true => query_parse_error_line(&err),
-                false => render_query_parse_error(&err),
-            };
-            Err(CodedError::new(ErrorCode::SearchInvalid, message).into())
-        }
-    }
-}
-
-/// Renders a parse error with ariadne, one label per inner error, into
-/// the string the caller raises through stdout.
-///
-/// Rendered without colour, the string landing in a JSON error as often
-/// as on a terminal. The report's own `Error:` head is dropped, the CLI
-/// printing its own.
-fn render_query_parse_error(err: &SearchQueryError) -> String {
-    let SearchQueryError::ParseError(errs, src) = err;
-    let source_name = "query";
-    let config = Config::default()
-        .with_color(false)
-        .with_index_type(IndexType::Byte);
-    let span = errs
-        .first()
-        .map(|inner| inner.span().into_range())
-        .unwrap_or(0..0);
-    let mut report = Report::build(ReportKind::Error, (source_name, span))
-        .with_config(config)
-        .with_message(err.to_string());
-
-    for inner in errs {
-        let range = word_range(src, inner.span().into_range());
-        let label = Label::new((source_name, range)).with_message(describe(inner, src));
-        report = report.with_label(label);
-    }
-
-    let mut buf = Vec::new();
-    let _ = report
-        .finish()
-        .write((source_name, Source::from(src.as_str())), &mut buf);
-    let rendered = String::from_utf8_lossy(&buf);
-
-    match rendered.strip_prefix("Error: ") {
-        Some(rendered) => rendered.to_owned(),
-        None => rendered.into_owned(),
-    }
-}
-
-/// A parse error as one line: the error, then each inner one with its
-/// byte span in the query and what was expected there.
-fn query_parse_error_line(err: &SearchQueryError) -> String {
-    let SearchQueryError::ParseError(errs, src) = err;
-    let mut line = err.to_string();
-
-    for inner in errs {
-        let range = word_range(src, inner.span().into_range());
-        let what = describe(inner, src);
-        line.push_str(&format!("; at {}..{}, {what}", range.start, range.end));
-    }
-
-    line
-}
-
-/// Widens an error span to the whole word it starts, as chumsky merges the
-/// errors raised at one place over the span of the first.
-fn word_range(src: &str, range: Range<usize>) -> Range<usize> {
-    let delimiter = |c: char| matches!(c, ' ' | '(' | ')');
-
-    match src.get(range.start..) {
-        Some(rest) if rest.starts_with(|c| !delimiter(c)) => {
-            let len = rest.find(delimiter).unwrap_or(rest.len());
-            range.start..(range.start + len).max(range.end)
-        }
-        _ => range,
-    }
-}
-
-/// Says what the parser found and what it expected there, the found
-/// part quoted from the query over the error's whole span.
-fn describe(err: &Rich<'_, char>, src: &str) -> String {
-    let RichReason::ExpectedFound { expected, .. } = err.reason() else {
-        return err.reason().to_string();
-    };
-
-    let found = match src.get(word_range(src, err.span().into_range())) {
-        Some(found) if !found.is_empty() => format!("`{found}`"),
-        _ => String::from("the end of the query"),
-    };
-
-    let mut expected: Vec<String> = expected
-        .iter()
-        .map(|pattern| match pattern {
-            RichPattern::Token(token) => format!("`{}`", **token),
-            RichPattern::Label(label) => label.to_string(),
-            RichPattern::Identifier(word) => format!("`{word}`"),
-            RichPattern::EndOfInput => String::from("the end of the query"),
-            _ => String::from("something else"),
-        })
-        .collect();
-    expected.dedup();
-
-    match expected.split_last() {
-        None => format!("unexpected {found}"),
-        Some((last, [])) => format!("found {found}, expected {last}"),
-        Some((last, rest)) => format!("found {found}, expected {} or {last}", rest.join(", ")),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::unified::email::search::query::SearchEmailsQuery;
+    use clap::{CommandFactory, Parser};
 
-    use clap::CommandFactory;
+    use super::EnvelopeSearchCommand;
 
-    use super::{EnvelopeSearchCommand, query_parse_error_line, render_query_parse_error};
-
-    fn render(query: &str) -> String {
-        let err = query.parse::<SearchEmailsQuery>().unwrap_err();
-        render_query_parse_error(&err)
+    fn refusal(args: &[&str], json: bool) -> String {
+        let command = EnvelopeSearchCommand::parse_from([&["search"], args].concat());
+        let err = command.capabilities(json).unwrap_err();
+        err.to_string()
     }
 
+    /// A refused query is drawn once over the query, its §8.4 code named.
     #[test]
-    fn a_refused_query_is_reported_once_over_the_whole_query() {
-        let rendered = render("from alice order by size");
-
-        assert!(
-            rendered.starts_with("Cannot parse search query `from alice order by size`\n"),
-            "{rendered}",
-        );
+    fn a_refused_query_is_drawn_over_the_query() {
+        let rendered = refusal(&["from:alice", "foo:bar"], false);
+        assert!(rendered.contains("unknown-field"), "{rendered}");
         assert!(!rendered.contains("Error:"), "{rendered}");
-        assert!(rendered.contains("query:1:21"), "{rendered}");
-        assert!(
-            rendered.contains("found `size`, expected `date`, `from`, `to` or `subject`"),
-            "{rendered}",
-        );
+        assert!(rendered.contains("fields: "), "{rendered}");
     }
 
-    /// Under JSON the error is one line, no diagram drawn over the query.
+    /// Under JSON the refusal is one line with its span.
     #[test]
     fn a_refused_query_is_one_line_under_json() {
-        let err = "from alice order by size".parse::<SearchEmailsQuery>();
-        let line = query_parse_error_line(&err.unwrap_err());
-
+        let line = refusal(&["date:tomorrow"], true);
         assert!(!line.contains('\n'), "{line}");
         assert!(
-            line.starts_with("Cannot parse search query `from alice order by size`; at 20..24, "),
+            line.starts_with("Query refused, invalid-date at 5..13"),
             "{line}"
         );
-        assert!(line.contains("found `size`, expected"), "{line}");
     }
 
+    /// A field outside mail is refused before any backend is reached.
     #[test]
-    fn a_misspelt_word_is_quoted_whole_and_no_keyword_prefix_leaks() {
-        let rendered = render("and");
-
-        assert!(rendered.contains("found `and`, expected"), "{rendered}");
-        assert!(!rendered.contains("'d'"), "{rendered}");
-        assert!(!rendered.contains("'t'"), "{rendered}");
+    fn a_field_outside_mail_is_refused() {
+        let message = refusal(&["status:completed"], false);
+        assert_eq!(message, "Cannot search `status` in mail");
     }
 
+    /// The query and the order name the options a backend declares.
     #[test]
-    fn a_query_past_its_bounds_says_which() {
-        let query = format!("{}from a{}", "(".repeat(40), ")".repeat(40));
-        let rendered = render(&query);
-
-        assert!(
-            rendered.contains("parentheses nested deeper than 32 levels"),
-            "{rendered}",
+    fn a_query_names_its_options() {
+        let command = EnvelopeSearchCommand::parse_from([
+            "search",
+            "--sort",
+            "oldest-first",
+            "--",
+            "from:alice",
+            "date:5h",
+            "-is:read",
+        ]);
+        let names: Vec<String> = command
+            .capabilities(false)
+            .unwrap()
+            .into_iter()
+            .map(|capability| capability.name())
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "envelope.search",
+                "envelope.search.from",
+                "envelope.search.date.instant",
+                "envelope.search.is.read",
+                "envelope.search.sort.oldest-first",
+            ]
         );
     }
 
     #[test]
-    fn a_date_clause_expects_a_date() {
-        let rendered = render("after foo");
-
-        assert!(
-            rendered.contains("found `foo`, expected date after `after`"),
-            "{rendered}",
-        );
-    }
-
-    #[test]
-    fn the_help_prints_one_clause_per_line() {
+    fn the_help_prints_one_field_group_per_line() {
         let help = EnvelopeSearchCommand::command()
             .render_long_help()
             .to_string();
@@ -399,16 +265,6 @@ mod tests {
             .filter(|line| line.trim_start().starts_with("- `"))
             .count();
 
-        assert_eq!(bullets, 8, "{help}");
-    }
-
-    #[test]
-    fn an_empty_sort_expects_a_key() {
-        let rendered = render("from alice order by");
-
-        assert!(
-            rendered.contains("found the end of the query, expected sort key after `order by`"),
-            "{rendered}",
-        );
+        assert_eq!(bullets, 6, "{help}");
     }
 }

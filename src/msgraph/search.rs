@@ -58,6 +58,7 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
         }
         SearchEmailsFilterQuery::Subject(pattern) => format!("subject:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::Body(pattern) => format!("body:{}", value_kql(pattern)),
+        SearchEmailsFilterQuery::Text(pattern) => value_kql(pattern),
         SearchEmailsFilterQuery::Attachment => String::from("hasAttachments:true"),
         SearchEmailsFilterQuery::Flag(_) => {
             return Err(unsupported(

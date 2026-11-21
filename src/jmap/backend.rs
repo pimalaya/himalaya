@@ -1205,6 +1205,10 @@ fn convert_filter(
         ]),
         Q::Not(inner) => JmapFilter::not(vec![convert_filter(inner, None)]),
 
+        Q::Text(text) => condition(JmapEmailFilter {
+            text: Some(text.clone()),
+            ..Default::default()
+        }),
         Q::From(pattern) => condition(JmapEmailFilter {
             from: Some(pattern.clone()),
             ..Default::default()
@@ -1449,8 +1453,8 @@ mod tests {
     fn a_negated_date_clause_is_not_rechecked_as_a_positive_one() {
         let december = sent_on("2025-12-01T10:00:00+00:00");
 
-        assert!(rechecked("not after 2026-01-01", &december));
-        assert!(rechecked("date 2026-01-01 or subject x", &december));
+        assert!(rechecked("not date:2026-01-02..", &december));
+        assert!(rechecked("date:2026-01-01 or subject:x", &december));
     }
 
     /// Whether a server holding `received` as the received-at answers
@@ -1487,17 +1491,17 @@ mod tests {
         let before = sent_on("2026-11-14T09:59:59+01:00");
         let after = sent_on("2026-11-14T10:00:01+01:00");
 
-        assert!(!rechecked("after 2026-11-14T10:00:00+01:00", &before));
-        assert!(rechecked("after 2026-11-14T10:00:00+01:00", &after));
-        assert!(rechecked("before 2026-11-14T10:00:00+01:00", &before));
-        assert!(!rechecked("before 2026-11-14T10:00:00+01:00", &after));
+        assert!(!rechecked("date:2026-11-14T10:00:01+01:00..", &before));
+        assert!(rechecked("date:2026-11-14T10:00:01+01:00..", &after));
+        assert!(rechecked("date:..2026-11-14T09:59:59+01:00", &before));
+        assert!(!rechecked("date:..2026-11-14T09:59:59+01:00", &after));
 
-        let parsed: SearchEmailsQuery = "after 2026-11-14T10:00:00+01:00".parse().unwrap();
+        let parsed: SearchEmailsQuery = "date:2026-11-14T10:00:01+01:00..".parse().unwrap();
         let converted = build(Some(&parsed), String::from("inbox"));
         assert!(received_matches(&converted.filter, "2026-11-14T09:00:01Z"));
         assert!(!received_matches(&converted.filter, "2026-11-14T08:59:59Z"));
 
-        let parsed: SearchEmailsQuery = "before 2026-11-14T10:00:00+01:00 or from a"
+        let parsed: SearchEmailsQuery = "date:..2026-11-14T09:59:59+01:00 or from:a"
             .parse()
             .unwrap();
         let converted = build(Some(&parsed), String::from("inbox"));
@@ -1510,7 +1514,7 @@ mod tests {
         let tokyo = sent_on("2026-05-15T00:30:00+09:00");
         let received = "2026-05-14T15:31:00Z";
 
-        for query in ["date 2026-05-15", "after 2026-05-14"] {
+        for query in ["date:2026-05-15", "date:2026-05-15.."] {
             let parsed: SearchEmailsQuery = query.parse().unwrap();
             let converted = build(Some(&parsed), String::from("inbox"));
             assert!(received_matches(&converted.filter, received), "{query}");
@@ -1519,7 +1523,7 @@ mod tests {
 
         let kiritimati = sent_on("2026-05-15T00:00:00+14:00");
         let received = "2026-05-14T10:00:00Z";
-        let parsed: SearchEmailsQuery = "date 2026-05-15".parse().unwrap();
+        let parsed: SearchEmailsQuery = "date:2026-05-15".parse().unwrap();
         let converted = build(Some(&parsed), String::from("inbox"));
         assert!(received_matches(&converted.filter, received));
         assert!(post_match(&kiritimati, &converted.post_filters));

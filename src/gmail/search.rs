@@ -64,7 +64,9 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Subject(pattern) => {
             Ok(format!("subject:{}", value_q(filter, pattern)?))
         }
-        SearchEmailsFilterQuery::Body(pattern) => value_q(filter, pattern),
+        SearchEmailsFilterQuery::Body(pattern) | SearchEmailsFilterQuery::Text(pattern) => {
+            value_q(filter, pattern)
+        }
         SearchEmailsFilterQuery::Flag(flag) => flag_q(filter, flag),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("has:attachment")),
         SearchEmailsFilterQuery::MessageId(id) => {
@@ -111,7 +113,9 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::Subject(pattern) => {
             Ok(format!("-subject:{}", value_q(filter, pattern)?))
         }
-        SearchEmailsFilterQuery::Body(pattern) => Ok(format!("-{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Body(pattern) | SearchEmailsFilterQuery::Text(pattern) => {
+            Ok(format!("-{}", value_q(filter, pattern)?))
+        }
         SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(filter, flag)?)),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("-has:attachment")),
         SearchEmailsFilterQuery::MessageId(id) => {
@@ -245,77 +249,74 @@ mod tests {
     /// being strict.
     #[test]
     fn an_instant_is_sent_in_seconds() {
-        assert_eq!(q("after 2026-11-14T10:00:00+01:00"), "after:1794646800");
-        assert_eq!(q("not before 2026-11-14T09:00:00Z"), "-before:1794646800");
+        assert_eq!(q("date:2026-11-14T10:00:01+01:00.."), "after:1794646800");
+        assert_eq!(q("not date:..2026-11-14T08:59:59Z"), "-before:1794646800");
     }
 
     #[test]
     fn leaf_conditions() {
-        assert_eq!(q("from alice"), "from:alice");
-        assert_eq!(q("to bob@example.org"), "to:bob@example.org");
-        assert_eq!(q("subject hello"), "subject:hello");
-        assert_eq!(q("body world"), "world");
+        assert_eq!(q("from:alice"), "from:alice");
+        assert_eq!(q("to:bob@example.org"), "to:bob@example.org");
+        assert_eq!(q("subject:hello"), "subject:hello");
+        assert_eq!(q("body:world"), "world");
     }
 
     #[test]
     fn message_id_conditions() {
+        assert_eq!(q("mid:id123@example.org"), "rfc822msgid:id123@example.org");
         assert_eq!(
-            q("message-id id123@example.org"),
+            q("mid:<id123@example.org>"),
             "rfc822msgid:id123@example.org"
         );
         assert_eq!(
-            q("message-id <id123@example.org>"),
-            "rfc822msgid:id123@example.org"
-        );
-        assert_eq!(
-            q("not message-id id123@example.org"),
+            q("not mid:id123@example.org"),
             "-rfc822msgid:id123@example.org"
         );
     }
 
     #[test]
     fn patterns_with_spaces_get_quoted() {
-        assert_eq!(q("from \"john doe\""), "from:\"john doe\"");
-        assert_eq!(q("from alice@example.org"), "from:alice@example.org");
+        assert_eq!(q("from:\"john doe\""), "from:\"john doe\"");
+        assert_eq!(q("from:alice@example.org"), "from:alice@example.org");
     }
 
     #[test]
     fn patterns_cannot_widen_the_search() {
         assert_eq!(
-            q("subject \"rapport OR kangaroo\""),
+            q("subject:\"rapport OR kangaroo\""),
             "subject:\"rapport or kangaroo\""
         );
         assert_eq!(
-            q("subject \"rapport} OR {kangaroo\""),
+            q("subject:\"rapport} OR {kangaroo\""),
             "subject:\"rapport or kangaroo\""
         );
-        assert_eq!(q("from \"alice) AND (dave\""), "from:\"alice and dave\"");
+        assert_eq!(q("from:\"alice) AND (dave\""), "from:\"alice and dave\"");
         assert_eq!(
-            q(r#"body "zebrafish\" OR kangaroo""#),
+            q("body:\"zebrafish OR kangaroo\""),
             "\"zebrafish or kangaroo\""
         );
     }
 
     #[test]
     fn operator_lookalikes_get_quoted() {
-        assert_eq!(q("body \"from:alice\""), "\"from:alice\"");
-        assert_eq!(q("not body \"-draft\""), "-\"-draft\"");
+        assert_eq!(q("body:\"from:alice\""), "\"from:alice\"");
+        assert_eq!(q("not body:-draft"), "-\"-draft\"");
     }
 
     #[test]
     fn patterns_without_a_word_bail() {
-        assert!(q_err("subject \"()\"").contains("holds none"));
+        assert!(q_err("subject:\"()\"").contains("holds none"));
     }
 
     #[test]
     fn conjunctions_flatten_into_whitespace() {
-        assert_eq!(q("from f and to t"), "from:f to:t");
-        assert_eq!(q("from f and to t and subject s"), "from:f to:t subject:s",);
+        assert_eq!(q("from:f to:t"), "from:f to:t");
+        assert_eq!(q("from:f to:t subject:s"), "from:f to:t subject:s",);
     }
 
     #[test]
     fn disjunctions_become_brace_groups() {
-        assert_eq!(q("from f or to t"), "{from:f to:t}");
+        assert_eq!(q("from:f or to:t"), "{from:f to:t}");
     }
 
     /// Gmail reads each term inside braces as an alternative, so a
@@ -323,100 +324,100 @@ mod tests {
     #[test]
     fn conjunctions_under_disjunctions_keep_their_group() {
         assert_eq!(
-            q("from alice and subject invoice or from bob"),
+            q("from:alice subject:invoice or from:bob"),
             "{(from:alice subject:invoice) from:bob}",
         );
         assert_eq!(
-            q("date 2026-09-08 or from alice"),
+            q("date:2026-09-08 or from:alice"),
             "{(after:1788825599 before:1788912000) from:alice}",
         );
         assert_eq!(
-            q("from a or (to b and (cc c or subject \"d e\"))"),
+            q("from:a or (to:b (cc:c or subject:\"d e\"))"),
             "{from:a (to:b {cc:c subject:\"d e\"})}",
         );
         assert_eq!(
-            q("not ((from a or to b) and subject c)"),
+            q("not ((from:a or to:b) subject:c)"),
             "{(-from:a -to:b) -subject:c}",
         );
         assert_eq!(
-            q("not (address e and to b)"),
+            q("not (with:e to:b)"),
             "{(-from:e -to:e -cc:e -bcc:e) -to:b}",
         );
     }
 
     #[test]
     fn negated_leaves_get_a_dash() {
-        assert_eq!(q("not from f"), "-from:f");
-        assert_eq!(q("not flag seen"), "-is:read");
-        assert_eq!(q("not flag flagged"), "-is:starred");
-        assert_eq!(q("not flag draft"), "-is:draft");
-        assert_eq!(q("not after 2026-09-08"), "-after:1788911999");
+        assert_eq!(q("not from:f"), "-from:f");
+        assert_eq!(q("not is:read"), "-is:read");
+        assert_eq!(q("not is:flagged"), "-is:starred");
+        assert_eq!(q("not is:draft"), "-is:draft");
+        assert_eq!(q("not date:2026-09-09.."), "-after:1788911999");
     }
 
     #[test]
     fn double_negation_cancels() {
-        assert_eq!(q("not not from f"), "from:f");
-        assert_eq!(q("not not flag seen"), "is:read");
+        assert_eq!(q("not not from:f"), "from:f");
+        assert_eq!(q("not not is:read"), "is:read");
     }
 
     #[test]
     fn negated_compounds_expand_through_de_morgan() {
-        assert_eq!(q("not (from f or to t)"), "-from:f -to:t");
-        assert_eq!(q("not (from f and to t)"), "{-from:f -to:t}");
-        assert_eq!(q("not (not from f and not to t)"), "{from:f to:t}");
+        assert_eq!(q("not (from:f or to:t)"), "-from:f -to:t");
+        assert_eq!(q("not (from:f to:t)"), "{-from:f -to:t}");
+        assert_eq!(q("not (not from:f not to:t)"), "{from:f to:t}");
     }
 
     #[test]
     fn exact_dates_bracket_the_utc_day() {
-        assert_eq!(q("date 2026-09-08"), "after:1788825599 before:1788912000");
+        assert_eq!(q("date:2026-09-08"), "after:1788825599 before:1788912000");
         assert_eq!(
-            q("not date 2026-09-08"),
+            q("not date:2026-09-08"),
             "{-after:1788825599 -before:1788912000}",
         );
     }
 
     #[test]
     fn after_starts_on_the_next_utc_day() {
-        assert_eq!(q("after 2026-09-08"), "after:1788911999");
+        assert_eq!(q("date:2026-09-09.."), "after:1788911999");
     }
 
     #[test]
     fn flag_operators() {
-        assert_eq!(q("flag seen"), "is:read");
-        assert_eq!(q("flag flagged"), "is:starred");
-        assert_eq!(q("flag draft"), "is:draft");
+        assert_eq!(q("is:read"), "is:read");
+        assert_eq!(q("is:flagged"), "is:starred");
+        assert_eq!(q("is:draft"), "is:draft");
     }
 
     #[test]
     fn unsupported_flags_bail() {
-        let query = SearchEmailsQuery::from_str("flag answered").unwrap();
+        let query = SearchEmailsQuery::from_str("is:answered").unwrap();
         let err = filter_to_q(&query.filter.unwrap()).unwrap_err();
 
         assert_eq!(
             err.to_string(),
-            "Cannot search `flag answered`: Gmail search offers no operator for this flag",
+            "Cannot search `is:answered`: Gmail search offers no operator for this flag",
         );
         assert_eq!(
             code_of::<ErrorCode>(&err),
             Some(ErrorCode::SearchUnsupported),
         );
-        assert!(q_err("flag $label").contains("flag $label"));
+        assert!(q_err("tag:$label").contains("tag:$label"));
     }
 
     #[test]
     fn copies_addresses_dates_and_attachments() {
-        assert_eq!(q("cc carol"), "cc:carol");
-        assert_eq!(q("bcc dave"), "bcc:dave");
-        assert_eq!(q("address eve"), "{from:eve to:eve cc:eve bcc:eve}");
-        assert_eq!(q("before 2026-09-08"), "before:1788825600");
-        assert_eq!(q("attachment"), "has:attachment");
-        assert_eq!(q("not address eve"), "-from:eve -to:eve -cc:eve -bcc:eve");
-        assert_eq!(q("not attachment"), "-has:attachment");
-        assert_eq!(q("not before 2026-09-08"), "-before:1788825600");
+        assert_eq!(q("cc:carol"), "cc:carol");
+        assert_eq!(q("bcc:dave"), "bcc:dave");
+        assert_eq!(q("with:eve"), "{from:eve to:eve cc:eve bcc:eve}");
+        assert_eq!(q("date:..2026-09-07"), "before:1788825600");
+        assert_eq!(q("has:attachment"), "has:attachment");
+        assert_eq!(q("not with:eve"), "-from:eve -to:eve -cc:eve -bcc:eve");
+        assert_eq!(q("not has:attachment"), "-has:attachment");
+        assert_eq!(q("not date:..2026-09-07"), "-before:1788825600");
     }
 
     #[test]
     fn the_unread_count_query_translates() {
-        assert_eq!(q("not flag seen"), "-is:read");
+        assert_eq!(q("not is:read"), "-is:read");
     }
 }

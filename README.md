@@ -10,7 +10,7 @@
 </div>
 
 ```sh
-$ himalaya envelope search --json from alice and after 2026-11-01 order by date desc
+$ himalaya envelope search --json --sort newest-first from:alice date:2026-11-02..
 ```
 
 ```json
@@ -262,7 +262,7 @@ Every command runs on the default account unless `-a` names another, prints JSON
 ```sh
 himalaya account check
 himalaya envelope list --json
-himalaya envelope search from alice and after 2 days ago order by date desc
+himalaya envelope search --sort newest-first from:alice date:2d
 himalaya message read 42
 himalaya message reply 42 --body "Thanks!" --send
 himalaya flag add --flag seen 1 2 3

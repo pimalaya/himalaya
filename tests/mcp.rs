@@ -320,12 +320,12 @@ fn a_call_answers_the_payload_and_refuses_what_it_does_not_take() {
             call(
                 4,
                 "envelope_search",
-                json!({ "query": ["subject", "Hello"] }),
+                json!({ "query": ["subject:Hello"] }),
             ),
             call(
                 5,
                 "envelope_search",
-                json!({ "query": "subject Hello order by date desc" }),
+                json!({ "query": "subject:Hello", "sort": "newest-first" }),
             ),
         ],
     );
@@ -780,7 +780,7 @@ fn the_search_tool_says_what_the_backend_answers() {
         .to_string();
 
     assert!(
-        description.contains("(maildir) answers fully: date, after, before"),
+        description.contains("(maildir) answers fully: text, title, body"),
         "{description}"
     );
 }

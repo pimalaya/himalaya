@@ -36,6 +36,7 @@ use io_pimdir::{
     intent::{self, PimdirSubmit},
     object::PimdirHash,
     placement::PimdirFlags,
+    search::mail::PimdirMail,
     summary::{
         PimdirAddress, PimdirSummary,
         mail::{self, PimdirMailSummary},
@@ -65,7 +66,6 @@ use crate::{
             mailbox::{Mailbox, MailboxIndex, MailboxRole},
             outcome::Outcome,
             search::{
-                eval::{self, EnvelopeCopies},
                 filter::query::SearchEmailsFilterQuery,
                 query::SearchEmailsQuery,
                 sort::{
@@ -459,9 +459,9 @@ impl PimdirClient {
         let filter = query.and_then(|q| q.filter.as_ref());
         let sort = query.and_then(|q| q.sort.as_deref());
 
-        match self.search_pushed(&collection, filter, sort, page, page_size)? {
+        match self.search_pushed(&collection, query, filter, sort, page, page_size)? {
             Some(hits) => Ok(hits),
-            None => self.search_scanned(&collection, filter, sort, page, page_size),
+            None => self.search_scanned(&collection, query, sort, page, page_size),
         }
     }
 
@@ -470,6 +470,7 @@ impl PimdirClient {
     fn search_pushed(
         &self,
         collection: &str,
+        query: Option<&SearchEmailsQuery>,
         filter: Option<&SearchEmailsFilterQuery>,
         sort: Option<&[SearchEmailsSorter]>,
         page: Option<u32>,
@@ -508,7 +509,7 @@ impl PimdirClient {
                 return ControlFlow::Break(());
             }
             let envelope = envelope_from_item(&item);
-            match self.matches(&item, &envelope, filter) {
+            match self.matches(&item, query) {
                 Ok(true) => hits.push(envelope),
                 Ok(false) => {}
                 Err(err) => {
@@ -543,7 +544,7 @@ impl PimdirClient {
     fn search_scanned(
         &self,
         collection: &str,
-        filter: Option<&SearchEmailsFilterQuery>,
+        query: Option<&SearchEmailsQuery>,
         sort: Option<&[SearchEmailsSorter]>,
         page: Option<u32>,
         page_size: Option<u32>,
@@ -551,7 +552,7 @@ impl PimdirClient {
         let mut hits: Vec<Envelope> = Vec::new();
         for item in self.scan_items(collection)? {
             let envelope = envelope_from_item(&item);
-            if self.matches(&item, &envelope, filter)? {
+            if self.matches(&item, query)? {
                 hits.push(envelope);
             }
         }
@@ -563,33 +564,30 @@ impl PimdirClient {
         Ok(EnvelopePage { envelopes, more })
     }
 
-    /// Whether `item`, read as `envelope`, matches `filter`, a missing
-    /// local body or blob matched as no body.
-    fn matches(
-        &self,
-        item: &PimdirItem,
-        envelope: &Envelope,
-        filter: Option<&SearchEmailsFilterQuery>,
-    ) -> Result<bool> {
-        let Some(filter) = filter else {
+    /// Whether `item` is a hit of `query`, read from its body when a term
+    /// reads one, else from its summary.
+    fn matches(&self, item: &PimdirItem, query: Option<&SearchEmailsQuery>) -> Result<bool> {
+        let Some(searched) = query.and_then(|query| query.query.as_ref()) else {
             return Ok(true);
         };
-        let body = match &item.object {
-            Some(hash) if reads_body(filter) => self.blobs.get(hash)?.unwrap_or_default(),
-            _ => Vec::new(),
+        let flags: Vec<String> = item.flags.known().into_iter().flatten().cloned().collect();
+        let body = match (&item.object, query.and_then(|q| q.filter.as_ref())) {
+            (Some(hash), Some(filter)) if reads_body(filter) => self.blobs.get(hash)?,
+            _ => None,
         };
-
-        let mail = mail_summary(item.summary.as_ref());
-        let copies = EnvelopeCopies {
-            cc: mail
-                .map(|mail| mail.cc.iter().cloned().map(address).collect())
-                .unwrap_or_default(),
-            bcc: mail
-                .map(|mail| mail.bcc.iter().cloned().map(address).collect())
-                .unwrap_or_default(),
+        let mail = match body {
+            Some(body) => PimdirMail::read(&body, flags),
+            None => {
+                let summary = mail_summary(item.summary.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+                PimdirMail::from_summary(summary, item.sort_key.clone(), flags)
+            }
         };
-
-        Ok(eval::matches_filter(envelope, Some(&copies), &body, filter))
+        let query = query.expect("a query when a parsed one stands");
+        Ok(searched
+            .match_mails(&[mail], query.now, &query.zone)
+            .is_ok_and(|hits| hits == [true]))
     }
 
     /// The mailbox's pending rows, every action kind, in append order, as
@@ -1823,7 +1821,7 @@ fn reads_body(filter: &SearchEmailsFilterQuery) -> bool {
     match filter {
         Q::And(left, right) | Q::Or(left, right) => reads_body(left) || reads_body(right),
         Q::Not(inner) => reads_body(inner),
-        Q::Body(_) => true,
+        Q::Body(_) | Q::Text(_) => true,
         _ => false,
     }
 }
@@ -3629,37 +3627,37 @@ mod tests {
 
     const QUERIES: &[&str] = &[
         "",
-        "flag seen",
-        "not flag seen",
-        "not flag \\\\Seen",
-        "flag flagged",
-        "not flag flagged",
-        "after 2026-05-12",
-        "date 2026-05-13",
-        "not after 2026-05-12",
-        "after 2026-05-11 and not after 2026-05-13",
-        "date 2026-05-13 and not flag seen",
-        "not flag seen and after 2026-05-14",
-        "date 2026-05-10 and date 2026-05-11",
-        "after 2026-05-30",
-        "after 1999-01-01",
-        "not after 1999-01-01",
-        "not date 2026-05-13",
-        "not (after 2026-05-12 and flag seen)",
-        "from user1",
-        "from SECOND",
-        "from alice and not flag seen",
-        "subject release",
-        "subject MÉTÉO",
-        "to team",
-        "body hello",
-        "from user1 or flag seen",
-        "order by date desc",
-        "order by date",
-        "order by from",
-        "date 2026-05-13 order by date asc",
-        "not flag seen order by subject desc",
-        "after 2026-05-12 order by date desc",
+        "is:read",
+        "not is:read",
+        "not tag:\\Seen",
+        "is:flagged",
+        "not is:flagged",
+        "date:2026-05-13..",
+        "date:2026-05-13",
+        "not date:2026-05-13..",
+        "date:2026-05-12.. not date:2026-05-14..",
+        "date:2026-05-13 not is:read",
+        "not is:read date:2026-05-15..",
+        "date:2026-05-10 date:2026-05-11",
+        "date:2026-05-31..",
+        "date:1999-01-02..",
+        "not date:1999-01-02..",
+        "not date:2026-05-13",
+        "not (date:2026-05-13.. is:read)",
+        "from:user1",
+        "from:SECOND",
+        "from:alice not is:read",
+        "subject:release",
+        "subject:MÃTÃO",
+        "to:team",
+        "body:hello",
+        "from:user1 or is:read",
+        " sort:newest-first",
+        " sort:oldest-first",
+        " sort:sender",
+        "date:2026-05-13 sort:oldest-first",
+        "not is:read sort:title",
+        "date:2026-05-13.. sort:newest-first",
     ];
 
     const PAGES: &[(Option<u32>, Option<u32>)] = &[
@@ -3710,10 +3708,10 @@ mod tests {
                 let filter = parsed.as_ref().and_then(|q| q.filter.as_ref());
                 let sort = parsed.as_ref().and_then(|q| q.sort.as_deref());
                 let scanned = client
-                    .search_scanned(mailbox, filter, sort, *page, *size)
+                    .search_scanned(mailbox, parsed.as_ref(), sort, *page, *size)
                     .unwrap();
                 let pushed = client
-                    .search_pushed(mailbox, filter, sort, *page, *size)
+                    .search_pushed(mailbox, parsed.as_ref(), filter, sort, *page, *size)
                     .unwrap()
                     .expect("the seeded rows are filed under their dates");
                 let searched = client
@@ -3741,7 +3739,7 @@ mod tests {
         assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
         assert_paged_reads_agree(&mut client, "imap/INBOX");
 
-        let unread = "not flag seen".parse::<SearchEmailsQuery>().unwrap();
+        let unread = "not is:read".parse::<SearchEmailsQuery>().unwrap();
         let hits = client
             .search_envelopes("imap/INBOX", Some(&unread), None, None, false)
             .unwrap()
@@ -3937,19 +3935,19 @@ mod tests {
         })
         .unwrap();
 
-        for query in ["", "after 2026-05-11", "not flag seen order by from"] {
+        for query in ["", "date:2026-05-12..", "not is:read sort:sender"] {
             let parsed = (!query.is_empty()).then(|| query.parse::<SearchEmailsQuery>().unwrap());
             let filter = parsed.as_ref().and_then(|q| q.filter.as_ref());
             let sort = parsed.as_ref().and_then(|q| q.sort.as_deref());
             assert!(
                 client
-                    .search_pushed("imap/INBOX", filter, sort, None, None)
+                    .search_pushed("imap/INBOX", parsed.as_ref(), filter, sort, None, None)
                     .unwrap()
                     .is_none(),
                 "`{query}`",
             );
             let scanned = client
-                .search_scanned("imap/INBOX", filter, sort, Some(1), Some(10))
+                .search_scanned("imap/INBOX", parsed.as_ref(), sort, Some(1), Some(10))
                 .unwrap();
             let searched = client
                 .search_envelopes("imap/INBOX", parsed.as_ref(), Some(1), Some(10), false)
@@ -3971,7 +3969,7 @@ mod tests {
         let day = |day: &str| Some(day.to_string());
 
         assert_eq!(
-            pushdown("date 2026-05-13 and not flag seen"),
+            pushdown("date:2026-05-13 not is:read"),
             PimdirPushdown {
                 from: day("2026-05-13"),
                 before: day("2026-05-14"),
@@ -3979,24 +3977,24 @@ mod tests {
             }
         );
         assert_eq!(
-            pushdown("after 2026-05-11 and not after 2026-05-13 and after 2026-05-10"),
+            pushdown("date:2026-05-12.. not date:2026-05-14.. date:2026-05-11.."),
             PimdirPushdown {
                 from: day("2026-05-12"),
                 before: day("2026-05-14"),
                 unread: false,
             }
         );
-        assert_eq!(pushdown("after 2026-12-31").from, day("2027-01-01"));
+        assert_eq!(pushdown("date:2027-01-01..").from, day("2027-01-01"));
         assert_eq!(
-            pushdown("after 2026-05-11 or flag seen"),
+            pushdown("date:2026-05-12.. or is:read"),
             PimdirPushdown::default()
         );
         assert_eq!(
-            pushdown("not (after 2026-05-11 and not flag seen)"),
+            pushdown("not (date:2026-05-12.. not is:read)"),
             PimdirPushdown::default()
         );
-        assert_eq!(pushdown("flag seen and from x"), PimdirPushdown::default());
-        assert_eq!(pushdown("after 9999-12-31"), PimdirPushdown::default());
+        assert_eq!(pushdown("is:read from:x"), PimdirPushdown::default());
+        assert_eq!(pushdown("date:9999-12-31..").from, day("9999-12-31"));
     }
 
     /// A body clause matches against the local body, on both search paths;
@@ -4035,9 +4033,8 @@ mod tests {
 
         let subjects = |client: &mut PimdirClient, query: &str| {
             let query = query.parse::<SearchEmailsQuery>().unwrap();
-            let filter = query.filter.as_ref();
             let scanned = client
-                .search_scanned("imap/Sent", filter, None, None, None)
+                .search_scanned("imap/Sent", Some(&query), None, None, None)
                 .unwrap();
             let mut subjects: Vec<String> = client
                 .search_envelopes("imap/Sent", Some(&query), None, None, false)
@@ -4057,12 +4054,12 @@ mod tests {
             subjects
         };
 
-        assert_eq!(subjects(&mut client, "body attached"), ["a"]);
+        assert_eq!(subjects(&mut client, "body:attached"), ["a"]);
         assert_eq!(
-            subjects(&mut client, "not body attached"),
+            subjects(&mut client, "not body:attached"),
             ["attached", "b"]
         );
-        assert_eq!(subjects(&mut client, "subject attached"), ["attached"]);
+        assert_eq!(subjects(&mut client, "subject:attached"), ["attached"]);
     }
 
     #[test]
@@ -4140,17 +4137,16 @@ mod tests {
             eprintln!("envelope list -s 50 -p {page}, paged read: {paged:?}");
         }
         for query in [
-            "not flag seen",
-            "after 2026-08-01",
-            "from user1",
-            "subject release order by from",
+            "not is:read",
+            "date:2026-08-02..",
+            "from:user1",
+            "subject:release sort:sender",
         ] {
             let parsed = query.parse::<SearchEmailsQuery>().unwrap();
-            let filter = parsed.filter.as_ref();
             let sort = parsed.sort.as_deref();
             let scanned = median(|| {
                 client
-                    .search_scanned("imap/INBOX", filter, sort, Some(1), Some(50))
+                    .search_scanned("imap/INBOX", Some(&parsed), sort, Some(1), Some(50))
                     .unwrap()
                     .envelopes
                     .len()

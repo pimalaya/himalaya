@@ -1465,6 +1465,7 @@ fn convert_filter_with(
         Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
+        Q::Text(pattern) => SearchKey::Text(astring(pattern)?),
         Q::MessageId(id) => SearchKey::Header(astring("Message-ID")?, astring(id)?),
         Q::Attachment => {
             return Err(unsupported(
@@ -1754,24 +1755,24 @@ mod tests {
     #[test]
     fn negations_reach_single_keys_only() {
         assert_eq!(
-            search_line("not (from alice or from bob)"),
+            search_line("not (from:alice or from:bob)"),
             "A UID SEARCH NOT FROM alice NOT FROM bob",
         );
-        assert_eq!(search_line("not not from alice"), "A UID SEARCH FROM alice");
+        assert_eq!(search_line("not not from:alice"), "A UID SEARCH FROM alice");
         assert_eq!(
-            search_line("not (from alice and flag flagged)"),
+            search_line("not (from:alice is:flagged)"),
             "A UID SEARCH OR NOT FROM alice NOT FLAGGED",
         );
         assert_eq!(
-            search_line("not address eve"),
+            search_line("not with:eve"),
             "A UID SEARCH NOT FROM eve NOT TO eve NOT CC eve NOT BCC eve",
         );
         assert_eq!(
-            search_line("address eve"),
+            search_line("with:eve"),
             "A UID SEARCH OR FROM eve OR TO eve OR CC eve BCC eve",
         );
         assert_eq!(
-            search_line("from a and not (subject b or not (to c and cc d))"),
+            search_line("from:a not (subject:b or not (to:c cc:d))"),
             "A UID SEARCH FROM a NOT SUBJECT b TO c CC d",
         );
     }
@@ -1779,13 +1780,11 @@ mod tests {
     #[test]
     fn a_message_id_is_a_header_key_rechecked_on_the_root_chain() {
         assert_eq!(
-            search_line("message-id <a@b.org> and from c"),
+            search_line("mid:<a@b.org> from:c"),
             "A UID SEARCH HEADER Message-ID a@b.org FROM c",
         );
 
-        let query: SearchEmailsQuery = "message-id a@b.org and (message-id c@d.org or from e)"
-            .parse()
-            .unwrap();
+        let query: SearchEmailsQuery = "mid:a@b.org (mid:c@d.org or from:e)".parse().unwrap();
         assert_eq!(root_message_ids(query.filter.as_ref()), ["a@b.org"]);
     }
 
@@ -1794,17 +1793,17 @@ mod tests {
     #[test]
     fn an_instant_is_searched_by_its_band_on_the_root_chain_alone() {
         assert_eq!(
-            search_line("after 2026-11-14T10:00:00+01:00 and from c"),
+            search_line("date:2026-11-14T10:00:01+01:00.. from:c"),
             "A UID SEARCH SENTSINCE \"13-Nov-2026\" FROM c",
         );
         assert_eq!(
-            search_line("before 2026-11-14T10:00:00+01:00"),
+            search_line("date:..2026-11-14T09:59:59+01:00"),
             "A UID SEARCH SENTBEFORE \"16-Nov-2026\"",
         );
 
         for query in [
-            "after 2026-11-14T10:00:00Z or from c",
-            "not before 2026-11-14T10:00:00Z",
+            "date:2026-11-14T10:00:01Z.. or from:c",
+            "not date:..2026-11-14T09:59:59Z",
         ] {
             let query: SearchEmailsQuery = query.parse().unwrap();
             let err = search_keys(query.filter.as_ref()).unwrap_err();
@@ -1872,7 +1871,7 @@ mod tests {
         let config: ImapConfig = toml::from_str(&format!("server = \"imap://{addr}\"")).unwrap();
         let mut secrets = pimalaya_config::secret::SecretResolver::new();
         let mut client = ImapClient::new(config, &mut secrets).unwrap();
-        let query: SearchEmailsQuery = "after 2026-11-14T10:00:00+01:00".parse().unwrap();
+        let query: SearchEmailsQuery = "date:2026-11-14T10:00:01+01:00..".parse().unwrap();
         let page = client
             .search_envelopes("INBOX", Some(&query), None, None, false)
             .unwrap();
@@ -1898,15 +1897,15 @@ mod tests {
     #[test]
     fn a_registry_keyword_is_searched_by_its_canonical_spelling() {
         assert_eq!(
-            search_line("flag important"),
+            search_line("tag:important"),
             "A UID SEARCH KEYWORD $Important"
         );
-        assert_eq!(search_line("flag junk"), "A UID SEARCH KEYWORD $Junk");
+        assert_eq!(search_line("tag:junk"), "A UID SEARCH KEYWORD $Junk");
         assert_eq!(
-            search_line("flag Forwarded"),
+            search_line("tag:Forwarded"),
             "A UID SEARCH KEYWORD $Forwarded"
         );
-        assert_eq!(search_line("flag custom"), "A UID SEARCH KEYWORD custom");
+        assert_eq!(search_line("tag:custom"), "A UID SEARCH KEYWORD custom");
     }
 
     #[test]
@@ -1917,7 +1916,7 @@ mod tests {
             code_of::<ErrorCode>(&err),
             Some(ErrorCode::SearchUnsupported)
         );
-        assert!(err.to_string().contains("`attachment`"), "{err}");
+        assert!(err.to_string().contains("`has:attachment`"), "{err}");
     }
 
     #[test]

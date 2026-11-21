@@ -1470,7 +1470,7 @@ mod page_tests {
     /// exactly full last page has no next one either.
     #[test]
     fn a_search_page_reads_one_message_past_it() {
-        let query: SearchEmailsQuery = "subject report".parse().unwrap();
+        let query: SearchEmailsQuery = "subject:report".parse().unwrap();
 
         let (mut client, requests) = graph(&[page(&["1", "2"]), json!({"value": []})]);
         let found = client

@@ -1,7 +1,7 @@
 //! # Search sort query
 //!
-//! Exposes [`SearchEmailsSortQuery`] and friends, the AST
-//! [`super::parser::query`] produces.
+//! Exposes [`SearchEmailsSortQuery`] and friends, the chain an order
+//! lowers to.
 
 /// The sort half of a search query, applied left to right, so the first
 /// sorter is the primary key.

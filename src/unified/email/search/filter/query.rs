@@ -1,7 +1,7 @@
 //! # Search filter query
 //!
-//! Exposes [`SearchEmailsFilterQuery`], the recursive AST
-//! [`super::parser::query`] produces.
+//! Exposes [`SearchEmailsFilterQuery`], the tree a pimdir SEARCH §8 query
+//! lowers to ([`super::super::query::SearchEmailsQuery::new`]).
 
 use std::fmt;
 
@@ -9,12 +9,12 @@ use chrono::{DateTime, FixedOffset, NaiveDate};
 
 use crate::unified::email::flag::Flag;
 
-/// The filter half of a search query: three operators over sixteen
-/// conditions.
+/// The filter half of a search query: three operators over the conditions
+/// a mail server searches.
 ///
 /// The date conditions read the `Date:` header, the sent-at, rather than
 /// the server's received-at.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SearchEmailsFilterQuery {
     /// Emails matching both conditions.
     And(Box<SearchEmailsFilterQuery>, Box<SearchEmailsFilterQuery>),
@@ -32,20 +32,21 @@ pub enum SearchEmailsFilterQuery {
     AfterInstant(DateTime<FixedOffset>),
     /// Emails sent strictly before that instant, to the second.
     BeforeInstant(DateTime<FixedOffset>),
-    /// Emails whose `From:` header contains the pattern.
+    /// Emails holding the text anywhere: a header or a text body.
+    Text(String),
+    /// Emails whose `From:` header holds the text.
     From(String),
-    /// Emails whose `To:` header contains the pattern.
+    /// Emails whose `To:` header holds the text.
     To(String),
-    /// Emails whose `Cc:` header contains the pattern.
+    /// Emails whose `Cc:` header holds the text.
     Cc(String),
-    /// Emails whose `Bcc:` header contains the pattern.
+    /// Emails whose `Bcc:` header holds the text.
     Bcc(String),
-    /// Emails whose `From:`, `To:`, `Cc:` or `Bcc:` header contains the
-    /// pattern.
+    /// Emails whose `From:`, `To:`, `Cc:` or `Bcc:` header holds the text.
     Address(String),
-    /// Emails whose `Subject:` header contains the pattern.
+    /// Emails whose `Subject:` header holds the text.
     Subject(String),
-    /// Emails one of whose text bodies contains the pattern.
+    /// Emails one of whose text bodies holds the text.
     Body(String),
     /// Emails carrying the flag.
     Flag(Flag),
@@ -56,79 +57,51 @@ pub enum SearchEmailsFilterQuery {
     MessageId(String),
 }
 
-/// Renders the filter in the query language, so an error can quote the
-/// clause it is about as the user would write it.
+/// Renders the filter in the pimdir SEARCH language, so an error can quote
+/// the clause it is about as the user would write it.
 impl fmt::Display for SearchEmailsFilterQuery {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SearchEmailsFilterQuery as Q;
 
         match self {
-            Q::And(left, right) => write!(f, "({left} and {right})"),
+            Q::And(left, right) => write!(f, "({left} {right})"),
             Q::Or(left, right) => write!(f, "({left} or {right})"),
             Q::Not(inner) => write!(f, "not {inner}"),
-            Q::Date(date) => write!(f, "date {date}"),
-            Q::AfterDate(date) => write!(f, "after {date}"),
-            Q::BeforeDate(date) => write!(f, "before {date}"),
-            Q::AfterInstant(instant) => write!(f, "after {}", instant.to_rfc3339()),
-            Q::BeforeInstant(instant) => write!(f, "before {}", instant.to_rfc3339()),
-            Q::From(pattern) => write!(f, "from {}", Pattern(pattern)),
-            Q::To(pattern) => write!(f, "to {}", Pattern(pattern)),
-            Q::Cc(pattern) => write!(f, "cc {}", Pattern(pattern)),
-            Q::Bcc(pattern) => write!(f, "bcc {}", Pattern(pattern)),
-            Q::Address(pattern) => write!(f, "address {}", Pattern(pattern)),
-            Q::Subject(pattern) => write!(f, "subject {}", Pattern(pattern)),
-            Q::Body(pattern) => write!(f, "body {}", Pattern(pattern)),
-            Q::Flag(flag) => write!(f, "flag {}", flag.raw()),
-            Q::Attachment => write!(f, "attachment"),
-            Q::MessageId(id) => write!(f, "message-id {}", Pattern(id)),
+            Q::Date(date) => write!(f, "date:{date}"),
+            Q::AfterDate(date) => write!(f, "date:{}..", date.succ_opt().unwrap_or(*date)),
+            Q::AfterInstant(instant) => write!(f, "date:{}..", instant.to_rfc3339()),
+            Q::BeforeDate(date) => write!(f, "date:..{}", date.pred_opt().unwrap_or(*date)),
+            Q::BeforeInstant(instant) => write!(f, "date:..{}", instant.to_rfc3339()),
+            Q::Text(text) => write!(f, "{}", Text(text)),
+            Q::From(text) => write!(f, "from:{}", Text(text)),
+            Q::To(text) => write!(f, "to:{}", Text(text)),
+            Q::Cc(text) => write!(f, "cc:{}", Text(text)),
+            Q::Bcc(text) => write!(f, "bcc:{}", Text(text)),
+            Q::Address(text) => write!(f, "with:{}", Text(text)),
+            Q::Subject(text) => write!(f, "subject:{}", Text(text)),
+            Q::Body(text) => write!(f, "body:{}", Text(text)),
+            Q::Flag(flag) => match flag.raw() {
+                "\\Seen" => write!(f, "is:read"),
+                "\\Flagged" => write!(f, "is:flagged"),
+                "\\Answered" => write!(f, "is:answered"),
+                "\\Draft" => write!(f, "is:draft"),
+                raw => write!(f, "tag:{raw}"),
+            },
+            Q::Attachment => write!(f, "has:attachment"),
+            Q::MessageId(id) => write!(f, "mid:{}", Text(id)),
         }
     }
 }
 
-/// A pattern as the grammar reads it back: quoted when it holds a space,
-/// a parenthesis or a double quote.
-struct Pattern<'a>(&'a str);
+/// A text as the language reads it back: quoted when it holds a space, a
+/// parenthesis or a double quote.
+struct Text<'a>(&'a str);
 
-impl fmt::Display for Pattern<'_> {
+impl fmt::Display for Text<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.contains([' ', '(', ')', '"', '\\']) {
-            let escaped = self.0.replace('\\', "\\\\").replace('"', "\\\"");
-            write!(f, "\"{escaped}\"")
-        } else {
-            write!(f, "{}", self.0)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use chumsky::Parser;
-
-    use crate::unified::email::search::filter::{parser, query::SearchEmailsFilterQuery};
-
-    #[test]
-    fn a_filter_renders_back_into_the_language_it_parses_from() {
-        let queries = [
-            "from alice",
-            "not subject \"weekly report\"",
-            "(cc bob or attachment)",
-            "(before 2026-01-01 and address \"say \\\"hi\\\"\")",
-            "message-id id@example.com",
-            "after 2026-11-14T09:30:00+01:00",
-            "before 2026-11-14T09:30:00Z",
-            "not message-id \"a b@example.com\"",
-        ];
-
-        for query in queries {
-            let parsed: SearchEmailsFilterQuery =
-                parser::query().parse(query).into_result().unwrap();
-            let rendered = parsed.to_string();
-            let reparsed: SearchEmailsFilterQuery = parser::query()
-                .parse(rendered.as_str())
-                .into_result()
-                .unwrap();
-
-            assert_eq!(parsed, reparsed, "{query} rendered as {rendered}");
+        match self.0.contains([' ', '(', ')', '"', ':']) {
+            true => write!(f, "\"{}\"", self.0.replace('"', " ")),
+            false => write!(f, "{}", self.0),
         }
     }
 }
