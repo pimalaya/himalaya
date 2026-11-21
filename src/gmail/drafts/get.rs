@@ -17,7 +17,7 @@ use crate::{
         client::GmailClient,
         format::{FormatArg, snippet_text, str_of},
     },
-    shared::output::write_bytes_or_save,
+    output::write_bytes_or_save,
 };
 
 /// Get a single Gmail draft (users.drafts.get).

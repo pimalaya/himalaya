@@ -13,12 +13,14 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::{
-        flag::{Flag, IanaFlag},
-        mailbox::MailboxRole,
-    },
     pimdir::client::PimdirClient,
-    shared::message::arg::MessageArg,
+    unified::{
+        email::{
+            flag::{Flag, IanaFlag},
+            mailbox::MailboxRole,
+        },
+        message::arg::MessageArg,
+    },
 };
 
 /// Queue a message for sending, printing its queue row.

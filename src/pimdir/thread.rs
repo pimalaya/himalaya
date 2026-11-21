@@ -13,12 +13,14 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     pimdir::{
         client::PimdirClient,
         index::{PimdirListStyle, PimdirMailThread},
     },
-    shared::envelope::list::{format_flags, format_names},
+    unified::{
+        backend::Backend,
+        envelope::list::{format_flags, format_names},
+    },
 };
 
 /// List the thread of a message, oldest first.
@@ -141,14 +143,14 @@ mod tests {
     use chrono::DateTime;
 
     use crate::{
-        email::{
-            address::Address,
-            envelope::Envelope,
-            flag::{Flag, IanaFlag},
-        },
         pimdir::{
             index::{PimdirListStyle, PimdirMailHit, PimdirMailThread},
             thread::PimdirThreadOutput,
+        },
+        unified::email::{
+            address::Address,
+            envelope::Envelope,
+            flag::{Flag, IanaFlag},
         },
     };
 

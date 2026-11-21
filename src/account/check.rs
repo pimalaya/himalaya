@@ -22,10 +22,10 @@ use pimalaya_config::secret::SecretResolver;
 #[cfg(feature = "imap")]
 use crate::config::imap::ImapConfig;
 use crate::{
-    backend::Backend,
     cli::resolve_account,
     config::tls::{RustlsCryptoConfig, TlsConfig, TlsProviderConfig},
     error::ErrorCode,
+    unified::backend::Backend,
 };
 
 /// Validate the account configuration.
@@ -505,9 +505,9 @@ mod tests {
 
     use crate::{
         account::check::{AccountCheckCommand, connect_pimdir},
-        backend::Backend,
         config::pimdir::PimdirConfig,
         error::ErrorCode,
+        unified::backend::Backend,
     };
 
     /// A printer keeping what it is handed, as text.

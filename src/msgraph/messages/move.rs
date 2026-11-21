@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Move a Microsoft Graph message into another folder (`POST
 /// /me/messages/{id}/move`).

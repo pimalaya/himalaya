@@ -24,7 +24,7 @@ use pimalaya_cli::file::private_options;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::email::envelope::Envelope;
+use crate::unified::email::envelope::Envelope;
 
 /// The version of what a cached envelope or index holds, raised when a
 /// message would now read or scan differently, so an older cache is

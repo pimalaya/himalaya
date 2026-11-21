@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::batch_modify::GmailMessagesBatchModify;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdsReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdsReceipt};
 
 /// Modify the labels of several Gmail messages at once
 /// (users.messages.batchModify).

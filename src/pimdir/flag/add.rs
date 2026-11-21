@@ -9,12 +9,11 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    email::flag::FlagOp,
     pimdir::{
         client::PimdirClient,
         flag::{PimdirFlagStageOutput, RawFlagsArg, message_ids},
     },
-    shared::{flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
+    unified::{email::flag::FlagOp, flag::arg::MessageIdsArg, mailbox::arg::MailboxArg},
 };
 
 /// Stage flags added to messages, keeping the ones already set.

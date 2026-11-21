@@ -23,12 +23,12 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     listing,
     msgraph::{
         client::MsgraphClient,
         messages::list::{next_page, raw_page, resume, skip_of},
     },
+    unified::backend::Backend,
 };
 
 /// List Microsoft Graph mail folders (`GET /me/mailFolders`).

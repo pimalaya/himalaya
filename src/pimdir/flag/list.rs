@@ -12,8 +12,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, backend::Backend, email::flag::Flag, pimdir::client::PimdirClient,
-    shared::mailbox::arg::MailboxArg,
+    account::context::Account,
+    pimdir::client::PimdirClient,
+    unified::{backend::Backend, email::flag::Flag, mailbox::arg::MailboxArg},
 };
 
 /// List the flags a pimdir message carries, one raw spelling per row.
@@ -90,7 +91,7 @@ impl fmt::Display for PimdirFlagListOutput {
 
 #[cfg(test)]
 mod tests {
-    use crate::{email::flag::Flag, pimdir::flag::list::PimdirFlagListOutput};
+    use crate::{pimdir::flag::list::PimdirFlagListOutput, unified::email::flag::Flag};
 
     fn list(flags: Option<Vec<&str>>) -> PimdirFlagListOutput {
         PimdirFlagListOutput {

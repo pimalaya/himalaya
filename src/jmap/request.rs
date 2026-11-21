@@ -18,7 +18,7 @@ use io_jmap::{
 use pimalaya_cli::{printer::Printer, session::check_stdin};
 use serde_json::{Map, Value, json};
 
-use crate::{error::ErrorCode, jmap::client::JmapClient, shared::raw_json::RawJsonOutput};
+use crate::{error::ErrorCode, jmap::client::JmapClient, raw_json::RawJsonOutput};
 
 /// Send a raw JMAP request and print the raw JMAP response.
 ///

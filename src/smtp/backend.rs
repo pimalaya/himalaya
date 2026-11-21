@@ -17,7 +17,9 @@ use io_smtp::{
 };
 use pimalaya_cli::{error::CodedError, sanitize};
 
-use crate::{email::submission::SubmissionEnvelope, error::ErrorCode, smtp::client::SmtpClient};
+use crate::{
+    error::ErrorCode, smtp::client::SmtpClient, unified::email::submission::SubmissionEnvelope,
+};
 
 impl SmtpClient {
     /// Runs the RFC 5321 mail transaction (MAIL FROM / RCPT TO / DATA)

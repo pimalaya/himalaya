@@ -7,7 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::threads::trash::GmailThreadTrash;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Move a Gmail thread to the trash (users.threads.trash).
 #[derive(Debug, Parser)]

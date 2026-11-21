@@ -18,7 +18,7 @@ use crate::{
         client::JmapClient,
         error::{format_set_error, set_error},
     },
-    shared::message::arg::MessageArg,
+    unified::message::arg::MessageArg,
 };
 
 /// Import an RFC 5322 message into a mailbox (upload, then Email/import).

@@ -10,7 +10,7 @@ use io_gmail::v1::rest::settings::send_as::{
 };
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Update a Gmail send-as alias (settings.sendAs.update/patch).
 #[derive(Debug, Parser)]

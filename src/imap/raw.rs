@@ -15,8 +15,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
+    base64,
     imap::{client::ImapClient, outcome::ImapStatus},
-    shared::{base64, raw::RawCommandArg},
+    raw::RawCommandArg,
 };
 
 /// Send raw IMAP commands and print the server's responses.
@@ -310,8 +311,8 @@ mod tests {
     use serde_json::json;
 
     use crate::{
+        base64,
         imap::raw::{ImapResponse, parse_response, split_reply},
-        shared::base64,
     };
 
     /// The responses as io-imap frames them, each with its final CRLF.

@@ -12,7 +12,7 @@ Unlike the per-provider reports, the built-in `compose`, `reply` and
 
 - himalaya: `v2.0.0-alpha.1` (working tree)
 - date: 2026-07-18
-- tests: `src/shared/message/builder.rs` (`mod tests`), run with
+- tests: src/unified/message/builder.rs (`mod tests`), run with
   `cargo test builder`
 
 ## Why no provider is needed

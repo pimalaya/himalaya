@@ -12,7 +12,7 @@ use crate::{
     account::{
         capability::AccountCapabilityCommand, check::AccountCheckCommand, list::AccountListCommand,
     },
-    backend::Backend,
+    unified::backend::Backend,
 };
 
 /// Manage accounts defined in the TOML configuration file.

@@ -18,8 +18,8 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome, utils::output_data},
+    unified::backend::Backend,
 };
 
 /// List the flags a mailbox allows (SELECT response, RFC 3501).

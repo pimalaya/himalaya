@@ -9,7 +9,7 @@ use anyhow::{Result, anyhow};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Add a file attachment to a message.
 ///

@@ -14,7 +14,7 @@ use crate::{
         arg::{MaildirNameArg, RequiredMaildirPathFlag},
         client::{MaildirClient, validate_maildir_name},
     },
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Rename a Maildir folder.

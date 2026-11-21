@@ -12,7 +12,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient, listing};
+use crate::{
+    account::context::Account, gmail::client::GmailClient, listing, unified::backend::Backend,
+};
 
 /// List all Gmail labels (users.labels.list).
 ///

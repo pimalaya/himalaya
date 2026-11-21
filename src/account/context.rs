@@ -20,7 +20,7 @@ use crate::config::{
     message::{PostingStyle, SaveCopyConfig},
 };
 #[cfg(any(backend, feature = "smtp"))]
-use crate::email::mailbox::{Mailbox, MailboxRole};
+use crate::unified::email::mailbox::{Mailbox, MailboxRole};
 
 /// chrono `strftime` format of an envelope date.
 #[cfg(any(backend, feature = "smtp"))]

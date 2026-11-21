@@ -3,7 +3,7 @@
 //! The JMAP adapter of the unified client, glue over the
 //! io-jmap client [`JmapClient`] wraps.
 //!
-//! The shared mailbox argument is always an opaque JMAP id, the client
+//! The unified mailbox argument is always an opaque JMAP id, the client
 //! having mapped human names up front with
 //! [`JmapClient::resolve_mailbox_id`], so nothing here resolves a name.
 
@@ -43,24 +43,28 @@ use pimalaya_cli::{error::CodedError, sanitize};
 use url::Url;
 
 use crate::{
-    capability,
-    email::{
-        address::Address,
-        envelope::{Envelope, EnvelopePage, normalize_message_id, page_follows},
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
-        outcome::Outcome,
-        search::{
-            filter::query::SearchEmailsFilterQuery,
-            query::SearchEmailsQuery,
-            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
-        },
-        vacation::{Vacation, VacationPatch, format_date, normalize_date},
-    },
     error::{ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message},
     jmap::{
         client::JmapClient,
         error::{format_set_error, set_error, set_item_error},
+    },
+    unified::{
+        capability,
+        email::{
+            address::Address,
+            envelope::{Envelope, EnvelopePage, normalize_message_id, page_follows},
+            flag::{Flag, FlagOp, IanaFlag},
+            mailbox::{Mailbox, MailboxRole},
+            outcome::Outcome,
+            search::{
+                filter::query::SearchEmailsFilterQuery,
+                query::SearchEmailsQuery,
+                sort::query::{
+                    SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder,
+                },
+            },
+            vacation::{Vacation, VacationPatch, format_date, normalize_date},
+        },
     },
 };
 
@@ -141,7 +145,7 @@ impl JmapClient {
     /// `Email/get`.
     ///
     /// A date clause over-approximates on the wire, JMAP filtering
-    /// `receivedAt` where the shared query means `sentAt`, so it is
+    /// `receivedAt` where the unified query means `sentAt`, so it is
     /// rechecked client-side and the page is cut after that trim.
     pub fn search_envelopes(
         &mut self,
@@ -1011,7 +1015,7 @@ fn account_id_of(session: &io_jmap::rfc8620::session::JmapSession) -> String {
         .unwrap_or_default()
 }
 
-/// Converts a JMAP mailbox into the shared [`Mailbox`] shape.
+/// Converts a JMAP mailbox into the unified [`Mailbox`] shape.
 fn mailbox_from(mailbox: JmapMailbox, with_counts: bool) -> Mailbox {
     Mailbox {
         id: mailbox.id.unwrap_or_default(),
@@ -1024,12 +1028,12 @@ fn mailbox_from(mailbox: JmapMailbox, with_counts: bool) -> Mailbox {
     }
 }
 
-/// A shared [`Flag`] as JMAP writes it, spelled as its keyword.
+/// A unified [`Flag`] as JMAP writes it, spelled as its keyword.
 pub(crate) fn written_flag(flag: &Flag) -> Flag {
     Flag::from_raw(keyword_from(flag))
 }
 
-/// Maps a shared [`Flag`] to its JMAP keyword (RFC 8621 §4.1.1).
+/// Maps a unified [`Flag`] to its JMAP keyword (RFC 8621 §4.1.1).
 fn keyword_from(flag: &Flag) -> String {
     match flag.iana() {
         Some(IanaFlag::Seen) => "$seen".into(),
@@ -1100,7 +1104,7 @@ pub(crate) fn query_page_follows(total: Option<u64>, listed: usize, page: u64, s
     }
 }
 
-/// Folds a JMAP email object into the shared [`Envelope`] shape.
+/// Folds a JMAP email object into the unified [`Envelope`] shape.
 pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
     let id = email.id.unwrap_or_default();
     let flags = email
@@ -1217,7 +1221,7 @@ fn build(query: Option<&SearchEmailsQuery>, mailbox_id: String) -> Converted {
 
 /// Recursively translates `node` into a JMAP filter tree.
 ///
-/// JMAP dates read the received-at, the shared clauses the sent-at. On the
+/// JMAP dates read the received-at, the unified clauses the sent-at. On the
 /// chain of `and` from the root, `post_filters` is given: a date leaf
 /// over-approximates on the wire and pushes a [`PostFilter`] re-checking
 /// the sent-at exactly, every residual having to hold: a message being
@@ -1462,9 +1466,9 @@ mod tests {
     use io_jmap::rfc8620::filter::JmapFilterOperatorKind;
 
     use crate::{
-        email::{envelope::Envelope, search::query::SearchEmailsQuery},
         error::ErrorCode,
         jmap::backend::*,
+        unified::email::{envelope::Envelope, search::query::SearchEmailsQuery},
     };
 
     fn sent_on(date: &str) -> Envelope {

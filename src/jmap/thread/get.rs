@@ -13,9 +13,9 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     error::{ErrorCode, ItemError, partial_when},
     jmap::{backend::not_found_errors, client::JmapClient, raw},
+    unified::backend::Backend,
 };
 
 /// Get JMAP threads by ID (Thread/get).

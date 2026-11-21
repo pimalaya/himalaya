@@ -23,7 +23,7 @@ use io_pimdir::client::reader::{PimdirAccountAttachment, PimdirAccountAttachment
 use crate::{
     error::{page_token_invalid, pimdir_error},
     pimdir::client::PimdirClient,
-    shared::message::part,
+    unified::message::part,
 };
 
 /// How many stand-ins a search reads per keyset page, so a sparse match

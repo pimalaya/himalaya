@@ -18,7 +18,7 @@ use crate::{
         client::MaildirClient,
         flag::arg::FlagArg,
     },
-    shared::message::arg::MessageArg,
+    unified::message::arg::MessageArg,
 };
 
 /// Store a message into a Maildir folder.

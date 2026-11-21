@@ -37,34 +37,34 @@ use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
 #[cfg(feature = "pimdir")]
 use crate::pimdir::{cli::PimdirCommand, client::build_pimdir_client};
 #[cfg(any(feature = "jmap", feature = "gmail"))]
-use crate::shared::vacation::cli::VacationClient;
+use crate::unified::vacation::cli::VacationClient;
 #[cfg(any(backend, feature = "smtp"))]
-use crate::shared::{
+use crate::unified::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
     mailbox::cli::MailboxCommand, vacation::cli::VacationCommand,
 };
 // NOTE: `EmailClient` and the `message` command host the send path, so
 // they exist for any backend rather than for storage ones alone.
-#[cfg(any(backend, feature = "smtp"))]
-use crate::shared::{client::EmailClient, message::cli::MessageCommand};
 #[cfg(feature = "sieve")]
 use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
+#[cfg(any(backend, feature = "smtp"))]
+use crate::unified::{client::EmailClient, message::cli::MessageCommand};
 use crate::{
     account::cli::AccountCommand,
-    backend::Backend,
     config::{AccountConfig, Config},
     error::{self, ErrorCode},
     json_schema,
     mcp::McpCommand,
     repl::ReplCommand,
     session::Session,
+    unified::backend::Backend,
 };
 #[cfg(any(backend, feature = "smtp"))]
 use crate::{
     account::context::Account,
-    capability::{self, Capability, Resolution},
+    unified::capability::{self, Capability, Resolution},
 };
 
 /// The sample configuration as a raw file, for `curl` to fetch.
@@ -592,7 +592,7 @@ mod tests {
     #[cfg(any(backend, feature = "smtp"))]
     #[test]
     fn an_option_after_a_message_is_the_option() {
-        use crate::{cli::Command, shared::message::cli::MessageCommand};
+        use crate::{cli::Command, unified::message::cli::MessageCommand};
 
         let message = "From: a@x.test\\n\\nx";
         let cli = parse(&["message", "send", message, "--save", "Sent", "--json"]);

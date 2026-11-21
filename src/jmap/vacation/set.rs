@@ -10,7 +10,7 @@ use io_jmap::rfc8621::vacation_response::{
 };
 use pimalaya_cli::printer::Printer;
 
-use crate::{jmap::client::JmapClient, shared::receipt::IdReceipt};
+use crate::{jmap::client::JmapClient, receipt::IdReceipt};
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]

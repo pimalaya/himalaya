@@ -11,7 +11,7 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{msgraph::client::MsgraphClient, shared::message::arg::MessageArg};
+use crate::{msgraph::client::MsgraphClient, unified::message::arg::MessageArg};
 
 /// Send a Microsoft Graph message from raw MIME (`POST /me/sendMail`);
 /// Graph saves it to Sent Items.

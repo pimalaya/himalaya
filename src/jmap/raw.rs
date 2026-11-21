@@ -227,8 +227,8 @@ mod tests {
     use serde_json::{Map, json};
 
     use crate::{
+        http_script::{Script, ok},
         jmap::raw,
-        shared::http_script::{Script, ok},
     };
 
     /// A client over a session naming `a1` as the mail account, its

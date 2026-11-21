@@ -1,7 +1,7 @@
 //! # Envelope search
 //!
 //! `envelope search` run as the built binary against a Maildir, asserting
-//! the copy, any-address, `before` and attachment clauses on the shared
+//! the copy, any-address, `before` and attachment clauses on the unified
 //! client-side evaluator, and that a malformed query fails with the code
 //! `search-invalid`.
 

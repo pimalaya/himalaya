@@ -8,7 +8,7 @@ use clap::Parser;
 use io_msgraph::v1::rest::users::mail_folders::MsgraphMailFolder;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Create a Microsoft Graph mail folder under the mailbox root (`POST
 /// /me/mailFolders`).

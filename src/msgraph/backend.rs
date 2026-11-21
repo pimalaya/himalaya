@@ -3,7 +3,7 @@
 //! The Graph adapter of the unified client, glue over the
 //! io-msgraph client [`MsgraphClient`] wraps.
 //!
-//! Graph is folder-based, and a shared flag maps onto a scalar field of
+//! Graph is folder-based, and a unified flag maps onto a scalar field of
 //! the message, `isRead` or the follow-up flag, or onto its categories.
 //! There is no `add_message`: a MIME message Graph creates stays a draft.
 
@@ -40,14 +40,6 @@ use serde_json::{Value, json};
 use url::Url;
 
 use crate::{
-    email::{
-        address::Address,
-        envelope::{Envelope, EnvelopePage, normalize_message_id},
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole},
-        outcome::Outcome,
-        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
-    },
     error::{
         ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message, unknown_message,
     },
@@ -55,10 +47,18 @@ use crate::{
         client::{MsgraphClient, names_no_message, refusal_of},
         search,
     },
+    unified::email::{
+        address::Address,
+        envelope::{Envelope, EnvelopePage, normalize_message_id},
+        flag::{Flag, FlagOp, IanaFlag},
+        mailbox::{Mailbox, MailboxRole},
+        outcome::Outcome,
+        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
+    },
 };
 
 /// OData `$select` for envelope listing: the message fields backing the
-/// shared [`Envelope`], returned in one round-trip.
+/// unified [`Envelope`], returned in one round-trip.
 const ENVELOPE_SELECT: &str = "id,subject,from,toRecipients,sentDateTime,receivedDateTime,isRead,isDraft,hasAttachments,internetMessageId,importance,flag,categories";
 
 /// The well-known folder names carrying a special-use role, a stable Graph
@@ -354,7 +354,7 @@ impl MsgraphClient {
         Ok(EnvelopePage { envelopes, more })
     }
 
-    /// Searches the `mailbox` folder with the shared query, its filter
+    /// Searches the `mailbox` folder with the unified query, its filter
     /// translated to a KQL `$search`, or a lone `message-id` clause to a
     /// `$filter` on `internetMessageId`.
     ///
@@ -714,7 +714,7 @@ fn names_existing_folder(err: &MsgraphClientStdError) -> bool {
     )
 }
 
-/// Converts one Graph mail folder named `name` into the shared
+/// Converts one Graph mail folder named `name` into the unified
 /// [`Mailbox`] shape, its total left for [`counts_from`] to fill.
 ///
 /// A folder's `totalItemCount` counts its contacts and events too (a
@@ -988,7 +988,7 @@ fn is_retryable(status: u16) -> bool {
     matches!(status, 429 | 500 | 502 | 503 | 504)
 }
 
-/// Folds a Graph message into the shared [`Envelope`] shape. `size` is
+/// Folds a Graph message into the unified [`Envelope`] shape. `size` is
 /// `None`, Graph's message resource carrying no raw size.
 pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     let flags = flags_from_message(&message);
@@ -1083,7 +1083,7 @@ fn flag_patch(flags: &[Flag], op: FlagOp) -> MsgraphMessage {
     patch
 }
 
-/// Derives the shared flag set from a Graph message's scalar fields and
+/// Derives the unified flag set from a Graph message's scalar fields and
 /// categories.
 fn flags_from_message(message: &MsgraphMessage) -> BTreeSet<Flag> {
     let mut flags = BTreeSet::new();
@@ -1110,7 +1110,7 @@ fn flags_from_message(message: &MsgraphMessage) -> BTreeSet<Flag> {
     flags
 }
 
-/// Converts a Graph recipient into a shared [`Address`].
+/// Converts a Graph recipient into a unified [`Address`].
 fn address_from(recipient: MsgraphRecipient) -> Address {
     Address {
         name: recipient.email_address.name,
@@ -1118,7 +1118,7 @@ fn address_from(recipient: MsgraphRecipient) -> Address {
     }
 }
 
-/// Maps the shared `\Flagged` onto a Graph follow-up flag.
+/// Maps the unified `\Flagged` onto a Graph follow-up flag.
 fn followup(flagged: bool) -> MsgraphFollowupFlag {
     let flag_status = if flagged {
         MsgraphFlagStatus::Flagged
@@ -1130,7 +1130,7 @@ fn followup(flagged: bool) -> MsgraphFollowupFlag {
     }
 }
 
-/// Maps the shared `$Important` onto a Graph importance.
+/// Maps the unified `$Important` onto a Graph importance.
 fn importance(important: bool) -> MsgraphImportance {
     if important {
         MsgraphImportance::High
@@ -1154,11 +1154,13 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        email::flag::{Flag, FlagOp, IanaFlag},
-        email::mailbox::MailboxRole,
         error::{ErrorCode, ItemError},
         msgraph::backend::{
             envelope_from, flag_patch, ids_found, roles_from, well_known_name, written,
+        },
+        unified::email::{
+            flag::{Flag, FlagOp, IanaFlag},
+            mailbox::MailboxRole,
         },
     };
 
@@ -1342,8 +1344,8 @@ mod count_tests {
 
     use crate::{
         error::ErrorCode,
+        http_script::{Script, ok},
         msgraph::client::MsgraphClient,
-        shared::http_script::{Script, ok},
     };
 
     /// A client over a Graph server answering `bodies` in order, each a
@@ -1477,7 +1479,9 @@ mod count_tests {
 mod page_tests {
     use serde_json::{Value, json};
 
-    use crate::{email::search::query::SearchEmailsQuery, msgraph::backend::count_tests::graph};
+    use crate::{
+        msgraph::backend::count_tests::graph, unified::email::search::query::SearchEmailsQuery,
+    };
 
     /// A page of `ids`, with the next link Graph answers after an exactly
     /// full last page too.
@@ -1552,8 +1556,8 @@ mod read_tests {
 
     use crate::{
         error::ErrorCode,
+        http_script::{Script, ok},
         msgraph::client::MsgraphClient,
-        shared::http_script::{Script, ok},
     };
 
     /// The raw message `m1`.

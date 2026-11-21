@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::{GmailSendAs, create::GmailSendAsCreate};
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Create a Gmail send-as alias (settings.sendAs.create).
 #[derive(Debug, Parser)]

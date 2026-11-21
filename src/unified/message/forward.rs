@@ -1,0 +1,209 @@
+//! # Message forward
+//!
+//! The `message forward` command, composing a forward of a fetched
+//! message.
+
+use std::path::PathBuf;
+
+use anyhow::Result;
+use clap::Parser;
+use pimalaya_cli::printer::Printer;
+
+use crate::{
+    account::context::Account,
+    config::message::PostingStyle,
+    unified::{
+        client::EmailClient,
+        email::flag::{Flag, FlagOp, IanaFlag},
+        mailbox::arg::MailboxArg,
+        message::{
+            builder::{self, BuilderArgs, InlineAttachment, SourceArgs, SourceMode},
+            handler,
+        },
+    },
+};
+
+/// Build a forward of a message from flags, then print, save or send it.
+///
+/// The source is fetched to pre-fill the `Fwd:` subject and the
+/// `References` header, to quote its body and, unless `--no-attachments`,
+/// to attach its attachments.
+///
+/// The forward is printed, saved or sent as `message compose` does it.
+/// Once sent, the source is flagged as forwarded where the backend takes
+/// the keyword.
+///
+/// Richer composition is `message read --raw <MESSAGE-ID>` piped into a
+/// standalone composer, whose output feeds `message send` or `message add`.
+#[derive(Debug, Parser)]
+pub struct MessageForwardCommand {
+    /// Identifier of the source message.
+    #[arg(value_name = "MESSAGE-ID")]
+    pub id: String,
+    #[command(flatten)]
+    pub mailbox: MailboxArg,
+    /// Sender address, defaulting to the account's `email` under its
+    /// `display-name`.
+    #[arg(long, value_name = "ADDR")]
+    pub from: Option<String>,
+    /// Recipient addresses, the flag repeating or taking a
+    /// comma-separated list.
+    #[arg(long, short = 't', value_name = "ADDR")]
+    pub to: Vec<String>,
+    /// Carbon-copy recipients.
+    #[arg(long, value_name = "ADDR")]
+    pub cc: Vec<String>,
+    /// Blind carbon-copy recipients.
+    #[arg(long, value_name = "ADDR")]
+    pub bcc: Vec<String>,
+    /// Subject line.
+    #[arg(long, short = 's', value_name = "TEXT")]
+    pub subject: Option<String>,
+    /// Inline body, the standard input answering when neither this nor
+    /// `--body-file` is given.
+    #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
+    pub body: Option<String>,
+    /// Read the body from a file, exclusive with `--body` and the
+    /// standard input.
+    #[arg(long = "body-file", value_name = "PATH")]
+    pub body_file: Option<PathBuf>,
+    /// Files to attach.
+    #[arg(long = "attach", value_name = "PATH")]
+    pub attach: Vec<PathBuf>,
+    /// Attachments given inline, which only the MCP server sets
+    /// (`attach-data`): no command line reaches this field.
+    #[arg(skip)]
+    pub attach_data: Vec<InlineAttachment>,
+    /// Leave the attachments of the source out of the forward, keeping
+    /// the quoted body alone.
+    #[arg(long = "no-attachments")]
+    pub no_attachments: bool,
+    /// Signature appended after the body, defaulting to the account's
+    /// `signature`.
+    ///
+    /// The account's `signature-delim` introduces it, the RFC 3676
+    /// section 4.3 `-- ` by default.
+    #[arg(long, value_name = "TEXT")]
+    pub signature: Option<String>,
+    /// Read the signature from a file, exclusive with `--signature`.
+    #[arg(
+        long = "signature-file",
+        value_name = "PATH",
+        conflicts_with = "signature"
+    )]
+    pub signature_file: Option<PathBuf>,
+    /// Where the quoted source body sits relative to the written one.
+    ///
+    /// Interleaved posting is left to the writer: put the message inside
+    /// the quoted block. Defaults to `message.forward.posting-style`, then
+    /// to `top`.
+    #[arg(long = "posting-style", short = 'P', value_name = "STYLE")]
+    pub posting_style: Option<PostingStyle>,
+    /// Plain-text headline placed before the quoted source body.
+    ///
+    /// Nothing is substituted in it, so pass the literal string wanted.
+    #[arg(long = "quote-headline", short = 'Q', value_name = "TEXT")]
+    pub quote_headline: Option<String>,
+    /// Save the message to this mailbox, a name, alias or role, flagged
+    /// seen, instead of printing it.
+    ///
+    /// With `--send`, the copy of the sent message goes there instead of
+    /// where `message.send.save-copy` puts it.
+    #[arg(long, value_name = "MAILBOX")]
+    pub save: Option<String>,
+    /// With `--send`, keep no copy of the sent message, whatever
+    /// `message.send.save-copy` says.
+    #[arg(long, conflicts_with = "save", requires = "send")]
+    pub no_save: bool,
+    /// Send the message instead of printing it.
+    ///
+    /// A copy goes where `message.send.save-copy` puts it, unless `--save`
+    /// names another mailbox or `--no-save` keeps none.
+    #[arg(long)]
+    pub send: bool,
+}
+
+impl MessageForwardCommand {
+    /// Fetches the source, builds the forward and hands it to the
+    /// handler, then flags the source as forwarded when the forward was
+    /// sent.
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
+        let mailbox = self.mailbox.resolve(account);
+        let source = client.get_message(&mailbox, &self.id, false)?.0;
+
+        let (from, from_name) = account.resolve_from(self.from.as_deref());
+        let template = printer.is_json() && !self.send && self.save.is_none();
+        let signature_file = self.signature_file.as_deref().filter(|_| !template);
+        let signature = match template {
+            true => None,
+            false => account.resolve_signature(self.signature.as_deref(), signature_file),
+        };
+
+        let raw = builder::build(
+            BuilderArgs {
+                from,
+                from_name,
+                to: &self.to,
+                cc: &self.cc,
+                bcc: &self.bcc,
+                subject: self.subject.as_deref(),
+                body: self.body.as_deref(),
+                body_file: self.body_file.as_deref(),
+                attach: &self.attach,
+                attach_data: self.attach_data,
+                signature,
+                signature_file,
+                signature_delim: account.signature_delim(),
+            },
+            Some(SourceArgs {
+                raw: &source,
+                mode: SourceMode::Forward,
+                posting_style: account.resolve_forward_posting_style(self.posting_style),
+                quote_headline: self.quote_headline.as_deref().unwrap_or(""),
+                no_attachments: self.no_attachments,
+                reply_all: false,
+                own: &[],
+            }),
+        )?;
+
+        handler::route(
+            printer,
+            account,
+            client,
+            raw,
+            account.resolve_save(self.save.as_deref(), self.no_save, self.send),
+            self.send,
+        )?;
+
+        // NOTE: `$Forwarded` (RFC 5788) is a keyword, which a server may
+        // refuse where `\Answered` is a system flag it has to take, so
+        // the flag is best-effort and never fails a forward already
+        // sent.
+        if self.send {
+            let forwarded = Flag::from_iana(IanaFlag::Forwarded);
+            let stored =
+                client.store_flags(&mailbox, &[self.id.as_str()], &[forwarded], FlagOp::Add);
+            match stored {
+                Ok(outcome) => {
+                    for error in outcome.errors {
+                        log::warn!(
+                            "message sent, but flagging the source as forwarded failed: {error}"
+                        );
+                    }
+                }
+                Err(err) => {
+                    log::warn!(
+                        "message sent, but flagging the source as forwarded failed: {err:#}"
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

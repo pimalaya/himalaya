@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Move a Gmail message to the trash (users.messages.trash).
 #[derive(Debug, Parser)]

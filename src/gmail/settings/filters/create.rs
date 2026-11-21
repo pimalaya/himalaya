@@ -10,7 +10,7 @@ use io_gmail::v1::rest::settings::filters::{
 };
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Create a Gmail filter (users.settings.filters.create).
 #[derive(Debug, Parser)]

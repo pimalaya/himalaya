@@ -1,7 +1,7 @@
 //! # Microsoft Graph client
 //!
 //! The wrapper around io-msgraph's blocking client every Graph-specific
-//! subcommand receives, plus the credential helper the shared client and
+//! subcommand receives, plus the credential helper the unified client and
 //! the account checker take.
 //!
 //! The unified API covers the operations every mail backend names, where
@@ -30,10 +30,10 @@ use crate::{
         msgraph::{MsgraphAuthConfig, MsgraphConfig},
         proxy::ProxyConfig,
     },
-    email::mailbox::MailboxRole,
     error::{ErrorCode, mailbox_not_found, unknown_mailbox},
     msgraph::backend::well_known_name,
-    shared::refusal::Refusal,
+    refusal::Refusal,
+    unified::email::mailbox::MailboxRole,
 };
 
 /// A live Microsoft Graph client and the folder ids it resolved.
@@ -187,8 +187,8 @@ impl MsgraphClient {
     ) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
         let bodies = bodies
             .iter()
-            .map(|body| crate::shared::http_script::ok("application/json", &body.to_string()));
-        let (script, requests) = crate::shared::http_script::Script::new(bodies.collect());
+            .map(|body| crate::http_script::ok("application/json", &body.to_string()));
+        let (script, requests) = crate::http_script::Script::new(bodies.collect());
         let inner = Inner::new(script, "token", Default::default());
         (Self::over(inner), requests)
     }
@@ -342,10 +342,10 @@ mod tests {
     use serde_json::{Value, json};
 
     use crate::{
-        email::mailbox::MailboxRole,
         error::{self, ErrorCode},
+        http_script::{Script, ok, refused as refused_with},
         msgraph::client::{MsgraphClient, is_folder_id, names_no_folder},
-        shared::http_script::{Script, ok, refused as refused_with},
+        unified::email::mailbox::MailboxRole,
     };
 
     fn refused(status: u16, code: &str) -> MsgraphSendError {

@@ -13,7 +13,7 @@ use crate::{
         client::MaildirClient,
         flag::arg::FlagArg,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Add Maildir flags to messages.

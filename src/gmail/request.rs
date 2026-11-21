@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::{
     gmail::client::GmailClient,
-    shared::raw_json::{RawJsonOutput, api_url},
+    raw_json::{RawJsonOutput, api_url},
 };
 
 /// Send a raw Gmail API request and print the JSON response.

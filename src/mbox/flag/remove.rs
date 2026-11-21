@@ -13,7 +13,7 @@ use crate::{
         client::MboxClient,
         flag::arg::FlagArg,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Remove mbox flag(s) from message(s).

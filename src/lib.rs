@@ -2,7 +2,7 @@
 //!
 //! A CLI to manage emails, and the crate architecture (header-001): the
 //! behavioural contract lives in cairn/spec/, the manual provider test
-//! reports in cairn/spec/testing/, the history in cairn/log/, the shared
+//! reports in cairn/spec/testing/, the history in cairn/log/, the unified
 //! conventions in the [Pimalaya ARCHITECTURE][pimalaya].
 //!
 //! [pimalaya]: https://github.com/pimalaya/.github/blob/master/ARCHITECTURE.md
@@ -30,10 +30,10 @@
 //! ## Command families
 //!
 //! The command tree ([`cli`], `Command`) splits in three. The unified API
-//! (mailbox, envelope, flag, message, attachment, vacation) is the
-//! cross-protocol surface: the union of what the backends serve, each verb
-//! meaning one thing wherever it runs, a backend that cannot give that
-//! result declaring it unserved ([`capability`]).
+//! ([`unified`]: mailbox, envelope, flag, message, attachment, vacation)
+//! is the cross-protocol surface, the union of what the backends serve,
+//! each verb meaning one thing wherever it runs. The crate root holds the
+//! code every family shares.
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, mbox,
 //! pimdir, smtp, sieve) each expose the full surface of one backend,
@@ -43,18 +43,18 @@
 //!
 //! ## Unified commands and backend selection
 //!
-//! The unified commands run over a [`shared::client`] `EmailClient` owning
+//! The unified commands run over a [`unified::client`] `EmailClient` owning
 //! one `BackendClient` variant per compiled-in backend: the first
 //! configured storage backend the global `--backend` flag allows, local
 //! before network, plus an SMTP transport for those that cannot send.
-//! The [`capability`] resolver picks them from the account's blocks and
-//! refuses, before connecting, a verb the resolved backend does not
-//! serve, under `capability-missing`; its tables also write each unified
-//! command's `--help` footer and filter the MCP tool list.
+//! The [`unified::capability`] resolver picks them from the account's
+//! blocks and refuses, before connecting, a verb the resolved backend
+//! does not serve, under `capability-missing`; its tables also write each
+//! unified command's `--help` footer and filter the MCP tool list.
 //!
-//! Each shared method matches the active backend and calls its
+//! Each unified method matches the active backend and calls its
 //! per-protocol adapter, which converts io-* results into the CLI's own
-//! [`email`] shared types. The active [`account`] context is threaded as
+//! [`unified::email`] types. The active [`account`] context is threaded as
 //! a sibling argument through every `execute` chain.
 //!
 //! ## Protocol-specific commands
@@ -110,15 +110,17 @@
 //! reference.
 
 pub mod account;
-pub mod backend;
-pub mod capability;
+#[cfg(any(backend, feature = "smtp"))]
+pub mod base64;
 pub mod cli;
 pub mod config;
-#[cfg(any(backend, feature = "smtp"))]
-pub mod email;
+#[cfg(any(backend, feature = "smtp", feature = "sieve"))]
+pub mod crlf;
 pub mod error;
 #[cfg(feature = "gmail")]
 pub mod gmail;
+#[cfg(all(test, any(feature = "gmail", feature = "jmap", feature = "msgraph")))]
+pub mod http_script;
 #[cfg(feature = "imap")]
 pub mod imap;
 #[cfg(feature = "jmap")]
@@ -132,6 +134,8 @@ pub mod mbox;
 pub mod mcp;
 #[cfg(feature = "msgraph")]
 pub mod msgraph;
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+pub mod output;
 #[cfg(feature = "pimdir")]
 pub mod pimdir;
 #[cfg(any(
@@ -143,6 +147,21 @@ pub mod pimdir;
     feature = "sieve"
 ))]
 pub mod proxy;
+#[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
+pub mod raw;
+#[cfg(any(feature = "gmail", feature = "jmap", feature = "msgraph"))]
+pub mod raw_json;
+#[cfg(any(
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "jmap",
+    feature = "maildir",
+    feature = "mbox",
+    feature = "sieve"
+))]
+pub mod receipt;
+#[cfg(any(feature = "gmail", feature = "jmap", feature = "msgraph"))]
+pub mod refusal;
 pub mod repl;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 pub mod sasl;
@@ -154,7 +173,6 @@ pub mod sasl;
 ))]
 pub mod server;
 pub mod session;
-pub mod shared;
 #[cfg(feature = "sieve")]
 pub mod sieve;
 #[cfg(feature = "smtp")]
@@ -168,3 +186,4 @@ pub mod smtp;
     feature = "sieve"
 ))]
 pub mod tls;
+pub mod unified;

@@ -18,7 +18,6 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     error::{ItemError, page_token_invalid, partial_when},
     pimdir::{
         client::PimdirClient,
@@ -27,7 +26,10 @@ use crate::{
             PimdirMailThread, local_clock, parse_query,
         },
     },
-    shared::envelope::list::{envelope_cells, format_names},
+    unified::{
+        backend::Backend,
+        envelope::list::{envelope_cells, format_names},
+    },
 };
 
 /// Search the account's messages with the pimdir query language.
@@ -357,12 +359,12 @@ mod tests {
     use io_pimdir::{client::search::PimdirSearchCursor, search::coverage::PimdirSearchUnread};
 
     use crate::{
-        email::{address::Address, envelope::Envelope},
         error::{ErrorCode, ItemError},
         pimdir::{
             index::{PimdirListStyle, PimdirMailCoverage, PimdirMailHit, PimdirMailMatched},
             search::{PimdirSearchOutput, PimdirSearchPlace, PimdirSearchSortArg},
         },
+        unified::email::{address::Address, envelope::Envelope},
     };
 
     /// One hit, on the last page of an incomplete answer.

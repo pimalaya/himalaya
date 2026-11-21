@@ -14,7 +14,7 @@ use crate::{
         client::MaildirClient,
         flag::arg::FlagArg,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Remove Maildir flags from messages.

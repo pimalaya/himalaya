@@ -21,7 +21,6 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     imap::{
         client::ImapClient,
         envelope::search::SearchCriteriaArgs,
@@ -29,6 +28,7 @@ use crate::{
         outcome,
         utils::output_data,
     },
+    unified::backend::Backend,
 };
 
 /// Sort messages (SORT, RFC 5256).

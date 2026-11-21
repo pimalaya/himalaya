@@ -23,7 +23,6 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     error::{ErrorCode, ItemError, page_token_invalid, partial_when},
     jmap::{
         backend::{not_found_errors, query_page_follows},
@@ -31,6 +30,7 @@ use crate::{
         raw,
     },
     listing,
+    unified::backend::Backend,
 };
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).

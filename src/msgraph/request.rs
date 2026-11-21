@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::{
     msgraph::client::MsgraphClient,
-    shared::raw_json::{RawJsonOutput, api_url},
+    raw_json::{RawJsonOutput, api_url},
 };
 
 /// Send a raw Microsoft Graph request and print the JSON response.

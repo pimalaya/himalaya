@@ -9,7 +9,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     mbox::{arg::MboxNameArg, client::MboxClient},
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Create an mbox.

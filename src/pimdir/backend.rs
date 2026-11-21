@@ -47,24 +47,6 @@ use log::{info, warn};
 use pimalaya_cli::{capability::CapabilityLevel, error::CodedError};
 
 use crate::{
-    capability::{Capability, StoreSupport, missing},
-    email::{
-        address::Address,
-        envelope::{Envelope, EnvelopePage, page_follows},
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxIndex, MailboxRole},
-        outcome::Outcome,
-        search::{
-            eval::{self, EnvelopeCopies},
-            filter::query::SearchEmailsFilterQuery,
-            query::SearchEmailsQuery,
-            sort::{
-                eval::sort_envelopes,
-                query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
-            },
-        },
-        submission::SubmissionEnvelope,
-    },
     error::{
         ErrorCode, ItemError, existing_mailbox, mailbox_not_found, message_not_found,
         missing_message, pimdir_error,
@@ -74,6 +56,26 @@ use crate::{
         queue::list::{PimdirQueueRefused, PimdirQueueRow},
         status::{
             PimdirMailboxStatus, PimdirParkedStatus, PimdirRefusedStatus, PimdirStatusOutput,
+        },
+    },
+    unified::{
+        capability::{Capability, StoreSupport, missing},
+        email::{
+            address::Address,
+            envelope::{Envelope, EnvelopePage, page_follows},
+            flag::{Flag, FlagOp, IanaFlag},
+            mailbox::{Mailbox, MailboxIndex, MailboxRole},
+            outcome::Outcome,
+            search::{
+                eval::{self, EnvelopeCopies},
+                filter::query::SearchEmailsFilterQuery,
+                query::SearchEmailsQuery,
+                sort::{
+                    eval::sort_envelopes,
+                    query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
+                },
+            },
+            submission::SubmissionEnvelope,
         },
     },
 };
@@ -455,7 +457,7 @@ impl PimdirClient {
     }
 
     /// Searches envelopes in `mailbox`: builds them from the summaries,
-    /// applies the shared filter/sort/paginate. A query holding a body clause
+    /// applies the unified filter/sort/paginate. A query holding a body clause
     /// reads each candidate's local body, and a message whose body is not
     /// local matches no body clause; the other clauses read no body.
     ///
@@ -1669,7 +1671,7 @@ fn is_queued_mail(action: &PimdirAction) -> bool {
     }
 }
 
-/// Builds a shared [`Envelope`] from a stored item (no body read): the
+/// Builds a unified [`Envelope`] from a stored item (no body read): the
 /// flags from the item, the display fields from its mail summary.
 pub(crate) fn envelope_from_item(item: &PimdirItem) -> Envelope {
     // NOTE: the public id is a short store-global integer rather than the
@@ -1715,7 +1717,7 @@ pub(crate) fn envelope(
     }
 }
 
-/// The flags of a set as shared ones, none when the set is unknown.
+/// The flags of a set as unified ones, none when the set is unknown.
 fn known_flags(flags: &PimdirFlags) -> BTreeSet<Flag> {
     flags
         .known()
@@ -1728,7 +1730,7 @@ fn known_flags(flags: &PimdirFlags) -> BTreeSet<Flag> {
         .unwrap_or_default()
 }
 
-/// A summary's canonical address as the shared one.
+/// A summary's canonical address as the unified one.
 fn address(address: PimdirAddress) -> Address {
     Address {
         name: address.name,

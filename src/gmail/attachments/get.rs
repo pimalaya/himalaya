@@ -10,7 +10,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::{attachments::get::GmailAttachmentGet, decode_raw};
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::output::write_bytes_or_save};
+use crate::{gmail::client::GmailClient, output::write_bytes_or_save};
 
 /// Get a Gmail attachment by message and attachment id, then print or
 /// save its decoded bytes.

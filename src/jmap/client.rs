@@ -17,15 +17,15 @@ use url::Url;
 
 use crate::{
     account::context::Account,
+    base64,
     config::{
         AccountConfig, Config,
         jmap::{JmapAuthConfig, JmapConfig},
         proxy::ProxyConfig,
     },
-    email::mailbox::{MailboxIndex, MailboxRole},
     error::mailbox_not_found,
     server::parse_server,
-    shared::base64,
+    unified::email::mailbox::{MailboxIndex, MailboxRole},
 };
 
 /// A live JMAP session and the mailbox index it caches.

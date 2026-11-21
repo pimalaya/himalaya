@@ -18,8 +18,8 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     gmail::{client::GmailClient, format::str_of},
+    unified::backend::Backend,
 };
 
 /// List Gmail message ids matching the given query and labels
@@ -139,7 +139,7 @@ mod tests {
     use crate::{
         account::context::Account,
         gmail::{client::GmailClient, messages::list::GmailMessagesListCommand},
-        shared::http_script::{Script, ok},
+        http_script::{Script, ok},
     };
 
     /// The page prints as Gmail sent it, `resultSizeEstimate` included, its

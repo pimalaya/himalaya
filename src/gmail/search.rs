@@ -1,6 +1,6 @@
 //! # Gmail search
 //!
-//! Bridges the shared search query onto the Gmail `messages.list` `q`
+//! Bridges the unified search query onto the Gmail `messages.list` `q`
 //! syntax, the same one the Gmail search box speaks.
 //!
 //! The filter half becomes one `q` string: leaf conditions map to
@@ -20,7 +20,7 @@
 //!
 //! The sort half has no server-side counterpart, `messages.list`
 //! ordering being fixed newest-first, so the backend orders the fetched
-//! page with the shared evaluator. The caveat: sorting a page is not
+//! page with the unified evaluator. The caveat: sorting a page is not
 //! sorting the result set, page boundaries staying in Gmail's default
 //! order.
 //!
@@ -30,12 +30,12 @@
 use anyhow::Result;
 use chrono::{Duration, NaiveDate, NaiveTime};
 
-use crate::email::{
+use crate::unified::email::{
     flag::{Flag, IanaFlag},
     search::{error::unsupported, filter::query::SearchEmailsFilterQuery},
 };
 
-/// Translates the filter half of a shared query into a Gmail `q` value.
+/// Translates the filter half of a unified query into a Gmail `q` value.
 pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
     match filter {
         SearchEmailsFilterQuery::And(lhs, rhs) => {
@@ -219,7 +219,7 @@ fn next_day(day: NaiveDate) -> NaiveDate {
     day + Duration::days(1)
 }
 
-/// Maps a shared flag onto its Gmail operator, mirroring the
+/// Maps a unified flag onto its Gmail operator, mirroring the
 /// [`crate::gmail::backend`] label pairs, `clause` being refused whole when
 /// there is none: `\Answered`, Gmail tracking replies in no searchable way,
 /// and the keywords.
@@ -244,7 +244,7 @@ mod tests {
     use pimalaya_cli::error::code_of;
 
     use super::*;
-    use crate::{email::search::query::SearchEmailsQuery, error::ErrorCode};
+    use crate::{error::ErrorCode, unified::email::search::query::SearchEmailsQuery};
 
     fn q(query: &str) -> String {
         let query = SearchEmailsQuery::from_str(query).unwrap();

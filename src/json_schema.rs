@@ -26,9 +26,9 @@ use crate::error::ErrorCode;
     feature = "mbox",
     feature = "sieve"
 ))]
-use crate::shared::receipt::IdReceipt;
+use crate::receipt::IdReceipt;
 #[cfg(any(feature = "gmail", feature = "maildir", feature = "mbox"))]
-use crate::shared::receipt::IdsReceipt;
+use crate::receipt::IdsReceipt;
 
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
@@ -49,7 +49,7 @@ pub fn registry() -> JsonSchemaRegistry {
     #[cfg(any(feature = "gmail", feature = "msgraph", feature = "jmap"))]
     macro_rules! refusable {
         ($key:expr, $ty:ty) => {
-            registry.insert::<crate::shared::refusal::Refusable<$ty>>($key);
+            registry.insert::<crate::refusal::Refusable<$ty>>($key);
         };
     }
 
@@ -71,106 +71,112 @@ pub fn registry() -> JsonSchemaRegistry {
     {
         insert!(
             "himalaya-mailbox-list",
-            crate::shared::mailbox::list::MailboxListOutput
+            crate::unified::mailbox::list::MailboxListOutput
         );
         insert!(
             "himalaya-mailbox-create",
-            crate::shared::mailbox::create::MailboxCreateOutput
+            crate::unified::mailbox::create::MailboxCreateOutput
         );
         insert!(
             "himalaya-mailbox-rename",
-            crate::shared::mailbox::rename::MailboxRenameOutput
+            crate::unified::mailbox::rename::MailboxRenameOutput
         );
         insert!(
             "himalaya-mailbox-delete",
-            crate::shared::mailbox::delete::MailboxDeleteOutput
+            crate::unified::mailbox::delete::MailboxDeleteOutput
         );
         insert!(
             "himalaya-envelope-list",
-            crate::shared::envelope::list::EnvelopeListOutput
+            crate::unified::envelope::list::EnvelopeListOutput
         );
         // NOTE: `envelope search` renders the page `list` renders.
         insert!(
             "himalaya-envelope-search",
-            crate::shared::envelope::list::EnvelopeListOutput
+            crate::unified::envelope::list::EnvelopeListOutput
         );
-        insert!("himalaya-flag-add", crate::shared::flag::add::FlagAddOutput);
-        insert!("himalaya-flag-set", crate::shared::flag::set::FlagSetOutput);
+        insert!(
+            "himalaya-flag-add",
+            crate::unified::flag::add::FlagAddOutput
+        );
+        insert!(
+            "himalaya-flag-set",
+            crate::unified::flag::set::FlagSetOutput
+        );
         insert!(
             "himalaya-flag-remove",
-            crate::shared::flag::remove::FlagRemoveOutput
+            crate::unified::flag::remove::FlagRemoveOutput
         );
         insert!(
             "himalaya-message-add",
-            crate::shared::message::handler::MessageRouteOutput
+            crate::unified::message::handler::MessageRouteOutput
         );
         insert!(
             "himalaya-message-copy",
-            crate::shared::message::copy::MessageCopyOutput
+            crate::unified::message::copy::MessageCopyOutput
         );
         insert!(
             "himalaya-message-move",
-            crate::shared::message::mv::MessageMoveOutput
+            crate::unified::message::mv::MessageMoveOutput
         );
         insert!(
             "himalaya-message-send",
-            crate::shared::message::handler::MessageRouteOutput
+            crate::unified::message::handler::MessageRouteOutput
         );
         // NOTE: `message read --raw` prints the message as bytes.
         insert!(
             "himalaya-message-read",
-            ViewOrRaw<crate::shared::message::read::MessageReadOutput>
+            ViewOrRaw<crate::unified::message::read::MessageReadOutput>
         );
         // NOTE: `message parse` prints the `message read` view, or under
         // `--part` the part `attachment download --stdout` prints.
         insert!(
             "himalaya-message-parse",
-            crate::shared::message::parse::MessageParseOutput
+            crate::unified::message::parse::MessageParseOutput
         );
         insert!(
             "himalaya-message-delete",
-            crate::shared::message::delete::MessageDeleteOutput
+            crate::unified::message::delete::MessageDeleteOutput
         );
         // NOTE: the composers print the template when neither saving nor
         // sending, and the receipt of the save or the send otherwise.
         insert!(
             "himalaya-message-compose",
             TemplateOrRoute<
-                crate::shared::message::handler::MessageTemplateOutput,
-                crate::shared::message::handler::MessageRouteOutput,
+                crate::unified::message::handler::MessageTemplateOutput,
+                crate::unified::message::handler::MessageRouteOutput,
             >
         );
         insert!(
             "himalaya-message-reply",
             TemplateOrRoute<
-                crate::shared::message::handler::MessageTemplateOutput,
-                crate::shared::message::handler::MessageRouteOutput,
+                crate::unified::message::handler::MessageTemplateOutput,
+                crate::unified::message::handler::MessageRouteOutput,
             >
         );
         insert!(
             "himalaya-message-forward",
             TemplateOrRoute<
-                crate::shared::message::handler::MessageTemplateOutput,
-                crate::shared::message::handler::MessageRouteOutput,
+                crate::unified::message::handler::MessageTemplateOutput,
+                crate::unified::message::handler::MessageRouteOutput,
             >
         );
         insert!(
             "himalaya-attachment-list",
-            crate::shared::attachment::list::AttachmentListOutput
+            crate::unified::attachment::list::AttachmentListOutput
         );
         // NOTE: `attachment download` reports the `AttachmentListOutput` of
         // `list`, or the one part `--stdout --json` reads.
         insert!(
             "himalaya-attachment-download",
-            crate::shared::attachment::download::AttachmentDownloadOutput
+            crate::unified::attachment::download::AttachmentDownloadOutput
         );
         insert!(
             "himalaya-vacation-get",
-            crate::shared::vacation::get::VacationGetOutput
+            crate::unified::vacation::get::VacationGetOutput
         );
         insert!(
             "himalaya-vacation-set",
-            crate::shared::vacation::set::VacationSetOutput
+            crate::unified::vacation::set::VacationSetOutput
         );
     }
 
@@ -228,10 +234,7 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "jmap")]
     {
-        refusable!(
-            "himalaya-jmap-request",
-            crate::shared::raw_json::RawJsonOutput
-        );
+        refusable!("himalaya-jmap-request", crate::raw_json::RawJsonOutput);
         // The former form keeps its schema under its former name.
         refusable!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
         refusable!(
@@ -282,10 +285,7 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "gmail")]
     {
-        refusable!(
-            "himalaya-gmail-request",
-            crate::shared::raw_json::RawJsonOutput
-        );
+        refusable!("himalaya-gmail-request", crate::raw_json::RawJsonOutput);
         refusable!(
             "himalaya-gmail-profile-get",
             crate::gmail::profile::get::GmailProfileOutput
@@ -390,10 +390,7 @@ pub fn registry() -> JsonSchemaRegistry {
 
     #[cfg(feature = "msgraph")]
     {
-        refusable!(
-            "himalaya-msgraph-request",
-            crate::shared::raw_json::RawJsonOutput
-        );
+        refusable!("himalaya-msgraph-request", crate::raw_json::RawJsonOutput);
         refusable!(
             "himalaya-msgraph-profile-get",
             crate::msgraph::profile::get::MsgraphProfileOutput

@@ -3,8 +3,9 @@
 //! The IMAP adapter of the unified client, glue over the
 //! io-imap session [`ImapClient`] already wraps.
 //!
-//! Each method takes and returns the CLI's own [`crate::email`] types, so
-//! the work here is converting between those and io-imap's wire types.
+//! Each method takes and returns the CLI's own [`crate::unified::email`]
+//! types, so the work here is converting between those and io-imap's wire
+//! types.
 
 use io_imap::client::ImapClient as _;
 use std::{
@@ -47,22 +48,6 @@ use mime::header::marker::MESSAGE_ID;
 use pimalaya_cli::error::CodedError;
 
 use crate::{
-    capability,
-    email::{
-        envelope::{
-            Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids,
-            parse_rfc2822_date,
-        },
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level},
-        outcome::Outcome,
-        search::{
-            error::unsupported,
-            filter::query::SearchEmailsFilterQuery,
-            query::SearchEmailsQuery,
-            sort::query::{SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder},
-        },
-    },
     error::{
         ErrorCode, ItemError, existing_mailbox, mailbox_not_found, message_not_found,
         missing_message, unknown_mailbox,
@@ -71,7 +56,29 @@ use crate::{
         client::ImapClient,
         utils::{output_data, to_addresses},
     },
-    shared::message::{header, part},
+    unified::{
+        capability,
+        email::{
+            envelope::{
+                Envelope, EnvelopePage, normalize_message_id, page_follows, parse_message_ids,
+                parse_rfc2822_date,
+            },
+            flag::{Flag, FlagOp, IanaFlag},
+            mailbox::{
+                Mailbox, MailboxIndex, MailboxRole, child_path, renamed_path, validate_level,
+            },
+            outcome::Outcome,
+            search::{
+                error::unsupported,
+                filter::query::SearchEmailsFilterQuery,
+                query::SearchEmailsQuery,
+                sort::query::{
+                    SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder,
+                },
+            },
+        },
+        message::{header, part},
+    },
 };
 
 impl ImapClient {
@@ -232,7 +239,7 @@ impl ImapClient {
         Ok((listed, total))
     }
 
-    /// Searches a mailbox with the shared query.
+    /// Searches a mailbox with the unified query.
     ///
     /// A UID `SORT`, or its client-side fallback, is constrained by the
     /// translated query, paginated, then fetched and reordered back into
@@ -993,7 +1000,7 @@ fn is_selectable(row: &ListRow) -> bool {
     !row.2.contains(&FlagNameAttribute::Noselect)
 }
 
-/// Converts one `LIST` row into the shared [`Mailbox`] shape.
+/// Converts one `LIST` row into the unified [`Mailbox`] shape.
 ///
 /// The role is the reserved `INBOX`, else the first special-use attribute
 /// the row carries (RFC 6154 §2 lets a plain `LIST` return them).
@@ -1071,7 +1078,7 @@ fn compute_window(exists: u32, page: Option<u32>, page_size: Option<u32>) -> Opt
     Some(format!("{start}:{end}"))
 }
 
-/// Folds one `FETCH` row into a shared [`Envelope`].
+/// Folds one `FETCH` row into a unified [`Envelope`].
 pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     let mut id = String::new();
     let mut message_id: Option<String> = None;
@@ -1134,7 +1141,7 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
     }
 }
 
-/// Converts a fetched flag into a shared [`Flag`], dropping the
+/// Converts a fetched flag into a unified [`Flag`], dropping the
 /// non-flag fetch items.
 fn flag_from_fetch(fetch: FlagFetch<'_>) -> Option<Flag> {
     let FlagFetch::Flag(flag) = fetch else {
@@ -1183,7 +1190,7 @@ fn part_has_attachment(structure: &BodyStructure<'_>, is_protocol_part: bool) ->
     }
 }
 
-/// Maps a shared [`Flag`] onto its IMAP wire counterpart.
+/// Maps a unified [`Flag`] onto its IMAP wire counterpart.
 ///
 /// An IANA flag becomes the matching system flag, and a custom keyword a
 /// Keyword atom, sanitised when it is not atom-safe.
@@ -1269,7 +1276,7 @@ fn same_mailbox(a: &str, b: &str) -> bool {
     a == b || (a.eq_ignore_ascii_case("INBOX") && b.eq_ignore_ascii_case("INBOX"))
 }
 
-/// Parses a shared mailbox name into an IMAP Mailbox token.
+/// Parses a unified mailbox name into an IMAP Mailbox token.
 fn parse_mailbox(name: &str) -> Result<ImapMailbox<'static>> {
     String::from(name)
         .try_into()
@@ -1417,7 +1424,7 @@ fn bytes_to_string(bytes: &[u8]) -> String {
     })
 }
 
-/// The `SEARCH` keys of a shared filter, `ALL` when there is none, a
+/// The `SEARCH` keys of a unified filter, `ALL` when there is none, a
 /// root `and` sent as the list of its keys.
 fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKey<'static>>> {
     match filter {
@@ -1429,7 +1436,7 @@ fn search_keys(filter: Option<&SearchEmailsFilterQuery>) -> Result<Vec1<SearchKe
     }
 }
 
-/// The `SORT` criteria of a shared sort, `REVERSE DATE` when there is
+/// The `SORT` criteria of a unified sort, `REVERSE DATE` when there is
 /// none.
 fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
     let criteria: Vec<SortCriterion> = match sort {
@@ -1443,7 +1450,7 @@ fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
     Vec1::try_from(criteria).expect("non-empty by construction")
 }
 
-/// Translates a shared filter into an IMAP search key, its negations
+/// Translates a unified filter into an IMAP search key, its negations
 /// pushed down to the single keys.
 ///
 /// `NOT` then only ever applies to one non-composite key: iCloud reads
@@ -1649,7 +1656,7 @@ fn flag_key(flag: &Flag) -> Result<SearchKey<'static>> {
     Ok(SearchKey::Keyword(keyword))
 }
 
-/// Translates one shared sorter into an IMAP sort criterion.
+/// Translates one unified sorter into an IMAP sort criterion.
 fn convert_sorter(sorter: &SearchEmailsSorter) -> SortCriterion {
     let SearchEmailsSorter(kind, order) = sorter;
 
@@ -1758,11 +1765,11 @@ mod tests {
         refuse_impermanent, root_message_ids, search_keys,
     };
     use crate::{
-        email::{
+        error::ErrorCode,
+        unified::email::{
             flag::{Flag, IanaFlag},
             search::{filter::query::SearchEmailsFilterQuery, query::SearchEmailsQuery},
         },
-        error::ErrorCode,
     };
 
     #[test]
@@ -2047,7 +2054,7 @@ mod tests {
         body_structure_has_attachment(structure)
     }
 
-    /// The `BODYSTRUCTURE` answers of Dovecot 2.4.5 for the shared
+    /// The `BODYSTRUCTURE` answers of Dovecot 2.4.5 for the unified
     /// attachment rows.
     mod attachment_rows {
         use super::has_attachment;
@@ -2210,12 +2217,12 @@ mod tests {
 
         use crate::{
             config::imap::ImapConfig,
-            email::{
+            error::ErrorCode,
+            imap::client::ImapClient,
+            unified::email::{
                 flag::{Flag, FlagOp, IanaFlag},
                 outcome::Outcome,
             },
-            error::ErrorCode,
-            imap::client::ImapClient,
         };
 
         /// The `COPYUID` code a scripted server answers for the source
@@ -2790,7 +2797,7 @@ mod tests {
     fn a_special_use_attribute_gives_the_role() {
         use io_imap::types::{flag::FlagNameAttribute, mailbox::Mailbox as ImapMailbox};
 
-        use crate::email::mailbox::MailboxRole;
+        use crate::unified::email::mailbox::MailboxRole;
 
         let row = |name: &str, attrs: &[&str]| {
             let attrs = attrs

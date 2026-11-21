@@ -1,0 +1,13 @@
+---
+cairn: tasks
+change: the-pre-release-reading
+---
+
+# Tasks
+
+- [x] src/shared/ split: unified API into src/unified/ (commands, client, email types, backend, capability), helpers to the root; docs and spec paths follow.
+- [ ] Remove every `//` line, whys moved per inline-008.
+- [ ] tests/docs.rs doc ceilings, docs trimmed to pass; `#![forbid(unsafe_code)]`.
+- [ ] `Envelope` `message-id` serde alias: keep or drop.
+- [ ] README rewrite with the `envelope search --json` block, its test, GUIDELINES.md readme-006 amendment.
+- [ ] Log, change landed.

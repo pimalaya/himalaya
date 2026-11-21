@@ -14,7 +14,7 @@ use crate::{
         profile::GmailProfileCommand, request::GmailRequestCommand, settings::GmailSettingsCommand,
         threads::GmailThreadsCommand,
     },
-    shared::refusal::{self, Reader},
+    refusal::{self, Reader},
 };
 
 /// The reader of what Gmail refused.
@@ -93,7 +93,7 @@ mod tests {
     use crate::{
         account::context::Account,
         gmail::{cli::GmailCommand, client::GmailClient, request::GmailRequestCommand},
-        shared::http_script::{Script, refused},
+        http_script::{Script, refused},
     };
 
     /// A request Gmail refuses is the command's result, under `refusal`,

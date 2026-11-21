@@ -14,10 +14,12 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
-    email::mailbox::{Mailbox, MailboxRole},
     listing,
     pimdir::{backend::PimdirCoveredMailbox, client::PimdirClient},
+    unified::{
+        backend::Backend,
+        email::mailbox::{Mailbox, MailboxRole},
+    },
 };
 
 /// List the mailboxes of the store, with their coverage.

@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::{GmailDelegate, create::GmailDelegateCreate};
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Create a Gmail delegate (users.settings.delegates.create).
 #[derive(Debug, Parser)]

@@ -16,7 +16,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     account::context::Account,
     jmap::{client::JmapClient, raw},
-    shared::message::read::sanitize_body,
+    unified::message::read::sanitize_body,
 };
 
 /// Get the JMAP vacation response (VacationResponse/get).

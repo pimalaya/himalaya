@@ -16,7 +16,7 @@ use crate::{
         error::{format_set_error, set_error},
         mailbox::query::{RoleArg, role_from_args},
     },
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Update a JMAP mailbox.

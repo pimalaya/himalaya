@@ -15,7 +15,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     gmail::{client::GmailClient, settings::convert::yes_no},
-    shared::message::read::sanitize_body,
+    unified::message::read::sanitize_body,
 };
 
 /// Get the Gmail vacation responder settings.

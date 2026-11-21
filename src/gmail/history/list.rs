@@ -19,7 +19,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{account::context::Account, backend::Backend, gmail::client::GmailClient};
+use crate::{account::context::Account, gmail::client::GmailClient, unified::backend::Backend};
 
 /// List the changes applied to the mailbox since a given history id.
 ///

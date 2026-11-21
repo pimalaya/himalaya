@@ -25,9 +25,8 @@ use url::Url;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     msgraph::{backend::envelope_from, client::MsgraphClient},
-    shared::envelope::list::envelope_cells,
+    unified::{backend::Backend, envelope::list::envelope_cells},
 };
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
@@ -287,11 +286,11 @@ mod tests {
 
     use crate::{
         account::context::Account,
+        http_script::{Script, ok},
         msgraph::{
             client::MsgraphClient,
             messages::list::{MsgraphMessageListCommand, next_page, quote_search, skip_of},
         },
-        shared::http_script::{Script, ok},
     };
 
     #[test]

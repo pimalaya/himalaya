@@ -23,14 +23,14 @@ use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::{
-    email::address::Address,
+    base64,
     imap::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
         utils::{output_data, parse_sequence_set, sequence_set_parser, to_addresses},
     },
-    shared::{base64, envelope::list::format_addresses, message::header},
+    unified::{email::address::Address, envelope::list::format_addresses, message::header},
 };
 
 /// Fetch message data items (FETCH, RFC 3501).

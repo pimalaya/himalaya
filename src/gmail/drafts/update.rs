@@ -12,7 +12,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     gmail::{client::GmailClient, drafts::GmailDraftWriteOutput},
-    shared::message::arg::MessageArg,
+    unified::message::arg::MessageArg,
 };
 
 /// Update a Gmail draft (users.drafts.update).

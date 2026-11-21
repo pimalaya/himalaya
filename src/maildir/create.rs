@@ -14,7 +14,7 @@ use crate::{
         arg::MaildirNameArg,
         client::{MaildirClient, refuse_existing, validate_maildir_name},
     },
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Create a Maildir folder.

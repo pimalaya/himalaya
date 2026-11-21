@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::output::write_bytes_or_save};
+use crate::{msgraph::client::MsgraphClient, output::write_bytes_or_save};
 
 /// Download an attachment's content (`GET
 /// /me/messages/{id}/attachments/{aid}/$value`), then print or save its

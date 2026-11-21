@@ -14,8 +14,8 @@ use pimalaya_cli::{
 use pimalaya_config::toml::TomlConfig;
 
 use crate::{
-    backend::Backend,
     config::{AccountConfig, Config},
+    unified::backend::Backend,
 };
 
 /// List all accounts declared in the configuration.

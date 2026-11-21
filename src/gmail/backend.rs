@@ -4,7 +4,7 @@
 //! io-gmail client [`GmailClient`] wraps.
 //!
 //! Gmail is label-based, so a label is a mailbox, nested by its name, and
-//! a handful of system labels back the shared flags.
+//! a handful of system labels back the unified flags.
 
 use std::{collections::BTreeSet, thread, time::Duration};
 
@@ -28,17 +28,6 @@ use pimalaya_cli::sanitize;
 use serde::de::{DeserializeOwned, IgnoredAny};
 
 use crate::{
-    email::{
-        address::{self, Address},
-        envelope::{
-            Envelope, EnvelopePage, normalize_message_id, parse_message_ids, parse_rfc2822_date,
-        },
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
-        outcome::Outcome,
-        search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
-        vacation::{Vacation, VacationPatch, date_from_millis},
-    },
     error::{
         ErrorCode, ItemError, existing_mailbox, message_not_found, missing_message, unknown_message,
     },
@@ -46,18 +35,31 @@ use crate::{
         client::{GmailClient, refusal_of},
         search,
     },
-    shared::message::header::parse_headers,
+    unified::{
+        email::{
+            address::{self, Address},
+            envelope::{
+                Envelope, EnvelopePage, normalize_message_id, parse_message_ids, parse_rfc2822_date,
+            },
+            flag::{Flag, FlagOp, IanaFlag},
+            mailbox::{Mailbox, MailboxRole, child_path, renamed_path, validate_level},
+            outcome::Outcome,
+            search::{query::SearchEmailsQuery, sort::eval::sort_envelopes},
+            vacation::{Vacation, VacationPatch, date_from_millis},
+        },
+        message::header::parse_headers,
+    },
 };
 
 /// Gmail system label marking an unread message; its absence means seen.
 const UNREAD: &str = "UNREAD";
-/// Gmail system label backing the shared `\Flagged` flag.
+/// Gmail system label backing the unified `\Flagged` flag.
 const STARRED: &str = "STARRED";
-/// Gmail system label backing the shared `$Important` flag.
+/// Gmail system label backing the unified `$Important` flag.
 const IMPORTANT: &str = "IMPORTANT";
-/// Gmail system label backing the shared `\Draft` flag.
+/// Gmail system label backing the unified `\Draft` flag.
 const DRAFT: &str = "DRAFT";
-/// Gmail system label backing the shared `$Junk` flag.
+/// Gmail system label backing the unified `$Junk` flag.
 const SPAM: &str = "SPAM";
 /// Gmail system label every sent message carries.
 const SENT: &str = "SENT";
@@ -128,7 +130,7 @@ impl GmailClient {
         Ok(listed(&ids, answers).map(|envelopes| EnvelopePage { envelopes, more }))
     }
 
-    /// Searches the `mailbox` label with the shared query: the filter
+    /// Searches the `mailbox` label with the unified query: the filter
     /// half translates into a `messages.list` `q` value, the sort half
     /// orders the fetched page client-side, Gmail keeping a
     /// newest-first list order with no server-side sort.
@@ -824,7 +826,7 @@ fn api_item_error(id: &str, err: &GmailApiError) -> ItemError {
     }
 }
 
-/// Converts one Gmail label into the shared [`Mailbox`] shape.
+/// Converts one Gmail label into the unified [`Mailbox`] shape.
 fn mailbox_from(label: GmailLabel) -> Mailbox {
     Mailbox {
         role: label_role(&label.id),
@@ -851,7 +853,7 @@ fn label_role(id: &str) -> Option<MailboxRole> {
     }
 }
 
-/// Folds a Gmail message (metadata format) into the shared [`Envelope`]
+/// Folds a Gmail message (metadata format) into the unified [`Envelope`]
 /// shape. `has_attachment` is left `None`: Gmail metadata does not
 /// expose the MIME structure.
 fn envelope_from(message: GmailMessage) -> Envelope {
@@ -888,7 +890,7 @@ fn envelope_from(message: GmailMessage) -> Envelope {
     }
 }
 
-/// Derives the shared flag set from a Gmail message's label ids. Only
+/// Derives the unified flag set from a Gmail message's label ids. Only
 /// the flag-like system labels are surfaced.
 fn flags_from_labels(label_ids: &[String]) -> BTreeSet<Flag> {
     let has = |label: &str| label_ids.iter().any(|id| id == label);
@@ -978,7 +980,7 @@ fn label_patch(flags: &[Flag], op: FlagOp) -> (Vec<String>, Vec<String>) {
     (add, remove)
 }
 
-/// Maps a shared flag to its Gmail `(label, inverted)` pair, or `None`
+/// Maps a unified flag to its Gmail `(label, inverted)` pair, or `None`
 /// when Gmail has no equivalent and the flag should be dropped.
 fn label_of(flag: &Flag) -> Option<(String, bool)> {
     match flag.iana() {
@@ -1005,7 +1007,7 @@ fn target(
     if present { add } else { remove }.push(label.into());
 }
 
-/// Parses an RFC 5322 address-list header value into shared addresses,
+/// Parses an RFC 5322 address-list header value into unified addresses,
 /// as every other backend reads one.
 fn parse_addresses(raw: &str) -> Vec<Address> {
     address::parse(raw.as_bytes())
@@ -1022,12 +1024,12 @@ mod tests {
     };
 
     use crate::{
-        email::flag::{Flag, FlagOp, IanaFlag},
         error::{ErrorCode, ItemError},
         gmail::backend::{
             batch_all, batch_item_error, is_unknown_id, label_patch, labelled, listed,
             parse_addresses, reply_parents, sublabel_renames,
         },
+        unified::email::flag::{Flag, FlagOp, IanaFlag},
     };
 
     /// A display name quoting a comma names one address, groups are
@@ -1286,7 +1288,7 @@ mod script_tests {
     use crate::{
         error::ErrorCode,
         gmail::{backend::list_ids, client::GmailClient},
-        shared::http_script::{Script, ok},
+        http_script::{Script, ok},
     };
 
     /// The boundary of the scripted batch answers.

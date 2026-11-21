@@ -7,7 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::labels::GmailLabel;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Rename a Gmail label (users.labels.patch).
 ///
@@ -46,7 +46,7 @@ mod tests {
 
     use crate::{
         gmail::{client::GmailClient, labels::update::GmailLabelUpdateCommand},
-        shared::http_script::{Script, ok},
+        http_script::{Script, ok},
     };
 
     /// A rename sends the name alone through `labels.patch`, so the label

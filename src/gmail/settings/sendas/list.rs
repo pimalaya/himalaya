@@ -15,8 +15,8 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    unified::backend::Backend,
 };
 
 /// List all Gmail send-as aliases (settings.sendAs.list).

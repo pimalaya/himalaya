@@ -12,7 +12,7 @@ use crate::{
         arg::{MaildirPathFlag, MaildirSubdirArg, MessageIdsArg, TargetMaildirPathFlag},
         client::MaildirClient,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Move Maildir message(s) to another folder.

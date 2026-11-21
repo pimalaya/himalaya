@@ -14,9 +14,9 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     error::{ItemError, partial_when, write_item_errors},
     pimdir::client::PimdirClient,
+    unified::backend::Backend,
 };
 
 /// List the rows queued in the account for the sync engine.

@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::flag::{Flag, IanaFlag},
+    unified::email::flag::{Flag, IanaFlag},
 };
 
 /// List the standard Maildir flags.
@@ -50,7 +50,7 @@ impl MaildirFlagListCommand {
 }
 
 /// The `maildir flag list` output, the standard Maildir flags as the
-/// shared flags print them, each info letter as `raw`.
+/// unified flags print them, each info letter as `raw`.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MaildirFlagListOutput {

@@ -8,7 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     mbox::{arg::RequiredMboxPathFlag, client::MboxClient},
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Delete an mbox.

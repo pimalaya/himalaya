@@ -7,7 +7,7 @@ use clap::Parser;
 use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::Printer;
 
-use crate::{shared::receipt::IdReceipt, sieve::client::SieveClient};
+use crate::{receipt::IdReceipt, sieve::client::SieveClient};
 
 /// Rename one server-side Sieve script.
 ///

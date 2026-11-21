@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::verify::GmailSendAsVerify;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Send a verification e-mail for a Gmail send-as alias
 /// (settings.sendAs.verify).

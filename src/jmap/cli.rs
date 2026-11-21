@@ -14,7 +14,7 @@ use crate::{
         submission::cli::JmapSubmissionCommand, thread::cli::JmapThreadCommand,
         vacation::cli::JmapVacationCommand,
     },
-    shared::refusal,
+    refusal,
 };
 
 /// JMAP-specific API.

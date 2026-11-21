@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Send an existing Microsoft Graph draft (`POST
 /// /me/messages/{id}/send`); Graph moves it to Sent Items.

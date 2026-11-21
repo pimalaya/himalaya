@@ -12,7 +12,7 @@ use crate::{
         arg::{MboxPathFlag, MessageIdsArg, TargetMboxPathFlag},
         client::MboxClient,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Copy mbox message(s) to another mbox.

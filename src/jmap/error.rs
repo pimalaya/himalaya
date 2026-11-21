@@ -31,7 +31,7 @@ use serde::Serialize;
 
 use crate::{
     error::{ErrorCode, ItemError},
-    shared::refusal::Refusal,
+    refusal::Refusal,
 };
 
 /// Returns the optional human-readable description carried by a JMAP set error.

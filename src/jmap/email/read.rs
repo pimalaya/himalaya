@@ -13,7 +13,7 @@ use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{jmap::client::JmapClient, shared::message::read::sanitize_body};
+use crate::{jmap::client::JmapClient, unified::message::read::sanitize_body};
 
 /// Read the content of a JMAP email (Email/get with body).
 ///

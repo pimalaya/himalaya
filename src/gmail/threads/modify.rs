@@ -7,7 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::threads::modify::GmailThreadModify;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Modify the labels of every message in a Gmail thread
 /// (users.threads.modify).

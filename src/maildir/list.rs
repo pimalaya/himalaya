@@ -12,7 +12,7 @@ use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, maildir::client::MaildirClient};
+use crate::{account::context::Account, maildir::client::MaildirClient, unified::backend::Backend};
 
 /// List Maildir folders.
 ///

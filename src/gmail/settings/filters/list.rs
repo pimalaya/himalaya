@@ -15,11 +15,11 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     gmail::{
         client::GmailClient,
         settings::filters::summary::{action_summary, criteria_summary},
     },
+    unified::backend::Backend,
 };
 
 /// List all Gmail filters (users.settings.filters.list).

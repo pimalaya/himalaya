@@ -1,6 +1,6 @@
 //! # Microsoft Graph search
 //!
-//! Translation of the shared search filter into a KQL `$search` value, the
+//! Translation of the unified search filter into a KQL `$search` value, the
 //! one Graph query reaching the address fields, subject and body, matched as
 //! KQL matches them rather than by substring. Graph refuses `$search`
 //! beside `$filter`, and KQL carries no flag property, so a flag clause is
@@ -11,9 +11,9 @@
 use anyhow::Result;
 use chrono::NaiveDate;
 
-use crate::email::search::{error::unsupported, filter::query::SearchEmailsFilterQuery};
+use crate::unified::email::search::{error::unsupported, filter::query::SearchEmailsFilterQuery};
 
-/// Translates the filter half of a shared query into the quoted `$search`
+/// Translates the filter half of a unified query into the quoted `$search`
 /// value Graph takes.
 pub(super) fn filter_to_search(filter: &SearchEmailsFilterQuery) -> Result<String> {
     Ok(format!("\"{}\"", filter_to_kql(filter)?))
@@ -102,7 +102,7 @@ fn date_kql(date: NaiveDate) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::email::flag::{Flag, IanaFlag};
+    use crate::unified::email::flag::{Flag, IanaFlag};
 
     #[test]
     fn a_lone_message_id_is_a_filter_and_refused_in_a_search() {

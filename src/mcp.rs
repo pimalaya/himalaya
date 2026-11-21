@@ -31,11 +31,11 @@ use pimalaya_cli::{
 use serde_json::{Map, Value, json};
 
 use crate::{
-    capability::{self, Capability, Resolution, Support},
     cli::{Cli, Command, resolve_account},
     error::{self, ErrorCode},
     json_schema,
     session::Session,
+    unified::capability::{self, Capability, Resolution, Support},
 };
 
 /// What the server tells the agent at initialization.
@@ -726,7 +726,7 @@ fn attach_data_schema() -> Value {
 /// valid.
 #[cfg(any(backend, feature = "smtp"))]
 fn hand_attach_data(value: &Value, limits: &McpLimits, cmd: &mut Command) -> Result<()> {
-    use crate::shared::message::cli::MessageCommand;
+    use crate::unified::message::cli::MessageCommand;
 
     let attachments = inline::attachments(value, limits.max_attachment_size)?;
 
@@ -756,10 +756,7 @@ mod inline {
     use pimalaya_cli::error::CodedError;
     use serde_json::{Map, Value};
 
-    use crate::{
-        error::ErrorCode,
-        shared::{base64, message::builder::InlineAttachment},
-    };
+    use crate::{base64, error::ErrorCode, unified::message::builder::InlineAttachment};
 
     /// The keys an item takes.
     const KEYS: &[&str] = &["filename", "mimeType", "data", "text"];
@@ -1043,7 +1040,7 @@ mod tests {
     #[cfg(any(backend, feature = "smtp"))]
     #[test]
     fn a_server_only_argument_is_taken_off_before_the_argv_and_handed_to_the_command() {
-        use crate::shared::message::{builder::InlineAttachment, cli::MessageCommand};
+        use crate::unified::message::{builder::InlineAttachment, cli::MessageCommand};
 
         let tool = spec("message_compose");
         let arguments = json!({

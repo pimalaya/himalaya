@@ -7,7 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::drafts::{GmailDraft, send::GmailDraftSend};
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Send a Gmail draft (users.drafts.send).
 #[derive(Debug, Parser)]

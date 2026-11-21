@@ -11,7 +11,7 @@ use crate::{
         arg::{MboxPathFlag, MessageIdsArg, TargetMboxPathFlag},
         client::MboxClient,
     },
-    shared::receipt::IdsReceipt,
+    receipt::IdsReceipt,
 };
 
 /// Move mbox message(s) to another mbox.

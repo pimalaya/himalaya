@@ -13,9 +13,8 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::flag::Flag,
     pimdir::client::PimdirClient,
-    shared::{flag::arg::FlagArg, message::arg::MessageArg},
+    unified::{email::flag::Flag, flag::arg::FlagArg, message::arg::MessageArg},
 };
 
 /// Stage a raw message in a mailbox, printing its queue row.

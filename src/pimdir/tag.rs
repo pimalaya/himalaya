@@ -13,13 +13,12 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
         index::{PimdirMailCoverage, PimdirTagStatus, PimdirTagged, local_clock, parse_query},
     },
-    shared::envelope::list::format_flags,
+    unified::{backend::Backend, envelope::list::format_flags},
 };
 
 /// Add or remove flags on every message a query matches.
@@ -143,8 +142,8 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        email::flag::Flag,
         pimdir::index::{PimdirTagStatus, PimdirTagged},
+        unified::email::flag::Flag,
     };
 
     /// A tagged placement prints its flags as every flag prints, and a

@@ -12,7 +12,7 @@ use pimalaya_cli::{columns::Columns, listing::Listing, printer::Printer, sanitiz
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, pimdir::client::PimdirClient};
+use crate::{account::context::Account, pimdir::client::PimdirClient, unified::backend::Backend};
 
 /// Report what the local pimdir store holds of the account.
 ///

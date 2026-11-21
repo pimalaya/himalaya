@@ -26,8 +26,8 @@ use crate::{
         AccountConfig, Config,
         maildir::{MaildirConfig, MaildirKeywordHeaderConfig, MaildirLayoutConfig},
     },
-    email::mailbox::{validate_level, validate_name},
     error::{mailbox_duplicate, mailbox_not_found},
+    unified::email::mailbox::{validate_level, validate_name},
 };
 
 /// The name the Maildir at the store root lists under, the inbox

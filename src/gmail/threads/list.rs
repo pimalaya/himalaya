@@ -18,11 +18,11 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     gmail::{
         client::GmailClient,
         format::{snippet_text, str_of},
     },
+    unified::backend::Backend,
 };
 
 /// List Gmail threads matching the given query and labels

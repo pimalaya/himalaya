@@ -12,7 +12,7 @@ use io_imap::{
 use log::warn;
 use pimalaya_cli::sanitize;
 
-use crate::shared::message::header;
+use crate::unified::message::header;
 
 /// Takes the result out of the output of `command`, warning of the
 /// server's alerts and of the response lines that did not decode whole.
@@ -38,19 +38,19 @@ pub fn output_data<T>(command: &str, output: ImapOutput<T>) -> T {
     output.data
 }
 
-/// Turns an ENVELOPE address list into shared addresses, the markers of
+/// Turns an ENVELOPE address list into unified addresses, the markers of
 /// a group (RFC 3501 §7.4.2, a NIL host) left out and its members kept.
-pub fn to_addresses(list: &[Address<'_>]) -> Vec<crate::email::address::Address> {
+pub fn to_addresses(list: &[Address<'_>]) -> Vec<crate::unified::email::address::Address> {
     list.iter()
         .filter(|addr| addr.host.0.is_some())
         .map(to_address)
         .collect()
 }
 
-/// Turns an envelope address into the shared address shape, its personal
+/// Turns an envelope address into the unified address shape, its personal
 /// name read as `message read` reads a header, `None` when absent or
 /// empty.
-fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
+fn to_address(addr: &Address<'_>) -> crate::unified::email::address::Address {
     let name = addr
         .name
         .0
@@ -58,7 +58,7 @@ fn to_address(addr: &Address<'_>) -> crate::email::address::Address {
         .map(|name| header::decode_bytes(name.as_ref()))
         .filter(|name| !name.is_empty());
 
-    crate::email::address::Address {
+    crate::unified::email::address::Address {
         name,
         email: format_email(addr),
     }

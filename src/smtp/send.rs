@@ -29,7 +29,7 @@ use pimalaya_cli::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{shared::message::arg::MessageArg, smtp::client::SmtpClient};
+use crate::{smtp::client::SmtpClient, unified::message::arg::MessageArg};
 
 /// Send a raw RFC 5322 message over SMTP.
 ///

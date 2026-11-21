@@ -41,13 +41,6 @@ use io_mbox::{
 use log::warn;
 
 use crate::{
-    email::{
-        envelope::{self, Envelope, EnvelopePage, page_follows},
-        flag::{Flag, FlagOp, IanaFlag},
-        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
-        outcome::Outcome,
-        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
-    },
     error::{
         ErrorCode, ItemError, existing_mailbox, headerless_message, message_not_found,
         missing_message,
@@ -55,6 +48,13 @@ use crate::{
     mbox::{
         cache::MboxCache,
         client::{MboxClient, mbox_error, validate_mbox_name},
+    },
+    unified::email::{
+        envelope::{self, Envelope, EnvelopePage, page_follows},
+        flag::{Flag, FlagOp, IanaFlag},
+        mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
+        outcome::Outcome,
+        search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
 };
 
@@ -173,7 +173,7 @@ impl MboxClient {
     }
 
     /// Searches envelopes in `mailbox`: reads every message, then applies
-    /// the shared filter, sort and pagination client-side.
+    /// the unified filter, sort and pagination client-side.
     pub fn search_envelopes(
         &self,
         mailbox: &str,
@@ -208,7 +208,7 @@ impl MboxClient {
     /// many it found, beside the error of each unknown id. None found writes
     /// nothing.
     ///
-    /// A set keeps the `O` (old) status, which no shared flag names, so
+    /// A set keeps the `O` (old) status, which no unified flag names, so
     /// replacing the flags does not make a read message new again, and a
     /// seen message is marked old too.
     pub fn store_flags(
@@ -900,14 +900,14 @@ fn strip_store_fields(contents: &[u8], content_length: bool) -> Vec<u8> {
     out
 }
 
-/// Parses a message into a shared [`Envelope`], its id and flags left
+/// Parses a message into a unified [`Envelope`], its id and flags left
 /// empty for the caller to fill from the index; `None` for one holding no
 /// header field.
 fn envelope_from(contents: &[u8]) -> Option<Envelope> {
     envelope::from_raw(contents, true)
 }
 
-/// Maps a shared [`Flag`] to an [`MboxFlag`]; a flag with no `Status`
+/// Maps a unified [`Flag`] to an [`MboxFlag`]; a flag with no `Status`
 /// or `X-Status` letter goes to `X-Keywords`.
 ///
 /// A keyword `X-Keywords` would not give back is refused.
@@ -936,8 +936,8 @@ fn flags_to_mbox(flags: &[Flag]) -> Result<MboxFlags> {
     flags.iter().map(flag_to_mbox).collect()
 }
 
-/// Maps an [`MboxFlag`] to a shared [`Flag`], the inverse of
-/// [`flag_to_mbox`]. `O` (old) has no shared counterpart.
+/// Maps an [`MboxFlag`] to a unified [`Flag`], the inverse of
+/// [`flag_to_mbox`]. `O` (old) has no unified counterpart.
 fn flag_from_mbox(flag: &MboxFlag) -> Option<Flag> {
     let flag = match flag {
         MboxFlag::Seen => Flag::from_iana(IanaFlag::Seen),
@@ -1170,8 +1170,8 @@ mod tests {
         ];
 
         for flag in flags {
-            let shared = flag_from_mbox(&flag).unwrap();
-            assert_eq!(flag_to_mbox(&shared).unwrap(), flag);
+            let unified = flag_from_mbox(&flag).unwrap();
+            assert_eq!(flag_to_mbox(&unified).unwrap(), flag);
         }
 
         assert_eq!(flag_from_mbox(&MboxFlag::Old), None);

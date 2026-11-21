@@ -36,13 +36,13 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::{envelope::Envelope, flag::Flag},
     error::{ErrorCode, ItemError, pimdir_error},
     pimdir::{
         backend::{envelope, envelope_from_item},
         client::PimdirClient,
         mailbox::list::span,
     },
+    unified::email::{envelope::Envelope, flag::Flag},
 };
 
 impl PimdirClient {
@@ -738,7 +738,7 @@ mod tests {
 
     use crate::{
         config::pimdir::PimdirConfig,
-        email::flag::{Flag, IanaFlag},
+        unified::email::flag::{Flag, IanaFlag},
     };
 
     use super::*;

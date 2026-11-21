@@ -19,13 +19,15 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    email::flag::{Flag, IanaFlag, classify_iana},
     error::{ErrorCode, message_not_found},
     pimdir::backend::PimdirFlagged,
-    shared::flag::arg::MessageIdsArg,
+    unified::{
+        email::flag::{Flag, IanaFlag, classify_iana},
+        flag::arg::MessageIdsArg,
+    },
 };
 
-/// The ids a write command acts on, refusing none, as the shared flag
+/// The ids a write command acts on, refusing none, as the unified flag
 /// commands fail when no given id matched.
 pub fn message_ids(arg: &MessageIdsArg) -> Result<Vec<&str>> {
     if arg.inner.is_empty() {
@@ -153,7 +155,7 @@ pub struct PimdirFlagRow {
 
 impl PimdirFlagStageOutput {
     /// The rows a write staged, failing when none of its ids matched, as
-    /// the shared flag commands do.
+    /// the unified flag commands do.
     pub fn found(staged: Vec<PimdirFlagged>) -> Result<Self> {
         if staged.is_empty() {
             return Err(message_not_found(

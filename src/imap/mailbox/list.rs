@@ -14,9 +14,8 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
-    email::mailbox::MailboxRole,
     imap::{client::ImapClient, outcome, utils::output_data},
+    unified::{backend::Backend, email::mailbox::MailboxRole},
 };
 
 /// List mailboxes (LIST and LSUB, RFC 3501).

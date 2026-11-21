@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::batch_delete::GmailMessagesBatchDelete;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdsReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdsReceipt};
 
 /// Permanently delete several Gmail messages at once
 /// (users.messages.batchDelete).

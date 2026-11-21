@@ -7,7 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::threads::delete::GmailThreadDelete;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Permanently delete a Gmail thread (users.threads.delete).
 #[derive(Debug, Parser)]

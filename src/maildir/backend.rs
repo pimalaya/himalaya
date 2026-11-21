@@ -3,8 +3,8 @@
 //! The Maildir adapter of the unified client, glue over the
 //! io-maildir client [`MaildirClient`] wraps.
 //!
-//! Each method takes and returns the CLI's own [`crate::email`] types, so
-//! the work here is converting between those and io-maildir's.
+//! Each method takes and returns the CLI's own [`crate::unified::email`]
+//! types, so the work here is converting between those and io-maildir's.
 
 use std::{
     collections::{BTreeSet, HashSet},
@@ -13,15 +13,15 @@ use std::{
 };
 
 use crate::{
-    email::{
+    error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
+    maildir::client::{MaildirClient, refuse_existing, validate_maildir_name},
+    unified::email::{
         envelope::{self, Envelope, EnvelopePage, page_follows},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::{Mailbox, MailboxRole, child_path, renamed_path},
         outcome::Outcome,
         search::{eval, query::SearchEmailsQuery, sort::eval::sort_envelopes},
     },
-    error::{ErrorCode, ItemError, headerless_message, message_not_found, missing_message},
-    maildir::client::{MaildirClient, refuse_existing, validate_maildir_name},
 };
 use anyhow::{Result, bail};
 use io_maildir::{
@@ -128,7 +128,7 @@ impl MaildirClient {
     }
 
     /// Searches envelopes in `mailbox`: lists them, then applies the
-    /// shared filter/sort/paginate client-side (body clauses reuse the
+    /// unified filter/sort/paginate client-side (body clauses reuse the
     /// already-read message bytes).
     pub fn search_envelopes(
         &self,
@@ -484,7 +484,7 @@ impl MaildirClient {
     }
 }
 
-/// Converts one [`Maildir`] into the shared [`Mailbox`] shape: `id` is
+/// Converts one [`Maildir`] into the unified [`Mailbox`] shape: `id` is
 /// the on-disk path, `name` the [`MaildirClient::mailbox_name`].
 fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
     Mailbox {
@@ -496,7 +496,7 @@ fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
     }
 }
 
-/// Folds a fully-read Maildir entry into a shared [`Envelope`], reading
+/// Folds a fully-read Maildir entry into a unified [`Envelope`], reading
 /// the RFC 5322 headers and mapping the flags io-maildir resolved; `None`
 /// for a file holding no header field.
 fn envelope_from_entry(entry: &MaildirFullEntry) -> Option<Envelope> {
@@ -507,7 +507,7 @@ fn envelope_from_entry(entry: &MaildirFullEntry) -> Option<Envelope> {
     })
 }
 
-/// Maps a shared [`Flag`] to a [`MaildirFlag`]; non-IANA keywords go
+/// Maps a unified [`Flag`] to a [`MaildirFlag`]; non-IANA keywords go
 /// through [`MaildirFlag::Keyword`] for the dovecot-keywords sidecar.
 fn flag_to_maildir(flag: &Flag) -> MaildirFlag {
     match flag.iana() {
@@ -526,7 +526,7 @@ fn flags_to_maildir(flags: &[Flag]) -> MaildirFlags {
     flags.iter().map(flag_to_maildir).collect()
 }
 
-/// Maps a [`MaildirFlag`] to a shared [`Flag`]; the inverse of
+/// Maps a [`MaildirFlag`] to a unified [`Flag`]; the inverse of
 /// [`flag_to_maildir`].
 fn flag_from_maildir(flag: &MaildirFlag) -> Flag {
     match flag {

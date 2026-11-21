@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     mbox::{arg::MboxPathFlag, client::MboxClient, flag::arg::FlagArg},
-    shared::message::arg::MessageArg,
+    unified::message::arg::MessageArg,
 };
 
 /// Append a message to an mbox.

@@ -11,7 +11,7 @@ use pimalaya_cli::{error::PartialOutcome, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{shared::raw::RawCommandArg, smtp::client::SmtpClient};
+use crate::{raw::RawCommandArg, smtp::client::SmtpClient};
 
 /// Send a raw SMTP command and print the verbatim server reply.
 ///

@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::delegates::delete::GmailDelegateDelete;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Delete a Gmail delegate (users.settings.delegates.delete).
 #[derive(Debug, Parser)]

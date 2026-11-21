@@ -1,7 +1,7 @@
 //! # Gmail client
 //!
 //! The wrapper around io-gmail's blocking client every Gmail-specific
-//! subcommand receives, plus the credential helper the shared client and
+//! subcommand receives, plus the credential helper the unified client and
 //! the account checker take.
 //!
 //! The unified API covers the operations every mail backend names, where
@@ -28,9 +28,9 @@ use crate::{
         gmail::{GmailAuthConfig, GmailConfig},
         proxy::ProxyConfig,
     },
-    email::mailbox::{MailboxIndex, MailboxRole},
     error::{ErrorCode, mailbox_not_found},
-    shared::refusal::Refusal,
+    refusal::Refusal,
+    unified::email::mailbox::{MailboxIndex, MailboxRole},
 };
 
 /// One page of a Gmail listing as Gmail sent it, its cursor lifted out.
@@ -188,8 +188,8 @@ impl GmailClient {
     ) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
         let bodies = bodies
             .iter()
-            .map(|body| crate::shared::http_script::ok("application/json", &body.to_string()));
-        let (script, requests) = crate::shared::http_script::Script::new(bodies.collect());
+            .map(|body| crate::http_script::ok("application/json", &body.to_string()));
+        let (script, requests) = crate::http_script::Script::new(bodies.collect());
         let inner = Inner::new(script, "token", Default::default());
         (Self::over(inner), requests)
     }
@@ -356,7 +356,7 @@ mod tests {
     /// A label named by no id, name nor role is `mailbox-not-found`.
     #[test]
     fn a_missing_label_is_coded() {
-        use crate::{email::mailbox::MailboxIndex, gmail::client::GmailClient};
+        use crate::{gmail::client::GmailClient, unified::email::mailbox::MailboxIndex};
 
         let (mut client, requests) = GmailClient::scripted(&[]);
         client.label_index = Some(MailboxIndex(Vec::new()));

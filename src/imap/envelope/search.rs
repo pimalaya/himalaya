@@ -21,13 +21,13 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     imap::{
         client::ImapClient,
         mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
         outcome,
         utils::output_data,
     },
+    unified::backend::Backend,
 };
 
 /// Search messages (SEARCH, RFC 3501).

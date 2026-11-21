@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use crate::{
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg, outcome},
-    shared::message::arg::MessageArg,
+    unified::message::arg::MessageArg,
 };
 
 /// Append a message to a mailbox (APPEND, RFC 3501).

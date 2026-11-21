@@ -21,12 +21,11 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    backend::Backend,
-    email::address::Address,
     pimdir::{
         attachment::{AttachmentQuery, PimdirAttachmentPage, page_token, parse_page_token},
         client::PimdirClient,
     },
+    unified::{backend::Backend, email::address::Address},
 };
 
 /// List the files the account's messages attach, newest message first.

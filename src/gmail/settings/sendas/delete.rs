@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::send_as::delete::GmailSendAsDelete;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Delete a Gmail send-as alias (settings.sendAs.delete).
 #[derive(Debug, Parser)]

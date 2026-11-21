@@ -17,7 +17,6 @@ use anyhow::Result;
 #[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 use pimalaya_cli::printer::Printer;
 
-use crate::backend::Backend;
 #[cfg(feature = "gmail")]
 use crate::gmail::client::GmailClient;
 #[cfg(feature = "imap")]
@@ -32,12 +31,13 @@ use crate::mbox::client::MboxClient;
 use crate::msgraph::client::MsgraphClient;
 #[cfg(feature = "pimdir")]
 use crate::pimdir::client::PimdirClient;
-#[cfg(any(backend, feature = "smtp"))]
-use crate::shared::client::EmailClient;
 #[cfg(feature = "sieve")]
 use crate::sieve::client::SieveClient;
 #[cfg(feature = "smtp")]
 use crate::smtp::client::SmtpClient;
+use crate::unified::backend::Backend;
+#[cfg(any(backend, feature = "smtp"))]
+use crate::unified::client::EmailClient;
 #[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 use crate::{
     account::context::Account,

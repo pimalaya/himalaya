@@ -11,7 +11,7 @@ use io_msgraph::v1::{
 };
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Update a Microsoft Graph message (`PATCH /me/messages/{id}`): mark
 /// read/unread, set importance or replace categories.

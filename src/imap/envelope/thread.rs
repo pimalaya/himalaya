@@ -28,9 +28,6 @@ use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
-    capability::missing,
-    email::{address::Address, envelope::Envelope, flag::Flag},
     imap::{
         backend::envelope_from,
         client::ImapClient,
@@ -39,7 +36,12 @@ use crate::{
         outcome,
         utils::output_data,
     },
-    shared::envelope::list::{format_date, format_flags, format_names},
+    unified::{
+        backend::Backend,
+        capability::missing,
+        email::{address::Address, envelope::Envelope, flag::Flag},
+        envelope::list::{format_date, format_flags, format_names},
+    },
 };
 
 /// Thread messages (THREAD, RFC 5256).
@@ -372,12 +374,12 @@ mod tests {
     };
 
     use crate::{
-        email::{
+        imap::envelope::thread::ImapThreadOutput,
+        unified::email::{
             address::Address,
             envelope::Envelope,
             flag::{Flag, IanaFlag},
         },
-        imap::envelope::thread::ImapThreadOutput,
     };
 
     fn members(ids: &[u32], answers: Vec<Thread>) -> Thread {

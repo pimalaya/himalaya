@@ -15,9 +15,11 @@ use pimalaya_cli::{
 #[cfg(feature = "pimdir")]
 use crate::pimdir::client::PimdirClient;
 use crate::{
-    backend::Backend,
-    capability::{self, Resolution, StoreSupport},
     cli::resolve_account,
+    unified::{
+        backend::Backend,
+        capability::{self, Resolution, StoreSupport},
+    },
 };
 
 /// List what the account serves of the unified API.

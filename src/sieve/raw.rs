@@ -11,7 +11,7 @@ use pimalaya_cli::{error::PartialOutcome, printer::Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{shared::raw::RawCommandArg, sieve::client::SieveClient};
+use crate::{raw::RawCommandArg, sieve::client::SieveClient};
 
 /// Send a raw ManageSieve command and print the verbatim server response.
 ///

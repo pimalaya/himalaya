@@ -283,7 +283,7 @@ mod tests {
     #[cfg(not(feature = "mbox"))]
     #[test]
     fn a_backend_left_out_of_the_build_names_its_feature() {
-        use crate::backend::Backend;
+        use crate::unified::backend::Backend;
 
         let toml = "[accounts.example]\ndefault = true\nmbox.root = \"~/mbox\"\n";
         let mut config: Config = toml::from_str(toml).unwrap();

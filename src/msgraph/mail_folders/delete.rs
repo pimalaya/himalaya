@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{msgraph::client::MsgraphClient, shared::receipt::IdReceipt};
+use crate::{msgraph::client::MsgraphClient, receipt::IdReceipt};
 
 /// Delete a Microsoft Graph mail folder and everything in it (`DELETE
 /// /me/mailFolders/{id}`).

@@ -15,7 +15,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     msgraph::{client::MsgraphClient, messages::list::recipient},
-    shared::output::write_bytes_or_save,
+    output::write_bytes_or_save,
 };
 
 /// Get a single Microsoft Graph message (`GET /me/messages/{id}`), or its

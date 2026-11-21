@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    email::flag::{Flag, IanaFlag},
+    unified::email::flag::{Flag, IanaFlag},
 };
 
 /// List the mbox flags.
@@ -53,7 +53,7 @@ pub struct MboxFlagListOutput {
     flags: Vec<MboxFlagRow>,
 }
 
-/// One mbox flag: the flag, as the shared flags print it, its letter as
+/// One mbox flag: the flag, as the unified flags print it, its letter as
 /// `raw` and `iana` `null` for `O`, which has none, and the header
 /// carrying the letter.
 #[derive(Clone, Debug, Serialize, JsonSchema)]

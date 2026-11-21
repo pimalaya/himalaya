@@ -18,7 +18,7 @@ use crate::{
         client::GmailClient,
         settings::convert::{verification_status_wire, yes_no},
     },
-    shared::message::read::sanitize_body,
+    unified::message::read::sanitize_body,
 };
 
 /// Get one Gmail send-as alias by e-mail address (settings.sendAs.get).

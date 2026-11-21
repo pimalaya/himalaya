@@ -8,7 +8,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     maildir::{arg::RequiredMaildirPathFlag, client::MaildirClient},
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Delete a Maildir folder.

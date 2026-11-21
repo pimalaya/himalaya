@@ -7,9 +7,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw};
 use pimalaya_cli::printer::Printer;
 
-use crate::{
-    gmail::client::GmailClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
-};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt, unified::message::arg::MessageArg};
 
 /// Send a Gmail message (users.messages.send).
 #[derive(Debug, Parser)]

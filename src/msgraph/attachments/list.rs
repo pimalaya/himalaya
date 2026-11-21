@@ -16,8 +16,8 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     msgraph::{client::MsgraphClient, messages::list::raw_page},
+    unified::backend::Backend,
 };
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).

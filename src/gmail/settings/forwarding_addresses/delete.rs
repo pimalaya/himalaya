@@ -8,7 +8,7 @@ use clap::Parser;
 use io_gmail::v1::rest::settings::forwarding_addresses::delete::GmailForwardingAddressDelete;
 use pimalaya_cli::printer::Printer;
 
-use crate::{gmail::client::GmailClient, shared::receipt::IdReceipt};
+use crate::{gmail::client::GmailClient, receipt::IdReceipt};
 
 /// Delete a Gmail forwarding address
 /// (users.settings.forwardingAddresses.delete).

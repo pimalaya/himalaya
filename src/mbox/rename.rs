@@ -12,7 +12,7 @@ use crate::{
         arg::{MboxNameArg, RequiredMboxPathFlag},
         client::MboxClient,
     },
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Rename an mbox.

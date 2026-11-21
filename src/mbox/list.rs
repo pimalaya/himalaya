@@ -11,7 +11,7 @@ use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, mbox::client::MboxClient};
+use crate::{account::context::Account, mbox::client::MboxClient, unified::backend::Backend};
 
 /// List mbox files.
 ///

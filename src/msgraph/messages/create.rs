@@ -7,7 +7,7 @@ use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
 use crate::{
-    msgraph::client::MsgraphClient, shared::message::arg::MessageArg, shared::receipt::IdReceipt,
+    msgraph::client::MsgraphClient, receipt::IdReceipt, unified::message::arg::MessageArg,
 };
 
 /// Create a Microsoft Graph draft message from raw MIME (`POST

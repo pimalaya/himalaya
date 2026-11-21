@@ -25,14 +25,13 @@ use serde_json::{Map, Value};
 
 use crate::{
     account::context::Account,
-    backend::Backend,
     error::{ErrorCode, ItemError, page_token_invalid, partial_when},
     jmap::{
         backend::{envelope_from, not_found_errors, parse_rfc3339, query_page_follows},
         client::JmapClient,
         raw,
     },
-    shared::envelope::list::envelope_cells,
+    unified::{backend::Backend, envelope::list::envelope_cells},
 };
 
 /// Query JMAP emails (Email/query + Email/get).

@@ -13,7 +13,7 @@ use crate::{
         client::JmapClient,
         error::{format_set_error, set_error},
     },
-    shared::receipt::IdReceipt,
+    receipt::IdReceipt,
 };
 
 /// Update a JMAP sender identity (Identity/set).

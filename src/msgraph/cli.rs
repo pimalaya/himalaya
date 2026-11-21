@@ -13,7 +13,7 @@ use crate::{
         mail_folders::cli::MsgraphMailFoldersCommand, messages::cli::MsgraphMessagesCommand,
         profile::cli::MsgraphProfileCommand, request::MsgraphRequestCommand,
     },
-    shared::refusal::{self, Reader},
+    refusal::{self, Reader},
 };
 
 /// The reader of what Graph refused.
@@ -73,8 +73,8 @@ mod tests {
 
     use crate::{
         account::context::Account,
+        http_script::{Script, refused},
         msgraph::{cli::MsgraphCommand, client::MsgraphClient, request::MsgraphRequestCommand},
-        shared::http_script::{Script, refused},
     };
 
     /// A request Graph refuses is the command's result, under `refusal`,

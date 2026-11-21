@@ -11,7 +11,7 @@ use pimalaya_cli::{listing::Listing, printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, backend::Backend, sieve::client::SieveClient};
+use crate::{account::context::Account, sieve::client::SieveClient, unified::backend::Backend};
 
 /// List all server-side Sieve scripts and mark the active script.
 #[derive(Debug, Parser)]
