@@ -41,21 +41,19 @@ pub struct ImapClient {
 impl ImapClient {
     /// Opens the connection and authenticates, caching the capabilities
     /// the handshake reported.
+    ///
+    /// A `unix://` sirup socket greets with PREAUTH, so it negotiates no SASL.
     pub fn new(config: ImapConfig, resolver: &mut SecretResolver) -> Result<Self> {
         let sort_fallback = config.sort.fallback;
         let tls = config.tls.into_tls(config.alpn)?;
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // NOTE: a `unix://` sirup socket greets with PREAUTH, so the
-            // session is already authenticated and no SASL is negotiated.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from IMAP server `{server}`"))?;
-                // NOTE: url knows no imap default port, so the fallback is
-                // the same scheme default io-imap connects with.
                 let port = server.port().unwrap_or(default_port(server.scheme()));
                 Some(cfg.try_into_sasl(host, port, resolver)?)
             }
@@ -245,7 +243,6 @@ mod tests {
 
     #[test]
     fn icloud_sorts_on_the_client_though_it_advertises_sort() {
-        // NOTE: iCloud's CAPABILITY line as of 2026-11-12.
         let icloud = capabilities(
             "XAPPLEPUSHSERVICE IMAP4 IMAP4rev1 CONDSTORE ENABLE QRESYNC QUOTA \
              XAPPLELITERAL NAMESPACE UIDPLUS UNSELECT SORT ESEARCH ESORT \

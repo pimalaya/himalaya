@@ -25,8 +25,6 @@ use pimalaya_config::toml::{ConfigMissingError, TomlConfig};
 use simd_cpu::SimdCpu;
 
 fn main() {
-    // NOTE: the base64 and quoted-printable codecs read the installed CPU
-    // token, the portable baseline until one is installed.
     let _ = SimdCpu::install_detected();
 
     let cli = parse::<Cli>();
@@ -40,8 +38,6 @@ fn main() {
 
     let result = execute(cli.cmd, &cli.log, account, &mut printer).map_err(error::coded);
 
-    // A person missing a configuration meets the welcome, a script or a
-    // JSON caller the error.
     if let Err(err) = &result
         && let Some(missing) = err.downcast_ref::<ConfigMissingError>()
         && is_wanted(&printer)

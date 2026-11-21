@@ -104,8 +104,6 @@ impl MessageParseCommand {
             path => {
                 check_stdin(ErrorCode::StdinTaken)?;
 
-                // NOTE: a bare `message parse` at a prompt would wait for
-                // a message nobody announced, where `-` asks for it.
                 if path.is_none() && stdin().is_terminal() {
                     bail!("No message provided: pass a file path, or `-` to read stdin");
                 }
@@ -162,8 +160,6 @@ mod tests {
     fn a_file_is_read_as_found() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("m.eml");
-        // NOTE: bare newlines and 8-bit bytes stay, as `message read`
-        // gets them from the backend.
         std::fs::write(&path, b"Subject: \xe9\n\nbody\n").unwrap();
 
         assert_eq!(read(&path).unwrap(), b"Subject: \xe9\n\nbody\n");

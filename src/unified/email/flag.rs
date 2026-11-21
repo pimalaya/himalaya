@@ -326,7 +326,6 @@ mod tests {
     fn predicates_match_iana_only() {
         assert!(Flag::from_iana(IanaFlag::Seen).is_seen());
         assert!(!Flag::from_raw("seen-ish").is_seen());
-        // NOTE: the junk predicate serves the Gmail backend only.
         #[cfg(feature = "gmail")]
         assert!(Flag::from_iana(IanaFlag::Junk).is_junk());
     }

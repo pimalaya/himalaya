@@ -518,7 +518,6 @@ Page:     1, envelopes 1 to 2, the last
             message_id: None,
             in_reply_to: Vec::new(),
             flags: Default::default(),
-            // Writes the clipboard (OSC 52), then clears the screen.
             subject: Some(String::from("Hi\x1b]52;c;ZWNobyBoaQ==\x07\x1b[2J")),
             from: vec![Address {
                 name: Some(String::from("Eve\x1b[8m")),

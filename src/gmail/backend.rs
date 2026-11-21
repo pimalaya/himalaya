@@ -207,6 +207,9 @@ impl GmailClient {
     /// Adds, sets, or removes `flags` via `messages.modify` on the ids
     /// carrying the `mailbox` label, returning how many it modified beside
     /// the error of each id it did not.
+    ///
+    /// A patch left empty (`$Forwarded` has no label) sends nothing, an
+    /// empty `messages.modify` being a wasted request that could still fail.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -217,9 +220,6 @@ impl GmailClient {
         let (add, remove) = label_patch(flags, op);
         let found = self.ids_in(mailbox, ids)?;
 
-        // NOTE: an IANA flag without a label (`$Forwarded`) leaves nothing
-        // to patch, and an empty `messages.modify` is a wasted request that
-        // could still fail.
         if add.is_empty() && remove.is_empty() {
             return Ok(found.map(|ids| ids.len()));
         }
@@ -281,8 +281,6 @@ impl GmailClient {
         ids: &[&str],
         format: GmailMessageFormat,
     ) -> Result<Vec<Result<GmailMessage, GmailBatchResponseError>>> {
-        // NOTE: a part is named by its index, an id given on the command
-        // line being no safe `Content-ID`.
         let requests = ids
             .iter()
             .enumerate()
@@ -337,8 +335,6 @@ impl GmailClient {
             .map_err(|err| anyhow!("Gmail raw message could not be decoded: {err}"))?;
         let mut flags = flags_from_labels(&message.label_ids);
 
-        // NOTE: `messages.get` never changes read state, so `--seen` costs
-        // a separate `messages.modify` removing the `UNREAD` label.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             flags.insert(seen.clone());
@@ -915,9 +911,11 @@ fn flags_from_labels(label_ids: &[String]) -> BTreeSet<Flag> {
 }
 
 /// Translates a flag-store operation into Gmail `(addLabelIds,
-/// removeLabelIds)`. `\Seen` maps to the absence of `UNREAD`, so its
-/// polarity is inverted; flags with no Gmail equivalent are dropped;
-/// custom keywords pass through as label ids.
+/// removeLabelIds)`.
+///
+/// `\Seen` maps to the absence of `UNREAD`, so its polarity is inverted;
+/// custom keywords pass through as label ids. `\Draft` is dropped like
+/// flags Gmail lacks, Gmail refusing `DRAFT` from a client in either list.
 fn label_patch(flags: &[Flag], op: FlagOp) -> (Vec<String>, Vec<String>) {
     let mut add = Vec::new();
     let mut remove = Vec::new();
@@ -959,8 +957,6 @@ fn label_patch(flags: &[Flag], op: FlagOp) -> (Vec<String>, Vec<String>) {
                 &mut add,
                 &mut remove,
             );
-            // NOTE: no `DRAFT` target: Gmail refuses it from a client in
-            // either list, failing the whole request.
             target(
                 flags.iter().any(Flag::is_junk),
                 SPAM,

@@ -106,7 +106,6 @@ mod tests {
         assert_eq!(client.cert, home.join("me.pem"));
         assert_eq!(client.key, home.join("me.key.pem"));
 
-        // NOTE: a certificate without its key cannot be presented
         assert!(toml::from_str::<TlsConfig>(r#"client.cert = "~/me.pem""#).is_err());
     }
 }

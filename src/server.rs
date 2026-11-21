@@ -38,8 +38,6 @@ mod tests {
         let url = parse_server("mail.example.com", "imaps", IMAP).unwrap();
         assert_eq!(url.scheme(), "imaps");
         assert_eq!(url.host_str(), Some("mail.example.com"));
-        // NOTE: with no explicit port, the backend client applies the
-        // protocol default rather than this parser.
         assert_eq!(url.port(), None);
     }
 

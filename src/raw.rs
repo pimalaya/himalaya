@@ -72,7 +72,6 @@ impl RawCommandArg {
 mod tests {
     #[test]
     fn literal_escapes_become_real_crlf() {
-        // NOTE: mirrors what `resolve` does to a shell-escaped batch.
         let command = "a0 CAPABILITY\\r\\na1 NOOP\\r\\n"
             .replace("\\r", "")
             .replace("\\n", "\r\n");

@@ -39,20 +39,19 @@ pub struct SmtpClient {
 impl SmtpClient {
     /// Opens the SMTP connection (TCP/TLS/STARTTLS, greeting, EHLO,
     /// SASL).
+    ///
+    /// A `unix://` sirup socket is already authenticated, so it negotiates
+    /// no SASL.
     pub fn new(config: SmtpConfig, resolver: &mut SecretResolver) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn)?;
         let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // NOTE: a `unix://` sirup socket is already authenticated, so
-            // no SASL is negotiated over it.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from SMTP server `{server}`"))?;
-                // NOTE: url knows no smtp default port, so the fallback is
-                // io-smtp's own connection default.
                 let port = server
                     .port()
                     .unwrap_or(Inner::default_port(server.scheme()));

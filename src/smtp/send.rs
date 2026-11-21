@@ -129,8 +129,6 @@ impl SmtpSendCommand {
             ..Default::default()
         };
 
-        // NOTE: an empty reverse path is the null one, see
-        // `reverse_path_parser`.
         let mail_from = match self.mail_from.as_str() {
             "" => SmtpReversePath::Null,
             addr => SmtpReversePath::SmtpMailbox(SmtpMailbox::try_from(addr)?),

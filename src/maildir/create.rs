@@ -31,6 +31,9 @@ pub struct MaildirMailboxCreateCommand {
 
 impl MaildirMailboxCreateCommand {
     /// Creates the Maildir under the store root.
+    ///
+    /// The bare name goes through: io-maildir resolves it under the store
+    /// root, where a pre-joined root would land under a second copy of it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let name = Path::new(&self.maildir_name.inner);
         validate_maildir_name(name)?;
@@ -40,9 +43,6 @@ impl MaildirMailboxCreateCommand {
             client.validate_level(level)?;
         }
 
-        // NOTE: io-maildir resolves a name relative to the store root, so
-        // the bare name goes through: pre-joining the root would land the
-        // Maildir under a second copy of it.
         let target = client.store.resolve(&name.as_str().into());
         refuse_existing(Path::new(target.as_str()), &name)?;
         client.create_maildir(name)?;

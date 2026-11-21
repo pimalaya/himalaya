@@ -30,14 +30,13 @@ pub struct SieveRawCommand {
 
 impl SieveRawCommand {
     /// Sends the command and prints the raw response.
+    ///
+    /// An interior newline is refused: the response reader would never
+    /// account for that second command, desyncing the stream.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        // NOTE: io-managesieve appends the trailing CRLF itself, so the one
-        // the caller may have added is stripped.
         let command = self.command.parse()?;
         let command = command.trim_end_matches(['\r', '\n']);
 
-        // NOTE: an interior newline would be a second command the
-        // response reader never accounts for, desyncing the stream.
         if command.contains('\n') {
             bail!("ManageSieve raw accepts a single command line; batching is not supported");
         }
@@ -45,9 +44,6 @@ impl SieveRawCommand {
         let response = client.raw(command.into())?;
         let data: Vec<String> = response.data.iter().map(ToString::to_string).collect();
 
-        // NOTE: a text event reaches a terminal only, and the data lines
-        // are what a raw command asks for, so the text form prints them
-        // within the result instead.
         if printer.is_json() {
             for text in &data {
                 let text = text.clone();

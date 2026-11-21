@@ -34,6 +34,9 @@ pub struct MaildirMailboxRenameCommand {
 
 impl MaildirMailboxRenameCommand {
     /// Renames the Maildir under the store root.
+    ///
+    /// Both names go root-relative: io-maildir resolves them under the
+    /// store root, where absolute paths would land under a second copy.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir_path.inner)?;
         if client.is_root(&maildir) {
@@ -52,8 +55,6 @@ impl MaildirMailboxRenameCommand {
         if Path::new(target.as_str()).exists() {
             bail!("Cannot rename Maildir to `{to}`: it already exists");
         }
-        // NOTE: Maildir++ keeps every folder flat at the root, so a
-        // parent exists there only by name.
         if let Some((parent, _)) = to.rsplit_once('/')
             && !client.store.maildirpp
             && !client.root.join(parent).is_dir()
@@ -61,9 +62,6 @@ impl MaildirMailboxRenameCommand {
             bail!("Cannot rename Maildir to `{to}`: its parent `{parent}` does not exist");
         }
 
-        // NOTE: io-maildir resolves both names relative to the store
-        // root, so the root-relative names go through: absolute paths
-        // would work under a second copy of the root.
         let from = client.relative_name(&maildir);
         client.rename_maildir(from, to)?;
 

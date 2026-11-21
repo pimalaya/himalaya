@@ -301,8 +301,6 @@ impl ImapClient {
         let Outcome { value, errors } = fetched_messages(output);
         let mut envelopes = reorder_envelopes(value, &page_uids);
 
-        // NOTE: HEADER matches a substring, so a `message-id` clause on the
-        // chain of `and` from the root is checked whole once fetched.
         let ids = root_message_ids(query.and_then(|q| q.filter.as_ref()));
         envelopes.retain(|envelope| {
             let id = envelope.message_id.as_deref();
@@ -416,8 +414,6 @@ impl ImapClient {
         let selected = self.select_mailbox(mailbox)?;
         let selected = output_data("SELECT", selected);
 
-        // NOTE: a server sending no PERMANENTFLAGS lets every flag be
-        // changed permanently (RFC 3501 section 7.1).
         if let Some(permanent) = &selected.permanent_flags {
             refuse_impermanent(mailbox, flags, permanent)?;
         }
@@ -448,8 +444,6 @@ impl ImapClient {
 
         self.select_mailbox(mailbox)?;
 
-        // NOTE: `BODY[]` sets `\Seen` server-side as a side effect, so
-        // `--seen` costs no extra round trip where `BODY.PEEK[]` does not.
         let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
             MessageDataItemName::Flags,
             MessageDataItemName::BodyExt {
@@ -533,9 +527,6 @@ impl ImapClient {
             return Ok(Some(uid.to_string()));
         }
 
-        // NOTE: without `APPENDUID`, which a server may omit even with
-        // UIDPLUS, the UID is recovered by searching the message's own
-        // `Message-ID`, which it therefore has to carry.
         let message_id = header::parse_headers(&raw)
             .root
             .header::<MESSAGE_ID>()
@@ -597,18 +588,12 @@ impl ImapClient {
 
         self.select_mailbox(from)?;
 
-        // NOTE: a move onto its own mailbox changes nothing, as on every
-        // backend, where a server would give the messages new UIDs.
         if same_mailbox(from, to) {
             let present = self.present_uids(sequence_set)?;
             return Ok(found_uids(ids, &present));
         }
 
         if self.supports_move() {
-            // NOTE: `UID MOVE` takes the messages out of the source, so
-            // without a readable `COPYUID` nothing is left there to tell
-            // a moved message from one that never existed. The UIDs
-            // present are searched beforehand, and only they are moved.
             let present = self.present_uids(sequence_set)?;
             if present.is_empty() {
                 return Ok(found_uids(ids, &present));
@@ -619,8 +604,6 @@ impl ImapClient {
                 ImapMessageMoveOptions { uid: true },
             );
             let copy_uid = moved.map_err(|err| self.explain(to, err, None))?;
-            // NOTE: a COPYUID counting more messages than were sent is
-            // not believed.
             let mut outcome = found_uids(ids, &present);
             if let Some(copy_uid) = copy_uid
                 && copy_uid.count() < present.len() as u64
@@ -679,8 +662,6 @@ impl ImapClient {
                 let Some(delimiter) = delimiter else {
                     bail!("IMAP mailbox `{parent}` holds no other: the server keeps no hierarchy");
                 };
-                // NOTE: the parent is joined as the server spells it, so
-                // `Inbox` nests under the reserved `INBOX`.
                 let Some((parent, holds_others)) = self
                     .mailbox_rows()?
                     .into_iter()
@@ -905,9 +886,6 @@ impl ImapClient {
         let present = self.stored_uids(echoes, sequence_set.clone(), ids.len())?;
         let outcome = found_uids(ids, &present);
 
-        // NOTE: what removes says how the mailbox deletes, so a delete
-        // that found nothing never reads as flagged and asks for an
-        // expunge; only the expunge waits for a found UID.
         let removes = self.supports_uidplus();
         if removes && outcome.value > 0 {
             self.uid_expunge(sequence_set)?;
@@ -1107,8 +1085,6 @@ pub(crate) fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> E
                 if let Some(m) = env.message_id.into_option() {
                     message_id = normalize_message_id(&bytes_to_string(m.as_ref()));
                 }
-                // NOTE: the ninth ENVELOPE element (RFC 3501 section
-                // 7.4.2), so a reply's parent costs no extra round trip.
                 if let Some(m) = env.in_reply_to.into_option() {
                     in_reply_to = parse_message_ids(&bytes_to_string(m.as_ref()));
                 }
@@ -1514,15 +1490,11 @@ fn convert_filter_with(
 
         Q::Date(date) => SearchKey::SentOn(imap_date(*date)?),
 
-        // NOTE: the shared clause is strictly after, where SENTSINCE is on
-        // or after, so the day is bumped.
         Q::AfterDate(date) => {
             let bumped = date.succ_opt().unwrap_or(*date);
             SearchKey::SentSince(imap_date(bumped)?)
         }
 
-        // NOTE: SENTBEFORE is strictly earlier than the day, as the shared
-        // clause is.
         Q::BeforeDate(date) => SearchKey::SentBefore(imap_date(*date)?),
 
         Q::From(pattern) => SearchKey::From(astring(pattern)?),
@@ -1990,8 +1962,6 @@ mod tests {
 
     #[test]
     fn an_envelope_reads_its_header_strings_as_message_read_does() {
-        // NOTE: an emoji split across two encoded words, and a name in
-        // raw Windows-1252 bytes beside an encoded word.
         const LINE: &[u8] = b"* 1 FETCH (UID 7 ENVELOPE (NIL \
             \"=?UTF-8?Q?=F0=9F?= =?UTF-8?Q?=98=82?=\" \
             (({24}\r\n\x93Ann\x94 =?UTF-8?Q?=C3=A9?= NIL \"a\" \"example.org\")) \

@@ -88,8 +88,6 @@ pub fn apply(
 
     let mailbox = save.map(|name| account.resolve_mailbox(name));
 
-    // NOTE: a backend filing every sent message itself (Graph) keeps that
-    // copy wherever `--save` points, `--no-save` being refused up front.
     if send && client.files_sent_copy() {
         if let Some(mailbox) = mailbox {
             debug!("the backend files the sent copy itself, ignoring `{mailbox}`");
@@ -101,8 +99,6 @@ pub fn apply(
         });
     }
 
-    // NOTE: checked before the send, so a backend that cannot hold the
-    // copy refuses the whole command rather than send and then fail.
     if mailbox.is_some() {
         client.require(&[Capability::MessageAdd])?;
     }
@@ -328,7 +324,6 @@ impl MessageTemplateOutput {
                 .unwrap_or_default()
         };
 
-        // NOTE: the text is read back from the CRLF bytes the builder wrote.
         let body = part::body_text(&message).replace("\r\n", "\n");
         let attachments = attachments(&message)
             .map(|attachment| TemplateAttachment {

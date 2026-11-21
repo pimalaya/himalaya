@@ -107,6 +107,9 @@ pub fn parse_message_ids(raw: &str) -> Vec<String> {
 }
 
 /// Parses an RFC 2822 date, retrying without its day-of-week token.
+///
+/// chrono rejects a date whose day of week disagrees with it, which many
+/// senders get wrong, and the token is redundant.
 #[cfg(any(feature = "imap", feature = "gmail"))]
 pub fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
     let trimmed = raw.trim();
@@ -114,9 +117,6 @@ pub fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
         return None;
     }
 
-    // NOTE: chrono rejects the whole timestamp when the day-of-week
-    // disagrees with the date, which a surprising number of senders get
-    // wrong. The token is redundant, so the retry drops it.
     DateTime::parse_from_rfc2822(trimmed)
         .or_else(|_| DateTime::parse_from_rfc2822(strip_weekday(trimmed)))
         .ok()
@@ -180,7 +180,6 @@ pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
     };
     let root = &message.root;
 
-    // NOTE: mime-rs takes any bytes before a colon for a field name.
     let ftext = |name: &[u8]| {
         let printable = |byte: &u8| matches!(byte, 33..=57 | 59..=126);
         !name.is_empty() && name.iter().all(printable)
@@ -236,8 +235,6 @@ mod tests {
             ["a@x.org", "b@x.org"]
         );
 
-        // NOTE: folded and unspaced values are the same list, the
-        // brackets delimiting the ids rather than the whitespace.
         assert_eq!(
             parse_message_ids("<a@x.org>\r\n\t<b@x.org>"),
             ["a@x.org", "b@x.org"]
@@ -289,8 +286,6 @@ mod tests {
 
     #[test]
     fn an_id_normalises_the_same_way_wherever_it_came_from() {
-        // NOTE: the pairing a reply leans on, the parent's `message_id`
-        // and the child's `in_reply_to` entry comparing equal.
         assert_eq!(
             parse_message_ids(" <a@x.org> "),
             [normalize_message_id("<a@x.org>").unwrap()]

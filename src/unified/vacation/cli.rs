@@ -3,8 +3,6 @@
 //! The `vacation` command, dispatching onto its subcommands over the
 //! client of the backend keeping the auto-reply.
 
-// NOTE: a build with neither JMAP nor Gmail compiles the tree with no
-// client to run it on, the resolver refusing the verb before any runs.
 #![cfg_attr(
     not(any(feature = "jmap", feature = "gmail")),
     allow(unused_variables, unreachable_code)

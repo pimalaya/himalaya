@@ -41,8 +41,6 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
             format!("({}) OR ({})", filter_to_kql(lhs)?, filter_to_kql(rhs)?)
         }
         SearchEmailsFilterQuery::Not(inner) => format!("NOT ({})", filter_to_kql(inner)?),
-        // NOTE: the shared date clauses read the `Date:` header, which is
-        // what Graph indexes as `sent`.
         SearchEmailsFilterQuery::Date(date) => format!("sent:{}", date_kql(*date)),
         SearchEmailsFilterQuery::AfterDate(date) => format!("sent>{}", date_kql(*date)),
         SearchEmailsFilterQuery::BeforeDate(date) => format!("sent<{}", date_kql(*date)),
@@ -56,7 +54,6 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::To(pattern) => format!("to:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::Cc(pattern) => format!("cc:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::Bcc(pattern) => format!("bcc:{}", value_kql(pattern)),
-        // NOTE: KQL's `participants` reads the From, To, Cc and Bcc fields.
         SearchEmailsFilterQuery::Address(pattern) => {
             format!("participants:{}", value_kql(pattern))
         }

@@ -12,8 +12,6 @@
 //! The active [`Account`] is threaded as a sibling argument through every
 //! `execute` chain rather than bundled into the client.
 
-// NOTE: a send-only build compiles every storage method with no arm to
-// use its parameters, the resolver refusing the verb before any runs.
 #![cfg_attr(not(backend), allow(unused_variables))]
 
 use std::collections::BTreeSet;
@@ -106,6 +104,9 @@ enum BackendClient {
 impl EmailClient {
     /// Opens the connections of the active account, bailing when nothing
     /// usable is configured.
+    ///
+    /// SMTP is kept as configuration, unconnected, so a read-only command
+    /// opens no SMTP connection.
     pub fn new(
         config: Config,
         name: &str,
@@ -117,8 +118,6 @@ impl EmailClient {
         let mut resolver = SecretResolver::new();
         let storage = open_storage(&mut account_config, resolution.storage, &mut resolver)?;
 
-        // NOTE: left unconnected, so a read-only command opens no SMTP
-        // connection and a single-session proxy serves storage alone.
         #[cfg(feature = "smtp")]
         let smtp = match (backend.allows_smtp(), account_config.smtp.take()) {
             (true, Some(config)) => Some(Box::new(config)),
@@ -130,8 +129,6 @@ impl EmailClient {
         #[cfg(not(feature = "smtp"))]
         let has_transport = storage.is_some();
         if !has_transport {
-            // NOTE: ManageSieve holds no mailbox, so no unified command runs
-            // on it.
             let supported: Vec<Backend> = Backend::COMPILED
                 .iter()
                 .copied()
@@ -523,8 +520,6 @@ impl EmailClient {
             BackendClient::Gmail(client) => client.add_message(mailbox, flags, raw).map(Some),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(_) => bail!("Microsoft Graph does not support adding messages"),
-            // NOTE: `storage_mut` bails first in a send-only build, so
-            // this arm only keeps the match exhaustive over an empty enum.
             #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
@@ -768,7 +763,6 @@ impl EmailClient {
                 });
             }
             #[cfg(feature = "msgraph")]
-            // NOTE: Graph files every message it sends in Sent Items itself.
             Some(BackendClient::Msgraph(client)) => {
                 return client.send_message(raw).map(|()| SentCopy::Filed(None));
             }
@@ -1040,8 +1034,6 @@ mod tests {
         let runs = dir.path().join("runs");
         let command = format!("echo run >> '{}'; echo secret", runs.display());
 
-        // NOTE: nothing listens there, so the send fails once its
-        // credential is resolved.
         let closed = TcpListener::bind("127.0.0.1:0")
             .unwrap()
             .local_addr()

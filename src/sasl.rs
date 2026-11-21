@@ -48,8 +48,6 @@ impl SaslConfig {
                 username: c.username,
                 token: resolver.resolve(c.token)?,
             }),
-            // NOTE: an empty nonce means draw one for me: the client fills
-            // it in, an I/O-free coroutine having no randomness of its own.
             SaslConfig::ScramSha256(c) => Sasl::ScramSha256(SaslScramCreds {
                 username: c.username,
                 password: resolver.resolve(c.password)?,

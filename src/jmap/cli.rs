@@ -44,8 +44,6 @@ pub enum JmapCommand {
     #[command(subcommand, visible_alias = "vacation")]
     VacationResponse(JmapVacationCommand),
 
-    // The former form of `request`, a method-calls array printing
-    // `{methodResponses}`, kept with its schema key.
     #[command(hide = true)]
     Query(JmapQueryCommand),
 }

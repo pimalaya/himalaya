@@ -71,7 +71,6 @@ impl MsgraphChildFoldersListCommand {
         let response = match token {
             Some(link) => resume(client, link)?,
             None => {
-                // NOTE: clap requires the id when no page token is given.
                 let id = self.id.as_deref().unwrap_or_default();
                 let path = format!("mailFolders/{}/childFolders", path_segment(id)?);
                 raw_page(client, &path, &to_query_pairs(&params))?

@@ -63,8 +63,6 @@ impl PimdirMessageSendCommand {
 
         let sent = client.send_message(anchor, raw.clone(), save.is_some())?;
 
-        // NOTE: an owner declaring no capabilities ignores the copy in the
-        // intent, so it is queued beside the send, as `message send` does.
         let copy_handle = match save {
             Some(mailbox) if !sent.carried => {
                 let seen = Flag::from_iana(IanaFlag::Seen);

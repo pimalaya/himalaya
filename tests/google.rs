@@ -59,8 +59,6 @@ mod anonymous {
         let dir = TempDir::new().unwrap();
         let list = ["--json", "account", "list"];
 
-        // NOTE: each account overwrites the one before, so each loads
-        // before the next is written.
         let config = write_gmail_account(dir.path());
         json(&himalaya(&config, MADE_UP, &list), 0);
 

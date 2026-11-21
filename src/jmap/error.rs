@@ -208,6 +208,8 @@ fn described(status: Option<u16>, reason: Option<String>, message: String) -> Re
 
 /// Renders the suffix a failed JMAP set is reported with: its error type,
 /// the properties it names, then its description.
+///
+/// All three come from the server, so the result is sanitized.
 pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
     let mut msg = format!(": {}", err.type_name());
 
@@ -222,7 +224,6 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
         msg.push_str(desc.trim_end_matches(['.', '\n']));
     }
 
-    // The type, properties and description come from the server.
     sanitize::text(&msg).into_owned()
 }
 

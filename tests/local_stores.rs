@@ -166,8 +166,6 @@ fn an_unsearchable_maildir_names_the_permission_error() {
     maildir_at(&locked);
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
 
-    // NOTE: root searches through any mode, so the check only holds for
-    // an ordinary user.
     let searchable = locked.join("cur").is_dir();
     let lines = maildir_lines(&root, "");
     let (ok, out) = himalaya(dir.path(), &lines, &["envelope", "list", "-m", "Locked"]);

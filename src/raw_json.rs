@@ -44,8 +44,6 @@ pub struct RawJsonOutput {
 
 impl fmt::Display for RawJsonOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a 204 carries no body, which parses as null. Printing
-        // "null" would read as a value the server sent; it sent nothing.
         if self.response.is_null() {
             return Ok(());
         }

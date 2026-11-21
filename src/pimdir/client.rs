@@ -63,8 +63,6 @@ impl PimdirClient {
             return Err(CodedError::new(ErrorCode::StoreUncreated, message).into());
         }
 
-        // NOTE: reads overlay the queue, so what this client staged shows on
-        // the next read rather than on the next sync.
         let store = PimdirReader::open(&root)
             .map_err(pimdir_error)
             .with_context(|| format!("Open pimdir store `{}`", root.display()))?
@@ -226,9 +224,6 @@ impl PimdirClient {
         collection: &str,
         capability: &str,
     ) -> Result<Option<String>> {
-        // NOTE: a collection the sync engine only declared (`neverest sync
-        // --declare-only`) has no source syncing it yet, so the account's
-        // candidates count too.
         let declared = producer
             .capabilities(collection)
             .map_err(pimdir_error)

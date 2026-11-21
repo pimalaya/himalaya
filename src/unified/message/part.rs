@@ -353,8 +353,6 @@ fn invalid_content_type(part: &MimeEntity) -> bool {
         return false;
     };
 
-    // NOTE: read off the raw value, mime-rs stopping at the first byte
-    // past a token, so `text/pl ain` would read as `text/pl`.
     let media = value.split(';').next().unwrap_or_default();
     match media.split_once('/') {
         Some((top, sub)) => !is_token(top.trim().as_bytes()) || !is_token(sub.trim().as_bytes()),
@@ -455,17 +453,14 @@ pub fn bytes<'t>(part: &'t MimeEntity) -> Cow<'t, [u8]> {
 /// The part decoded to UTF-8 by its charset, lossily, a `format=flowed`
 /// text unwrapped (RFC 3676 §4.2).
 ///
-/// A part labelled US-ASCII, or naming no charset, whose bytes are valid
-/// UTF-8 is read as UTF-8, which is what such mail holds in practice.
+/// A part labelled US-ASCII, or naming no charset, is read as UTF-8 when
+/// valid, else as Windows-1252, which is what such mail holds in practice.
 pub fn text(part: &MimeEntity) -> String {
     let ascii = charset(part).is_none_or(|charset| {
         let charset = charset.trim_matches('"').to_ascii_lowercase();
         charset == "us-ascii" || charset == "ascii"
     });
 
-    // NOTE: mime-rs reads US-ASCII as UTF-8, so bytes past ASCII that are
-    // no UTF-8 would come back replaced; Windows-1252 is what such mail
-    // holds in practice, as for raw 8-bit header bytes.
     if ascii {
         let text = header::eight_bit(&bytes(part));
         return unflow(part, text);
@@ -664,7 +659,6 @@ mod tests {
     #[test]
     fn a_message_at_the_bounds_is_read() {
         assert!(!refused(&nested(MAX_DEPTH)));
-        // NOTE: the container is a part too.
         assert!(!refused(&wide(MAX_PARTS - 1)));
         assert!(!refused(&tall(MAX_HEADER_LINES)));
     }

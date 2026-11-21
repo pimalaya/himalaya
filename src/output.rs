@@ -56,8 +56,6 @@ fn looks_binary(bytes: &[u8]) -> bool {
 
     match std::str::from_utf8(bytes) {
         Ok(text) => text.chars().any(is_control),
-        // NOTE: bytes that are not UTF-8 are read as Latin-1, where
-        // 0x80..=0x9f are the C1 controls.
         Err(_) => bytes.iter().any(|&byte| is_control(char::from(byte))),
     }
 }
@@ -69,7 +67,6 @@ mod tests {
     #[test]
     fn text_is_not_binary() {
         assert!(!looks_binary(b"Hello,\tworld\r\n"));
-        // UTF-8 continuation bytes in 0x80..=0x9f are not C1 controls.
         assert!(!looks_binary("Příliš žluťoučký kůň\n".as_bytes()));
     }
 

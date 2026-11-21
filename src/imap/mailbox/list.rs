@@ -76,8 +76,6 @@ pub struct ImapMailboxListOutput {
 
 impl fmt::Display for ImapMailboxListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: the attributes join without a blank, so a line still splits
-        // on blanks.
         let mut listing = Listing::new(&self.account, Some(Backend::Imap.as_str()));
 
         for mbox in &self.mailboxes {

@@ -78,11 +78,9 @@ fn mailbox(addrs: &[Address]) -> &str {
 /// subject: blanks collapsed, `(fwd)` trailers, `Re:`, `Fw:` and `Fwd:`
 /// leaders, `[blob]` prefixes and `[fwd: ...]` wrappers stripped.
 pub fn base_subject(subject: &str) -> String {
-    // Step 1: every run of blanks becomes one space.
     let mut base = subject.split_whitespace().collect::<Vec<_>>().join(" ");
 
     loop {
-        // Step 2: trailing `(fwd)` and blanks.
         loop {
             let trimmed = base.trim_end();
             let trimmed = match trimmed.len().checked_sub(5) {
@@ -100,7 +98,6 @@ pub fn base_subject(subject: &str) -> String {
             base.truncate(trimmed.len());
         }
 
-        // Steps 3 to 5: leaders, then a blob leaving a non-empty base.
         loop {
             let mut rest = base.as_str();
             while let Some(after) = strip_leader(rest) {
@@ -117,7 +114,6 @@ pub fn base_subject(subject: &str) -> String {
             base = rest.to_owned();
         }
 
-        // Step 6: a `[fwd: ...]` wrapper, then again from step 2.
         let unwrapped = base
             .get(..5)
             .filter(|head| head.eq_ignore_ascii_case("[fwd:"))

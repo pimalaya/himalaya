@@ -106,6 +106,9 @@ impl ImapFetchCommand {
 
     /// The data items to request: the UID always, the envelope when
     /// nothing else is asked for.
+    ///
+    /// The body goes through `BODY.PEEK[]`, since `BODY[]` sets `\Seen`
+    /// (RFC 3501 section 6.4.5).
     fn item_names(&self) -> Vec<MessageDataItemName<'static>> {
         let any = self.envelope
             || self.structure
@@ -132,8 +135,6 @@ impl ImapFetchCommand {
             names.push(MessageDataItemName::Rfc822Size);
         }
         if self.body {
-            // NOTE: `BODY[]` would set `\Seen` as a side effect (RFC 3501
-            // §6.4.5), a bulk download leaves the flag to the user.
             names.push(MessageDataItemName::BodyExt {
                 section: None,
                 partial: None,
@@ -370,7 +371,6 @@ fn format_size(bytes: usize) -> String {
 
 impl fmt::Display for ImapFetchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: one record per message, a blank line apart.
         for (index, message) in self.messages.iter().enumerate() {
             let mut fields = Fields::default();
             fields.push("Message", message.uid.unwrap_or(message.seq));
@@ -393,8 +393,6 @@ impl fmt::Display for ImapFetchOutput {
                 push_envelope(&mut fields, envelope);
             }
             if let Some(structure) = &message.structure {
-                // NOTE: a leading line break leaves the label alone, the
-                // tree starting under it.
                 let mut tree = String::from("\n");
                 write_body_tree(&mut tree, structure, "", true)?;
                 fields.push("Structure", tree);
@@ -532,7 +530,6 @@ mod tests {
 
     #[test]
     fn body_keeps_8bit_octets() {
-        // NOTE: koi8-r octets and a bare 0xFF, none of it valid UTF-8.
         let raw: &[u8] = b"Subject: x\r\n\r\n\xf0\xd2\xc9\xd7\xc5\xd4 \xff\r\n";
         let item = MessageDataItem::BodyExt {
             section: None,
@@ -545,8 +542,6 @@ mod tests {
 
     #[test]
     fn body_prints_as_standard_padded_base64() {
-        // NOTE: the last octets map to `+` and `/`, and 26 octets end on
-        // one `=` of padding.
         let message = FetchedMessage {
             body: Some(b"Subject: x\r\n\r\n\xf0\xd2\xc9\xd7\xc5\xd4 \xff\xfb\xff\xbf\r".to_vec()),
             ..Default::default()

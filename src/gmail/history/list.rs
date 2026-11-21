@@ -134,8 +134,6 @@ impl fmt::Display for GmailHistoryListOutput {
         }
 
         for record in &self.history {
-            // NOTE: a record Gmail sent in a shape io-gmail does not read
-            // prints no line; the JSON keeps it whole.
             let Ok(record) = serde_json::from_value::<GmailHistory>(record.clone()) else {
                 continue;
             };

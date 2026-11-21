@@ -131,6 +131,9 @@ pub struct MessageReplyCommand {
 impl MessageReplyCommand {
     /// Fetches the source, builds the reply and hands it to the handler,
     /// then flags the source as answered when the reply was sent.
+    ///
+    /// The flag follows the send alone (RFC 3501 §2.3.2), only where the
+    /// backend keeps it, and never fails a reply already sent.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -187,10 +190,6 @@ impl MessageReplyCommand {
             return Ok(());
         };
 
-        // NOTE: a draft that is only printed or saved answers nothing
-        // yet, so the flag follows the send alone (RFC 3501 section
-        // 2.3.2), and only where the backend keeps it, a send already
-        // done never failing for want of the flag.
         let answered = client.resolution().support(Capability::FlagsAnswered);
         if self.send && answered.is_served() {
             output

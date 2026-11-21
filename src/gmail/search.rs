@@ -393,8 +393,6 @@ mod tests {
 
     #[test]
     fn after_starts_on_the_next_utc_day() {
-        // NOTE: `after` is strict, and Gmail's bare `after:2026/09/08`
-        // kept that day's mail too, from its midnight in PST.
         assert_eq!(q("after 2026-09-08"), "after:1788911999");
     }
 

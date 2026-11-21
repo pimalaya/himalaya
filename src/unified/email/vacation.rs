@@ -4,8 +4,6 @@
 //! agree on it: whether it is on, the window it answers in, and what it
 //! answers.
 
-// NOTE: a build with neither JMAP nor Gmail keeps the shape for the
-// commands it parses and refuses, nothing building one.
 #![cfg_attr(not(any(feature = "jmap", feature = "gmail")), allow(dead_code))]
 
 use anyhow::{Result, anyhow};

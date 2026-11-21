@@ -34,7 +34,6 @@ impl SubmissionEnvelope {
     /// no transport can submit it, and so is an address holding a control
     /// character.
     pub fn parse(raw: &[u8]) -> Result<Self> {
-        // NOTE: the header block alone, the body left unsplit.
         let opts = MimeParseOptions {
             structure_depth: Some(0),
             ..Default::default()

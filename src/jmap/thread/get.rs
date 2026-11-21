@@ -76,8 +76,6 @@ pub struct JmapThreadGetOutput {
 
 impl fmt::Display for JmapThreadGetOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: one row per email, in thread order, so each line is one
-        // pair a script can read, and an empty thread one row of its own.
         let mut listing = Listing::new(&self.account, Some(Backend::Jmap.as_str()));
 
         for thread in &self.threads {

@@ -253,7 +253,6 @@ mod tests {
         let err = config.take_account(None).unwrap_err().to_string();
         assert!(err.contains("(perso, work)"), "{err}");
 
-        // NOTE: `default` is a name like any other, which no account has.
         let mut config: Config = toml::from_str(toml).unwrap();
         let err = config.take_account(Some("default")).unwrap_err();
         assert!(matches!(&err, AccountError::Missing { name, .. } if name == "default"));

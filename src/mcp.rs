@@ -87,12 +87,8 @@ const TOOLS: &[McpTool] = &[
     McpTool::write("message", "copy", false).untyped(),
     McpTool::write("message", "move", true).untyped(),
     McpTool::write("message", "delete", true),
-    // NOTE: `--raw` prints the message bytes instead of the read view its
-    // output schema describes.
     McpTool::read("message", "read").without(&["raw"]),
     McpTool::send("message", "send"),
-    // NOTE: the composers print the composed message, or a confirmation
-    // once `save` or `send` is given, so they declare no output schema.
     McpTool::read("message", "compose")
         .untyped()
         .server(COMPOSER_ARGS),
@@ -103,9 +99,6 @@ const TOOLS: &[McpTool] = &[
         .untyped()
         .server(COMPOSER_ARGS),
     McpTool::read("attachment", "list"),
-    // NOTE: always run with `--stdout`, which writes no file and reads
-    // exactly one part, whose bytes travel as an embedded resource, so
-    // `--inline` (inline parts when no id is given) does nothing.
     McpTool::read("attachment", "download")
         .without(&["inline"])
         .fixed(&["--stdout"])
@@ -116,8 +109,6 @@ const TOOLS: &[McpTool] = &[
         )])
         .part(),
     McpTool::read("vacation", "get"),
-    // NOTE: an auto-reply once on answers incoming mail, so setting it
-    // is sending, listed under `--allow-send` alone.
     McpTool::send("vacation", "set"),
 ];
 
@@ -202,14 +193,9 @@ impl McpCommand {
     pub fn execute(self, session: &mut Session) -> Result<()> {
         let account = session.account;
 
-        // Resolved once up front, so a missing configuration or account
-        // fails the server rather than its first call, and the tools
-        // listed are the ones the account's backends serve.
         let (_, name, account_config) = resolve_account(account.config_paths, account.name)?;
         let resolution = Resolution::of(&name, &account_config, account.backend);
 
-        // Set before the tools are built, the download tool's
-        // description naming the cap.
         PATHS_CLOSED.store(true, Ordering::Relaxed);
         ATTACHMENT_CAP.store(self.max_attachment_size, Ordering::Relaxed);
 
@@ -413,8 +399,6 @@ impl McpToolSpec {
                 continue;
             }
 
-            // NOTE: an argument reaching what the account does not serve
-            // (`send` without a transport) is left out, the tool kept.
             let unserved = leaf
                 .map(|(leaf, resolution)| leaf.unserved_args(resolution))
                 .unwrap_or_default();
@@ -447,7 +431,6 @@ impl McpToolSpec {
 
             let mut input_schema = grammar.input_schema();
 
-            // What the grammar does not say, declared on the tool.
             for arg in tool.server {
                 input_schema["properties"][arg.name] = (arg.schema)();
             }
@@ -492,8 +475,6 @@ impl McpToolSpec {
                 },
             });
 
-            // A part tool prints one shape of its two, the part, `data`
-            // moved out of it.
             let schema = schemas.get(&format!("himalaya-{}-{}", tool.group, tool.leaf));
             let output_schema = match schema {
                 Some(schema) if tool.part => part_schema(schema),
@@ -622,8 +603,6 @@ fn tool_result(
         return ToolResult::error::<ErrorCode>(anyhow!("The command printed no part to embed"));
     };
 
-    // The bytes travel once, as an embedded resource after the part's
-    // JSON, which takes the place of the printed one.
     result.content.pop();
     result.content.push(text(part.to_string()));
     result.content.push(resource);
@@ -734,7 +713,6 @@ fn hand_attach_data(value: &Value, limits: &McpLimits, cmd: &mut Command) -> Res
         Command::Message(MessageCommand::Compose(cmd)) => cmd.attach_data = attachments,
         Command::Message(MessageCommand::Reply(cmd)) => cmd.attach_data = attachments,
         Command::Message(MessageCommand::Forward(cmd)) => cmd.attach_data = attachments,
-        // NOTE: only the composers declare it.
         _ => return Err(anyhow!("`attach-data` is not taken by this tool")),
     }
 
@@ -1078,8 +1056,6 @@ mod tests {
             }]
         );
 
-        // The argv alone, as a command line would carry it, is refused by
-        // clap.
         let refused = McpLine::try_parse_from(["message", "compose", "--attach-data=x"]);
         assert!(refused.is_err());
     }
@@ -1328,7 +1304,6 @@ mod tests {
             assert_eq!(inline::estimated_size("AAAAAAAAAA=="), 7);
             assert_eq!(inline::estimated_size("iVBORw0KGgo"), 8);
 
-            // NOTE: exactly 10 MiB of bytes is not over a 10 MiB cap.
             let encoded = "A".repeat(13_981_014) + "==";
             assert_eq!(inline::estimated_size(&encoded), 10 * 1024 * 1024);
         }
@@ -1372,9 +1347,6 @@ mod tests {
                 Ok(vec![0x00, 0x01, 0xff, 0xfe, 0x00, 0x0a, 0x0d])
             );
 
-            // NOTE: non-zero trailing bits, padding past the quantum or
-            // inside the data, a lone last symbol, whitespace and the URL
-            // alphabet are refused.
             for data in [
                 "aGl=", "aG", "aGk==", "Zm9v=", "=", "aGk=aGk=", "aGkxY", "aG k=", "aGk=\n", "-_-_",
             ] {

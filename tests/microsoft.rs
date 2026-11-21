@@ -72,8 +72,6 @@ mod anonymous {
         let dir = TempDir::new().unwrap();
         let list = ["--json", "account", "list"];
 
-        // NOTE: each account overwrites the one before, so each loads
-        // before the next is written.
         let config = write_graph_account(dir.path());
         json(&himalaya(&config, MADE_UP, &list), 0);
 
@@ -286,7 +284,6 @@ mod credentialed {
         let moved = json(&run(&args), 0);
         assert_eq!(moved["count"], 1, "{moved}");
 
-        // NOTE: a move gives the message a new id.
         let id = find_by_subject(&run, "archive", &tag);
         cleanup.later(&["msgraph", "messages", "delete", &id]);
 

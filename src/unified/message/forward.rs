@@ -127,6 +127,9 @@ impl MessageForwardCommand {
     /// Fetches the source, builds the forward and hands it to the
     /// handler, then flags the source as forwarded when the forward was
     /// sent.
+    ///
+    /// A server may refuse the `$Forwarded` keyword (RFC 5788), so the flag
+    /// is best-effort and never fails a forward already sent.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -180,10 +183,6 @@ impl MessageForwardCommand {
             self.send,
         )?;
 
-        // NOTE: `$Forwarded` (RFC 5788) is a keyword, which a server may
-        // refuse where `\Answered` is a system flag it has to take, so
-        // the flag is best-effort and never fails a forward already
-        // sent.
         if self.send {
             let forwarded = Flag::from_iana(IanaFlag::Forwarded);
             let stored =

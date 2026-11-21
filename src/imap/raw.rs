@@ -57,15 +57,15 @@ impl ImapRawCommand {
     }
 
     /// Sends the commands and prints the responses.
+    ///
+    /// Untagged responses print as events under JSON only, the text form
+    /// carrying them within the result.
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let command = tagged(self.command.parse()?)?;
 
         let responses = client.raw(command.as_bytes())?;
         let (events, output) = split_reply(&responses);
 
-        // NOTE: a text event reaches a terminal only, and the untagged
-        // responses are what a raw command asks for, so the text form
-        // prints them within the result instead.
         if printer.is_json() {
             for event in events {
                 printer.event(event)?;

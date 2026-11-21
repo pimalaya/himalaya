@@ -30,14 +30,13 @@ pub struct SmtpRawCommand {
 
 impl SmtpRawCommand {
     /// Sends the command and prints the raw reply.
+    ///
+    /// An interior newline is refused: the reply parser would never account
+    /// for that second command, desyncing the stream.
     pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
-        // NOTE: io-smtp appends the trailing CRLF itself, so the one the
-        // caller may have added is stripped.
         let command = self.command.parse()?;
         let command = command.trim_end_matches(['\r', '\n']);
 
-        // NOTE: an interior newline would be a second command the reply
-        // parser never accounts for, desyncing the stream.
         if command.contains('\n') {
             bail!("SMTP raw accepts a single command line; batching is not supported");
         }

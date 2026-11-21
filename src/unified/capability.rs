@@ -17,8 +17,6 @@
 //! backends included, so the `--help` they annotate reads the same in
 //! every build.
 
-// NOTE: a build with no mail transport keeps the tables for the MCP
-// server, which then has no verb to look them up for.
 #![cfg_attr(not(any(backend, feature = "smtp")), allow(dead_code))]
 
 use std::fmt;
@@ -368,9 +366,6 @@ impl Resolution {
             _ => None,
         };
 
-        // NOTE: an account syncing a local store from its provider keeps
-        // its auto-reply on the provider, which the storage order would
-        // never reach.
         let features = STORAGE_ORDER
             .iter()
             .copied()
@@ -1101,7 +1096,6 @@ pub fn help(group: &str, leaf: &str) -> String {
 
     let mut help = String::from("Backends:");
 
-    // NOTE: each capability once, with the arguments reaching it.
     let mut reached: Vec<(&Capability, Vec<&str>)> = leaf
         .capabilities
         .iter()
@@ -1239,8 +1233,6 @@ mod resolution_tests {
         let config = account(&format!("{IMAP_BLOCK}{MAILDIR_BLOCK}"));
         let resolution = Resolution::of("a", &config, Backend::Auto);
 
-        // NOTE: local before network, and every verb exchanging ids on
-        // that one backend.
         for capability in [
             C::MailboxList,
             C::EnvelopeList,
@@ -1257,15 +1249,11 @@ mod resolution_tests {
 
     #[test]
     fn the_auto_reply_resolves_to_the_backend_keeping_it() {
-        // NOTE: a Maildir synced from JMAP stores the mail, JMAP keeps the
-        // auto-reply.
         let config = account(&format!("{MAILDIR_BLOCK}{JMAP_BLOCK}"));
         let resolution = Resolution::of("a", &config, Backend::Auto);
         assert_eq!(resolution.storage, Some(Backend::Maildir));
         assert_eq!(resolution.transport(C::Vacation), Some(Backend::Jmap));
 
-        // NOTE: no backend keeps one, so the storage backend refuses it,
-        // naming what does.
         let imap = Resolution::of("a", &account(IMAP_BLOCK), Backend::Auto);
         assert_eq!(imap.transport(C::Vacation), Some(Backend::Imap));
         let refused = imap.require(&[C::Vacation]).unwrap_err().to_string();

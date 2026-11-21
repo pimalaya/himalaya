@@ -139,7 +139,6 @@ fn store(dir: &Path) {
             .unwrap();
     }
 
-    // NOTE: listed with no body: it attaches nothing until one is stored.
     let unfetched = message(
         "later@shop.test",
         "Shop <billing@shop.test>",
@@ -453,7 +452,6 @@ fn pages_follow_one_another_by_their_token() {
         ]
     );
 
-    // NOTE: a page exactly full of the last files names no next page.
     let page = himalaya.json(&["pimdir", "attachment", "list", "-s", "4"]);
     assert_eq!(page["nextPage"], Value::Null);
 
@@ -517,7 +515,6 @@ fn a_search_finds_files_by_name_and_by_sender() {
 
 #[test]
 fn an_account_holding_no_attachments_lists_none() {
-    // NOTE: mail listed with no body: no attachments collection at all.
     let himalaya = Himalaya::new(|dir| {
         let mut store = PimdirStore::open(dir)
             .unwrap()

@@ -148,7 +148,6 @@ fn runs_with_no_configuration_from_a_path_and_from_stdin() {
     let text = ok(himalaya.run(&["message", "parse", path]));
     assert_eq!(ok(himalaya.run_stdin(&["message", "parse"], MIXED)), text);
 
-    // NOTE: nothing was looked for, so nothing was offered or written.
     assert_eq!(fs::read_dir(himalaya.home.path()).unwrap().count(), 1);
 }
 
@@ -161,8 +160,6 @@ fn a_part_comes_out_as_its_decoded_bytes() {
     let bytes = ok(himalaya.run(&["message", "parse", "--part", "7", path]));
     assert_eq!(bytes, b"\x00\x01\xff\xfe\x00\x0a\x0d");
 
-    // NOTE: a Latin-1 body keeps its charset, only the transfer
-    // encoding being undone.
     let body = ok(himalaya.run_stdin(&["message", "parse", "--part", "4"], MIXED));
     assert_eq!(body, b"Un caf\xe9 ?");
 
@@ -216,8 +213,6 @@ fn a_part_is_named_by_its_imap_section_too() {
     let path = himalaya.eml("m.eml", MIXED);
     let path = path.to_str().unwrap();
 
-    // NOTE: mixed holds related (1: alternative 1.1, holding 1.1.1 and
-    // 1.1.2, then the image 1.2), the file (2) and the message (3).
     for (section, id) in [
         ("1.1.1", "4"),
         ("1.1.2", "5"),
@@ -235,7 +230,6 @@ fn a_part_is_named_by_its_imap_section_too() {
         b"\x00\x01\xff\xfe\x00\x0a\x0d"
     );
 
-    // NOTE: containers, a part of the attached message and nothing.
     for section in ["1", "1.1", "3.1", "4", "0", ""] {
         let output = himalaya.run(&["--json", "message", "parse", "--section", section, path]);
         assert!(!output.status.success(), "section {section:?}");
@@ -250,7 +244,6 @@ fn a_part_is_named_by_its_imap_section_too() {
     let output = himalaya.run(&["message", "parse", "--part", "7", "--section", "2", path]);
     assert!(!output.status.success());
 
-    // NOTE: the body of a message that is not multipart is section 1.
     let single = b"Content-Type: application/pdf\r\n\
         Content-Disposition: attachment; filename=\"a.pdf\"\r\n\
         Content-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQK\r\n";

@@ -77,6 +77,9 @@ pub struct MsgraphMessageListCommand {
 
 impl MsgraphMessageListCommand {
     /// Lists one page of messages and prints it.
+    ///
+    /// A search drops `$orderby`, which Graph rejects beside `$search`, and
+    /// `$count`, which there wants a `ConsistencyLevel` header not sent.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -86,9 +89,6 @@ impl MsgraphMessageListCommand {
         let quoted = self.search.as_deref().map(quote_search);
         let search = quoted.as_deref();
 
-        // NOTE: Graph rejects `$search` beside `$orderby`, and pairing it
-        // with `$count` wants a `ConsistencyLevel` header the client does
-        // not send, so both are dropped when searching.
         let orderby = match search {
             Some(_) => None,
             None => Some(self.orderby.as_deref().unwrap_or("receivedDateTime desc")),

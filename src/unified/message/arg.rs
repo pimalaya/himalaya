@@ -43,8 +43,6 @@ impl MessageArg {
     pub fn parse(&self) -> anyhow::Result<Vec<u8>> {
         let message = self.resolve()?;
 
-        // NOTE: an empty message would otherwise reach the backend and
-        // fail there with an opaque server error.
         if message.trim_ascii().is_empty() {
             bail!("Message is empty");
         }

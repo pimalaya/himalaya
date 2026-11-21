@@ -60,7 +60,6 @@ pub struct GmailSettingsSendAsListOutput {
 
 impl fmt::Display for GmailSettingsSendAsListOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: a display name is free text, so it reads last.
         let mut listing = Listing::new(&self.account, Some(Backend::Gmail.as_str()));
 
         for send_as in &self.send_as {

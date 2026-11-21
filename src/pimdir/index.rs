@@ -285,8 +285,6 @@ impl PimdirClient {
             .get_item(&first.collection, hit.seq)
             .map_err(pimdir_error)
             .with_context(|| format!("Read message `{}`", hit.seq))?;
-        // NOTE: a placement the store dropped since the index read it has
-        // no item; the hit keeps the title the index answered.
         let envelope = match item {
             Some(item) => envelope_from_item(&item),
             None => {
@@ -381,7 +379,6 @@ fn refusal_line(err: &PimdirQueryError) -> String {
 fn refusal_report(query: &str, err: &PimdirQueryError) -> String {
     let name = "query";
     let config = Config::default().with_color(false);
-    // NOTE: an empty span past the end is drawn on the last character.
     let end = err.end.max(err.start + 1);
     let mut report = Report::build(ReportKind::Error, (name, err.start..end))
         .with_config(config)
@@ -398,7 +395,6 @@ fn refusal_report(query: &str, err: &PimdirQueryError) -> String {
     let mut buf = Vec::new();
     let _ = report.finish().write((name, Source::from(query)), &mut buf);
 
-    // NOTE: the report heads itself `Error:`, which the printer adds too.
     String::from_utf8_lossy(&buf).replacen("Error: ", "", 1)
 }
 
@@ -592,13 +588,10 @@ impl From<&PimdirSearchCoverage> for PimdirMailCoverage {
             } => (since.clone(), until.clone(), *filling),
         };
 
-        // NOTE: every query is scoped to mail, so the kinds are mail's.
         let unread = |count: fn(&PimdirSearchUnread) -> u64| -> u64 {
             coverage.local.kinds.values().map(count).sum()
         };
 
-        // NOTE: a zone that differs is never reported: a mail date is an
-        // instant, which no zone of the index reads otherwise.
         Self {
             complete: coverage.is_complete(),
             bodiless: unread(|unread| unread.bodiless),
@@ -619,7 +612,6 @@ impl PimdirMailCoverage {
     /// What the answer could not see, `None` when it is complete.
     pub fn summary(&self) -> Option<String> {
         let mut parts = Vec::new();
-        // NOTE: a count no term of the query reads leaves it complete.
         if self.counted.bodiless > 0 {
             parts.push(format!(
                 "{} message(s) have no local body and matched on their headers alone",
@@ -802,8 +794,6 @@ mod tests {
         }
         let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
         assert_eq!(owner.drain().unwrap().applied, 3);
-        // NOTE: a mail listed with no flags read, as a header-only listing
-        // may leave one.
         let flags = PimdirFlags::Unknown;
         owner
             .write(vec![PimdirWriteOp::UpsertPlacement(PimdirPlacement {
@@ -1009,7 +999,6 @@ mod tests {
         drop(owner);
         refresh(dir.path());
 
-        // NOTE: now is 08:00 on 2026-11-07 in Paris
         let clock = PimdirSearchClock {
             now: Some(1_794_034_800),
             zone: Some("Europe/Paris".into()),
@@ -1410,7 +1399,6 @@ mod tests {
         ] {
             assert!(line.contains(part), "{line}");
         }
-        // NOTE: no term reads a body, so the four counts are not said.
         for part in [
             "no local body",
             "could not read",
@@ -1429,8 +1417,6 @@ mod tests {
     #[test]
     fn a_bodiless_message_is_incomplete_only_while_a_term_reads_it() {
         let (dir, client) = indexed_store();
-        // NOTE: the source closes its round, so a body is all the answer
-        // cannot see.
         let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
         let inbox = PimdirCollectionId(INBOX.into());
         owner

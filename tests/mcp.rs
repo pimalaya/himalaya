@@ -252,13 +252,11 @@ fn a_message_that_is_no_request_is_refused_and_the_server_goes_on() {
     let responses = serve_bytes(&config, &[], &input);
     assert_eq!(responses.len(), 4, "{responses:#?}");
 
-    // A batch, then bytes that are not UTF-8, both without an id to keep.
     assert_eq!(responses[0]["error"]["code"], -32600, "{}", responses[0]);
     assert_eq!(responses[0]["id"], Value::Null);
     assert_eq!(responses[1]["error"]["code"], -32700, "{}", responses[1]);
     assert_eq!(responses[1]["id"], Value::Null);
 
-    // A request without `jsonrpc: "2.0"`, which keeps its id.
     assert_eq!(responses[2]["error"]["code"], -32600, "{}", responses[2]);
     assert_eq!(responses[2]["id"], 3);
 
@@ -285,7 +283,6 @@ fn write_and_send_tools_under_their_flags() {
 
     assert!(tool(&responses[0], "message_send").is_some());
     assert!(tool(&responses[0], "flag_add").is_none());
-    // NOTE: a Maildir keeps no auto-reply, so neither tool is listed.
     assert!(tool(&responses[0], "vacation_set").is_none());
     assert!(tool(&responses[0], "vacation_get").is_none());
     assert!(compose["inputSchema"]["properties"].get("send").is_some());
@@ -437,7 +434,6 @@ fn a_refused_argument_is_a_usage_failure() {
     let unknown = refusal(&responses[0]);
     assert_eq!(unknown["code"], "usage-invalid", "{unknown}");
 
-    // Named as the tool's input names it, not as clap renders the flag.
     let invalid = refusal(&responses[1]);
     let error = invalid["error"].as_str().unwrap();
     assert_eq!(invalid["code"], "usage-invalid", "{invalid}");
@@ -466,8 +462,6 @@ fn a_path_given_as_a_message_is_not_read_from_disk() {
         )],
     );
 
-    // NOTE: the path opens on no header field, so it is refused as a
-    // message rather than read as a file.
     let refused = &responses[0]["result"];
     assert_eq!(refused["isError"], true, "{refused}");
 
@@ -623,7 +617,6 @@ fn the_download_tool_is_listed_read_only_without_its_disk_arguments() {
         "{output}"
     );
 
-    // NOTE: the cap is the server's, so no tool takes it.
     for tool in tools["result"]["tools"].as_array().unwrap() {
         let properties = tool["inputSchema"]["properties"].as_object().unwrap();
         assert!(properties.get("max-attachment-size").is_none(), "{tool}");
@@ -646,8 +639,6 @@ fn an_attachment_is_read_as_an_embedded_resource_and_nothing_is_written() {
         )],
     );
 
-    // NOTE: checked first, so it is what fails with the fixed `--stdout`
-    // removed, the command then writing the part to `downloads-dir`.
     assert_eq!(
         snapshot(dir.path()),
         before,
@@ -683,7 +674,6 @@ fn an_attachment_is_read_as_an_embedded_resource_and_nothing_is_written() {
     let blob = embedded["resource"]["blob"].as_str().unwrap();
     assert_eq!(base64_decode(blob), BLOB);
 
-    // NOTE: the bytes travel once, never also as `data`.
     assert!(!result.to_string().contains("\"data\""), "{result}");
 }
 
@@ -731,7 +721,6 @@ fn the_download_tool_takes_exactly_one_part_id() {
         ],
     );
 
-    // Two ids and none are refused by the tool's grammar.
     let refusals = [
         "Argument `attachment-id` takes exactly one value",
         "Missing argument `attachment-id`",
@@ -776,8 +765,6 @@ fn a_part_over_the_server_cap_is_refused() {
     assert!(refused.get("structuredContent").is_none(), "{refused}");
     assert_eq!(refused["content"].as_array().unwrap().len(), 1);
 
-    // NOTE: the cap bounds the decoded size, a part of exactly that size
-    // passing.
     let responses = serve(&config, &["--max-attachment-size=7"], &[read(1)]);
     assert_eq!(responses[0]["result"]["structuredContent"]["size"], 7);
 }
@@ -1004,7 +991,6 @@ fn inline_attachments_are_stored_with_their_bytes_names_and_types() {
         ]
     );
 
-    // NOTE: a non-ASCII name goes out RFC 2231 encoded.
     let raw = stored_raw(dir.path(), id);
     assert!(raw.contains("filename*"), "{raw}");
 }
@@ -1129,8 +1115,6 @@ fn an_oversized_attachment_is_refused_before_it_is_decoded() {
         &config,
         &["--allow-write", "--max-attachment-size", "8"],
         &[
-            // NOTE: 16 characters that are no base64 at all: the size
-            // estimate refuses them before a decoder reads them.
             compose(
                 1,
                 json!({ "filename": "a.bin", "data": "!!!!!!!!!!!!!!!!" }),
@@ -1147,7 +1131,6 @@ fn an_oversized_attachment_is_refused_before_it_is_decoded() {
     }
     assert_eq!(stored(dir.path()), before);
 
-    // NOTE: exactly at the cap, 8 bytes as 12 base64 characters.
     let responses = serve(
         &config,
         &["--allow-write", "--max-attachment-size", "8"],

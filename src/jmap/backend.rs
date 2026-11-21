@@ -186,7 +186,6 @@ impl JmapClient {
             more = page_follows(envelopes.len() as u64, page, page_size);
             envelopes = paginate(envelopes, page, page_size);
 
-            // NOTE: the whole query was read, so its errors go on page 1.
             if page.unwrap_or(1) > 1 {
                 errors.clear();
             }
@@ -349,8 +348,6 @@ impl JmapClient {
 
         let raw = self.download_blob(&url)?;
 
-        // NOTE: a blob download carries no mutation, so `--seen` costs a
-        // separate `Email/set` here.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             flags.insert(seen.clone());
@@ -445,14 +442,15 @@ impl JmapClient {
     /// Moves the ids of `ids` that `from` holds to `to` in one
     /// `Email/set`, and returns how many were moved beside the error of
     /// each id not moved.
+    ///
+    /// A move onto `from` itself sends nothing: the patch removing `from`
+    /// would win over the one adding it, taking the emails out of it.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let Outcome {
             value: found,
             errors,
         } = self.emails_in(from, ids)?;
 
-        // NOTE: the patch removing `from` would win over the one adding
-        // `to`, taking the emails out of the very mailbox they stay in.
         if found.is_empty() || from == to {
             let value = found.len();
             return Ok(Outcome { value, errors });
@@ -626,8 +624,6 @@ impl JmapClient {
             html_body: patch.html,
         };
 
-        // NOTE: the server echoes only what changed, so the whole response
-        // is read again.
         self.vacation_response_set(update)?;
         self.get_vacation()
     }
@@ -699,9 +695,6 @@ impl JmapClient {
                 received_at: None,
             },
         );
-        // NOTE: bytes the account holds already (a draft added earlier, a
-        // retry) are refused with `alreadyExists` by a server forbidding
-        // duplicates; the existing email is then the one submitted.
         let (email_id, created) = match imported(self.email_import(imports)?, "outgoing")? {
             Imported::Created(Some(id)) => (id, true),
             Imported::Existing(id) => (id, false),
@@ -733,7 +726,6 @@ impl JmapClient {
 
         let draft = sanitize::text(&email_id).into_owned();
 
-        // NOTE: without an answer the message may have gone out.
         let output = match submission {
             Ok(output) => output,
             Err(err) if created => {
@@ -767,7 +759,6 @@ impl JmapClient {
             return Err(submission_error(err));
         }
 
-        // NOTE: the message went out whatever the Email/set answers.
         match output.email_set {
             Some(Err(err)) => {
                 let err = err.to_string();
@@ -1105,6 +1096,9 @@ pub(crate) fn query_page_follows(total: Option<u64>, listed: usize, page: u64, s
 }
 
 /// Folds a JMAP email object into the unified [`Envelope`] shape.
+///
+/// The first non-empty `messageId` entry is canonical, RFC 5322 allowing
+/// several header instances.
 pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
     let id = email.id.unwrap_or_default();
     let flags = email
@@ -1129,14 +1123,9 @@ pub(crate) fn envelope_from(email: JmapEmail) -> Envelope {
     let date = email.sent_at.as_deref().and_then(parse_rfc3339);
     let size = email.size;
     let has_attachment = email.has_attachment;
-    // NOTE: JMAP returns messageId as a list, RFC 5322 allowing several
-    // header instances, and the first non-empty entry is canonical.
     let message_id = email
         .message_id
         .and_then(|ids| ids.into_iter().find_map(|s| normalize_message_id(&s)));
-    // NOTE: JMAP hands the ids over already stripped of their brackets,
-    // but normalising anyway keeps them comparable with a server that
-    // does not.
     let in_reply_to = email
         .in_reply_to
         .unwrap_or_default()
@@ -1297,8 +1286,6 @@ fn convert_filter(
             has_attachment: Some(true),
             ..Default::default()
         }),
-        // NOTE: JMAP declares `message-id` `none`, refused before connecting,
-        // so this never runs; were it reached, it matches nothing.
         Q::MessageId(_) => JmapFilter::not(vec![condition(JmapEmailFilter::default())]),
 
         Q::Date(target) => match post_filters {
@@ -1328,9 +1315,6 @@ fn convert_filter(
                 ..Default::default()
             }),
         },
-        // NOTE: a message sent before the day may be received any time
-        // after, so nothing bounds the received-at and the sent-at is
-        // checked client-side alone.
         Q::BeforeDate(target) => match post_filters {
             Some(post_filters) => {
                 post_filters.push(PostFilter::BeforeDate(*target));

@@ -45,8 +45,6 @@ impl AccountCapabilityCommand {
         let (_, name, account_config) = resolve_account(config_paths, account_name)?;
         let resolution = Resolution::of(&name, &account_config, backend);
 
-        // NOTE: the store is opened as a reader, a local read writing
-        // nothing, so the rows say what its gate would refuse.
         #[cfg(feature = "pimdir")]
         let pimdir = match (resolution.storage, account_config.pimdir) {
             (Some(Backend::Pimdir), Some(config)) => Some(PimdirClient::new(config)?),

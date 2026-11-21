@@ -61,8 +61,6 @@ impl MessageDeleteCommand {
             },
         };
 
-        // NOTE: `resolve_mailbox_id` is idempotent, so the comparison holds
-        // however each of the two mailboxes was addressed.
         let current_id = client.resolve_mailbox_id(&mailbox)?;
         let trash_id = client.resolve_mailbox_id(&trash)?;
 
@@ -177,8 +175,6 @@ impl fmt::Display for MessageDeleteOutput {
             (DeleteAction::Deleted, false) => {
                 writeln!(f, "Successfully deleted {count} message(s) from the trash")
             }
-            // NOTE: an expunge removes every `\Deleted` message of the
-            // trash, so it is advised only when this run flagged some.
             (DeleteAction::Flagged, _) if count == 0 => {
                 writeln!(f, "Flagged no message as deleted")
             }

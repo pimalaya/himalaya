@@ -127,9 +127,6 @@ impl fmt::Display for ImapMessageCopyOutput {
             uids.join(",")
         };
 
-        // NOTE: a server sends no COPYUID without UIDPLUS, and a UIDPLUS
-        // one sends none when nothing matched, so the plain form says
-        // which UIDs moved only when it knows.
         if self.uid_validity.is_none() {
             return writeln!(f, "{}, no COPYUID returned", self.done);
         }

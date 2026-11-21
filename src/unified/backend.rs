@@ -155,8 +155,6 @@ impl AccountConfig {
     /// `capability-missing`, as the resolver refuses a verb the filter
     /// leaves unserved.
     pub fn no_backend_error(&self, name: &str, backend: Backend, supported: &[Backend]) -> Error {
-        // NOTE: a block of a backend this build leaves out loads, so one
-        // file serves every build; using it names the cargo feature.
         let unbuilt: Vec<Backend> = match backend {
             Backend::Auto => {
                 let configured = self.configured();

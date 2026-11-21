@@ -241,8 +241,6 @@ impl MaildirClient {
         let raw = entry.contents().to_vec();
         let mut flags: BTreeSet<Flag> = entry.flags().iter().map(flag_from_maildir).collect();
 
-        // NOTE: reading the file never renames it, so `--seen` costs the
-        // rename that adds the `S` flag.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             flags.insert(seen.clone());
@@ -830,7 +828,6 @@ mod tests {
             .unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
 
-        // NOTE: root reads through any mode.
         if fs::read(&path).is_ok() {
             return;
         }
@@ -865,7 +862,6 @@ mod tests {
         }
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
 
-        // NOTE: root reads through any mode.
         if fs::read_dir(&locked).is_ok() {
             fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
             return;

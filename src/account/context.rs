@@ -282,8 +282,6 @@ impl From<Config> for Account {
         Self {
             name: None,
 
-            // NOTE: the address is per-account by nature, so only the
-            // name it carries has a global default.
             email: None,
             logins: Vec::new(),
             display_name: config.display_name,
@@ -474,8 +472,6 @@ mod tests {
             (Some("alice@example.org"), Some("Alice")),
         );
 
-        // NOTE: an address the user spelled out is theirs whole, so the
-        // configured name is not grafted onto it.
         assert_eq!(
             account.resolve_from(Some("alias@example.org")),
             (Some("alias@example.org"), None),
@@ -497,8 +493,6 @@ mod tests {
         assert_eq!(account.resolve_signature(None, None), Some("Alice"));
         assert_eq!(account.signature_delim(), "~~~\n");
 
-        // NOTE: `--signature-file` names the file the builder reads, so
-        // the configured signature stands down rather than shadowing it.
         assert_eq!(
             account.resolve_signature(Some("Alias"), None),
             Some("Alias"),

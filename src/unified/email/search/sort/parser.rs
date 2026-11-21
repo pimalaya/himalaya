@@ -33,7 +33,6 @@ pub fn query<'a>() -> impl Parser<'a, &'a str, Vec<SearchEmailsSorter>, ParserEr
         keyword("subject", "`subject`").to(SearchEmailsSorterKind::Subject),
     ));
 
-    // The spaces before a direction, unnamed: a key may end the sort.
     let blank = just(' ').labelled(hidden()).repeated().at_least(1);
 
     let order = choice((

@@ -92,7 +92,6 @@ pub fn plain_param(value: &str, name: &str) -> Option<String> {
     }
     segments.push(current);
 
-    // NOTE: an RFC 2231 form of the parameter wins over the plain one.
     let extended = format!("{name}*");
     let keys = segments
         .iter()

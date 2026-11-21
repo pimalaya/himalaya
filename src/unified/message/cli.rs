@@ -67,8 +67,6 @@ impl MessageCommand {
         let composed = |read: bool, save: bool, send: bool| {
             [
                 (read, Capability::MessageRead),
-                // NOTE: the copy of a sent message is the sending transport's
-                // to keep, which a backend filing it itself answers.
                 (save && !send, Capability::MessageAdd),
                 (save && send, Capability::SubmitCopy),
                 (send, Capability::Submit),

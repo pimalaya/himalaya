@@ -93,7 +93,6 @@ pub struct ImapIdOutput {
 
 impl fmt::Display for ImapIdOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NOTE: sorted by parameter, the map holding them in no order.
         let mut params: Vec<_> = self
             .server_id
             .iter()

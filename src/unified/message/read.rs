@@ -361,8 +361,6 @@ fn addresses(entity: &MimeEntity, name: &str) -> (Vec<Address>, Vec<String>) {
     };
 
     for item in split_addresses(&value) {
-        // NOTE: what is left of an empty group, or of a list ending in a
-        // separator, holds nothing and is no entry.
         if strip_comments(&item).trim().is_empty() {
             continue;
         }
@@ -418,7 +416,6 @@ fn split_addresses(value: &str) -> Vec<String> {
                 continue;
             }
             ':' if !angle => {
-                // NOTE: what precedes is a group name.
                 current.clear();
                 continue;
             }
@@ -575,12 +572,8 @@ impl fmt::Display for MessageView {
 
         write!(f, "{headers}")?;
 
-        // NOTE: HTML markup is verbose and `--raw` covers it, so a part
-        // stays a summary unless printing it is the only readable option.
         let html_only = is_html_only(message);
 
-        // NOTE: the ids are the leaves' own, the ones the `attachment`
-        // commands and the JSON view take.
         for part::Leaf { id, part, .. } in part::leaves(message) {
             let mime = part::mime(part);
             let size = format_size(part::bytes(part).len() as u64, BINARY);
@@ -842,8 +835,6 @@ mod tests {
 
         let out = render(raw);
 
-        // NOTE: the skipped multipart container leaves a gap at id 1, the
-        // leaves keeping the `attachment` command ids 2, 3 and 4.
         assert!(out.contains("[2] text/plain"));
         assert!(out.contains("[3] text/html"));
         assert!(out.contains("[4] application/pdf, doc.pdf"));
@@ -908,7 +899,6 @@ mod tests {
 
         let json = view(raw);
 
-        // NOTE: serde_json sorts the keys of a parsed object.
         let keys: Vec<&str> = json
             .as_object()
             .unwrap()
@@ -1169,7 +1159,6 @@ mod tests {
         );
         assert_eq!(json["parts"][0]["charset"], "ISO-8859-1");
         assert_eq!(json["parts"][1]["charset"], "windows-1252");
-        // NOTE: the size counts the bytes in the part's own charset.
         assert_eq!(json["parts"][0]["size"], 17);
         assert_eq!(json["parts"][1]["size"], 11);
     }

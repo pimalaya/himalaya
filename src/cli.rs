@@ -36,6 +36,10 @@ use crate::mbox::{cli::MboxCommand, client::build_mbox_client};
 use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
 #[cfg(feature = "pimdir")]
 use crate::pimdir::{cli::PimdirCommand, client::build_pimdir_client};
+#[cfg(feature = "sieve")]
+use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
+#[cfg(feature = "smtp")]
+use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 #[cfg(any(feature = "jmap", feature = "gmail"))]
 use crate::unified::vacation::cli::VacationClient;
 #[cfg(any(backend, feature = "smtp"))]
@@ -43,12 +47,6 @@ use crate::unified::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
     mailbox::cli::MailboxCommand, vacation::cli::VacationCommand,
 };
-// NOTE: `EmailClient` and the `message` command host the send path, so
-// they exist for any backend rather than for storage ones alone.
-#[cfg(feature = "sieve")]
-use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
-#[cfg(feature = "smtp")]
-use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 #[cfg(any(backend, feature = "smtp"))]
 use crate::unified::{client::EmailClient, message::cli::MessageCommand};
 use crate::{
@@ -285,8 +283,6 @@ fn run_vacation<P: Printer>(
                 command.execute(printer, account, VacationClient::Gmail(client))
             },
         ),
-        // NOTE: the resolver let through a backend serving it, every one of
-        // which has its arm above.
         _ => Err(capability::missing(format!(
             "Account `{name}` cannot `vacation`: this build keeps no client for it"
         ))),
@@ -324,8 +320,6 @@ impl Command {
                 false,
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
-            // NOTE: `message parse` reads a raw message it is given, so it
-            // resolves no account and reads no configuration at all.
             #[cfg(any(backend, feature = "smtp"))]
             Self::Message(MessageCommand::Parse(cmd)) => cmd.execute(printer),
             #[cfg(any(backend, feature = "smtp"))]
@@ -420,17 +414,13 @@ impl Command {
             ),
 
             Self::Repl(cmd) => cmd.execute(&*printer, session),
-            Self::Mcp(cmd) => {
-                // stdout carries protocol messages only, so a failure goes
-                // to stderr, a person missing a configuration aside.
-                match cmd.execute(session) {
-                    Err(err) if err.is::<ConfigMissingError>() && is_wanted(&*printer) => Err(err),
-                    result => {
-                        exit_on_failure::<ErrorCode, _>(result.map_err(error::coded));
-                        Ok(())
-                    }
+            Self::Mcp(cmd) => match cmd.execute(session) {
+                Err(err) if err.is::<ConfigMissingError>() && is_wanted(&*printer) => Err(err),
+                result => {
+                    exit_on_failure::<ErrorCode, _>(result.map_err(error::coded));
+                    Ok(())
                 }
-            }
+            },
             Self::Account(cmd) => {
                 cmd.execute(printer, account.config_paths, account.name, account.backend)
             }
@@ -474,8 +464,6 @@ mod tests {
 
     #[test]
     fn a_config_path_is_never_split() {
-        // NOTE: an absolute Windows path holds a colon of its own, so splitting
-        // on it would read `C:\dir\config.toml` as two paths and find neither.
         let path = absent_dir().join("config.toml");
 
         assert_eq!(

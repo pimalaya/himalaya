@@ -89,7 +89,6 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-envelope-list",
             crate::unified::envelope::list::EnvelopeListOutput
         );
-        // NOTE: `envelope search` renders the page `list` renders.
         insert!(
             "himalaya-envelope-search",
             crate::unified::envelope::list::EnvelopeListOutput
@@ -122,13 +121,10 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-message-send",
             crate::unified::message::handler::MessageRouteOutput
         );
-        // NOTE: `message read --raw` prints the message as bytes.
         insert!(
             "himalaya-message-read",
             ViewOrRaw<crate::unified::message::read::MessageReadOutput>
         );
-        // NOTE: `message parse` prints the `message read` view, or under
-        // `--part` the part `attachment download --stdout` prints.
         insert!(
             "himalaya-message-parse",
             crate::unified::message::parse::MessageParseOutput
@@ -137,8 +133,6 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-message-delete",
             crate::unified::message::delete::MessageDeleteOutput
         );
-        // NOTE: the composers print the template when neither saving nor
-        // sending, and the receipt of the save or the send otherwise.
         insert!(
             "himalaya-message-compose",
             TemplateOrRoute<
@@ -164,8 +158,6 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-attachment-list",
             crate::unified::attachment::list::AttachmentListOutput
         );
-        // NOTE: `attachment download` reports the `AttachmentListOutput` of
-        // `list`, or the one part `--stdout --json` reads.
         insert!(
             "himalaya-attachment-download",
             crate::unified::attachment::download::AttachmentDownloadOutput
@@ -235,7 +227,6 @@ pub fn registry() -> JsonSchemaRegistry {
     #[cfg(feature = "jmap")]
     {
         refusable!("himalaya-jmap-request", crate::raw_json::RawJsonOutput);
-        // The former form keeps its schema under its former name.
         refusable!("himalaya-jmap-query", crate::jmap::query::JmapQueryOutput);
         refusable!(
             "himalaya-jmap-mailbox-get",
@@ -508,12 +499,10 @@ pub fn registry() -> JsonSchemaRegistry {
             "himalaya-pimdir-attachment-list",
             crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
-        // NOTE: `pimdir attachment search` prints the page `list` prints.
         insert!(
             "himalaya-pimdir-attachment-search",
             crate::pimdir::attachment::list::PimdirAttachmentListOutput
         );
-        // NOTE: `pimdir search --threads` prints the threads instead.
         insert!(
             "himalaya-pimdir-search",
             HitsOrThreads<
@@ -521,8 +510,6 @@ pub fn registry() -> JsonSchemaRegistry {
                 crate::pimdir::search::PimdirSearchThreadsOutput,
             >
         );
-        // NOTE: `pimdir performer` lists the candidates, or with a source
-        // or `--clear` prints the choice.
         insert!(
             "himalaya-pimdir-performer",
             CandidatesOrChoice<
@@ -544,9 +531,6 @@ pub fn registry() -> JsonSchemaRegistry {
             crate::pimdir::status::PimdirStatusOutput
         );
     }
-
-    // NOTE: the writes of the protocol namespaces with no payload of their
-    // own print a receipt naming what they acted on.
 
     #[cfg(feature = "imap")]
     {
@@ -685,8 +669,6 @@ pub fn registry() -> JsonSchemaRegistry {
         refusable!("himalaya-gmail-messages-batch-delete", IdsReceipt);
         refusable!("himalaya-gmail-messages-batch-modify", IdsReceipt);
         refusable!("himalaya-gmail-attachments-get", BytesOrSaved);
-        // NOTE: a settings write prints the settings the server holds
-        // after it, as the matching `get` does.
         refusable!(
             "himalaya-gmail-settings-auto-forwarding-set",
             settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput

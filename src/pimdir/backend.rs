@@ -506,8 +506,6 @@ impl PimdirClient {
                 .overlay_quiet(collection)
                 .map_err(pimdir_error)
                 .with_context(|| format!("Read the queue of `{collection}`"))?;
-        // NOTE: one hit past the page says whether another follows; a page
-        // in another order sits anywhere in the range, so it is read whole.
         let wanted = match is_store_order(sort) {
             true => page_end(page, page_size).map(|end| end.saturating_add(1)),
             false => None,
@@ -602,8 +600,6 @@ impl PimdirClient {
             _ => Vec::new(),
         };
 
-        // NOTE: the summary holds the copy recipients whether or not the
-        // body is local, so they are never read off the body.
         let mail = mail_summary(item.summary.as_ref());
         let copies = EnvelopeCopies {
             cc: mail
@@ -703,8 +699,6 @@ impl PimdirClient {
         Ok(parked
             .into_iter()
             .map(|parked| {
-                // NOTE: a payload the store parked for not decoding
-                // addresses nothing Himalaya can name.
                 let addressed = action_from_payload(&parked.action, &parked.payload)
                     .map(|action| self.addressed(&parked.collection, &action))
                     .unwrap_or_default();
@@ -905,8 +899,6 @@ impl PimdirClient {
                 .with_context(|| format!("Stage flags on `{id}` in `{mailbox}`"))?;
             let changed = replacement != item.flags;
             if changed {
-                // NOTE: a set replaces a set it never read, where an add
-                // or a remove changes the one read here.
                 let base = match op {
                     FlagOp::Set => None,
                     FlagOp::Add | FlagOp::Remove => Some(item.flags),
@@ -1187,8 +1179,6 @@ impl PimdirClient {
         name: &str,
         parent: Option<&str>,
     ) -> Result<PimdirQueuedIntent> {
-        // NOTE: a name the store does not list yet is the server's to
-        // refuse: the row parks, and `pimdir queue show` says why.
         let parent = parent.map(|parent| self.hub_id(parent)).transpose()?;
         let anchor = match &parent {
             Some(parent) => parent.clone(),
@@ -1307,9 +1297,6 @@ impl PimdirClient {
     /// The performer is named as for a creation, and a store whose sources
     /// declare nothing is refused the same way.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<PimdirQueuedIntent> {
-        // NOTE: the store records no hierarchy separator, so a name holding
-        // the server's is the performer's to refuse: the row parks, as it
-        // does on a sibling already named so.
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
         let Some(source) = self.performer(&producer, &collection, capability::COLLECTION_RENAME)?
@@ -1337,9 +1324,6 @@ impl PimdirClient {
     /// The performer is named as for a creation, and a store whose sources
     /// declare nothing is refused the same way.
     pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<PimdirQueuedIntent> {
-        // NOTE: no sync engine records a mailbox's parent in the store, so
-        // a mailbox holding others is the performer's to refuse: the row
-        // parks naming them, and `pimdir queue show` says so.
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
         let Some(source) = self.performer(&producer, &collection, capability::COLLECTION_DELETE)?
@@ -1673,9 +1657,10 @@ fn is_queued_mail(action: &PimdirAction) -> bool {
 
 /// Builds a unified [`Envelope`] from a stored item (no body read): the
 /// flags from the item, the display fields from its mail summary.
+///
+/// Its id is the item's short store-global sequence number, not its long
+/// link id.
 pub(crate) fn envelope_from_item(item: &PimdirItem) -> Envelope {
-    // NOTE: the public id is a short store-global integer rather than the
-    // long link id.
     envelope(
         item.seq.to_string(),
         &item.flags,
@@ -1895,6 +1880,8 @@ impl PimdirPushdown {
         pushdown
     }
 
+    /// Narrows the bounds by `clause`, never past what it matches: the
+    /// filter still runs on every row the walk reads.
     fn add(&mut self, clause: &SearchEmailsFilterQuery) {
         use SearchEmailsFilterQuery as Q;
 
@@ -1910,12 +1897,7 @@ impl PimdirPushdown {
             Q::AfterDate(day) => self.raise(next_day_key(*day)),
             Q::BeforeDate(day) => self.lower(day_key(*day)),
             Q::Not(inner) => match inner.as_ref() {
-                // NOTE: an undated row is not after any day, so it matches
-                // and the bound is an upper one only.
                 Q::AfterDate(day) => self.lower(next_day_key(*day)),
-                // NOTE: the chip reads `\Seen` in that one spelling, so it reads
-                // every row unread here and some read in another spelling,
-                // which the match drops.
                 Q::Flag(flag) if flag.iana() == Some(IanaFlag::Seen) => self.unread = true,
                 _ => {}
             },
@@ -2104,8 +2086,6 @@ mod tests {
         assert_eq!(client.hub_id("imap/Junk").unwrap(), "imap/Junk");
         let err = client.hub_id("junk").unwrap_err().to_string();
         assert!(err.contains("not found"), "{err}");
-        // NOTE: the store keeps a role on one mailbox of an account, the
-        // last one it was recorded on.
         assert_eq!(client.hub_id("trash").unwrap(), "imap/Bin");
         assert_eq!(
             client.role_mailbox_id(&MailboxRole::Inbox).unwrap(),
@@ -2496,8 +2476,6 @@ mod tests {
         };
         assert_eq!(kind, intent::SUBMIT);
 
-        // NOTE: the `submit` payload a store owner decodes, naming the one
-        // source syncing the mailbox; the message is the row's body.
         let hash = object_hash.as_ref().unwrap();
         let json: serde_json::Value = serde_json::from_str(payload).unwrap();
         assert_eq!(
@@ -2521,12 +2499,8 @@ mod tests {
             }
         );
 
-        // NOTE: the body keeps its Bcc field, which the sending channel
-        // removes; Graph derives its recipients from it.
         assert_eq!(client.blobs.get(hash).unwrap().as_deref(), Some(RAW));
 
-        // NOTE: a send creates no message in the store, so its row names
-        // no link id; its subject is read off the body it pins.
         let queued = client.queued_rows("imap/Sent").unwrap().value;
         assert_eq!(queued.len(), 1);
         assert_eq!(queued[0].row, pending[0].id);
@@ -2547,7 +2521,6 @@ mod tests {
             .send_message(Some("imap/Sent"), RAW.to_vec(), true)
             .unwrap();
 
-        // NOTE: an owner predating capabilities would ignore `copy`.
         assert!(!carried.carried);
         let pending = client.store.pending_actions("imap/Sent").unwrap();
         let PimdirAction::Unknown { payload, .. } = &pending[0].action else {
@@ -3030,8 +3003,6 @@ mod tests {
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        // NOTE: the sync runs in another process, which holds the owner
-        // lock; owners in one process share it.
         let sync = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -3100,8 +3071,6 @@ mod tests {
         let db = rusqlite::Connection::open(&path).unwrap();
         db.execute_batch("CREATE TABLE notes (body TEXT)").unwrap();
         drop(db);
-        // NOTE: a store others can read is refused before it is read, and
-        // neither tempfile nor SQLite restricts what they create.
         #[cfg(unix)]
         for (path, mode) in [(dir.path(), 0o700), (path.as_path(), 0o600)] {
             std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(mode))
@@ -3231,8 +3200,6 @@ mod tests {
             .send_message(Some("imap/Sent"), DRAFT.to_vec(), false)
             .unwrap();
 
-        // NOTE: what the sync engine does once the message has left (pimdir
-        // STORAGE §15.5): the intent goes, its receipt stays.
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
         assert!(
             owner
@@ -3353,7 +3320,6 @@ mod tests {
     fn a_mailbox_creation_no_source_performs_stages_nothing() {
         let (dir, mut client) = sent_store();
 
-        // NOTE: an undeclared owner predates the intent.
         assert!(client.create_mailbox("Projets", None).is_err());
 
         declare(dir.path(), &[capability::MAIL_SUBMIT]);
@@ -3444,7 +3410,6 @@ mod tests {
     fn the_store_says_which_writes_its_sources_serve() {
         let (dir, client) = sent_store();
 
-        // NOTE: nothing declared yet, so the static table stands.
         assert_eq!(client.store_support(Capability::FlagsSeen).unwrap(), None);
 
         declare(
@@ -3458,7 +3423,6 @@ mod tests {
         assert_eq!(full(Capability::FlagsAnswered), CapabilityLevel::None);
         assert_eq!(full(Capability::MailboxDelete), CapabilityLevel::None);
 
-        // NOTE: a read is the store's own, whatever its sources declare.
         assert_eq!(client.store_support(Capability::MessageRead).unwrap(), None);
     }
 
@@ -3646,11 +3610,9 @@ mod tests {
     fn a_mailbox_renaming_or_deletion_no_source_performs_stages_nothing() {
         let (dir, mut client) = sent_store();
 
-        // NOTE: an undeclared owner predates the intents.
         assert!(client.rename_mailbox("imap/Sent", "Envoyés").is_err());
         assert!(client.delete_mailbox("imap/Sent").is_err());
 
-        // NOTE: each capability gates its own intent alone.
         declare(dir.path(), &[capability::COLLECTION_CREATE]);
         assert!(client.rename_mailbox("imap/Sent", "Envoyés").is_err());
         assert!(client.delete_mailbox("imap/Sent").is_err());
@@ -3914,7 +3876,6 @@ mod tests {
         assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
         assert_paged_reads_agree(&mut client, "imap/INBOX");
 
-        // NOTE: a sanity check that the seed holds what the queries reach.
         let unread = "not flag seen".parse::<SearchEmailsQuery>().unwrap();
         let hits = client
             .search_envelopes("imap/INBOX", Some(&unread), None, None, false)
@@ -3952,8 +3913,6 @@ mod tests {
             ids.iter().map(String::as_str).collect()
         }
 
-        // An add or a remove is refused on a set the store never read, and
-        // the seeded mails carry some, so the flag ops pick synced ones.
         let synced = |client: &PimdirClient, ids: Vec<String>| -> Vec<String> {
             ids.into_iter()
                 .filter(|id| client.read_flags("imap/INBOX", id).unwrap().is_some())
@@ -3991,7 +3950,6 @@ mod tests {
     fn a_queue_touching_another_mailbox_leaves_one_quiet() {
         let (dir, mut client) = seeded_store();
         seed(dir.path(), "imap/Work", &mails("wo", 5));
-        // The first synced mail: an add is refused on flags never read.
         let id = client
             .list_envelopes("imap/Archive", None, None, false)
             .unwrap()
@@ -4166,7 +4124,6 @@ mod tests {
             }
         );
         assert_eq!(pushdown("after 2026-12-31").from, day("2027-01-01"));
-        // NOTE: only clauses joined by `and` at the top bound the walk.
         assert_eq!(
             pushdown("after 2026-05-11 or flag seen"),
             PimdirPushdown::default()
@@ -4901,7 +4858,6 @@ mod tests {
                 .store_flags("imap/INBOX", &[id.as_str()], &[keyword(flag)], op)
                 .unwrap();
 
-            // NOTE: a sync lands the server's set while the row waits.
             let landed = Seeded {
                 handle: format!("k{n}"),
                 flags: known(synced),
@@ -5093,8 +5049,6 @@ mod tests {
         let twin = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
             .unwrap();
-        // NOTE: the source lists the same message before the owner drains
-        // the add, which then parks.
         let listed = PimdirMailSummary {
             message_id: Some("d1@x.org".into()),
             ..Default::default()
@@ -5120,8 +5074,6 @@ mod tests {
         assert_eq!(parked[0].action, "add");
         assert!(!parked[0].error.is_empty());
 
-        // NOTE: the parked add keeps the link id its receipt printed and
-        // the subject of the body it pins, in the pending row's shape.
         let rows = client.parked_rows("imap/Sent").unwrap();
         assert_eq!(rows.len(), 1, "{rows:?}");
         assert_eq!(
@@ -5244,8 +5196,6 @@ mod tests {
         assert!(parked[0].error.contains(&theirs.0), "{}", parked[0].error);
         assert!(client.parked_actions("imap/Trash").unwrap().is_empty());
 
-        // NOTE: the parked move names the message it acts on, as
-        // `envelope list` prints it, and that message's subject.
         let rows = client.parked_rows("imap/Drafts").unwrap();
         assert_eq!(rows[0].item_id.as_deref(), Some(drafts[0].as_str()));
         assert_eq!(rows[0].link_id, None);

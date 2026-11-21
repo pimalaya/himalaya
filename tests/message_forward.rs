@@ -149,7 +149,6 @@ fn forward_carries_the_attachment_of_the_source() {
     let composed = forward(&config, dir.path(), &[]);
 
     assert!(
-        // NOTE: a charset name is case-insensitive (RFC 2231 §4).
         composed
             .to_ascii_lowercase()
             .contains("content-disposition: attachment; filename*=utf-8''r%c3%a9sum%c3%a9.bin"),

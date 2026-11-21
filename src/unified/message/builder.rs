@@ -172,8 +172,6 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
                     to.extend(parse_mailboxes(value)?.into_iter().map(|(_, email)| email));
                 }
 
-                // NOTE: the reply's own `From` is the user's too, whatever
-                // the account configures.
                 let mut own = source.own.to_vec();
                 own.extend(sender.as_deref());
                 cc = reply_all_cc(root, &to, &own);
@@ -274,9 +272,6 @@ fn attachment(mime: &str, filename: String, content: Vec<u8>) -> MimeAttachment 
 /// its original or derived file name, leaving bodies and inline
 /// resources to the quoting.
 fn carry_source_attachments(builder: &mut MimeBuilder, parsed: &MimeCst) -> Result<()> {
-    // NOTE: the leaves alone: a multipart container holds no bytes of its
-    // own, and a `name` attribute on it would pass the attachment role
-    // fallthrough.
     for leaf in part::leaves(parsed) {
         if part::role(leaf.part) != part::PartRole::Attachment {
             continue;
@@ -381,8 +376,6 @@ fn new_message_id(sender: Option<&str>) -> String {
 fn message_id(address: &str) -> Option<String> {
     let (_, domain) = address.rsplit_once('@')?;
 
-    // NOTE: RFC 5322 section 3.6.4 wants a dot-atom on the right, so a
-    // domain literal or an internationalized domain is left out.
     let is_atext = |c: char| c.is_ascii_alphanumeric() || c == '-';
     if domain.is_empty()
         || !domain
@@ -421,8 +414,6 @@ fn unique_id() -> String {
 fn parse_mailboxes(value: &str) -> Result<Vec<Mailbox>> {
     let mailboxes = header_mailboxes(&parse_addresses(value.as_bytes()));
 
-    // NOTE: a bare word reads as an address with no domain, which no
-    // transport delivers.
     if mailboxes.is_empty() || mailboxes.iter().any(|(_, email)| !email.contains('@')) {
         bail!("Could not parse address `{value}`");
     }
@@ -443,6 +434,8 @@ fn addresses(values: &[String]) -> Result<Vec<Mailbox>> {
 
 /// Reads the text body from the flag, the file it names, or piped
 /// standard input.
+///
+/// Inside a session stdin carries the commands, so it is never read there.
 fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
     if let Some(body) = body {
         return Ok(body.to_owned());
@@ -453,8 +446,6 @@ fn read_body(body: Option<&str>, body_file: Option<&Path>) -> Result<String> {
             .map_err(|err| anyhow!("read body file {}: {err}", path.display()));
     }
 
-    // NOTE: inside a session stdin carries the commands, so a body given
-    // nowhere is empty, as it is at a terminal.
     if !stdin().is_terminal() && !in_session() {
         let mut buf = String::new();
         stdin().read_to_string(&mut buf)?;
@@ -536,9 +527,6 @@ fn compose_body(
         }
     };
 
-    // NOTE: the separator is written verbatim, its own trailing
-    // newline included, so a delimiter meant to stand on its own line
-    // says so rather than relying on a rule here.
     if !signature.trim().is_empty() {
         body.push_str("\n\n");
         body.push_str(signature_delim);
@@ -553,10 +541,10 @@ fn compose_body(
 }
 
 /// Whether a subject already carries a `Re:` or `Fwd:` prefix.
+///
+/// The colon is compared too, so "Ready to ship" carries no `Re:`.
 fn has_prefix(subject: &str, prefix: &str) -> bool {
     let s = subject.trim_start();
-    // NOTE: the colon is part of the comparison, letters alone reading
-    // "Ready to ship" as already `Re:`-prefixed.
     let p = prefix.trim();
     s.len() >= p.len() && s.get(..p.len()).map(|h| h.eq_ignore_ascii_case(p)) == Some(true)
 }
@@ -756,8 +744,6 @@ Original body line.\r\n";
     fn compose_names_the_from_address() {
         let to = vec!["bob@example.com".to_string()];
         let mut a = args("alice@example.com", &to, Some("Hello"), "Hi Bob");
-        // NOTE: a comma is what an unquoted display name breaks on, the
-        // header then reading as two addresses.
         a.from_name = Some("Doe, Alice");
 
         let raw = build(a, None).unwrap();
@@ -1102,7 +1088,6 @@ Body.\r\n";
         let raw = build(args("sender@example.org", &to, None, "hi"), None).unwrap();
         let text = String::from_utf8(raw.clone()).unwrap();
 
-        // regression: the whole value used to land inside the brackets
         assert!(!text.contains("<Alice <alice@example.org>>"));
 
         let msg = parse(&raw);
@@ -1154,8 +1139,6 @@ Body.\r\n";
 
     #[test]
     fn compose_body_writes_the_signature_delimiter_verbatim() {
-        // NOTE: a delimiter meant to stand on its own line carries its own
-        // newline; one that does not, does not.
         let custom = compose_body("mine", "", "", "Alice", "~~~\n", PostingStyle::Top);
         assert_eq!(custom, "mine\n\n~~~\nAlice\n");
 

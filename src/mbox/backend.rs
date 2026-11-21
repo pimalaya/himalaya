@@ -412,6 +412,9 @@ impl MboxClient {
 
     /// Moves like [`Self::move_messages`], returning the ids of the
     /// messages in `to`, each message found once.
+    ///
+    /// A move onto `from` itself changes nothing, where io-mbox would
+    /// append the copy then drop the original, moving it to the file's end.
     pub fn move_message_ids(
         &self,
         from: &str,
@@ -430,9 +433,6 @@ impl MboxClient {
             });
         }
 
-        // NOTE: a move onto its own mailbox changes nothing, as on every
-        // backend, where io-mbox would append the copy then drop the
-        // original, moving the message to the end of the file.
         if same_mbox(&source, &target) {
             return Ok(Outcome {
                 value: entries.into_iter().map(|entry| entry.id).collect(),
@@ -562,7 +562,6 @@ impl MboxClient {
         self.exec(MboxRename::new(from_path.clone(), to_path.clone()))?;
 
         if subtree && let Err(err) = fs::rename(from_sbd.as_str(), to_sbd.as_str()) {
-            // Put the file back, so the mbox and its children stay together.
             self.exec(MboxRename::new(to_path, from_path))
                 .context("Cannot move the renamed mbox back")?;
             return Err(err).with_context(|| format!("Cannot rename {from_sbd} to {to_sbd}"));
@@ -1256,8 +1255,6 @@ mod tests {
         let other = b"From: b@x.org\nSubject: two\n\nbody two\n";
         client.add_message("A", &[], other.to_vec()).unwrap();
 
-        // NOTE: a cached index whose file did not change on disk is reused
-        // as is, so a wrong entry stands for one another client moved.
         let path = client.resolve_mbox("A").unwrap();
         let mut cache = MboxCache::load(client.cache_dir.as_deref(), &path);
         let index = cache.index.as_mut().unwrap();
@@ -1280,7 +1277,6 @@ mod tests {
         let second = client.add_message("A", &[], other.to_vec()).unwrap();
         let path = client.resolve_mbox("A").unwrap();
 
-        // NOTE: see `a_listing_rebuilds_a_stale_index_once`.
         let move_an_entry = || {
             let mut cache = MboxCache::load(client.cache_dir.as_deref(), &path);
             let index = cache.index.as_mut().unwrap();

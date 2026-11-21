@@ -99,8 +99,6 @@ impl AttachmentDownloadCommand {
         let message = part::parse(&raw)?;
 
         if let Some(id) = part_id {
-            // NOTE: inside an MCP server the part is bounded, so a large one
-            // is refused before its bytes are encoded into the result.
             let Some(part) = PartBytes::bounded(&message, &id, mcp::max_attachment_size())? else {
                 bail!("No part with id {id} on message `{}`", self.message_id);
             };
@@ -474,7 +472,6 @@ mod tests {
         assert_eq!(invite.bytes, b"SUMMARY:Caf\xe9 \x80 5");
         assert_eq!(invite.filename, None);
 
-        // NOTE: a body is a part like any other, and the container none.
         assert_eq!(PartBytes::new(&message, "2").unwrap().bytes, b"body");
         assert!(PartBytes::new(&message, "1").is_none());
         assert!(PartBytes::new(&message, "5").is_none());
@@ -505,8 +502,6 @@ mod tests {
         let at_cap = PartBytes::bounded(&message, "3", Some(7)).unwrap().unwrap();
         assert_eq!(at_cap.bytes, b"\x00\x01\xff\xfe\x00\x0a\x0d");
 
-        // NOTE: an unknown id is no part rather than a refusal, and no cap
-        // bounds nothing.
         assert!(
             PartBytes::bounded(&message, "5", Some(0))
                 .unwrap()

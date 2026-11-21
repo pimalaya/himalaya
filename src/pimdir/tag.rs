@@ -112,7 +112,6 @@ impl fmt::Display for PimdirTagOutput {
         listing.head("Query", &self.query);
 
         for tagged in &self.tagged {
-            // A placement whose flags were never read shows no flag.
             let flags = match tagged.status {
                 PimdirTagStatus::UnknownFlags => String::from("    "),
                 _ => {

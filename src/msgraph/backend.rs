@@ -256,7 +256,6 @@ impl MsgraphClient {
                 continue;
             }
 
-            // NOTE: an id that cannot be a path segment names nothing.
             let Ok(segment) = path_segment(id) else {
                 errors.push(missing_message(id));
                 continue;
@@ -386,8 +385,6 @@ impl MsgraphClient {
             None => (Some(search::filter_to_search(filter)?), None),
         };
 
-        // NOTE: the page's first message, and how many to read to know
-        // whether one follows it.
         let window = page_size.map(|size| {
             let start = (page.unwrap_or(1).max(1) as usize - 1).saturating_mul(size as usize);
             (start, start.saturating_add(size as usize))
@@ -465,6 +462,9 @@ impl MsgraphClient {
     /// Adds, sets, or removes `flags` on the messages of `ids` the folder
     /// `mailbox` holds, one `PATCH /messages/{id}` each through `$batch`,
     /// returning how many it patched beside the error of each other id.
+    ///
+    /// A patch left empty (`$Forwarded` has no Graph field) sends nothing,
+    /// an empty PATCH being a wasted request that could still fail.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -475,10 +475,6 @@ impl MsgraphClient {
         let found = self.ids_in_folder(mailbox, ids)?;
         let patch = flag_patch(flags, op);
 
-        // NOTE: `$Forwarded` has no Graph field, so adding or removing it
-        // alone leaves an empty PATCH, a wasted request that could still
-        // fail. `\Answered` and `\Draft` never get here: the unified API
-        // refuses them up front (`flags.answered`, `flags.draft`).
         if patch == MsgraphMessage::default() {
             return Ok(found.map(|ids| ids.len()));
         }
@@ -522,8 +518,6 @@ impl MsgraphClient {
             .response;
         let mut flags = flags_from_message(&message);
 
-        // NOTE: fetching `$value` never changes read state, so `--seen`
-        // costs a separate PATCH setting `isRead`.
         if seen {
             let seen = Flag::from_iana(IanaFlag::Seen);
             flags.insert(seen.clone());
@@ -603,8 +597,6 @@ impl MsgraphClient {
             ..Default::default()
         };
 
-        // NOTE: under a parent, a namesake at the top blocks the step
-        // through the top: it is no duplicate of the folder asked.
         let created = match self.mail_folder_create(&folder) {
             Ok(created) => created.response,
             Err(err) if parent.is_none() && names_existing_folder(&err) => {
@@ -990,14 +982,15 @@ fn is_retryable(status: u16) -> bool {
 
 /// Folds a Graph message into the unified [`Envelope`] shape. `size` is
 /// `None`, Graph's message resource carrying no raw size.
+///
+/// `in_reply_to` stays empty: Graph keeps In-Reply-To in
+/// `internetMessageHeaders` alone, which a listing does not select.
 pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     let flags = flags_from_message(&message);
     let message_id = message
         .internet_message_id
         .as_deref()
         .and_then(normalize_message_id);
-    // NOTE: the shared date is the `Date:` header, which Graph keeps as
-    // `sentDateTime`; a message without one falls back on its arrival.
     let date = message
         .sent_date_time
         .as_deref()
@@ -1020,9 +1013,6 @@ pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     Envelope {
         id: message.id,
         message_id,
-        // NOTE: Graph carries In-Reply-To inside `internetMessageHeaders`
-        // alone, which a listing does not select, so the field stays
-        // empty rather than cost one request per row.
         in_reply_to: Vec::new(),
         flags,
         subject: message.subject,

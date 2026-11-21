@@ -201,7 +201,6 @@ fn a_line_json_flag_switches_that_line_alone() {
     let json: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
     assert_eq!(json["envelopes"][0]["id"], "m1", "{stdout}");
 
-    // The text list follows, nothing added between the two answers.
     let text: Vec<&str> = lines.collect();
     let expected = [
         "Account:  a (maildir)",

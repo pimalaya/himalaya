@@ -38,8 +38,6 @@ impl ReplCommand {
     pub fn execute(self, printer: &impl Printer, session: &mut Session) -> Result<()> {
         let account = session.account;
 
-        // Resolved once up front, so a missing configuration or account
-        // fails the session rather than its first command.
         resolve_account(account.config_paths, account.name)?;
 
         let mut repl = Repl::new("himalaya", printer.is_json());

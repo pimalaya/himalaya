@@ -73,6 +73,9 @@ pub struct ImapEnvelopeThreadCommand {
 impl ImapEnvelopeThreadCommand {
     /// Selects the mailbox unless told not to, threads it, then fetches
     /// the envelopes of the messages it returned.
+    ///
+    /// The algorithm is checked locally, since a server without it answers
+    /// with a bare parse error.
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -83,8 +86,6 @@ impl ImapEnvelopeThreadCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
         let algorithm: ThreadingAlgorithm = self.algorithm.into();
 
-        // NOTE: a server without the extension answers with a bare parse
-        // error (iCloud's `BAD Parse Error`), so the refusal is local.
         if !client.supports_thread(&algorithm) {
             let algorithm = algorithm.to_string().to_ascii_uppercase();
             return Err(missing(format!(
@@ -313,7 +314,6 @@ impl fmt::Display for ImapThreadOutput {
         }
 
         for entry in self.build_entries() {
-            // A message whose envelope could not be fetched shows no flag.
             let flags = match self.envelopes.contains_key(&entry.id) {
                 true => format_flags(&entry.flags, None),
                 false => String::from("    "),

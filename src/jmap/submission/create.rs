@@ -49,9 +49,6 @@ impl JmapSubmissionCreateCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        // NOTE: the JMAP envelope is all or nothing, mail_from being
-        // required, so one side cannot be overridden while the other is
-        // derived. With neither, the server derives both.
         let envelope = match (self.mail_from, self.rcpt_to.is_empty()) {
             (None, true) => None,
             (Some(mail_from_addr), false) => {

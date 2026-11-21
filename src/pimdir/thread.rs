@@ -108,7 +108,6 @@ impl PimdirThreadOutput {
         let mut earlier: HashMap<&str, usize> = HashMap::new();
 
         for (i, hit) in hits.iter().enumerate() {
-            // Only an earlier message is a parent, so no cycle forms.
             let parent = hit
                 .envelope
                 .in_reply_to

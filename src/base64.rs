@@ -11,7 +11,6 @@ pub fn encode(bytes: &[u8]) -> String {
     let mut encoded = Vec::new();
     Base64Codec::default().encode_vec(bytes, &mut encoded);
 
-    // NOTE: the base64 alphabet is ASCII, so this never falls back.
     String::from_utf8(encoded).unwrap_or_default()
 }
 
@@ -32,8 +31,6 @@ pub fn decode_strict(data: &str) -> Option<Vec<u8>> {
         ..Base64Codec::default()
     };
 
-    // NOTE: the codec decodes leniently and never fails, so the data is
-    // taken only when it is the very encoding of what it decodes to.
     let mut bytes = Vec::new();
     codec.decode_vec(symbols.as_bytes(), &mut bytes);
     let mut canonical = Vec::new();

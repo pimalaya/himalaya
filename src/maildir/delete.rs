@@ -25,6 +25,9 @@ pub struct MaildirMailboxDeleteCommand {
 
 impl MaildirMailboxDeleteCommand {
     /// Deletes the Maildir and every message in it.
+    ///
+    /// The name goes root-relative: io-maildir resolves it under the store
+    /// root, where an absolute path would land under a second copy of it.
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir_path.inner)?;
         if client.is_root(&maildir) {
@@ -32,9 +35,6 @@ impl MaildirMailboxDeleteCommand {
             bail!("Cannot delete Maildir `{path}`: it is the store root");
         }
 
-        // NOTE: io-maildir resolves a name relative to the store root, so
-        // the root-relative name goes through: the absolute path would
-        // land under a second copy of the root.
         let name = client.relative_name(&maildir);
         client.delete_maildir(name)?;
 

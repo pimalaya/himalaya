@@ -1,3 +1,9 @@
+//! # Build script
+//!
+//! Sets the `backend` cfg when any backend exposing a mailbox is enabled
+//! (every one but the send-only SMTP), collapsing the repeated feature list.
+//! Code that also needs SMTP uses `any(backend, feature = "smtp")`.
+
 use std::env;
 
 use pimalaya_cli::build::{features_env, git_envs, target_envs};
@@ -7,11 +13,6 @@ fn main() {
     target_envs();
     git_envs();
 
-    // `backend` collapses the repeated mailbox-backend feature list: it
-    // is set when any backend that exposes a mailbox is enabled (every
-    // backend except the send-only SMTP). Code that also needs SMTP uses
-    // `any(backend, feature = "smtp")`. Cargo exports `CARGO_FEATURE_<NAME>`
-    // for every enabled feature.
     println!("cargo::rustc-check-cfg=cfg(backend)");
 
     let backend = [
