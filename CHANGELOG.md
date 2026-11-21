@@ -98,7 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the io-imap dependency to 0.12.
 - Changed the io-smtp dependency to 0.10.
 - Changed the io-sasl dependency to 0.3.
-- Changed the io-managesieve dependency to 0.5.
+- Changed the io-managesieve dependency to 0.6.
+- Changed the io-jmap dependency to 0.11, io-gmail to 0.10, io-msgraph to 0.10 and pimalaya-stream to 0.4.1.
 - Changed the io-pimdir dependency to 0.18.
 - Changed the pimalaya-cli dependency to 0.8.
 - **BREAKING**: Changed `imap raw` to print each response from its exact octets, as io-imap 0.12 frames them: one that is UTF-8 prints as text, parsed as before, one that is not, such as a response carrying an 8-bit literal, prints under `--json` as an `undecoded` event `{base64}`, its octets in standard base64, where io-imap's lossy decoding replaced each such byte by U+FFFD. A tagged response that is not UTF-8, its status left unread, exits 3. The text form prints such a response as one line, `undecoded (base64): ` then the same base64, where it printed it with each such byte replaced by U+FFFD.

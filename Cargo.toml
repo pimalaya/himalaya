@@ -18,12 +18,12 @@ rustls-aws = ["pimalaya-stream/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rus
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-gmail?/rustls-ring", "io-msgraph?/rustls-ring", "io-smtp?/rustls-ring", "io-managesieve?/rustls-ring"]
 imap = ["dep:io-imap", "dep:mime-rs", "io-imap/std", "io-imap/scram"]
 smtp = ["dep:io-smtp", "dep:mime-rs", "io-smtp/std", "io-smtp/scram"]
-jmap = ["dep:io-jmap", "dep:mime-rs", "io-jmap/client", "io-jmap/schemars"]
-gmail = ["dep:io-gmail", "dep:mime-rs", "io-gmail/client", "io-gmail/schemars"]
-msgraph = ["dep:io-msgraph", "dep:mime-rs", "io-msgraph/client", "io-msgraph/schemars"]
+jmap = ["dep:io-jmap", "dep:mime-rs", "io-jmap/std", "io-jmap/schemars"]
+gmail = ["dep:io-gmail", "dep:mime-rs", "io-gmail/std", "io-gmail/schemars"]
+msgraph = ["dep:io-msgraph", "dep:mime-rs", "io-msgraph/std", "io-msgraph/schemars"]
 maildir = ["dep:io-maildir", "dep:mime-rs", "io-maildir/client"]
 mbox = ["dep:io-mbox", "dep:mime-rs", "dep:sha2", "io-mbox/client", "io-mbox/serde"]
-sieve = ["dep:io-managesieve", "io-managesieve/client", "io-managesieve/scram"]
+sieve = ["dep:io-managesieve", "io-managesieve/std", "io-managesieve/scram"]
 pimdir = ["dep:io-pimdir", "dep:jiff", "dep:mime-rs", "io-pimdir/search", "pimalaya-cli/prompt"]
 vendored = ["pimalaya-stream/vendored", "io-pimdir?/vendored"]
 
@@ -37,7 +37,7 @@ panic = "abort"
 pimalaya-cli = { version = "0.8.0", default-features = false, features = ["build"] }
 
 [dev-dependencies]
-io-oauth = { version = "0.7", default-features = false, features = ["client", "jwt-bearer", "rustls-ring"] }
+io-oauth = { version = "0.8", default-features = false, features = ["std", "jwt-bearer", "rustls-ring"] }
 rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 tempfile = { version = "3", default-features = false }
 toml = { version = "1.1", default-features = false, features = ["parse", "serde"] }
@@ -53,14 +53,14 @@ dirs = { version = "7", default-features = false }
 gethostname = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 idna_adapter = { version = "=1.0.0", default-features = false }
-io-gmail = { version = "0.9", default-features = false, optional = true }
+io-gmail = { version = "0.10", default-features = false, optional = true }
 io-imap = { version = "0.12.0", default-features = false, optional = true }
-io-jmap = { version = "0.10.1", default-features = false, optional = true }
+io-jmap = { version = "0.11", default-features = false, optional = true }
 io-maildir = { version = "0.5", default-features = false, optional = true }
-io-managesieve = { version = "0.5", default-features = false, optional = true }
+io-managesieve = { version = "0.6", default-features = false, optional = true }
 io-mbox = { version = "0.2", default-features = false, optional = true }
-io-msgraph = { version = "0.9.3", default-features = false, optional = true }
-io-pimdir = { version = "0.19.0", default-features = false, features = ["client"], optional = true }
+io-msgraph = { version = "0.10", default-features = false, optional = true }
+io-pimdir = { version = "0.19.1", default-features = false, features = ["client"], optional = true }
 io-sasl = { version = "0.3", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.10", default-features = false, optional = true }
 jiff = { version = "1", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"], optional = true }
@@ -70,7 +70,7 @@ mime_guess = { version = "2", default-features = false, features = ["rev-mapping
 percent-encoding = { version = "2", default-features = false }
 pimalaya-cli = { version = "0.8.0", default-features = false, features = ["mcp", "repl", "terminal"] }
 pimalaya-config = { version = "0.6.0", default-features = false, features = ["toml", "secret"] }
-pimalaya-stream = { version = "0.4", default-features = false, features = ["std"] }
+pimalaya-stream = { version = "0.4.1", default-features = false, features = ["std"] }
 schemars = { version = "1", default-features = false, features = ["chrono04", "derive", "std"] }
 secrecy = { version = "0.10", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "std"] }
