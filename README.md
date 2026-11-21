@@ -104,6 +104,12 @@ Himalaya manages your mail from the command line: every command prints JSON for 
   <summary>Cargo</summary>
 
   ```sh
+  cargo install --locked himalaya
+  ```
+
+  For a build of `master`:
+
+  ```sh
   cargo install --locked --git https://github.com/pimalaya/himalaya.git
   ```
 </details>
@@ -132,7 +138,7 @@ Himalaya manages your mail from the command line: every command prints JSON for 
 
 ## Configuration
 
-Run without a configuration at a terminal, Himalaya shows the commands copying the shipped sample in place. A TOML configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before:
+A TOML configuration is loaded from every existing path among the following, each one deep-merged on top of the ones before:
 
 - `$XDG_CONFIG_HOME/himalaya/config.toml`
 - `$HOME/.config/himalaya/config.toml`
@@ -141,7 +147,7 @@ Run without a configuration at a terminal, Himalaya shows the commands copying t
 Override the path with `-c <PATH>`, repeated to merge several files. The same file backs [himalaya-tui](https://github.com/pimalaya/himalaya-tui), its own keys under `[tui]`.
 
 > [!TIP]
-> See [config.sample.toml](./config.sample.toml) for a complete configuration of one example account with commented fields, one section per backend; rename the account and uncomment what you need.
+> See [config.sample.toml](./config.sample.toml) for a complete configuration of one example account with commented fields; rename the account and uncomment what you need, or start from a provider below.
 
 ### Proton Mail
 
@@ -257,16 +263,40 @@ mailbox.alias.sent = "Sent Messages"
 
 ## Usage
 
-Every command runs on the default account unless `-a` names another, prints JSON under `--json`, and details its flags, exit codes and output in its `--help`.
+**Step 1**: once your first account is configured, check that every backend answers:
 
 ```sh
 himalaya account check
-himalaya envelope list --json
-himalaya envelope search --sort newest-first from:alice date:2d
+```
+
+**Step 2**: list the envelopes of the inbox:
+
+```sh
+himalaya envelope list
+```
+
+**Step 3**: read a message by its id:
+
+```sh
 himalaya message read 42
+```
+
+Every command runs on the default account unless `-a` names another, and its `--help` details its flags, exit codes and JSON output. More use cases:
+
+```sh
+# Search the newest messages from Alice of the last two days
+himalaya envelope search --sort newest-first from:alice date:2d
+
+# Reply and send at once
 himalaya message reply 42 --body "Thanks!" --send
+
+# Mark messages as seen
 himalaya flag add --flag seen 1 2 3
+
+# Send a raw IMAP command
 himalaya imap raw 'a1 NAMESPACE'
+
+# Serve the account to an AI agent, writes allowed
 himalaya mcp --allow-write
 ```
 
