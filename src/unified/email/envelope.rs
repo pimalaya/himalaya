@@ -12,9 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::unified::email::{address::Address, flag::Flag};
 
 /// A message summary, enough to list without fetching a body.
-///
-/// The mbox cache stores it too, so the kebab-case keys it was written with
-/// before 3.0 stay readable through `alias`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Envelope {
@@ -23,14 +20,14 @@ pub struct Envelope {
     pub id: String,
     /// The RFC 5322 section 3.6.4 `Message-ID:`, normalised so it is
     /// stable across every backend storing the message.
-    #[serde(default, alias = "message-id")]
+    #[serde(default)]
     pub message_id: Option<String>,
     /// The messages this one replies to, from its `In-Reply-To:` header.
     ///
     /// A list, the grammar being `1*msg-id`. Each id is normalised like
     /// `messageId`, so a client pairs a reply with its parent
     /// from a listing alone.
-    #[serde(default, alias = "in-reply-to")]
+    #[serde(default)]
     pub in_reply_to: Vec<String>,
     /// The flags set on the message, a sorted set since wire order means
     /// nothing and a duplicate is nonsense.
@@ -55,7 +52,7 @@ pub struct Envelope {
     pub size: Option<u64>,
     /// Whether the message carries an attachment, `null` when the caller
     /// did not ask or the backend cannot tell.
-    #[serde(default, alias = "has-attachment")]
+    #[serde(default)]
     pub has_attachment: Option<bool>,
 }
 
