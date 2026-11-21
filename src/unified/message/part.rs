@@ -32,13 +32,11 @@ pub const MAX_PARTS: usize = 200;
 /// headers of every part included.
 pub const MAX_HEADER_LINES: usize = 500;
 
-/// Parses a raw message, refusing it whole with `message-too-complex`
-/// when it is nested too deep or holds too many parts or header lines,
-/// or when mime-rs stopped splitting it at its own caps, a part it left
-/// unsplit hiding what it holds.
+/// Parses a raw message, refusing it whole with `message-too-complex` past
+/// the nesting, part or header line caps, or mime-rs's own.
 ///
-/// Any bytes parse: mime-rs recovers from malformed mail rather than
-/// failing on it.
+/// A part mime-rs left unsplit would hide what it holds. Any bytes parse:
+/// mime-rs recovers from malformed mail rather than failing on it.
 pub fn parse(raw: &[u8]) -> Result<MimeCst<'_>> {
     let message = MimeCst::parse(raw);
     measure(&message.root, 1, &mut Tally::default())?;
@@ -52,9 +50,8 @@ struct Tally {
     header_lines: usize,
 }
 
-/// Measures one part sitting at `depth`, then what it holds: the parts
-/// of a multipart one level deeper, and an attached message's top-level
-/// part one level deeper too, encoded or not.
+/// Measures one part at `depth`, then a multipart's parts or an attached
+/// message's top part, encoded or not, one level deeper.
 fn measure(part: &MimeEntity, depth: usize, tally: &mut Tally) -> Result<()> {
     if part.anomalies.contains(MimeAnomaly::PartLimit)
         || part.anomalies.contains(MimeAnomaly::NestingLimit)
@@ -118,9 +115,8 @@ struct Node<'t, 'a> {
     section: Option<String>,
 }
 
-/// Every part of a message, depth first: the root, then the parts of
-/// each multipart in order. An attached message is one part, its own
-/// parts being its own, not the message's.
+/// Every part of a message, depth first. An attached message is one part,
+/// its own parts not the message's.
 fn nodes<'t, 'a>(message: &'t MimeCst<'a>) -> Vec<Node<'t, 'a>> {
     let root = &message.root;
     let mut nodes = Vec::new();
@@ -166,9 +162,8 @@ fn is_multipart(part: &MimeEntity) -> bool {
 
 /// One leaf part of a message, a `multipart/*` container being none.
 pub struct Leaf<'t, 'a> {
-    /// The id the `message read` and `attachment` commands share: the
-    /// 1-based position of the part among all of the message's parts,
-    /// depth first, so the ids gap where a container sits.
+    /// The id `message read` and `attachment` share: the 1-based depth-first
+    /// position among all parts, so ids gap where a container sits.
     pub id: String,
     pub part: &'t MimeEntity<'a>,
     /// Its IMAP section (RFC 3501 §6.4.5), `None` past the depth the walk
@@ -197,13 +192,11 @@ pub fn find<'t, 'a>(message: &'t MimeCst<'a>, id: &str) -> Option<Leaf<'t, 'a>> 
     leaves(message).find(|leaf| leaf.id == id)
 }
 
-/// The leaf part at the given IMAP section (RFC 3501 §6.4.5): `1` for
-/// the body of a message that is not multipart, else the 1-based
-/// position of each part among its siblings, joined with dots down the
-/// multipart parts (`2`, `1.2`).
+/// The leaf part at the IMAP section (RFC 3501 §6.4.5): `1` for a
+/// non-multipart body, else sibling positions joined with dots (`1.2`).
 ///
-/// A part of an attached message has no section here, as it is no leaf
-/// of the message.
+/// A part of an attached message has no section here, being no leaf of the
+/// message.
 pub fn find_section<'t, 'a>(message: &'t MimeCst<'a>, section: &str) -> Option<Leaf<'t, 'a>> {
     leaves(message).find(|leaf| leaf.section.as_deref() == Some(section))
 }
@@ -224,10 +217,9 @@ pub enum PartRole {
 
 /// The role of a leaf part.
 ///
-/// A `message/rfc822` part or one marked `Content-Disposition:
-/// attachment` is an attachment; a `text/plain` or `text/html` part
-/// naming no file is a body; an `image/*` part marked inline or carrying
-/// a `Content-ID` is inline; anything else is an attachment.
+/// `message/rfc822` or `Content-Disposition: attachment` is an attachment,
+/// `text/plain` or `text/html` naming no file a body, `image/*` marked
+/// inline or with a `Content-ID` inline, anything else an attachment.
 pub fn role(part: &MimeEntity) -> PartRole {
     let mime = mime(part);
     let disposition = disposition(part);
@@ -273,9 +265,8 @@ pub fn marks_attachment(
     }
 }
 
-/// Whether the child at 1-based `position` of a multipart of `subtype` is
-/// an RFC 1847 protocol part: the signature of a signed message, or any
-/// child of an encrypted one.
+/// Whether child `position` (1-based) of a `subtype` multipart is an RFC
+/// 1847 protocol part: a signed message's signature, any encrypted child.
 pub fn is_protocol_part(subtype: &[u8], position: usize) -> bool {
     subtype.eq_ignore_ascii_case(b"encrypted")
         || (subtype.eq_ignore_ascii_case(b"signed") && position > 1)
@@ -321,10 +312,8 @@ fn part_has_attachment(part: &MimeEntity, is_protocol: bool) -> bool {
     })
 }
 
-/// The part's MIME type, lowercased, defaulting as RFC 2045 does when
-/// the part carries no `Content-Type` (`message/rfc822` in a digest),
-/// and taken as `text/plain` when it carries an invalid one (RFC 2045
-/// §5.2).
+/// The part's lowercased MIME type, the RFC 2045 default when absent
+/// (`message/rfc822` in a digest), `text/plain` when invalid (§5.2).
 pub fn mime(part: &MimeEntity) -> String {
     if invalid_content_type(part) {
         return String::from("text/plain");
@@ -345,9 +334,8 @@ pub fn mime(part: &MimeEntity) -> String {
     .to_string()
 }
 
-/// Whether the part's `Content-Type` is present but invalid: a type or
-/// subtype missing, empty or not an RFC 2045 token. RFC 2045 §5.2 reads
-/// it as `text/plain; charset=us-ascii`.
+/// Whether a present `Content-Type` has a type or subtype missing, empty or
+/// no RFC 2045 token, which §5.2 reads as `text/plain; charset=us-ascii`.
 fn invalid_content_type(part: &MimeEntity) -> bool {
     let Some(value) = header::raw_text(part, "Content-Type") else {
         return false;
@@ -378,10 +366,9 @@ fn disposition(part: &MimeEntity) -> Option<String> {
 /// The file name the part carries, from `Content-Disposition` then
 /// `Content-Type`, RFC 2231 and RFC 2047 decoded, `None` when empty.
 ///
-/// NOTE: a plain parameter is read off the raw header, as
-/// [`header::eight_bit`] reads it, so a raw 8-bit name reads right and
-/// adjacent encoded words rebuild a character split between them; the
-/// RFC 2231 forms are left to mime-rs.
+/// A plain parameter is read off the raw header ([`header::eight_bit`]), so
+/// a raw 8-bit name reads right and adjacent encoded words rebuild a split
+/// character; RFC 2231 forms are left to mime-rs.
 pub fn filename(part: &MimeEntity) -> Option<String> {
     let disposition = || {
         let value = header::raw_text(part, "Content-Disposition")?;
@@ -438,9 +425,8 @@ fn param(part: &MimeEntity, name: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
-/// The part's bytes once its transfer encoding is undone, in its own
-/// charset: what a file attached to the message holds, the attached
-/// message itself for a `message/rfc822` part.
+/// The part's bytes, transfer encoding undone, in its own charset: an
+/// attached file, or the attached message for `message/rfc822`.
 pub fn bytes<'t>(part: &'t MimeEntity) -> Cow<'t, [u8]> {
     match &part.body {
         MimeBodyNode::Multipart(_) => Cow::Borrowed(&[]),
@@ -486,9 +472,8 @@ fn unflow(part: &MimeEntity, text: String) -> String {
     flowed::decode(&text, delsp)
 }
 
-/// The text body of a message, what a reply quotes: its first text body
-/// (RFC 8621 §4.1.4), an HTML one turned into text when the message has
-/// no plain text; empty without any.
+/// The text a reply quotes: the first text body (RFC 8621 §4.1.4), HTML
+/// turned into text without plain text, empty without any.
 pub fn body_text(message: &MimeCst) -> String {
     let lists = message.root.body_lists();
     let Some(first) = lists.text.first() else {
@@ -501,10 +486,8 @@ pub fn body_text(message: &MimeCst) -> String {
     }
 }
 
-/// Reads HTML as plain text: markup dropped with the content of `head`,
-/// `style` and `script`, a line break for each break, paragraph, row,
-/// list item and heading, the common entities decoded and runs of blank
-/// lines collapsed.
+/// Reads HTML as plain text: markup, `head`, `style` and `script` dropped,
+/// block elements broken into lines, common entities decoded.
 fn html_to_text(html: &str) -> String {
     const BREAKS: &[&str] = &[
         "br",
@@ -670,9 +653,8 @@ mod tests {
         assert!(refused(&tall(MAX_HEADER_LINES + 1)));
     }
 
-    /// mime-rs stops past its own entity cap and leaves the multipart it
-    /// stopped at unsplit, one part to a walk: such a message is refused,
-    /// not read in part, even behind a decoy text part.
+    /// A multipart mime-rs left unsplit past its entity cap is refused, not
+    /// read in part, even behind a decoy text part.
     #[test]
     fn a_message_past_the_parser_cap_is_refused() {
         let count = mime::tree::parse::ENTITIES_MAX + 1;

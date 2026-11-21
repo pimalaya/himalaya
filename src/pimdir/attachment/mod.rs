@@ -5,11 +5,10 @@
 //! attachments collection as each message body enters it (pimdir STORAGE
 //! §14.3), read with the message attaching each.
 //!
-//! A listing finds the files in the store's index, so a store lists every
-//! attachment whose message body was ever stored, newest message first. A
-//! message whose body never entered the store attaches nothing yet. Only
-//! the bodies of a page's messages are opened, to number each file's part
-//! as `attachment download` takes it.
+//! A listing reads the store's index, so it holds every attachment whose
+//! message body was ever stored, newest first, and none of a body never
+//! stored. Only a page's bodies are opened, to number each part as
+//! `attachment download` takes it.
 
 pub mod cli;
 pub mod list;
@@ -40,13 +39,10 @@ pub struct PimdirAttachmentPage {
 }
 
 impl PimdirClient {
-    /// One page of the account's attachments, newest message first, from
-    /// after `after` or from the newest; with `query`, only those it
-    /// matches.
+    /// One page of the account's attachments matching `query`, newest
+    /// message first, from after `after` or from the newest.
     ///
-    /// The page is read one entry past `limit`, so the cursor of the next
-    /// page is there exactly when one more attachment is: the last page
-    /// has none.
+    /// Read one entry past `limit`, so the last page has no next cursor.
     pub fn list_attachments(
         &self,
         after: Option<&PimdirAccountAttachmentCursor>,
@@ -94,9 +90,10 @@ impl PimdirClient {
     }
 
     /// The part id `attachment download` takes for each of `attachments`,
-    /// in order: the id of the part standing at its section in its
-    /// message's body, read once per message. `None` where the body is not
-    /// local, does not parse, or holds no leaf part at that section.
+    /// in order, each body read once.
+    ///
+    /// `None` where the body is not local, does not parse, or holds no
+    /// leaf part at that section.
     pub fn part_ids(&self, attachments: &[PimdirAccountAttachment]) -> Result<Vec<Option<String>>> {
         let mut parts: HashMap<(&str, i64), Vec<(String, String)>> = HashMap::new();
         let mut ids = Vec::with_capacity(attachments.len());
@@ -149,9 +146,8 @@ impl PimdirClient {
     }
 }
 
-/// What `pimdir attachment search` matches: words, each of which must
-/// appear in the file name, the sender's address or the sender's name,
-/// ignoring case.
+/// What `pimdir attachment search` matches: words each found, ignoring
+/// case, in the file name or the sender's address or name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttachmentQuery {
     /// The words, lowercased.
@@ -190,9 +186,8 @@ impl AttachmentQuery {
     }
 }
 
-/// The page token of a cursor: the stand-in's public id, a dot, then the
-/// message's sort key, verbatim. Opaque to a caller, which hands it back
-/// as printed.
+/// The page token of a cursor, opaque to a caller: the stand-in's public
+/// id, a dot, then the message's sort key, verbatim.
 pub fn page_token(cursor: &PimdirAccountAttachmentCursor) -> String {
     format!("{}.{}", cursor.seq, cursor.message_sort_key)
 }

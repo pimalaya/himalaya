@@ -77,10 +77,8 @@ mod tests {
 
     use crate::{cli::Cli, json_schema::registry};
 
-    /// `request` names the escape hatch of an HTTP API across the family,
-    /// taking one whole request object and printing `{response}`; `query`,
-    /// its former form, still takes a method-calls array, hidden, its
-    /// schema kept.
+    /// `request` is the family's HTTP escape hatch, one request object in,
+    /// `{response}` out; the hidden `query` still takes a method-calls array.
     #[test]
     fn the_raw_request_is_jmap_request() {
         let mut cli = Cli::command();

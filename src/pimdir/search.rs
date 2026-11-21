@@ -414,9 +414,8 @@ mod tests {
         }
     }
 
-    /// A hit prints on one line, its mailboxes and what matched before the
-    /// sender, under the account, the query, the page and what the answer
-    /// could not see, `Incomplete:` widening the label column.
+    /// A hit prints on one line, mailboxes and match before the sender,
+    /// under a header whose `Incomplete:` label widens the column.
     #[test]
     fn a_hit_prints_on_one_line() {
         let expected = "\
@@ -430,9 +429,8 @@ Incomplete:  1 message(s) have no local body and matched on their headers alone
         assert_eq!(output().to_string(), expected);
     }
 
-    /// A page pages as every listing does: `nextPage`, which `--page-token`
-    /// takes, in text too, and no `more`; a message the store could not
-    /// read is an `errors` entry, printed after the items.
+    /// A page pages as every listing does (`nextPage`, no `more`), and an
+    /// unreadable message is an `errors` entry printed after the items.
     #[test]
     fn a_page_names_the_next_and_its_errors() {
         let mut output = output();
@@ -471,9 +469,8 @@ Error:  9  message-unreadable  Read message `9`
         assert_eq!(output.to_string(), expected);
     }
 
-    /// A page token reads back under the place that printed it alone: a
-    /// token of another query, order, listing or account is refused, as
-    /// a page number of the offset paging is.
+    /// A page token of another query, order, listing or account is
+    /// refused, as is an offset page number.
     #[test]
     fn a_page_token_is_bound_to_its_query() {
         let place = output().place;

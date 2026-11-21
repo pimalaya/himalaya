@@ -142,9 +142,8 @@ mod tests {
         http_script::{Script, ok},
     };
 
-    /// The page prints as Gmail sent it, `resultSizeEstimate` included, its
-    /// `nextPageToken` lifted into `nextPage`; an empty page, which Gmail
-    /// sends without `messages`, prints `[]`.
+    /// The page prints as sent, `nextPageToken` lifted into `nextPage`; an
+    /// empty page, sent without `messages`, prints `[]`.
     #[test]
     fn a_page_prints_as_gmail_sent_it() {
         let list = |page: serde_json::Value| {

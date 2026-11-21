@@ -80,8 +80,7 @@ const MESSAGES_MAX_TOP: u32 = 1000;
 const FOLDER_DELIMITER: char = '/';
 
 /// The sub-requests one `$batch` holds: Graph runs them in parallel and
-/// serves at most four concurrent requests per mailbox, throttling the
-/// others.
+/// throttles past four concurrent requests per mailbox.
 const BATCH_CONCURRENCY: usize = 4;
 
 /// How many times a throttled sub-request is sent again.
@@ -91,10 +90,8 @@ const BATCH_RETRIES: usize = 3;
 const BATCH_MAX_WAIT: u64 = 10;
 
 impl MsgraphClient {
-    /// Lists every Graph mail folder as a mailbox, nested ones named by
-    /// their path (`Parent/Child`). With `with_counts`, counts the
-    /// messages of each folder through `$batch`, a folder whose counts
-    /// Graph refuses listed without them, beside its error.
+    /// Lists every Graph mail folder as a mailbox named by its path, counted
+    /// through `$batch`; one whose count Graph refuses is listed without.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let roles = self.folder_roles()?;
         let mut folders = Vec::new();
@@ -174,9 +171,8 @@ impl MsgraphClient {
         }
     }
 
-    /// Resolves the well-known folder names to folder ids through
-    /// `$batch`, since Graph v1.0 lists folders without them. A name the
-    /// mailbox lacks, such as `archive`, is skipped.
+    /// Resolves the well-known folder names to ids, Graph v1.0 listing
+    /// folders without them; a name the mailbox lacks is skipped.
     fn folder_roles(&mut self) -> Result<Vec<(String, MailboxRole)>> {
         let user = user_path(&self.user_id)?;
         let requests: Vec<_> = WELL_KNOWN_FOLDERS
@@ -193,12 +189,11 @@ impl MsgraphClient {
         roles_from(responses)
     }
 
-    /// Sends `requests` through `$batch`, at most [`BATCH_CONCURRENCY`] at
-    /// a time, sending a throttled (429) or unavailable (5xx) one again
-    /// after the delay Graph asks for.
+    /// Sends `requests` [`BATCH_CONCURRENCY`] at a time, retrying a 429 or
+    /// 5xx after the delay Graph asks for.
     ///
-    /// Returns one response per request, a sub-request still failing
-    /// after [`BATCH_RETRIES`] tries keeping its last error status.
+    /// One response per request, one still failing after [`BATCH_RETRIES`]
+    /// tries keeping its last error status.
     fn batch_all(
         &mut self,
         mut requests: Vec<MsgraphBatchRequest>,
@@ -281,9 +276,8 @@ impl MsgraphClient {
         Ok(ids_found(&unique, responses, mailbox).after(errors))
     }
 
-    /// Sends one `$batch` request per id of `ids`, `request` building each
-    /// from the id's path segment, returning how many Graph answered with a
-    /// success beside the error of each other one.
+    /// Sends one `$batch` request per id, returning how many succeeded
+    /// beside each other one's error.
     fn write_each(
         &mut self,
         ids: &[&str],
@@ -306,14 +300,11 @@ impl MsgraphClient {
         Ok(written(ids, responses))
     }
 
-    /// Lists envelopes from the `mailbox` folder (id or well-known name
-    /// such as `inbox`). Page 1 is the most recent window; the offset is
-    /// `(page - 1) * page_size` via OData `$skip`. Without a page size,
-    /// every page is read and `page` is moot.
+    /// Lists envelopes from the `mailbox` folder, page 1 the most recent,
+    /// through `$skip`; without a page size, every page is read.
     ///
     /// Graph answers a next link after an exactly full last page too, so
-    /// the page is asked one message longer, a page following when that
-    /// one comes back; past the largest `$top`, the next link answers.
+    /// one message past the page is asked: a page follows when it exists.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -353,17 +344,12 @@ impl MsgraphClient {
         Ok(EnvelopePage { envelopes, more })
     }
 
-    /// Searches the `mailbox` folder with the unified query, its filter
-    /// translated to a KQL `$search`, or a lone `message-id` clause to a
-    /// `$filter` on `internetMessageId`.
+    /// Searches the `mailbox` folder through KQL `$search`, a lone
+    /// `message-id` clause through `$filter` on `internetMessageId`.
     ///
-    /// Graph refuses `$skip` and `$orderby` beside `$search`, so a page is
-    /// reached through the paging links and sorted locally, newest first
-    /// by default since Graph answers in relevance order. The links are
-    /// followed up to one message past the page, the first request asking
-    /// that many at once, so a page follows when that message exists:
-    /// Graph answers a next link after an exactly full last page too.
-    /// Without a page size, every page is read.
+    /// Graph refuses `$skip` and `$orderby` beside `$search`, so the links
+    /// reach one message past the page, sorted locally (newest first, Graph
+    /// answering by relevance); without a page size, every page is read.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -459,12 +445,11 @@ impl MsgraphClient {
         Ok(self.run(coroutine)?.response)
     }
 
-    /// Adds, sets, or removes `flags` on the messages of `ids` the folder
-    /// `mailbox` holds, one `PATCH /messages/{id}` each through `$batch`,
-    /// returning how many it patched beside the error of each other id.
+    /// Applies `flags` to the ids the folder `mailbox` holds, one PATCH
+    /// each, returning how many it patched beside each other id's error.
     ///
-    /// A patch left empty (`$Forwarded` has no Graph field) sends nothing,
-    /// an empty PATCH being a wasted request that could still fail.
+    /// An empty patch (`$Forwarded` has no Graph field) sends nothing, an
+    /// empty PATCH being a wasted request that could still fail.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -485,15 +470,11 @@ impl MsgraphClient {
         Ok(patched.after(found.errors))
     }
 
-    /// Fetches one message's raw RFC 5322 bytes via
-    /// `GET /messages/{id}/$value`, once `GET /messages/{id}` found it in
-    /// the folder `mailbox` and read its flags.
+    /// Fetches one message's raw RFC 5322 bytes via `$value`, once a plain
+    /// get found it in the folder `mailbox` and read its flags.
     ///
     /// The id names the message account-wide, so a message of another
-    /// folder is not found, as on the backends whose ids are the
-    /// mailbox's. `$value` carries no property, so its `parentFolderId`
-    /// costs a request of its own. The mailbox is resolved through the
-    /// folder listing only when it is not that folder id already.
+    /// folder is not found; `$value` carries no `parentFolderId` to check.
     pub fn get_message(
         &mut self,
         mailbox: &str,
@@ -527,9 +508,8 @@ impl MsgraphClient {
         Ok((raw, flags))
     }
 
-    /// Copies the messages of `ids` the folder `from` holds into `to`
-    /// through `$batch`, returning how many it copied beside the error of
-    /// each other id.
+    /// Copies the ids the folder `from` holds into `to`, returning how many
+    /// it copied beside each other id's error.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in_folder(from, ids)?;
         let body = json!({ "destinationId": to });
@@ -541,9 +521,10 @@ impl MsgraphClient {
         Ok(copied.after(found.errors))
     }
 
-    /// Moves the messages of `ids` the folder `from` holds into `to`
-    /// through `$batch`, returning how many it moved beside the error of
-    /// each other id. Moving into `from` itself leaves them as they are.
+    /// Moves the ids the folder `from` holds into `to`, returning how many
+    /// it moved beside each other id's error.
+    ///
+    /// Moving into `from` itself leaves them as they are.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in_folder(from, ids)?;
         if from == to {
@@ -558,10 +539,10 @@ impl MsgraphClient {
         Ok(moved.after(found.errors))
     }
 
-    /// Permanently deletes the messages of `ids` the folder `mailbox`
-    /// holds (`DELETE /messages/{id}` through `$batch`; from Deleted Items
-    /// this is a hard delete), returning how many it deleted beside the
-    /// error of each other id.
+    /// Deletes the ids the folder `mailbox` holds, returning how many it
+    /// deleted beside each other id's error.
+    ///
+    /// From Deleted Items this is a hard delete.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in_folder(mailbox, ids)?;
 
@@ -577,13 +558,9 @@ impl MsgraphClient {
     /// Creates the folder `name` at the top, or under `parent`, returning
     /// its id.
     ///
-    /// io-msgraph creates top-level folders only, so a folder under a
-    /// parent is created at the top then moved under it, two requests: a
-    /// failed move leaves it at the top, which the error says.
-    ///
-    /// A folder of that name under the parent, hidden ones included, is
-    /// refused `mailbox-duplicate` before anything is created, as is one
-    /// at the top Graph answers exists (`409 ErrorFolderExists`).
+    /// A child is created at the top then moved, io-msgraph creating only
+    /// top-level folders; a failed move leaves it there, the error says so.
+    /// A namesake, even hidden, is `mailbox-duplicate` before any request.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
         if let Some(parent) = parent
             && self.holds_child(parent, name)?
@@ -642,9 +619,8 @@ impl MsgraphClient {
         }
     }
 
-    /// Renames the folder `mailbox` to `name`, its parent kept (`PATCH
-    /// /mailFolders/{id}`), returning its id, which a rename leaves as it
-    /// is.
+    /// Renames the folder `mailbox` to `name`, its parent kept, returning
+    /// its unchanged id.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
         let folder = MsgraphMailFolder {
             display_name: name.to_string(),
@@ -709,10 +685,9 @@ fn names_existing_folder(err: &MsgraphClientStdError) -> bool {
 /// Converts one Graph mail folder named `name` into the unified
 /// [`Mailbox`] shape, its total left for [`counts_from`] to fill.
 ///
-/// A folder's `totalItemCount` counts its contacts and events too (a
-/// deleted one lands in Deleted Items), so only a 0 is a message count:
-/// a folder holding no item holds no message. Its `unreadItemCount`
-/// matched its unread messages live, so `unread` reads it as is.
+/// `totalItemCount` counts contacts and events too (deleted ones land in
+/// Deleted Items), so only a 0 is a message count; `unreadItemCount`
+/// matched the unread messages live, so it is read as is.
 fn mailbox_from(
     name: String,
     folder: MsgraphMailFolder,
@@ -731,11 +706,8 @@ fn mailbox_from(
     }
 }
 
-/// The `$batch` requests counting the messages of `folders`, each
-/// identified by the folder's index, through `$count` over a one-message
-/// page.
-///
-/// A folder holding no item holds no message, so it is not asked.
+/// The `$batch` requests counting the messages of `folders` by `$count`,
+/// each under the folder's index; a folder holding no item is not asked.
 fn count_requests(
     user_id: &str,
     folders: &[(String, MsgraphMailFolder)],
@@ -762,9 +734,8 @@ fn count_requests(
     Ok(requests)
 }
 
-/// Fills the totals of `mailboxes` from the answers to `requests`
-/// ([`count_requests`]), returning the error of each mailbox a count
-/// failed for, coded `mailbox-unreadable`, both its counts then `null`.
+/// Fills the totals of `mailboxes` from the [`count_requests`] answers; a
+/// failed count is `mailbox-unreadable`, both its counts then `null`.
 fn counts_from(
     mailboxes: &mut [Mailbox],
     requests: &[MsgraphBatchRequest],
@@ -840,10 +811,8 @@ fn roles_from(responses: Vec<MsgraphBatchResponse>) -> Result<Vec<(String, Mailb
     Ok(roles)
 }
 
-/// Keeps the ids of `ids` whose `$batch` response, answered under the id's
-/// index, names a message of the folder `mailbox`, beside the error of
-/// each other id: one of another folder is not found, as is one Graph
-/// answers so ([`part_error`]).
+/// Keeps the ids whose response names a message of the folder `mailbox`,
+/// beside each other id's error, another folder's being not found.
 fn ids_found<'a>(
     ids: &[&'a str],
     responses: Vec<MsgraphBatchResponse>,
@@ -1024,9 +993,8 @@ pub(crate) fn envelope_from(message: MsgraphMessage) -> Envelope {
     }
 }
 
-/// Builds the message PATCH body applying `flags` under `op`. `Set`
-/// drives every scalar flag-field to its target and replaces
-/// `categories`; `Add`/`Remove` only touch the scalar fields mentioned.
+/// Builds the PATCH body applying `flags` under `op`: `Set` drives every
+/// flag field and replaces `categories`, `Add`/`Remove` touch those named.
 fn flag_patch(flags: &[Flag], op: FlagOp) -> MsgraphMessage {
     let mut patch = MsgraphMessage::default();
 
@@ -1223,9 +1191,8 @@ mod tests {
             .collect()
     }
 
-    /// A message of another folder, one Graph answers 404 for or 400
-    /// `ErrorInvalidIdMalformed`, is not found; another 400 is a refused
-    /// request, and a part the answer left out an error coded `null`.
+    /// Another folder's message, a 404 or a 400 `ErrorInvalidIdMalformed` is
+    /// not found; another 400 is refused, a missing part coded `null`.
     #[test]
     fn a_lookup_keeps_the_messages_of_the_folder() {
         let ids = ["in", "elsewhere", "gone", "malformed", "refused", "lost"];
@@ -1371,10 +1338,8 @@ mod count_tests {
         ]
     }
 
-    /// Graph's `totalItemCount` counts the contacts and events a folder
-    /// holds too: the Deleted Items of the Microsoft test account said 835
-    /// where its messages were 26, and 5 unread as its messages. The total
-    /// is its messages', the unread count the folder's own, asked of none.
+    /// `totalItemCount` counts contacts and events too (a test Deleted Items
+    /// said 835 for 26 messages), so the total is counted, unread kept.
     #[test]
     fn a_folder_counts_its_messages_not_its_items() {
         let [inbox, junk] = roles();
@@ -1481,9 +1446,8 @@ mod page_tests {
         json!({"value": value, "@odata.nextLink": link})
     }
 
-    /// Five messages listed five a page: Graph's next link leads to an
-    /// empty page, which no page follows. A page is asked one message
-    /// longer, that message telling whether one follows.
+    /// Five messages five a page: Graph's next link leads to an empty page,
+    /// so none follows, the extra message asked telling so.
     #[test]
     fn an_exactly_full_last_page_has_no_next() {
         let (mut client, requests) = graph(&[page(&["1", "2", "3", "4", "5"])]);
@@ -1502,9 +1466,8 @@ mod page_tests {
         assert!(listed.more);
     }
 
-    /// A search reaches its page through the links, reading one message
-    /// past it, so an exactly full last page has no next one either: the
-    /// first request asks the pages before it and that message at once.
+    /// A search reads one message past its page through the links, so an
+    /// exactly full last page has no next one either.
     #[test]
     fn a_search_page_reads_one_message_past_it() {
         let query: SearchEmailsQuery = "subject report".parse().unwrap();
@@ -1578,11 +1541,8 @@ mod read_tests {
         [reply(folders), reply(sent)]
     }
 
-    /// A read names the mailbox it reads in, as IMAP and JMAP do: a
-    /// message of another folder is `message-not-found`, though Graph ids
-    /// name messages account-wide, its bytes not fetched, and one of the
-    /// folder is read, the listing asked only when the mailbox is not the
-    /// message's folder id.
+    /// Another folder's message is `message-not-found` though Graph ids are
+    /// account-wide, its bytes not fetched, as on IMAP and JMAP.
     #[test]
     fn a_read_of_a_message_another_folder_holds_is_not_found() {
         let message = || reply(json!({"id": "m1", "parentFolderId": "I"}));
@@ -1635,9 +1595,8 @@ mod read_tests {
         format!("{head}\r\nContent-Length: {len}\r\n\r\n{body}").into_bytes()
     }
 
-    /// A folder Graph answers exists at the top, or one the parent holds,
-    /// is `mailbox-duplicate`, the latter before anything is created; a
-    /// namesake at the top of a folder asked under a parent is not.
+    /// A namesake at the top or under the parent is `mailbox-duplicate`, one
+    /// at the top of a folder asked under a parent is not.
     #[test]
     fn a_create_of_an_existing_folder_is_a_duplicate() {
         let code = |err: &anyhow::Error| pimalaya_cli::error::code_of::<ErrorCode>(err);

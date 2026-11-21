@@ -82,14 +82,9 @@ impl MboxClient {
 
     /// Resolves a mailbox argument to its file.
     ///
-    /// A name goes through the store, `INBOX` reaching the spool. An
-    /// absolute path is taken as is, so any mbox file opens without
-    /// configuring it, as `mail -f` does, except inside an MCP server, which
-    /// refuses it: a tool reaches no file outside `mbox.root`.
-    ///
-    /// `INBOX` fails, naming `mbox.inbox`, when the spool is a directory,
-    /// or when no spool is set and the root holds no file of that name,
-    /// coded `mailbox-not-found`.
+    /// An absolute path opens as is, as `mail -f` does, but not under MCP,
+    /// where no tool reaches outside `mbox.root`. `INBOX` is the spool,
+    /// `mailbox-not-found` naming `mbox.inbox` when it is none.
     pub fn resolve_mbox(&self, mailbox: &str) -> Result<MboxFsPath> {
         let path = Path::new(mailbox);
         if path.is_absolute() {
@@ -129,10 +124,9 @@ impl MboxClient {
     /// Resolves a mailbox argument to the mbox file a message command
     /// reads or writes, see [`Self::resolve_mbox`].
     ///
-    /// A missing file fails with `mailbox-not-found`; a directory, or a
-    /// file that does not open on a `From_` line, is refused before any
-    /// lock is taken. A file that cannot be read goes through, for the
-    /// command to name the error.
+    /// A missing file is `mailbox-not-found`; a directory or a file not
+    /// opening on `From_` is refused before any lock; an unreadable file
+    /// goes through, for the command to name the error.
     pub fn open_mbox(&self, mailbox: &str) -> Result<MboxFsPath> {
         let path = self.resolve_mbox(mailbox)?;
 
@@ -238,9 +232,8 @@ pub fn build_mbox_client(
     Ok((account, MboxClient::new(mbox_config)))
 }
 
-/// An io-mbox failure as Himalaya reports it: a lock another process
-/// holds past `mbox.lock.timeout` carries `store-busy`, and a dotlock the
-/// user may not create names the key that skips it.
+/// An io-mbox failure, `store-busy` past `mbox.lock.timeout`; a dotlock
+/// the user may not create names the key that skips it.
 pub fn mbox_error(err: MboxClientError) -> anyhow::Error {
     if err.lock_busy().is_some() {
         return CodedError::new(
@@ -262,11 +255,11 @@ pub fn mbox_error(err: MboxClientError) -> anyhow::Error {
 /// Suffixes of the side files of other tools, which a listing hides.
 const SIDE_FILE_SUFFIXES: [&str; 3] = [".lock", ".lck", ".msf"];
 
-/// Rejects an mbox name that is empty, absolute, or contains a `..`
-/// component, so a mailbox operation joined to the root cannot escape
-/// it, and one a listing would hide: a level starting with `.`, ending in
-/// the suffix of a dotlock or a Thunderbird summary, or in the Thunderbird
-/// layout (`thunderbird`) in `.sbd`.
+/// Rejects an mbox name empty, absolute or with a `..`, which would escape
+/// the root, or one a listing hides.
+///
+/// Hidden is a level starting with `.`, ending in a dotlock or Thunderbird
+/// summary suffix, or in `.sbd` when `thunderbird`.
 pub fn validate_mbox_name(name: &str, thunderbird: bool) -> Result<()> {
     let path = Path::new(name);
 

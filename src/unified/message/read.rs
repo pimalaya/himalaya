@@ -114,9 +114,8 @@ impl MessageReadCommand {
     }
 }
 
-/// The `message read` output: under `--json` the row `envelope list`
-/// prints for the message, then its etag and its view; as text the view
-/// alone.
+/// The `message read` output: under `--json` the `envelope list` row, the
+/// etag and the view; as text the view alone.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageReadOutput {
@@ -136,10 +135,8 @@ impl fmt::Display for MessageReadOutput {
     }
 }
 
-/// The view of a message, built from its raw bytes so it is the same on
-/// every backend: what `message read` and `message parse` print. As text
-/// a header block, then one summary line per MIME part with the decoded
-/// contents of the text ones.
+/// The view `message read` and `message parse` print, built from the raw
+/// bytes so it is the same on every backend.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageReadView {
@@ -251,9 +248,8 @@ pub struct MessageHeaders {
     pub invalid: InvalidAddresses,
 }
 
-/// The entries of the address headers that are not readable as an
-/// address, as decoded text, in header order. A group name is not an
-/// entry, nor is an empty group.
+/// The address header entries unreadable as an address, as decoded text in
+/// header order; group names and empty groups are no entries.
 #[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InvalidAddresses {
@@ -349,9 +345,8 @@ pub struct MessagePartView {
     pub method: Option<String>,
 }
 
-/// An address header as a list, read from its raw bytes: groups
-/// flattened, names unquoted and RFC 2047 decoded, entries without a
-/// valid email dropped and returned beside the list as decoded text.
+/// An address header's raw list: groups flattened, names RFC 2047 decoded,
+/// entries without a valid email returned beside it as decoded text.
 fn addresses(entity: &MimeEntity, name: &str) -> (Vec<Address>, Vec<String>) {
     let mut valid = Vec::new();
     let mut invalid = Vec::new();
@@ -428,9 +423,8 @@ fn split_addresses(value: &str) -> Vec<String> {
     items
 }
 
-/// One address of a list: `email`, `<email>` or `name <email>`, read by
-/// mime-rs as every listing reads it, its comments dropped and its
-/// address a valid one.
+/// One `email`, `<email>` or `name <email>` read by mime-rs as every
+/// listing reads it, comments dropped, its address valid.
 fn mailbox(item: &str) -> Option<Address> {
     let item = strip_comments(item);
     let list = parse_mailboxes(item.as_bytes());
@@ -699,9 +693,8 @@ fn format_params(value: &str, params: &[MimeParam]) -> String {
     rendered
 }
 
-/// An address header read as the JSON view reads it, its addresses as
-/// `Name <email>` then the entries unreadable as one; `None` when it holds
-/// neither.
+/// An address header as the JSON view reads it, `Name <email>` then the
+/// unreadable entries; `None` when it holds neither.
 fn address_line(entity: &MimeEntity, name: &str) -> Option<String> {
     let (valid, invalid) = addresses(entity, name);
     let valid = valid.into_iter().map(|address| match address.name {

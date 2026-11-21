@@ -4,12 +4,10 @@
 //! not read the whole file again: the io-mbox scan index, and the
 //! envelope of every message already read.
 //!
-//! An mbox has no directory of its contents, so without it every listing
-//! scans and parses the whole file. The index tells an unchanged file
-//! from one a delivery appended to, and the envelopes, keyed by content
-//! id, stay valid whatever happens to the flags. The cache is an
-//! optimisation only: a missing, stale or unreadable one is rebuilt, and
-//! failing to write one is not an error.
+//! The index tells an unchanged file from one a delivery appended to, and
+//! the envelopes, keyed by content id, stay valid whatever the flags. It
+//! is an optimisation only: a missing, stale or unreadable cache is
+//! rebuilt, and failing to write one is not an error.
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -26,9 +24,8 @@ use sha2::{Digest, Sha256};
 
 use crate::unified::email::envelope::Envelope;
 
-/// The version of what a cached envelope or index holds, raised when a
-/// message would now read or scan differently, so an older cache is
-/// rebuilt.
+/// The cache format version, raised when a message would now read or scan
+/// differently, so an older cache is rebuilt.
 const VERSION: u32 = 4;
 
 /// The cached state of one mbox file.
@@ -39,9 +36,8 @@ pub struct MboxCache {
     pub version: u32,
     /// The scan index, `None` until the file was scanned once.
     pub index: Option<MboxIndex>,
-    /// Envelopes keyed by content id, their flags left empty since the
-    /// index carries the current ones; `None` for a message holding no
-    /// header field.
+    /// Envelopes by content id, flags empty as the index carries them;
+    /// `None` for a message holding no header field.
     pub envelopes: BTreeMap<String, Option<Envelope>>,
 }
 
@@ -74,9 +70,8 @@ impl MboxCache {
         }
     }
 
-    /// Saves the cache of the mbox at `path` under `dir`, dropping the
-    /// envelopes of messages the index no longer holds, in one pass over
-    /// each.
+    /// Saves the cache of `path` under `dir`, dropping the envelopes of
+    /// messages the index no longer holds.
     pub fn save(&mut self, dir: Option<&Path>, path: &MboxFsPath) {
         let Some(dir) = dir else {
             return;
@@ -101,9 +96,8 @@ impl MboxCache {
     }
 }
 
-/// Creates `dir` and its missing parents readable by the owner alone, and
-/// tightens `dir` when it exists open: the cache holds the subject, sender,
-/// recipients and Message-ID of every message.
+/// Creates `dir` and its parents owner-only, tightening an open `dir`: the
+/// cache holds every message's subject, sender, recipients and Message-ID.
 fn create_private_dir(dir: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
@@ -228,9 +222,8 @@ mod tests {
         assert!(MboxCache::load(Some(dir.as_path()), &path).index.is_none());
     }
 
-    /// The cache holds the envelopes of private mail: its directory is
-    /// the owner's alone, tightened when an older run left it open, and
-    /// its files are read by the owner alone, whatever the umask.
+    /// The cache directory and files are the owner's alone whatever the
+    /// umask, a directory an older run left open tightened.
     #[cfg(unix)]
     #[test]
     fn a_cache_is_private_to_its_owner() {

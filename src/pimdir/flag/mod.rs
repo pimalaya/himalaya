@@ -61,20 +61,14 @@ impl RawFlagsArg {
 }
 
 /// The characters IMAP forbids in a flag (RFC 3501 `atom-specials` less
-/// the ones checked apart), a backslash being allowed only in front of a
-/// system flag.
+/// those checked apart), a backslash only fronting a system flag.
 const SPECIALS: &[char] = &['(', ')', '{', '%', '*', '"', ']', '\\'];
 
 /// Parses a raw flag, refusing what the store cannot carry as typed.
 ///
-/// A registered flag is accepted in its canonical spelling only, compared
-/// without case as IMAP does, and staged in that canonical case.
-/// `\Deleted` is a deletion and `\Recent` belongs to the server, so
-/// neither can be staged as a flag. A backslash names a system flag, so
-/// one in front of any other word is refused, as are a character outside
-/// ASCII and one IMAP forbids in a flag. What the store cannot hold at all
-/// (empty, whitespace, a control or a non-ASCII character) is refused as
-/// `flag-invalid`, the code io-pimdir's enqueue gives it.
+/// A registered flag matches without case, as in IMAP, staged canonical.
+/// `\Deleted`, `\Recent`, an unknown system flag and IMAP-forbidden or
+/// non-ASCII characters are refused, as `flag-invalid` if unstorable.
 pub fn parse_flag(raw: &str) -> Result<Flag> {
     if raw.is_empty() {
         return Err(invalid(String::from("A flag cannot be empty")));
@@ -132,9 +126,8 @@ pub struct PimdirFlagStageOutput {
     /// One entry per message, in the order given.
     #[serde(rename = "messages")]
     pub queued: Vec<PimdirFlagRow>,
-    /// What a source supports of the change only in part, each once, as
-    /// its declaration words it: the rows are queued, and the server may
-    /// keep less than they ask.
+    /// Each partial support a source declares, worded as declared: the rows
+    /// are queued, but the server may keep less than they ask.
     pub warnings: Vec<String>,
 }
 
@@ -144,9 +137,8 @@ pub struct PimdirFlagStageOutput {
 pub struct PimdirFlagRow {
     /// The message's public id.
     pub id: String,
-    /// The `set-flags` row, which `pimdir queue show` and `cancel` take,
-    /// `null` when the change left the message as it was and nothing was
-    /// staged.
+    /// The `set-flags` row `pimdir queue show` and `cancel` take, `null`
+    /// when the message already stood so and nothing was staged.
     pub row: Option<i64>,
     /// The row's handle, its id under the store's identity (pimdir STORAGE
     /// §4.5), `null` when nothing was staged.

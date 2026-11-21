@@ -84,9 +84,8 @@ impl GmailSettingsCommand {
     }
 }
 
-/// Replaces the settings at `users/<user>/settings/<path>` with
-/// `settings`, the request io-gmail's update sends, and hands back what
-/// Gmail answered, as it sent it.
+/// Replaces the settings at `users/<user>/settings/<path>`, returning
+/// Gmail's answer as sent.
 pub(crate) fn raw_put(
     client: &mut GmailClient,
     path: &str,

@@ -77,9 +77,8 @@ impl PimdirTagCommand {
     }
 }
 
-/// The flags of a tag in the spelling the store takes, each checked as
-/// `pimdir flag` checks it, the `is:` names passing through for the index
-/// to map.
+/// The flags of a tag, checked as `pimdir flag` does, the `is:` names
+/// passing through for the index to map.
 fn flags(values: &[String]) -> Result<Vec<String>> {
     values
         .iter()

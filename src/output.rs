@@ -16,10 +16,9 @@ use pimalaya_cli::{
 
 /// Writes bytes to the given path, or prints them when there is none.
 ///
-/// Printed bytes go verbatim to a redirected stdout, so a saved file is
-/// byte-exact, and as a [`Bytes`] object under `--json`. Binary-looking
-/// content is refused on a terminal in text mode, where it would corrupt
-/// the display or inject escape sequences.
+/// Verbatim to a redirected stdout, a [`Bytes`] object under `--json`.
+/// Binary-looking content is refused on a terminal in text mode, where it
+/// would corrupt the display or inject escape sequences.
 pub fn write_bytes_or_save(
     printer: &mut impl Printer,
     output: Option<&Path>,
@@ -48,9 +47,8 @@ pub fn write_bytes_or_save(
     })
 }
 
-/// Whether `bytes` read as binary, which is what a terminal must be
-/// spared: a control character other than tab, newline and CR, that is
-/// NUL and the rest of C0, DEL and C1.
+/// Whether `bytes` hold a control character a terminal must be spared: C0
+/// other than tab, newline and CR, DEL or C1.
 fn looks_binary(bytes: &[u8]) -> bool {
     let is_control = |c: char| c.is_control() && !matches!(c, '\t' | '\n' | '\r');
 

@@ -4,13 +4,10 @@
 //! the `pimdir search`, `count`, `thread` and `tag` commands ask in the
 //! SEARCH query language, scoped to the account's mail.
 //!
-//! The index belongs to the store's owner: its sync engine builds it and
-//! folds the store's changes in after each run. Himalaya opens it
-//! read-only and never builds, rebuilds nor refreshes it, so an answer is
-//! the store as of the owner's last refresh, with no queued write in it.
-//! An index absent or built by another version is a coded error saying
-//! to run the sync engine, and every answer says how far the index lags
-//! the store.
+//! The index belongs to the store's owner, whose sync engine builds and
+//! refreshes it. Himalaya only reads it, so an answer is the store as of
+//! the last refresh, without queued writes, and says how far it lags. An
+//! index absent or of another version is a coded error: run the sync.
 
 use std::{collections::BTreeMap, fmt};
 
@@ -148,14 +145,12 @@ impl PimdirClient {
         }
     }
 
-    /// Plans adding `add` to and removing `remove` from the flags of every
-    /// message `query` matches in the account, its dates read by `clock`,
-    /// each placement as the one source syncing its mailbox, and stages the
-    /// plan through the queue unless `dry_run`.
+    /// Plans adding `add` and removing `remove` on every message `query`
+    /// matches, and stages the plan unless `dry_run`.
     ///
     /// Every action passes the capability gate before the first is
     /// appended (io-pimdir `PimdirSearchTagPlan::stage`), so a refusal
-    /// stages nothing. The owner applies the rows on its next run.
+    /// stages nothing.
     pub fn tag_mail(
         &self,
         query: PimdirQuery,
@@ -228,27 +223,22 @@ impl PimdirClient {
         })
     }
 
-    /// Opens the store's search index for queries alone (io-pimdir
-    /// `PimdirIndex::open_query`): read-only, never created, rebuilt nor
-    /// refreshed.
+    /// Opens the store's search index read-only (io-pimdir
+    /// `PimdirIndex::open_query`), never building nor refreshing it.
     fn index(&self) -> Result<PimdirIndex> {
         PimdirIndex::open_query(&self.root)
             .map_err(pimdir_error)
             .with_context(|| format!("Open the pimdir search index of `{}`", self.root.display()))
     }
 
-    /// Reads `query` as Himalaya asks it: its conjuncts, `kind:mail`, and
-    /// `account:` naming the account when the store groups it under a
-    /// name, joined at the top by io-pimdir's `PimdirQuery::scoped`, where
-    /// the index reads the date range and the scope its coverage is
-    /// computed over.
+    /// Scopes `query` to `kind:mail` and the named `account:` through
+    /// `PimdirQuery::scoped`, where the index reads date range and coverage.
     fn scope(&self, query: PimdirQuery) -> PimdirQuery {
         query.scoped(Some(PimdirQueryKind::Mail), self.account.as_deref(), None)
     }
 
-    /// The hits as Himalaya lists them, the item error of each one the
-    /// store cannot read pushed to `errors`, coded `message-unreadable`
-    /// unless the store names its own code.
+    /// The hits as Himalaya lists them, each unreadable one pushed to
+    /// `errors` (`message-unreadable` unless the store gives a code).
     fn mail_hits(
         &self,
         index: &PimdirIndex,
@@ -342,10 +332,9 @@ pub fn local_clock() -> PimdirSearchClock {
 /// Parses the words of a query, joined by spaces, as the pimdir SEARCH
 /// query language (§8.3).
 ///
-/// A query the language refuses (§8.4) is the error `query-refused`: in
-/// plain output the fault is drawn over the query, in JSON its message
-/// names the §8.4 code, the span in Unicode scalar values and what would
-/// have been valid there.
+/// A refused query (§8.4) is `query-refused`, drawn over the query in
+/// plain output; in JSON its message names the §8.4 code, the span in
+/// Unicode scalar values and what was expected there.
 pub fn parse_query(words: &[String], json: bool) -> Result<PimdirQuery> {
     let query = words.join(" ");
     PimdirQuery::parse(&query).map_err(|err| {
@@ -743,10 +732,8 @@ mod tests {
         format!("Message-ID: <{id}@x.org>\r\n{headers}\r\n\r\n{body}\r\n").into_bytes()
     }
 
-    /// A store whose `imap` source syncs `imap/INBOX`, holding three
-    /// mails with their bodies (`a`, a reply `b`, a flagged `c`) and one
-    /// whose body was never fetched (`d`), indexed; and the client
-    /// reading it.
+    /// An indexed `imap/INBOX` holding `a`, its reply `b`, a flagged `c`
+    /// and a bodiless `d`, and the client reading it.
     fn indexed_store() -> (tempfile::TempDir, PimdirClient) {
         let dir = tempfile::tempdir().unwrap();
         let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
@@ -939,9 +926,8 @@ mod tests {
         );
     }
 
-    /// A hit whose message the store cannot read is an item error coded
-    /// `message-unreadable`, the other hits listed, by message as by
-    /// thread, where the whole search failed.
+    /// An unreadable hit is a `message-unreadable` item error, the other
+    /// hits still listed, by message as by thread.
     #[test]
     fn a_hit_the_store_cannot_read_is_an_item_error() {
         let (dir, client) = indexed_store();
@@ -1186,9 +1172,8 @@ mod tests {
         );
     }
 
-    /// A query past the bounds of SEARCH §8.3 (1,024 characters, 32 groups
-    /// open at once, 128 terms) is refused whole as `limit-exceeded`, in
-    /// the ariadne drawing as in the JSON line.
+    /// A query past SEARCH §8.3 bounds (1,024 characters, 32 open groups,
+    /// 128 terms) is refused whole as `limit-exceeded`, plain and JSON.
     #[test]
     fn a_query_past_its_bounds_is_refused_as_limit_exceeded() {
         let long = "a".repeat(1025);
@@ -1280,9 +1265,8 @@ mod tests {
         assert!(!dir.path().join("index.db").exists(), "the index was built");
     }
 
-    /// An index another draft of SEARCH built is refused as
-    /// `index-version`, saying its sync engine rebuilds an earlier one,
-    /// and left as it is.
+    /// An index of another SEARCH draft is refused as `index-version`,
+    /// pointing at the sync engine, and left as it is.
     #[test]
     fn an_index_of_another_draft_is_refused_as_index_version() {
         let (dir, client) = indexed_store();
@@ -1409,11 +1393,8 @@ mod tests {
         }
     }
 
-    /// A message held without its body is counted whatever the query, and
-    /// leaves the answer incomplete only while a term reads a message's
-    /// body, `thread:` among them, or under `has:attachment` (pimdir
-    /// SEARCH §8.2): a mailbox listed and not fetched answers a flag, a
-    /// date or an address whole.
+    /// A bodiless message is counted, and leaves the answer incomplete only
+    /// for body terms, `thread:` and `has:attachment` (SEARCH §8.2).
     #[test]
     fn a_bodiless_message_is_incomplete_only_while_a_term_reads_it() {
         let (dir, client) = indexed_store();
@@ -1457,10 +1438,8 @@ mod tests {
         }
     }
 
-    /// A body the index could not read, parse or decrypt is counted
-    /// whatever the query (pimdir SEARCH §8.2), and leaves the answer
-    /// incomplete only while a term reads bodies: a header query over the
-    /// same mailbox is whole.
+    /// A body the index could not read, parse or decrypt is counted, and
+    /// leaves only a body query incomplete (pimdir SEARCH §8.2).
     #[test]
     fn an_unread_body_is_incomplete_only_while_a_term_reads_bodies() {
         use io_pimdir::search::coverage::PimdirSearchReads;

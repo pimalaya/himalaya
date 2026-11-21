@@ -81,10 +81,8 @@ impl From<PopAccessWindowArg> for GmailPopAccessWindow {
     }
 }
 
-/// Folds a `--enable` / `--disable` flag pair into a tri-state:
-/// `Some(true)` to enable, `Some(false)` to disable, `None` to leave
-/// the current value unchanged. The two flags are mutually exclusive
-/// at the clap layer.
+/// Folds a `--enable` / `--disable` pair into a tri-state, `None` leaving
+/// the value unchanged; clap makes the two flags mutually exclusive.
 pub fn enabled_flag(enable: bool, disable: bool) -> Option<bool> {
     if enable {
         Some(true)

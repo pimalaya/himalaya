@@ -68,10 +68,8 @@ pub fn decode_charset(label: &str, bytes: &[u8]) -> String {
     }
 }
 
-/// The value of a parameter written plainly (`name=value` or
-/// `name="value"`, not the RFC 2231 forms) in a `Content-Type` or
-/// `Content-Disposition` value, unquoted; `None` when absent or when an
-/// RFC 2231 form of it is there too.
+/// The unquoted value of a plain `name=value` or `name="value"` parameter;
+/// `None` when absent or when an RFC 2231 form of it is there too.
 pub fn plain_param(value: &str, name: &str) -> Option<String> {
     let mut segments = Vec::new();
     let mut current = String::new();
@@ -203,9 +201,8 @@ pub fn decode_words(value: &str) -> String {
         .collect()
 }
 
-/// Reads an encoded word `=?charset?B|Q?text?=` at the start of `input`,
-/// returning its charset (lowercased, RFC 2231 language dropped), its
-/// decoded bytes and its length.
+/// The encoded word `=?charset?B|Q?text?=` opening `input`: its charset
+/// (lowercased, RFC 2231 language dropped), decoded bytes and length.
 fn encoded_word(input: &str) -> Option<(String, Vec<u8>, usize)> {
     let body = input.strip_prefix("=?")?;
     let (charset, body) = body.split_once('?')?;

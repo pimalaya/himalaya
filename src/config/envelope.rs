@@ -21,8 +21,7 @@ pub struct EnvelopeListConfig {
     /// `"%F %R"`.
     pub datetime_fmt: Option<String>,
     /// Whether the `Date:` offset is converted to the local timezone
-    /// before formatting, the default `true`; `false` keeps the offset
-    /// the message was sent with.
+    /// (default `true`); `false` keeps the sender's offset.
     pub datetime_local_tz: Option<bool>,
     /// Default `-s/--page-size`, the flag winning when passed and 25
     /// being the hard fallback.
@@ -33,9 +32,8 @@ pub struct EnvelopeListConfig {
 mod tests {
     use crate::config::Config;
 
-    /// The v2 `envelope.list.table` block is an unknown key like any
-    /// other, at the root and in an account, as is an unknown key of
-    /// `envelope.list` and a `mailbox` colour key.
+    /// The v2 `envelope.list.table` block, an unknown `envelope.list` key
+    /// and a `mailbox` colour key are all unknown keys.
     #[test]
     fn envelope_table_is_an_unknown_key() {
         let root = "[envelope.list.table]\nunseen-char = \"N\"\n[accounts.example]\n";

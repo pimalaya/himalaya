@@ -3,26 +3,19 @@
 //! Bridges the unified search query onto the Gmail `messages.list` `q`
 //! syntax, the same one the Gmail search box speaks.
 //!
-//! The filter half becomes one `q` string: leaf conditions map to
-//! operators (`from alice` becomes `from:alice`), conjunctions flatten
-//! into whitespace, disjunctions into brace groups (a conjunction inside
-//! one wrapped in parentheses, see `any_of`), and negations expand
-//! through De Morgan so a `-` only ever prefixes a leaf, the shape Gmail
-//! matches reliably. Two conditions have no Gmail counterpart and are
-//! refused with `search-unsupported` rather than return wrong hits: `flag
-//! answered`, replies being tracked in no searchable way, and flags outside
-//! the set below.
+//! The filter half becomes one `q` string, negations expanded through De
+//! Morgan so a `-` only prefixes a leaf, the shape Gmail matches reliably.
+//! `flag answered` (replies are not searchable) and the keywords are refused
+//! with `search-unsupported` rather than return wrong hits.
 //!
 //! A date clause is sent as Unix seconds bounding the UTC day, Gmail
 //! reading a bare date as midnight in PST. It compares them with the
 //! message's internal date, when Gmail received it, where IMAP and the
 //! local evaluator read the day written in `Date:`.
 //!
-//! The sort half has no server-side counterpart, `messages.list`
-//! ordering being fixed newest-first, so the backend orders the fetched
-//! page with the unified evaluator. The caveat: sorting a page is not
-//! sorting the result set, page boundaries staying in Gmail's default
-//! order.
+//! The sort half has no server-side counterpart, `messages.list` being
+//! fixed newest-first, so the backend sorts the fetched page: page
+//! boundaries stay in Gmail's default order.
 //!
 //! A pattern is a literal: what Gmail would read as an operator inside it
 //! is neutralised (see `value_q`).
@@ -80,9 +73,7 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
     }
 }
 
-/// Negates a filter, expanding through De Morgan so that `not (a and
-/// b)` becomes an OR group of negations and `not (a or b)` an AND of
-/// them, leaving every `-` on a leaf.
+/// Negates a filter through De Morgan, leaving every `-` on a leaf.
 fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
     match filter {
         SearchEmailsFilterQuery::Not(inner) => filter_to_q(inner),
@@ -129,9 +120,8 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
     }
 }
 
-/// The brace group matching `lhs` or `rhs`, each wrapped in parentheses
-/// when it holds more than one term: Gmail reads every term inside braces
-/// as an alternative of its own.
+/// The brace group matching `lhs` or `rhs`, a multi-term side in parentheses
+/// since Gmail reads each term inside braces as an alternative.
 fn any_of(lhs: &str, rhs: &str) -> String {
     format!("{{{} {}}}", group(lhs), group(rhs))
 }
@@ -163,11 +153,9 @@ fn group(q: &str) -> String {
 /// Renders the pattern of `clause` as a Gmail query value matching it
 /// literally, refusing a pattern left with no word.
 ///
-/// Gmail reads `OR`, `AND`, braces and parentheses even inside quotes and
-/// has no escape, so quotes, braces and parentheses become spaces (Gmail
-/// matches words, skipping punctuation) and a standalone `OR` or `AND` is
-/// lowercased (its operators are case-sensitive). Anything but a bare word
-/// is then quoted, so no `-` or `:` reads as an operator.
+/// Gmail reads `OR`, `AND`, braces and parentheses even quoted, with no
+/// escape: those marks become spaces (it matches words), a bare `OR`/`AND`
+/// is lowercased, and the rest is quoted so no `-` or `:` is an operator.
 fn value_q(clause: &SearchEmailsFilterQuery, pattern: &str) -> Result<String> {
     let words: Vec<&str> = pattern
         .split(|c: char| c.is_whitespace() || matches!(c, '"' | '{' | '}' | '(' | ')'))
@@ -198,10 +186,9 @@ fn value_q(clause: &SearchEmailsFilterQuery, pattern: &str) -> Result<String> {
 
 /// The first second of `day` in UTC, as Unix seconds.
 ///
-/// Gmail reads a bare `yyyy/mm/dd` as midnight in the PST timezone, and
-/// takes Unix seconds as an exact instant instead
-/// (<https://developers.google.com/workspace/gmail/api/guides/filtering>),
-/// so every day boundary is sent in seconds, UTC.
+/// Gmail reads a bare `yyyy/mm/dd` as midnight PST but seconds as an exact
+/// instant
+/// (<https://developers.google.com/workspace/gmail/api/guides/filtering>).
 fn day_start(day: NaiveDate) -> i64 {
     day.and_time(NaiveTime::MIN).and_utc().timestamp()
 }
@@ -219,10 +206,8 @@ fn next_day(day: NaiveDate) -> NaiveDate {
     day + Duration::days(1)
 }
 
-/// Maps a unified flag onto its Gmail operator, mirroring the
-/// [`crate::gmail::backend`] label pairs, `clause` being refused whole when
-/// there is none: `\Answered`, Gmail tracking replies in no searchable way,
-/// and the keywords.
+/// Maps a unified flag onto its Gmail operator, as the
+/// [`crate::gmail::backend`] label pairs, refusing `\Answered` and keywords.
 fn flag_q(clause: &SearchEmailsFilterQuery, flag: &Flag) -> Result<String> {
     match flag.iana() {
         Some(IanaFlag::Seen) => Ok("is:read".into()),
@@ -333,9 +318,8 @@ mod tests {
         assert_eq!(q("from f or to t"), "{from:f to:t}");
     }
 
-    /// Gmail reads every blank-separated term inside braces as one
-    /// alternative, so a conjunction under a disjunction keeps its grouping
-    /// in parentheses.
+    /// Gmail reads each term inside braces as an alternative, so a
+    /// conjunction under a disjunction keeps its parentheses.
     #[test]
     fn conjunctions_under_disjunctions_keep_their_group() {
         assert_eq!(

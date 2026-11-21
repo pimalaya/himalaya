@@ -152,9 +152,8 @@ impl ImapClient {
         })
     }
 
-    /// Maps a role (`sent`, `trash`...) onto the mailbox whose special-use
-    /// attribute names it, a mailbox literally named so winning; any other
-    /// name passes through without a round trip.
+    /// Maps a role (`sent`, `trash`...) onto its special-use mailbox, one
+    /// literally named so winning; other names pass through untouched.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match MailboxRole::known(mailbox) {
             None | Some(MailboxRole::Inbox) => Ok(mailbox.to_string()),
@@ -192,9 +191,8 @@ impl ImapClient {
         Ok(())
     }
 
-    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
-    /// messages the mailbox holds: the `EXISTS` of the `SELECT` the
-    /// listing sends anyway.
+    /// [`Self::list_envelopes`] beside the mailbox's message count, the
+    /// `EXISTS` of the `SELECT` the listing sends anyway.
     pub fn list_envelopes_counted(
         &mut self,
         mailbox: &str,
@@ -317,10 +315,8 @@ impl ImapClient {
         })
     }
 
-    /// The UIDs the search under `criteria` lists that an instant of
-    /// `instants` does not hold: the messages of each instant's band
-    /// ([`InstantBand`]) are searched, their dates fetched, and a message
-    /// sent on the wrong side of any instant, or undated, is left out.
+    /// The UIDs under `criteria` that an instant does not hold: those of
+    /// each [`InstantBand`] dated on its wrong side, or undated.
     fn outside_instants(
         &mut self,
         criteria: &Vec1<SearchKey<'static>>,
@@ -390,12 +386,9 @@ impl ImapClient {
     /// Adds, sets or removes flags on a UID set, returning how many of
     /// the UIDs exist in the mailbox.
     ///
-    /// `UID STORE` answers `OK` for UIDs that match nothing (RFC 3501
-    /// section 6.4.8), so the untagged `FETCH` echoes are the first
-    /// count. A server is free to skip the echo of a message whose flags
-    /// did not change, so fewer echoes than UIDs is settled by a
-    /// `UID SEARCH` on the same set. A UID found by neither is an item
-    /// error.
+    /// `UID STORE` answers `OK` for UIDs matching nothing (RFC 3501 §6.4.8)
+    /// and may skip unchanged echoes, so too few `FETCH` echoes are settled
+    /// by a `UID SEARCH`; a UID found by neither is an item error.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -429,9 +422,8 @@ impl ImapClient {
         Ok(found_uids(ids, &present))
     }
 
-    /// Fetches one message's raw RFC 5322 bytes and its flags, marking it
-    /// seen only when asked, the mailbox named by role as a listing names
-    /// it.
+    /// Fetches one message's raw RFC 5322 bytes and flags, marking it seen
+    /// only when asked.
     pub fn get_message(
         &mut self,
         mailbox: &str,
@@ -575,13 +567,9 @@ impl ImapClient {
 
     /// Moves a UID set between two mailboxes.
     ///
-    /// With RFC 6851 MOVE this is a single `UID MOVE`. Without it, it is
-    /// the sequence RFC 6851 §1 describes for such servers: `UID COPY`,
-    /// then `\Deleted` and, when RFC 4315 UIDPLUS is advertised, a
-    /// `UID EXPUNGE` of the source UIDs really copied (see
-    /// `Self::copied_uids`). Without UIDPLUS the messages stay flagged
-    /// in the source, as `delete_messages` already does in the trash. A
-    /// plain `EXPUNGE` would also remove every other `\Deleted` message.
+    /// Without RFC 6851 MOVE: `UID COPY`, `\Deleted`, then with UIDPLUS a
+    /// `UID EXPUNGE` of the UIDs really copied; without it they stay flagged,
+    /// a plain `EXPUNGE` removing every other `\Deleted` message too.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
@@ -646,10 +634,8 @@ impl ImapClient {
         Ok(outcome)
     }
 
-    /// Creates `name` at the top, or under `parent` joined by the
-    /// server's hierarchy delimiter, returning the new mailbox's id, its
-    /// full name. A NAME holding the delimiter is refused, NAME being one
-    /// level.
+    /// Creates the one level `name` at the top or under `parent`, returning
+    /// its full name; a NAME holding the delimiter is refused.
     pub fn create_mailbox(&mut self, name: &str, parent: Option<&str>) -> Result<String> {
         let delimiter = self.delimiter()?;
         if let Some(delimiter) = delimiter {
@@ -684,9 +670,8 @@ impl ImapClient {
         }
     }
 
-    /// The failure of a `CREATE` of `path`, under `mailbox-duplicate` when
-    /// the server names the mailbox as existing (`ALREADYEXISTS`, RFC 5530
-    /// section 3) or, refusing it with no code, lists it.
+    /// A refused `CREATE`, `mailbox-duplicate` on `ALREADYEXISTS` (RFC 5530
+    /// §3) or on an uncoded refusal of a mailbox the server lists.
     fn create_refusal(&mut self, path: &str, err: ImapClientError) -> anyhow::Error {
         let (exists, refused) = match err.status() {
             Some(status) => {
@@ -714,9 +699,8 @@ impl ImapClient {
         }
     }
 
-    /// Renames the last level of `mailbox` to `name`, its parent kept,
-    /// returning the mailbox's new id, its full name. A NAME holding the
-    /// delimiter is refused, NAME being one level.
+    /// Renames the last level of `mailbox` to `name`, returning its new full
+    /// name; a NAME holding the delimiter is refused.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
         let path = match self.delimiter()? {
             Some(delimiter) => {
@@ -749,12 +733,9 @@ impl ImapClient {
 
     /// Explains the server's refusal of a command addressing `mailbox`.
     ///
-    /// A `NO` coded `NONEXISTENT` (RFC 5530 section 3) or `TRYCREATE`
-    /// (RFC 3501 section 6.3.11) is `mailbox-not-found`. A plain `NO`
-    /// costs one `LIST`: `mailbox-not-found` when it lists no such
-    /// mailbox, the server's error otherwise. With `delimiter` given, a
-    /// `NO` on a mailbox holding others names them. Any other failure
-    /// stays the server's error, which `sources` keeps.
+    /// `NONEXISTENT` (RFC 5530 §3), `TRYCREATE` (RFC 3501 §6.3.11) or a plain
+    /// `NO` whose `LIST` finds nothing is `mailbox-not-found`; with
+    /// `delimiter`, a `NO` on a mailbox holding others names them.
     fn explain(
         &mut self,
         mailbox: &str,
@@ -859,15 +840,11 @@ impl ImapClient {
         Ok(rows)
     }
 
-    /// Permanently deletes a UID set from the trash, returning how many
-    /// of the UIDs the mailbox held and whether the mailbox removes them
-    /// rather than flag them, whatever it held.
+    /// Permanently deletes a UID set from the trash, returning how many it
+    /// held and whether the mailbox removes or only flags, even if none.
     ///
-    /// They are flagged `\Deleted`, then `UID EXPUNGE`d one by one when
-    /// the server advertises RFC 4315 UIDPLUS, which leaves every other
-    /// `\Deleted` message alone. Without it they are only flagged. The
-    /// count comes from the STORE echoes, else from a `UID SEARCH UID`
-    /// run before the expunge.
+    /// Only RFC 4315 UIDPLUS `UID EXPUNGE` leaves every other `\Deleted`
+    /// message alone, so without it the UIDs are only flagged.
     pub fn delete_messages(
         &mut self,
         mailbox: &str,
@@ -894,9 +871,8 @@ impl ImapClient {
         Ok(outcome.map(|count| (count, removes)))
     }
 
-    /// The UIDs of `requested` a `UID STORE` found, from its `echoes` when
-    /// they number `asked`, else from a `UID SEARCH` of the set, a server
-    /// being free to skip the echo of a message whose flags did not change.
+    /// The UIDs a `UID STORE` found: its `echoes` when they number `asked`,
+    /// else a `UID SEARCH`, a server being free to skip unchanged echoes.
     fn stored_uids(
         &mut self,
         echoes: ImapOutput<BTreeMap<NonZeroU32, Vec1<MessageDataItem<'static>>>>,
@@ -926,16 +902,8 @@ impl ImapClient {
     /// The source UIDs a `UID COPY` of `requested` really copied, the
     /// source still selected.
     ///
-    /// A RFC 4315 `COPYUID` lists exactly those, so it answers alone,
-    /// including Mailo's, whose forbidden UIDVALIDITY 0 io-imap still
-    /// reads ([#781]). Without one the tagged `OK` says nothing of what
-    /// matched: a server without UIDPLUS never sends one, a UIDPLUS
-    /// server sends none when nothing matched (an `OK` all the same,
-    /// RFC 9051 §6.4.9), and one malformed beyond that deviation is
-    /// reported as missing. `COPY` leaves the source untouched, so a
-    /// `UID SEARCH` of the requested UIDs still there finds the ones
-    /// copied. A `COPYUID` counting more than the `limit` UIDs asked is
-    /// read as missing too, a server being free to announce billions.
+    /// An RFC 4315 `COPYUID` answers alone (even with UIDVALIDITY 0, [#781]);
+    /// else, or over `limit`, a `UID SEARCH` of the untouched source does.
     ///
     /// [#781]: https://github.com/pimalaya/himalaya/issues/781
     fn copied_uids(
@@ -1191,10 +1159,10 @@ fn flag_from(flag: &Flag) -> ImapFlag<'static> {
     }
 }
 
-/// Refuses a keyword the mailbox would keep for the session only, its
-/// `PERMANENTFLAGS` listing neither it nor `\*` (RFC 3501 section 7.1), so
-/// a flag never seems set and then vanishes. The system flags are left
-/// to the server.
+/// Refuses a keyword `PERMANENTFLAGS` lists neither by name nor as `\*`
+/// (RFC 3501 §7.1), so a flag never seems set and then vanishes.
+///
+/// The system flags are left to the server.
 fn refuse_impermanent(mailbox: &str, flags: &[Flag], permanent: &[FlagPerm<'_>]) -> Result<()> {
     if permanent.contains(&FlagPerm::Asterisk) {
         return Ok(());
@@ -1265,10 +1233,8 @@ fn same_name(left: &str, right: &str) -> bool {
     left == right || (left.eq_ignore_ascii_case("INBOX") && right.eq_ignore_ascii_case("INBOX"))
 }
 
-/// Whether a refusal coded `code` says the mailbox addressed does not
-/// exist: `NONEXISTENT` (RFC 5530 section 3), or `TRYCREATE`, which an
-/// `APPEND`, `COPY` or `MOVE` to a missing mailbox answers (RFC 3501
-/// section 6.3.11, RFC 6851 section 3.3).
+/// Whether `code` says the mailbox does not exist: `NONEXISTENT` (RFC 5530
+/// §3) or `TRYCREATE` (RFC 3501 §6.3.11, RFC 6851 §3.3).
 fn names_no_mailbox(code: &Code<'_>) -> bool {
     match code {
         Code::TryCreate => true,
@@ -1429,18 +1395,14 @@ fn sort_criteria(sort: Option<&[SearchEmailsSorter]>) -> Vec1<SortCriterion> {
 /// Translates a unified filter into an IMAP search key, its negations
 /// pushed down to the single keys.
 ///
-/// `NOT` then only ever applies to one non-composite key: iCloud reads
-/// `NOT OR a b` as matching everything and `NOT NOT a` as `NOT a`, and
-/// refuses `NOT (a b)`. The rewrite (De Morgan, double negations
-/// cancelled) means the same on every server.
+/// `NOT` then only wraps a single key: iCloud reads `NOT OR a b` as all,
+/// `NOT NOT a` as `NOT a`, and refuses `NOT (a b)`.
 fn convert_filter(filter: &SearchEmailsFilterQuery) -> Result<SearchKey<'static>> {
     convert_filter_with(filter, false, true)
 }
 
-/// Translates `filter`, or its negation when `negated` holds, `root`
-/// telling it sits on the chain of `and` from the root, where an instant
-/// is searched by the days around it and checked once fetched
-/// ([`InstantBand`]); elsewhere one is refused.
+/// Translates `filter` or its negation; an instant is searched by its
+/// [`InstantBand`] when `root` (on the root `and` chain), else refused.
 fn convert_filter_with(
     filter: &SearchEmailsFilterQuery,
     negated: bool,
@@ -1520,11 +1482,11 @@ fn convert_filter_with(
     }
 }
 
-/// The days around an instant whose messages may be sent on either side
-/// of it, a `Date:` naming its day in its own offset (UTC-12:00 to
-/// UTC+14:00): from the day before the instant's UTC day, up to and
-/// excluding the second day after it. A message dated before the band is
-/// sent before the instant, one dated on or after its end after it.
+/// The days whose messages may be sent on either side of an instant, a
+/// `Date:` day being in its own offset (UTC-12:00 to UTC+14:00).
+///
+/// It runs from the day before the instant's UTC day to, excluded, the
+/// second day after; a message dated outside lies on that side.
 struct InstantBand {
     /// The first day of the band.
     first: chrono::NaiveDate,
@@ -1827,9 +1789,8 @@ mod tests {
         assert_eq!(root_message_ids(query.filter.as_ref()), ["a@b.org"]);
     }
 
-    /// An instant on the chain of `and` from the root is searched by the
-    /// days of its band, and refused under `or` or `not`, where no check
-    /// of the fetched dates holds.
+    /// An instant on the root `and` chain is searched by its band, refused
+    /// under `or` or `not`, where no check of the fetched dates holds.
     #[test]
     fn an_instant_is_searched_by_its_band_on_the_root_chain_alone() {
         assert_eq!(
@@ -1853,8 +1814,7 @@ mod tests {
     }
 
     /// The messages of an instant's band are kept by their fetched dates:
-    /// of three sent on 14 November 2026 at 09:00, 11:00 and 12:00 (UTC+1),
-    /// `after` 10:00 keeps the last two.
+    /// `after` 10:00 keeps those sent at 11:00 and 12:00, not 09:00.
     #[test]
     fn an_instant_keeps_the_messages_on_its_side() {
         use std::{
@@ -1981,9 +1941,8 @@ mod tests {
         assert_eq!(envelope.from[0].email, "a@example.org");
     }
 
-    /// The markers of an ENVELOPE group (RFC 3501 §7.4.2) are no address:
-    /// an empty group lists none, as the header does on Maildir and mbox,
-    /// and a group lists its members.
+    /// ENVELOPE group markers (RFC 3501 §7.4.2) are no address: a group
+    /// lists its members alone, an empty one none, as on Maildir and mbox.
     #[test]
     fn an_envelope_group_lists_its_members_alone() {
         const LINE: &[u8] = b"* 1 FETCH (UID 7 ENVELOPE (NIL NIL \
@@ -2238,9 +2197,8 @@ mod tests {
             )
         }
 
-        /// A `FETCH` answer holding a whole line, one whose
-        /// `BODYSTRUCTURE` nests seven multiparts ([#801]), one whose
-        /// `UID` does not decode and one that does not scan.
+        /// `FETCH` lines: a whole one, a seven-multipart `BODYSTRUCTURE`
+        /// ([#801]), an undecodable `UID` and one that does not scan.
         ///
         /// [#801]: https://github.com/pimalaya/himalaya/issues/801
         fn fetch_lines() -> String {
@@ -2415,9 +2373,8 @@ mod tests {
             assert_eq!(total, Some(3));
         }
 
-        /// A `CREATE` the server refuses naming the mailbox as existing,
-        /// or refuses without a code while listing the mailbox, is
-        /// `mailbox-duplicate`; any other refusal keeps its own code.
+        /// A `CREATE` refused as existing, or uncoded on a listed mailbox,
+        /// is `mailbox-duplicate`; any other refusal keeps its own code.
         #[test]
         fn a_create_of_an_existing_mailbox_is_a_duplicate() {
             let duplicate = Some(ErrorCode::MailboxDuplicate);
@@ -2601,10 +2558,8 @@ mod tests {
             assert_eq!(run(PLAIN, &[1], none, delete(&["999"])).0, 0);
         }
 
-        /// Whether a trash delete removes says how the mailbox deletes,
-        /// whatever it found: a UIDPLUS trash removes even when no id
-        /// was found, so it never reads as flagged and asks for an
-        /// expunge (#814).
+        /// A UIDPLUS trash delete finding no id still says it removes, so it
+        /// never reads as flagged and asks for an expunge (#814).
         #[test]
         fn a_trash_delete_finding_nothing_still_says_how_it_deletes() {
             for (capabilities, removes) in [(UIDPLUS, true), (PLAIN, false)] {
@@ -2657,9 +2612,8 @@ mod tests {
             assert_eq!(error.code, Some(ErrorCode::MailboxUnreadable));
         }
 
-        /// A listing keeps the message of a line decoded in part, beside
-        /// an item error naming the items that did not decode; a line
-        /// whose UID failed, or that does not scan, names no message.
+        /// A line decoded in part lists its message beside an item error;
+        /// a line whose UID failed, or that does not scan, lists none.
         #[test]
         fn a_line_decoded_in_part_lists_its_message_beside_its_error() {
             let (server, handle) = serve(PLAIN, vec![1, 2, 3, 4], none);

@@ -181,9 +181,8 @@ pub fn resolve_account(
     Ok((config, name, account_config))
 }
 
-/// The welcome a person meets when no configuration exists at `path`:
-/// the commands creating it from `sample`, the shipped sample
-/// configuration, or downloading it without one, then `envelope list`.
+/// The welcome shown when no configuration exists at `path`: how to create
+/// it from the shipped `sample` or download it, then `envelope list`.
 pub fn welcome<'a>(
     path: &'a Path,
     config_paths: &'a [PathBuf],
@@ -204,13 +203,9 @@ pub fn welcome<'a>(
 /// Runs a unified command over the session's email client, refusing it
 /// first when the account does not serve what it reaches.
 ///
-/// Checked against the kept client's resolution, or against the
-/// account's blocks before a new client connects, so a refusal costs no
-/// connection and drops no kept client. An account configuring no
-/// transport at all is left to the client's own error, which names the
-/// v1 configuration when that is the cause. `no_copy` says the command
-/// sends keeping no copy (`--no-save`), which a transport filing every
-/// sent message itself refuses.
+/// Checked before connecting, so a refusal costs no connection or kept
+/// client; no transport at all is left to the client's error. `no_copy` is
+/// `--no-save`, which a transport filing every sent message refuses.
 #[cfg(any(backend, feature = "smtp"))]
 fn run_shared<P: Printer>(
     printer: &mut P,
@@ -245,13 +240,11 @@ fn run_shared<P: Printer>(
     account.run(printer, &mut session.email, build, command)
 }
 
-/// Runs a `vacation` command over the client of the backend keeping the
-/// auto-reply: the first configured one `--backend` allows that serves it,
-/// whatever backend stores the mail.
+/// Runs a `vacation` command over the first configured backend `--backend`
+/// allows that serves the auto-reply, whatever backend stores the mail.
 ///
-/// The account is read to resolve it, nothing connecting, so a refusal
-/// costs no connection; the client is the session's protocol one, kept
-/// for the commands after it.
+/// Resolved before connecting, so a refusal costs no connection; the
+/// session keeps the client for the commands after it.
 #[cfg(any(backend, feature = "smtp"))]
 #[cfg_attr(not(any(feature = "jmap", feature = "gmail")), allow(unused_variables))]
 fn run_vacation<P: Printer>(

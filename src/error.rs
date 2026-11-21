@@ -12,13 +12,10 @@
 //! (`PimdirError::code`), spelled the same, so a caller reading every
 //! pimdir app reads one vocabulary.
 //!
-//! A whole command a server refused takes the code of that refusal,
-//! `permission-denied`, `quota-exceeded` or `rate-limited`, read from the
-//! typed error of the protocol that answered it, and an account
-//! pimalaya-config could not take one of the `account-*` codes, read from
-//! its `AccountError`: [`code`] walks the chain through one reader per
-//! protocol, and [`coded`] hands the code to the failure object at every
-//! exit (a one-shot run, a REPL line, an MCP call).
+//! A command a server refused takes the refusal's code (`permission-denied`,
+//! `quota-exceeded`, `rate-limited`), an account pimalaya-config could not
+//! take an `account-*` code: [`code`] reads them off the chain, and
+//! [`coded`] attaches it at every exit (one-shot run, REPL line, MCP call).
 //!
 //! The same codes type an `ItemError`, the failure of one item a command
 //! listing or acting on several could not serve, printed in its `errors`.
@@ -44,34 +41,29 @@ pub enum ErrorCode {
     /// bring it, so the caller waits rather than reports a loss.
     BodyPending,
     /// The message is nested too deep or holds too many parts or header
-    /// lines to be read whole, so it is refused rather than read in
-    /// part.
+    /// lines to be read whole, so it is refused rather than read in part.
     MessageTooComplex,
     /// The command would read its input off stdin inside a session, where
     /// stdin carries the commands: pass it as an argument or a file path.
     StdinTaken,
-    /// An attachment is larger than the server's `--max-attachment-size`:
-    /// one given inline is refused before being decoded, one read before
-    /// being encoded, and nothing was done.
+    /// An attachment exceeds the server's `--max-attachment-size`, refused
+    /// before being decoded or encoded: nothing was done.
     AttachmentTooLarge,
-    /// An attachment given inline is malformed (no file name, both or
-    /// neither of `data` and `text`, bad base64, a bad MIME type): nothing
-    /// was composed.
+    /// An inline attachment is malformed (no file name, both or neither of
+    /// `data` and `text`, bad base64 or MIME type): nothing was composed.
     AttachmentInvalid,
     /// The search query does not parse: nothing was searched.
     SearchInvalid,
     /// The search query holds a clause the backend cannot search:
     /// nothing was searched, no clause dropped.
     SearchUnsupported,
-    /// The account's backend does not serve the verb, or the option of
-    /// it asked for: nothing was done. The message names the capability
-    /// and what serves it instead.
+    /// The backend does not serve the verb or the option asked: nothing was
+    /// done. The message names the capability and what serves it instead.
     CapabilityMissing,
     /// The mailbox named does not exist: nothing was done.
     MailboxNotFound,
-    /// The mailbox a create names exists already: the store lists it, or
-    /// has its creation queued, or the server answered that it exists.
-    /// Nothing was created nor staged.
+    /// The mailbox exists already (listed, queued for creation, or so the
+    /// server answered): nothing was created nor staged.
     MailboxDuplicate,
     /// A message id given is not in the mailbox: an item error beside what
     /// was done, or the failure of a command reading that one message.
@@ -98,9 +90,8 @@ pub enum ErrorCode {
     RateLimited,
     /// The server refused a recipient, so the message reached nobody.
     RecipientRefused,
-    /// The pimdir store is of another format version than Himalaya's:
-    /// upgrade Himalaya, or sync the store out with its engine and set it
-    /// aside.
+    /// The pimdir store has another format version: upgrade Himalaya, or
+    /// sync the store out with its engine and set it aside.
     StoreVersion,
     /// The pimdir store has no schema yet: its sync engine creates it.
     StoreUncreated,
@@ -119,9 +110,8 @@ pub enum ErrorCode {
     /// The pimdir store's sync state was written by another version of
     /// its sync engine.
     SyncVersion,
-    /// Another writer holds the store's lock: the pimdir store's write
-    /// lock, or the dotlock or fcntl lock of an mbox file past
-    /// `mbox.lock.timeout`. Retry.
+    /// Another writer holds the pimdir write lock, or an mbox dotlock or
+    /// fcntl lock past `mbox.lock.timeout`. Retry.
     StoreBusy,
     /// A sync owns the pimdir store: retry once it ends.
     StoreOwned,
@@ -218,8 +208,7 @@ impl ErrorCode {
 }
 
 /// Gives a failure the code of the account or server refusal its chain
-/// carries, its messages kept, as the report reads it (see
-/// [`with_code`]).
+/// carries, its messages kept (see [`with_code`]).
 pub fn coded(err: Error) -> Error {
     with_code(err, typed_code)
 }
@@ -233,9 +222,8 @@ pub fn code(err: &Error) -> Option<ErrorCode> {
 /// A reader of one kind of typed errors, coding those it knows.
 type Reader = fn(&(dyn std::error::Error + 'static)) -> Option<ErrorCode>;
 
-/// The code a typed error of `err`'s chain names, the account taken or
-/// the refusal of the server that answered: the first cause a reader
-/// codes.
+/// The code of the first cause in `err`'s chain a reader codes: the account
+/// taken, or the refusal of the server that answered.
 fn typed_code(err: &Error) -> Option<ErrorCode> {
     let readers: &[Reader] = &[
         account_code,
@@ -277,9 +265,8 @@ pub fn mailbox_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MailboxNotFound, message.into()).into()
 }
 
-/// The failure of a command naming a mailbox the server does not hold,
-/// under `mailbox-not-found`, worded `message`, `cause` what the server
-/// answered kept in `sources`.
+/// The `mailbox-not-found` failure, worded `message`, the server's answer
+/// `cause` kept in `sources`.
 #[cfg(any(feature = "imap", feature = "msgraph"))]
 pub fn unknown_mailbox(message: String, cause: impl Into<Error>) -> Error {
     with_code(cause.into(), |_| Some(ErrorCode::MailboxNotFound)).context(message)
@@ -302,9 +289,8 @@ pub fn mailbox_duplicate(name: &str) -> Error {
     .into()
 }
 
-/// The failure of a create naming the mailbox `name` the backend or the
-/// store answered exists already, under `mailbox-duplicate`, `cause` what
-/// it answered kept in `sources`.
+/// The `mailbox-duplicate` failure of creating `name`, the backend's or
+/// store's answer `cause` kept in `sources`.
 #[cfg(any(
     feature = "imap",
     feature = "jmap",
@@ -336,9 +322,8 @@ pub fn message_not_found(message: impl Into<String>) -> anyhow::Error {
     CodedError::new(ErrorCode::MessageNotFound, message.into()).into()
 }
 
-/// The failure of a command reading the message `id` the server does not
-/// know, under `message-not-found`, `cause` what it answered kept in
-/// `sources`.
+/// The `message-not-found` failure of reading `id`, the server's answer
+/// `cause` kept in `sources`.
 #[cfg(any(feature = "gmail", feature = "msgraph"))]
 pub fn unknown_message(id: &str, cause: impl Into<Error>) -> Error {
     with_code(cause.into(), |_| Some(ErrorCode::MessageNotFound))

@@ -14,9 +14,7 @@ pub struct SmtpConfig {
     ///
     /// A bare authority takes `smtps://`, implicit TLS. A full URL is used
     /// verbatim, `smtp://` being cleartext with an optional STARTTLS
-    /// upgrade. Mirrors [`JmapConfig::server`].
-    ///
-    /// [`JmapConfig::server`]: crate::config::jmap::JmapConfig::server
+    /// upgrade.
     pub server: String,
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]

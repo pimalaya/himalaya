@@ -99,9 +99,8 @@ mod tests {
         },
     };
 
-    /// Each settings listing prints Gmail's answer as sent, under Gmail's
-    /// key, a property io-gmail does not model kept, and `[]` when Gmail
-    /// leaves the key out.
+    /// Each settings listing prints Gmail's answer as sent, under its key,
+    /// and `[]` when Gmail leaves the key out.
     #[test]
     fn the_settings_lists_print_as_gmail_sent_them() {
         let run = |answer: serde_json::Value, path: &str, command: u8| {

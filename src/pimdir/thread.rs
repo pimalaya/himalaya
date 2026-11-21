@@ -98,9 +98,7 @@ impl fmt::Display for PimdirThreadOutput {
 }
 
 impl PimdirThreadOutput {
-    /// The hits in reply order, each with its depth: a message follows the
-    /// earlier one its `In-Reply-To` names, one whose parent the account
-    /// lacks standing at depth 0.
+    /// The hits in `In-Reply-To` order with their depth, an orphan at 0.
     fn reply_order(&self) -> Vec<(usize, usize)> {
         let hits = &self.thread.hits;
         let mut children = vec![Vec::new(); hits.len()];
@@ -195,8 +193,7 @@ mod tests {
         }
     }
 
-    /// Each reply follows the earlier message it answers, its subject one
-    /// step further in, and one whose parent the account lacks starts back
+    /// Each reply follows its parent one step further in, an orphan back
     /// at the margin.
     #[test]
     fn replies_follow_their_parent() {

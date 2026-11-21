@@ -1,10 +1,9 @@
 //! # ManageSieve outcome
 //!
-//! What a typed `sieve` command prints when the server refuses it: the
-//! completion it answered, `NO` or `BYE` with its response code and text,
-//! as the result, and the command exits 3, the server having answered. A
-//! command that gets no completion at all (network, TLS, a response that
-//! does not parse) still fails with the failure object.
+//! A typed `sieve` command the server refuses prints its `NO` or `BYE`
+//! completion, response code and text, as the result and exits 3, the
+//! server having answered. No completion at all (network, TLS, unparsable
+//! response) still fails with the failure object.
 
 use std::fmt;
 
@@ -73,9 +72,8 @@ pub enum SieveOutcome<T> {
     Refused(SieveRefusalOutput),
 }
 
-/// Ends a `sieve` command: its error unchanged, unless the server refused
-/// it, the refusal then printing as the result and ending the command
-/// with the partial-outcome status.
+/// Ends a `sieve` command: a server refusal prints as the result with the
+/// partial-outcome status, any other error is returned unchanged.
 pub fn print(printer: &mut impl Printer, result: Result<()>) -> Result<()> {
     let err = match result {
         Ok(()) => return Ok(()),

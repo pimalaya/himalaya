@@ -104,9 +104,8 @@ impl JmapClient {
             .map(|(listed, _)| listed.map(|page| page.envelopes))
     }
 
-    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
-    /// messages the mailbox holds: the `total` the same `Email/query`
-    /// computes.
+    /// Lists envelopes as [`Self::list_envelopes`] does, beside the `total`
+    /// the same `Email/query` computes.
     pub fn list_envelopes_counted(
         &mut self,
         mailbox: &str,
@@ -197,9 +196,8 @@ impl JmapClient {
         })
     }
 
-    /// Adds, sets, or removes `flags` (JMAP keywords) on the ids of `ids`
-    /// that `mailbox` holds, returning how many were updated beside the
-    /// error of each id not updated.
+    /// Applies `flags` (keywords) to the ids `mailbox` holds, returning how
+    /// many were updated beside each other id's error.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -254,10 +252,10 @@ impl JmapClient {
         Ok(written(self.email_set(args)?))
     }
 
-    /// The emails of `ids` that `mailbox` holds, each with the mailboxes
-    /// holding it (`Email/get` of `mailboxIds`), beside the error of each
-    /// other id. A JMAP id names an email account-wide, so this is what
-    /// scopes a write to the mailbox given.
+    /// The emails of `ids` that `mailbox` holds, with their mailboxes,
+    /// beside each other id's error.
+    ///
+    /// JMAP ids are account-wide, so this scopes a write to the mailbox.
     fn emails_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<EmailMailboxes>> {
         if ids.is_empty() {
             return Ok(Outcome::from(EmailMailboxes::new()));
@@ -280,14 +278,10 @@ impl JmapClient {
         })
     }
 
-    /// Fetches one message's raw RFC 5322 bytes and its flags: `Email/get`
-    /// for the blob id, the keywords and the mailboxes holding the email,
-    /// then `Blob/download`.
+    /// Fetches one message's raw RFC 5322 bytes and its flags.
     ///
     /// The id names the email account-wide, so an email `mailbox` does not
-    /// hold is not found, as on the backends whose ids are the mailbox's.
-    /// The mailbox is resolved through the listing only when it is not
-    /// one of the email's ids already.
+    /// hold is not found, as on the backends of per-mailbox ids.
     pub fn get_message(
         &mut self,
         mailbox: &str,
@@ -357,15 +351,12 @@ impl JmapClient {
         Ok((raw, flags))
     }
 
-    /// Uploads `raw` as a blob then imports it into `mailbox` with the
-    /// requested keywords. Returns the created email id, when the server
-    /// reports one.
+    /// Uploads `raw` then imports it into `mailbox` with the keywords,
+    /// returning the created email id when the server reports one.
     ///
-    /// A server forbidding duplicates (Fastmail) refuses an import of
-    /// bytes the account holds with `alreadyExists` (RFC 8621 section
-    /// 4.8). An email being in several mailboxes at once, the existing one
-    /// is then filed into `mailbox` with the keywords, and its id
-    /// returned: the message ends up in the mailbox, as asked.
+    /// On `alreadyExists` (RFC 8621 section 4.8, a server forbidding
+    /// duplicates), the existing email is filed into `mailbox` with the
+    /// keywords and its id returned, the message landing as asked.
     pub fn add_message(
         &mut self,
         mailbox: &str,
@@ -419,9 +410,8 @@ impl JmapClient {
         Ok(Some(existing_id))
     }
 
-    /// Copies the ids of `ids` that `from` holds into `to`, adding `to`
-    /// to their mailboxes, and returns how many were copied beside the
-    /// error of each id not copied.
+    /// Copies the ids `from` holds into `to` by adding it to their
+    /// mailboxes, returning how many beside each other id's error.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let Outcome {
             value: found,
@@ -439,9 +429,8 @@ impl JmapClient {
         Ok(written(self.email_set(args)?).after(errors))
     }
 
-    /// Moves the ids of `ids` that `from` holds to `to` in one
-    /// `Email/set`, and returns how many were moved beside the error of
-    /// each id not moved.
+    /// Moves the ids `from` holds to `to` in one `Email/set`, returning how
+    /// many beside each other id's error.
     ///
     /// A move onto `from` itself sends nothing: the patch removing `from`
     /// would win over the one adding it, taking the emails out of it.
@@ -465,10 +454,11 @@ impl JmapClient {
         Ok(written(self.email_set(args)?).after(errors))
     }
 
-    /// Removes the ids of `ids` that `mailbox` holds from it, and returns
-    /// how many were removed: an email held there alone is destroyed, one
-    /// another mailbox holds too only leaves `mailbox`. An id not removed
-    /// is an item error.
+    /// Removes the ids `mailbox` holds from it, returning how many beside
+    /// each other id's error.
+    ///
+    /// An email held there alone is destroyed, one held elsewhere too only
+    /// leaves `mailbox`.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let Outcome {
             value: found,
@@ -563,9 +553,8 @@ impl JmapClient {
         Ok(mailbox.to_string())
     }
 
-    /// Deletes `mailbox` with the messages it holds (`Mailbox/set` destroy
-    /// with `onDestroyRemoveEmails`), a message also in another mailbox
-    /// staying there (RFC 8621 section 2.5).
+    /// Deletes `mailbox` with its messages (`onDestroyRemoveEmails`), one
+    /// also elsewhere staying there (RFC 8621 section 2.5).
     pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<()> {
         let args = JmapMailboxSetArgs {
             destroy: Some(vec![mailbox.to_string()]),
@@ -649,18 +638,9 @@ impl JmapClient {
     /// Queues a message for delivery: upload, import as a draft, then
     /// `EmailSubmission/set` under the sending identity.
     ///
-    /// The identity and the mailboxes come from the configuration when it
-    /// names them, and from the account's default identity and the
-    /// `drafts`- and `sent`-role mailboxes otherwise. Once submitted, the
-    /// server moves the email to the sent mailbox, unsets `$draft` and sets
-    /// `$seen` (RFC 8621 section 7.5 `onSuccessUpdateEmail`), so it does
-    /// not stay behind as a draft. A refused submission destroys the email
-    /// the import created.
-    ///
-    /// A server whose session lacks `urn:ietf:params:jmap:submission`
-    /// (RFC 8621 section 7) is refused under `capability-missing` before
-    /// the upload, so no draft is left behind: the dynamic tier of
-    /// `submit`.
+    /// `onSuccessUpdateEmail` (RFC 8621 section 7.5) files it as sent, not a
+    /// draft; a refused submission destroys the import. A session lacking
+    /// the submission capability is `capability-missing` before upload.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
         let submits = self.session().is_some_and(|session| {
             session
@@ -779,9 +759,8 @@ impl JmapClient {
         Ok(())
     }
 
-    /// Resolves the identity to submit under: the configured
-    /// `identity_id`, or the first one `Identity/get` reports, servers
-    /// listing the primary identity first.
+    /// The configured `identity_id`, else the first `Identity/get` reports,
+    /// servers listing the primary identity first.
     fn resolve_identity_id(&mut self) -> Result<String> {
         if let Some(id) = self.config.identity_id.clone() {
             return Ok(id);
@@ -798,13 +777,10 @@ impl JmapClient {
             })
     }
 
-    /// Resolves the mailbox outgoing mail is staged in and the one it is
-    /// filed under once sent: the configured `drafts_mailbox_id` and
-    /// `sent_mailbox_id`, else the mailboxes carrying the `drafts` and
-    /// `sent` roles, read with one `Mailbox/get`.
+    /// The drafts and sent mailboxes, configured or else found by role.
     ///
-    /// Only the drafts mailbox is required, a server without a sent one
-    /// leaving the sent message where it was staged.
+    /// Only drafts is required, a server without a sent mailbox leaving the
+    /// sent message where it was staged.
     fn resolve_send_mailbox_ids(&mut self) -> Result<(String, Option<String>)> {
         let mut drafts = self.config.drafts_mailbox_id.clone();
         let mut sent = self.config.sent_mailbox_id.clone();
@@ -1081,9 +1057,8 @@ fn query_follows(output: &JmapEmailQueryOutput, page: Option<u32>, page_size: Op
     query_page_follows(output.total, listed, page.into(), size.into())
 }
 
-/// Whether a page follows page `page` of `size` items a JMAP query
-/// answered with `listed` ids: below its `total`, else while the page came
-/// back full; never for a page size of 0.
+/// Whether a page follows: below the `total`, else while the page came back
+/// full; never for a page size of 0.
 pub(crate) fn query_page_follows(total: Option<u64>, listed: usize, page: u64, size: u64) -> bool {
     if size == 0 {
         return false;
@@ -1210,15 +1185,9 @@ fn build(query: Option<&SearchEmailsQuery>, mailbox_id: String) -> Converted {
 
 /// Recursively translates `node` into a JMAP filter tree.
 ///
-/// JMAP dates read the received-at, the unified clauses the sent-at. On the
-/// chain of `and` from the root, `post_filters` is given: a date leaf
-/// over-approximates on the wire and pushes a [`PostFilter`] re-checking
-/// the sent-at exactly, every residual having to hold: a message being
-/// received no earlier than it is sent, the first instant of its day in
-/// any offset (10:00 UTC the day before, at UTC+14:00) bounds the
-/// received-at from below, an offset east of UTC included. Under `or` or
-/// `not` a residual cannot be ANDed onto the whole result, so a date leaf
-/// there reads the received-at day alone.
+/// JMAP dates read the received-at, unified clauses the sent-at: on the root
+/// `and` chain a date leaf widens to its day's earliest instant in any
+/// offset and pushes a [`PostFilter`]; under `or`/`not` it reads received-at.
 fn convert_filter(
     node: &SearchEmailsFilterQuery,
     mut post_filters: Option<&mut Vec<PostFilter>>,
@@ -1508,12 +1477,11 @@ mod tests {
         }
     }
 
-    /// A message dated in an offset east of UTC is received the day
-    /// before in UTC: the wire filter keeps it for the residual to judge
-    /// on its sent day, as the header writes it.
-    /// An instant on the chain of `and` bounds the received-at from below
-    /// and is re-checked on the sent-at; under `or` it reads the received-at
-    /// alone.
+    /// On the `and` chain an instant bounds the received-at from below and
+    /// is re-checked on the sent-at; under `or` it reads received-at alone.
+    ///
+    /// A message sent east of UTC is received the day before in UTC, so the
+    /// wire keeps it for the residual to judge.
     #[test]
     fn an_instant_bounds_the_received_at_and_rechecks_the_sent_at() {
         let before = sent_on("2026-11-14T09:59:59+01:00");
@@ -1809,10 +1777,8 @@ mod tests {
             jmap::{cli::JmapCommand, client::JmapClient, email::cli::JmapEmailCommand},
         };
 
-        /// The response a scripted server gives a method call: its name
-        /// (`error` for a method error, `problem` for a request refused
-        /// whole, answered 400 with the arguments as its body) and its
-        /// arguments.
+        /// A scripted method response, named `error` for a method error and
+        /// `problem` for a whole request refused 400, with its arguments.
         type Answer = (&'static str, Value);
 
         fn created() -> Answer {
@@ -1997,9 +1963,8 @@ mod tests {
             assert_eq!(code, Some(ErrorCode::MessageNotFound), "{err}");
         }
 
-        /// A create the server refuses while a sibling holds the name is
-        /// `mailbox-duplicate`; one refused with no such sibling, the
-        /// namesake under another parent, keeps its refusal uncoded.
+        /// A create refused while a sibling holds the name is
+        /// `mailbox-duplicate`; a namesake elsewhere leaves it uncoded.
         #[test]
         fn a_create_of_an_existing_mailbox_is_a_duplicate() {
             let refused = || {
@@ -2052,9 +2017,8 @@ mod tests {
             )
         }
 
-        /// A read names the mailbox it reads in, as IMAP does: an email the
-        /// mailbox does not hold is `message-not-found`, though JMAP ids
-        /// name emails account-wide, and one it holds is read.
+        /// An email the read's mailbox does not hold is `message-not-found`
+        /// though JMAP ids are account-wide, as on IMAP.
         #[test]
         fn a_read_of_an_email_another_mailbox_holds_is_not_found() {
             let mailboxes = json!({
@@ -2088,9 +2052,8 @@ mod tests {
             assert!(String::from_utf8(raw).unwrap().contains("/download/A/B1"));
         }
 
-        /// `jmap email get` lists the emails found, then an entry of
-        /// `errors` per id the server did not find, and ends as a partial
-        /// outcome.
+        /// `jmap email get` lists the emails found, then one `errors` entry
+        /// per id not found, as a partial outcome.
         #[test]
         fn an_email_get_reports_each_id_not_found() {
             use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};
@@ -2145,9 +2108,8 @@ mod tests {
             assert_eq!(output["errors"][0]["code"], "mailbox-not-found");
         }
 
-        /// `jmap thread get` lists the threads found, then an entry of
-        /// `errors` per id the server did not find, coded
-        /// `thread-not-found`, and ends as a partial outcome.
+        /// `jmap thread get` lists the threads found, then a
+        /// `thread-not-found` entry per id not found, as a partial outcome.
         #[test]
         fn a_thread_get_reports_each_id_not_found() {
             use pimalaya_cli::{error::PartialOutcome, printer::CapturePrinter};

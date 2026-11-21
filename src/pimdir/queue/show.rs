@@ -73,13 +73,11 @@ pub enum PimdirQueueState {
     Pending,
     /// Given up on by the sync engine; `error` says why.
     Parked,
-    /// Sent by the sync engine, which cannot tell whether it took effect:
-    /// it may have, and waits for the engine to confirm it or for a
-    /// cancellation; `error` holds what the engine recorded.
+    /// Sent, maybe in effect, awaiting confirmation or cancellation;
+    /// `error` holds what the engine recorded.
     Unconfirmed,
-    /// Applied or performed by the sync engine (a message sent, a mailbox
-    /// created, renamed or deleted); `itemId` is the message it acted on,
-    /// and `refusals` the servers that refused the change it led to.
+    /// Applied or performed; `itemId` is the message it acted on, and
+    /// `refusals` the servers that refused the change it led to.
     Applied,
 }
 
@@ -91,8 +89,7 @@ pub struct PimdirQueueShowOutput {
     /// The queue row id.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE
-    /// §4.5): the handle given, or the bare id given named under this
-    /// store's identity.
+    /// §4.5), a bare id given named under this store.
     pub handle: String,
     /// The row's action as the store holds it, `null` once applied.
     pub kind: Option<String>,
@@ -102,9 +99,8 @@ pub struct PimdirQueueShowOutput {
     /// The link id of the message the row creates, `null` when it creates
     /// none or is applied.
     pub link_id: Option<String>,
-    /// The id of the stored message the row addresses, or of the one an
-    /// applied row acted on (the one an add created), as `envelope list`
-    /// prints it; `null` when there is none.
+    /// The id of the message the row addresses or acted on (one an add
+    /// created), as `envelope list` prints it; `null` when there is none.
     pub item_id: Option<String>,
     /// The process that staged the row, `null` once applied.
     pub producer: Option<String>,
@@ -129,10 +125,8 @@ pub struct PimdirQueueShowOutput {
     pub refusals: Vec<PimdirQueueRefusal>,
 }
 
-/// A refusal standing on the message an applied row acted on (pimdir
-/// STORAGE §15.4): the server of `source` refused for good the change the
-/// row led to, and the sync engine holds it until the message changes
-/// again.
+/// A change the row led to that `source` refused for good (pimdir STORAGE
+/// §15.4), held until the message changes again.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueRefusal {
@@ -400,9 +394,8 @@ mod tests {
         assert_eq!(json["state"], "pending");
     }
 
-    /// An applied row whose change a server refused for good shows applied,
-    /// then a line per refusal with its source and reason (pimdir STORAGE
-    /// §15.4), and the JSON lists them.
+    /// An applied row shows a line per refusal with its source and reason
+    /// (pimdir STORAGE §15.4), and the JSON lists them.
     #[test]
     fn an_applied_row_prints_the_refusals_on_its_message() {
         let row = PimdirQueueShowOutput::new(
@@ -443,9 +436,8 @@ mod tests {
         );
     }
 
-    /// An intent its performer sent and could not confirm is no failure
-    /// and no success (pimdir STORAGE §15.2): it reads `unconfirmed`, with
-    /// what the performer recorded, never `parked`.
+    /// A sent, unconfirmed intent (pimdir STORAGE §15.2) reads
+    /// `unconfirmed` with what the performer recorded, never `parked`.
     #[test]
     fn an_unconfirmed_row_says_it_may_have_taken_effect() {
         let row = PimdirQueueShowOutput::new(

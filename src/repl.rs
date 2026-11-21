@@ -4,12 +4,10 @@
 //! CLI's own commands against one account, so each client connects once
 //! rather than once per command.
 //!
-//! pimalaya-cli's [`Repl`] runs the loop: each line split as a shell splits
-//! it, parsed with the one-shot grammar plus `--json` and run over the
-//! [`Session`] kept here, every answer on stdout, the session flags and a
-//! `repl` or `mcp` line refused by name, a `--version` line answered. It
-//! claims stdin, so a command that would read its own input there is
-//! refused (`pimalaya_cli::session::check_stdin`).
+//! pimalaya-cli's [`Repl`] runs the loop: each line shell-split, parsed with
+//! the one-shot grammar plus `--json` and run over the [`Session`] kept
+//! here. It claims stdin, so a command that would read its own input there
+//! is refused (`pimalaya_cli::session::check_stdin`).
 
 use anyhow::Result;
 use clap::Parser;

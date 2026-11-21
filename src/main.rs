@@ -4,6 +4,8 @@
 //! the command over a fresh session and reports its outcome. The crate's
 //! architecture is the library's header (src/lib.rs).
 
+#![forbid(unsafe_code)]
+
 use std::process;
 
 use anyhow::Result;

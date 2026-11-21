@@ -16,9 +16,7 @@ pub struct ImapConfig {
     ///
     /// A bare authority takes `imaps://`, implicit TLS. A full URL is used
     /// verbatim, `imap://` being cleartext with an optional STARTTLS
-    /// upgrade. Mirrors [`JmapConfig::server`].
-    ///
-    /// [`JmapConfig::server`]: crate::config::jmap::JmapConfig::server
+    /// upgrade.
     pub server: String,
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
@@ -83,11 +81,9 @@ pub struct ImapIdConfig {
     pub auto: bool,
     /// Parameters sent with the auto-`ID` command.
     ///
-    /// Unset sends himalaya's canned value for every well-known key
-    /// (`name`, `version`, `vendor`, `support-url`), and an empty map
-    /// sends `ID NIL`. `true` substitutes the canned value for a
-    /// well-known key and `NIL` otherwise, `false` always sends `NIL`,
-    /// and an absent key is not transmitted.
+    /// Unset sends the canned value of each well-known key, an empty map
+    /// `ID NIL`. `true` sends the canned value (`NIL` for other keys),
+    /// `false` sends `NIL`, and an absent key is not sent.
     #[serde(default)]
     pub fields: Option<HashMap<String, bool>>,
 }

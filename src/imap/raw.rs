@@ -94,9 +94,8 @@ impl ImapRawCommand {
     }
 }
 
-/// `command` terminated by CRLF, the last one appended when missing,
-/// refused `usage-invalid` unless each of its commands carries a tag of
-/// its own.
+/// `command` with a final CRLF, refused `usage-invalid` unless each of its
+/// commands carries its own tag.
 fn tagged(mut command: String) -> Result<String> {
     if !command.ends_with('\n') {
         command.push_str("\r\n");

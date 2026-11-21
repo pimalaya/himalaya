@@ -9,11 +9,9 @@
 //! not local still lists, and reads as not fetched rather than as an
 //! error, which is the cue to sync.
 //!
-//! Writes are staged as actions appended to the store's queue for its
-//! owner to apply and push, the reader overlaying them so they show on
-//! the next read. A staged creation has no public id until the owner
-//! applies it, and so no row in a listing, which is what [`queue`] is
-//! for.
+//! Writes are staged on the store's queue for its owner to apply and
+//! push, the reader overlaying them on the next read. A staged creation
+//! has no public id until applied, so no listing row: [`queue`] shows it.
 //!
 //! [`PimdirReader`]: io_pimdir::client::reader::PimdirReader
 

@@ -1,10 +1,9 @@
 //! # Microsoft Graph search
 //!
-//! Translation of the unified search filter into a KQL `$search` value, the
-//! one Graph query reaching the address fields, subject and body, matched as
-//! KQL matches them rather than by substring. Graph refuses `$search`
-//! beside `$filter`, and KQL carries no flag property, so a flag clause is
-//! refused with `search-unsupported` rather than dropped.
+//! The unified filter becomes a KQL `$search`, the one Graph query reaching
+//! addresses, subject and body, matched as KQL does, not by substring.
+//! Graph refuses `$search` beside `$filter` and KQL has no flag property, so
+//! a flag clause is refused with `search-unsupported` rather than dropped.
 //!
 //! <https://learn.microsoft.com/en-us/graph/search-query-parameter>
 
@@ -75,10 +74,8 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
     })
 }
 
-/// Renders a pattern as a KQL value: each word a quoted phrase, escaped
-/// for the `$search` quotes around the whole query, so a word that is KQL
-/// syntax (`OR`, `x:y`, `alpha*`) is matched as a word; several words
-/// group in parentheses. A double quote has no way through.
+/// Renders a pattern as KQL, each word an escaped quoted phrase so KQL
+/// syntax (`OR`, `x:y`, `alpha*`) matches as a word; a `"` is dropped.
 fn value_kql(pattern: &str) -> String {
     let words: Vec<String> = pattern
         .split_whitespace()

@@ -74,9 +74,8 @@ fn mailbox(addrs: &[Address]) -> &str {
     })
 }
 
-/// Extracts the base subject of RFC 5256 section 2.1 from a decoded
-/// subject: blanks collapsed, `(fwd)` trailers, `Re:`, `Fw:` and `Fwd:`
-/// leaders, `[blob]` prefixes and `[fwd: ...]` wrappers stripped.
+/// The RFC 5256 section 2.1 base subject of a decoded subject: blanks
+/// collapsed, `(fwd)`, `Re:`, `Fw:`, `Fwd:`, `[blob]` and `[fwd: ...]` cut.
 pub fn base_subject(subject: &str) -> String {
     let mut base = subject.split_whitespace().collect::<Vec<_>>().join(" ");
 

@@ -268,9 +268,8 @@ fn attachment(mime: &str, filename: String, content: Vec<u8>) -> MimeAttachment 
     }
 }
 
-/// Carries the attachments of the source into the forward, each under
-/// its original or derived file name, leaving bodies and inline
-/// resources to the quoting.
+/// Carries the source's attachments into the forward under their original
+/// or derived names, leaving bodies and inline resources to the quoting.
 fn carry_source_attachments(builder: &mut MimeBuilder, parsed: &MimeCst) -> Result<()> {
     for leaf in part::leaves(parsed) {
         if part::role(leaf.part) != part::PartRole::Attachment {
@@ -369,8 +368,7 @@ fn new_message_id(sender: Option<&str>) -> String {
 
 /// Generates a `Message-ID` on the domain of the sender's address.
 ///
-/// The machine's hostname on the right of the `@` would tell every
-/// recipient the name of the machine and is rarely a domain at all.
+/// The hostname would leak the machine's name and is rarely a domain.
 /// `None` when the address carries no plain domain, the hostname then
 /// being the fallback.
 fn message_id(address: &str) -> Option<String> {
@@ -404,13 +402,11 @@ fn unique_id() -> String {
     format!("{nanos:x}.{:x}.{count}", std::process::id())
 }
 
-/// Splits an address list into its mailboxes, each with its display
-/// name, when it carries one, and its address.
+/// Splits an address list into its mailboxes, each with its display name,
+/// if any, and its address; never empty.
 ///
-/// Handing the builder the whole `Alice <alice@example.org>` as an
-/// address would emit a `To: <Alice <alice@example.org>>` no SMTP
-/// server accepts. A comma inside a quoted display name does not split
-/// the list. The returned list is never empty.
+/// A whole `Alice <alice@example.org>` as an address would emit a `To:` no
+/// SMTP server accepts. A comma in a quoted display name does not split.
 fn parse_mailboxes(value: &str) -> Result<Vec<Mailbox>> {
     let mailboxes = header_mailboxes(&parse_addresses(value.as_bytes()));
 
@@ -560,9 +556,8 @@ fn reply_recipients(source: &MimeEntity) -> Vec<Mailbox> {
         .unwrap_or_default()
 }
 
-/// Derives the carbon-copy recipients of a reply to all: the `To` and
-/// `Cc` of the source, without the account's own addresses nor anyone
-/// already in `to`, and without duplicates, compared ignoring case.
+/// The `Cc` of a reply to all: the source's `To` and `Cc`, minus the
+/// account's own addresses, `to` and duplicates, compared ignoring case.
 fn reply_all_cc(source: &MimeEntity, to: &[String], own: &[&str]) -> Vec<Mailbox> {
     let mut seen: Vec<String> = to
         .iter()

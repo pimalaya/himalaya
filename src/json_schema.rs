@@ -32,11 +32,9 @@ use crate::receipt::IdsReceipt;
 
 /// Builds the command-to-schema registry consumed by `json-schema <DIR>`.
 ///
-/// Each value describes the type the command hands to the printer, and
-/// `himalaya-error` the failure object every command prints instead,
-/// `himalaya-item-error` the error of one item in a result's `errors`. A
-/// command printing one of two types is described by both, through an
-/// enum naming each alternative.
+/// Each value describes what the command prints; `himalaya-error` is the
+/// failure object, `himalaya-item-error` one item of a result's `errors`.
+/// A command printing one of two types gets an enum naming both.
 pub fn registry() -> JsonSchemaRegistry {
     let mut registry = JsonSchemaRegistry::new("himalaya", env!("CARGO_PKG_VERSION"));
 
@@ -834,9 +832,8 @@ mod tests {
 
     use crate::{cli::Cli, json_schema::registry};
 
-    /// The commands printing nothing a schema could describe: the REPL
-    /// and the MCP server speak their own protocols, and a bare
-    /// `himalaya` shows the help.
+    /// The commands printing nothing a schema describes: REPL and MCP speak
+    /// their own protocols, a bare `himalaya` shows the help.
     const SILENT: &[&str] = &["himalaya", "himalaya-repl", "himalaya-mcp"];
 
     #[test]

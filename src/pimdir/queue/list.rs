@@ -95,19 +95,16 @@ impl PimdirQueueListCommand {
     }
 }
 
-/// One row of the store's queue, pending or parked, in the one shape
-/// every Pimalaya program prints it (pimalaya-cli's output contract, "A
-/// queue row keeps one shape"), every key printed.
+/// One pending or parked queue row, every key printed, in the shape every
+/// Pimalaya program uses (pimalaya-cli, "A queue row keeps one shape").
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueRow {
-    /// The queue row id, which `pimdir queue show` and `cancel` take. It
-    /// names a queued action, not a message: a creation has no id until
-    /// the sync engine applies it, and gets a different one then.
+    /// The queue row id `pimdir queue show` and `cancel` take, naming an
+    /// action, not a message (a creation gets its own id once applied).
     pub row: i64,
-    /// The row's handle, its id under the store's identity (pimdir STORAGE
-    /// §4.5), which `pimdir queue show` and `cancel` take and check, a
-    /// restored copy of the store refusing it rather than another row.
+    /// The row's handle (pimdir STORAGE §4.5), so a restored store copy
+    /// refuses it in `queue show` and `cancel` rather than hit another row.
     pub handle: String,
     /// The row's action as the store holds it, never re-spelled: `add`,
     /// `submit`, `set-flags`, `move`, `remove`, `collection-create`, ...
@@ -117,9 +114,8 @@ pub struct PimdirQueueRow {
     /// The link id of the message the row creates, the `id` its write's
     /// receipt printed, `null` when the row creates none.
     pub link_id: Option<String>,
-    /// The id of the stored message the row addresses (a flag change, a
-    /// move, a copy, a removal), as `envelope list` prints it, `null` when
-    /// it addresses none, a creation among them.
+    /// The id of the stored message the row addresses, as `envelope list`
+    /// prints it, `null` when it addresses none (a creation).
     pub item_id: Option<String>,
     /// The process that staged the row.
     pub producer: String,
@@ -160,9 +156,8 @@ pub struct PimdirQueueListOutput {
     pub refused: Vec<PimdirQueueRefused>,
 }
 
-/// A refusal standing on a message of the mailbox (pimdir STORAGE §15.4):
-/// the server of `source` refused for good a change the store applied, and
-/// the sync engine holds it until the message changes again or is removed.
+/// A change `source` refused for good (pimdir STORAGE §15.4), held until
+/// the message changes again or is removed.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PimdirQueueRefused {
@@ -259,9 +254,8 @@ mod tests {
         }
     }
 
-    /// A pending and a parked row print in one shape, every key present,
-    /// as every Pimalaya program prints them, and one line each under the
-    /// way to cancel one.
+    /// A pending and a parked row print in the one shape, every key
+    /// present, one line each under the way to cancel one.
     #[test]
     fn a_pending_and_a_parked_row_keep_one_shape() {
         let output = PimdirQueueListOutput {

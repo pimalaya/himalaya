@@ -124,9 +124,8 @@ pub struct MessageForwardCommand {
 }
 
 impl MessageForwardCommand {
-    /// Fetches the source, builds the forward and hands it to the
-    /// handler, then flags the source as forwarded when the forward was
-    /// sent.
+    /// Builds the forward and hands it to the handler, then flags the
+    /// source as forwarded once sent.
     ///
     /// A server may refuse the `$Forwarded` keyword (RFC 5788), so the flag
     /// is best-effort and never fails a forward already sent.

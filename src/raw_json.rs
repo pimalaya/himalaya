@@ -13,10 +13,10 @@ use serde::Serialize;
 use serde_json::Value;
 use url::Url;
 
-/// The URL of `path` under the API at `base`: a path joined onto it, a
-/// leading `/` dropped, or a full URL taken as is. A URL off the origin of
-/// `base` is refused before any request, coded `request-origin`, so the
-/// bearer token the request carries never leaves for another host.
+/// The URL of `path` under the API at `base`, a full URL taken as is.
+///
+/// A URL off `base`'s origin is refused before any request, coded
+/// `request-origin`, so the bearer token never leaves for another host.
 pub fn api_url(base: &str, path: &str) -> Result<Url> {
     let base = Url::parse(base)?;
     let url = base.join(path.trim_start_matches('/'))?;
@@ -60,9 +60,8 @@ mod tests {
 
     use super::RawJsonOutput;
 
-    /// A path joins the API, a full URL on it stays as given, and a URL off
-    /// its origin is refused coded `request-origin`, whatever its case or
-    /// spelling, the bearer token never leaving for another host.
+    /// A path joins the API, a full URL on it stays, and one off its origin
+    /// is refused `request-origin` whatever its case or spelling.
     #[test]
     fn a_url_off_the_api_is_refused() {
         let base = "https://graph.microsoft.com/v1.0/";

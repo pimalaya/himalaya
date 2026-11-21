@@ -254,9 +254,8 @@ impl PartBytes {
         }
     }
 
-    /// Writes the bytes to stdout and nothing else, or under `--json`
-    /// the part as `{id, mime, filename, size, data}`: what `attachment
-    /// download --stdout` and `message parse --part` print.
+    /// Writes the bytes alone to stdout, or under `--json` the part as `{id,
+    /// mime, filename, size, data}`.
     pub fn print(self, printer: &mut impl Printer) -> Result<()> {
         if printer.is_json() {
             return printer.out(AttachmentDownloadOutput::Part(self));
@@ -274,12 +273,11 @@ impl PartBytes {
     }
 }
 
-/// The name trimmed and stripped of its leading dots, so it is never
-/// hidden, then made one path component by the family's rule
-/// (`pimalaya_cli::sanitize::path_component`, pimdir STORAGE §18): path
-/// separators, control and bidirectional formatting characters replaced,
-/// so a hostile filename header neither escapes the download directory
-/// nor disguises its extension. A name left empty is `attachment`.
+/// The name trimmed, stripped of leading dots so it is never hidden, then
+/// made one path component (pimdir STORAGE §18), empty becoming `attachment`.
+///
+/// A hostile filename neither escapes the download directory nor disguises
+/// its extension.
 fn sanitize(name: &str) -> String {
     let stripped = name.trim().trim_start_matches('.').trim();
     if stripped.is_empty() {
@@ -403,9 +401,8 @@ mod tests {
         assert_eq!(fs::read(path).unwrap(), b"attachment");
     }
 
-    /// An attachment is created readable by its owner alone, whatever the
-    /// umask, so one landing in the shared temporary directory stays
-    /// private.
+    /// An attachment is created owner-only whatever the umask, so one in
+    /// the shared temporary directory stays private.
     #[cfg(unix)]
     #[test]
     fn an_attachment_is_private_to_its_owner() {
@@ -563,9 +560,8 @@ mod tests {
         assert_eq!(sanitize(".hidden"), "hidden");
     }
 
-    /// A name a sender spells with control or bidirectional formatting
-    /// characters, `invoice<RLO>fdp.exe` showing as `invoiceexe.pdf`, is
-    /// saved with each replaced (pimdir STORAGE §18).
+    /// Control and bidirectional characters are replaced, so
+    /// `invoice<RLO>fdp.exe` cannot pose as a PDF (pimdir STORAGE §18).
     #[test]
     fn replaces_control_and_bidi_characters() {
         assert_eq!(sanitize("invoice\u{202E}fdp.exe"), "invoice_fdp.exe");

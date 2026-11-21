@@ -13,10 +13,9 @@ use crate::config::{proxy::ProxyConfig, tls::TlsConfig};
 pub struct JmapConfig {
     /// The JMAP server address, a bare authority or a full URL.
     ///
-    /// A bare authority is discovered through `GET /.well-known/jmap`,
-    /// a full URL reaching the session endpoint directly. The schemes are
-    /// `http` and `https`, a bare authority taking `https`. The host is
-    /// ASCII, an internationalised one written in Punycode (`xn--…`).
+    /// A bare authority takes `https` and is discovered through
+    /// `GET /.well-known/jmap`; a full URL is the session endpoint. An
+    /// internationalised host is written in Punycode (`xn--…`).
     pub server: String,
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]

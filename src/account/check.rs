@@ -356,9 +356,8 @@ fn connect_mbox(mbox_config: &crate::config::mbox::MboxConfig) -> Result<()> {
     Ok(())
 }
 
-/// Opens the pimdir store as a reader, lists its mailboxes, then opens a
-/// producer and probes it, so a missing, foreign or busy store fails here
-/// rather than on the first read or write.
+/// Opens the pimdir store as a reader and a probed producer, so a missing,
+/// foreign or busy store fails here rather than on the first read or write.
 ///
 /// The probe takes and releases the staging lock without waiting on a
 /// collector, and the database's write lock, writing nothing.
@@ -535,11 +534,8 @@ mod tests {
         }
     }
 
-    /// An account reading a pimdir store alone is checked rather than
-    /// refused as declaring no backend, and a store that does not answer
-    /// prints the report naming the backend and why, then ends with the
-    /// partial-outcome status, so a script reads the verdict from the
-    /// exit code and each backend from the report.
+    /// A pimdir-only account is checked, not refused as backendless; a
+    /// dead store is reported with why and exits with the partial status.
     #[test]
     fn a_pimdir_account_is_checked() {
         let dir = tempfile::tempdir().unwrap();
@@ -579,8 +575,7 @@ mod tests {
     }
 
     /// A collector holding the staging lock fails the check at once with
-    /// `store-busy`, a store the reader opens being one a write may still
-    /// not reach, and the check stages nothing into the blob tree.
+    /// `store-busy`, and the check stages nothing into the blob tree.
     #[test]
     fn a_held_staging_lock_fails_the_check_as_busy() {
         let dir = tempfile::tempdir().unwrap();

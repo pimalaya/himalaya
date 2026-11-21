@@ -123,9 +123,8 @@ pub struct PimdirAttachmentEntry {
     pub mime: Option<String>,
     /// Its size in octets, transfer encoding undone.
     pub size: Option<u64>,
-    /// The id of its part in the message, the one `attachment download`
-    /// takes and `attachment list` and `message read` print; `null` when
-    /// the message's body is not local or holds no part at `section`.
+    /// The part id `attachment download` takes; `null` when the body is
+    /// not local or holds no part at `section`.
     pub part: Option<String>,
     /// Its IMAP section in the message (RFC 3501 §6.4.5: `2`, `1.2`),
     /// which `message parse --section` takes.

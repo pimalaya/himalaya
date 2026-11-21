@@ -14,10 +14,10 @@ pub fn encode(bytes: &[u8]) -> String {
     String::from_utf8(encoded).unwrap_or_default()
 }
 
-/// The bytes `data` encodes in the standard alphabet, padding optional,
-/// or `None` when it holds anything else: whitespace, a byte outside the
-/// alphabet, non-zero trailing bits, a lone last symbol or padding past
-/// the last quantum.
+/// The bytes `data` encodes in the standard alphabet, padding optional.
+///
+/// `None` on whitespace, a byte outside the alphabet, non-zero trailing
+/// bits, a lone last symbol or padding past the last quantum.
 pub fn decode_strict(data: &str) -> Option<Vec<u8>> {
     let symbols = data.trim_end_matches('=');
     let padding = data.len() - symbols.len();

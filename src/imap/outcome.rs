@@ -1,11 +1,9 @@
 //! # IMAP outcome
 //!
-//! What an `imap` command prints: the tagged completion of its exchange.
-//! A completion the server accepts prints `status: "OK"` beside the data
-//! the command understood; one it refuses prints `status: "NO"` or
-//! `"BAD"` with the server's text, and the command exits 3, the server
-//! having answered. A command that gets no completion at all (network,
-//! TLS, a stream that does not parse) fails with the failure object.
+//! What an `imap` command prints: the tagged completion of its exchange,
+//! `status: "OK"` beside the data, or `"NO"`/`"BAD"` with the server's text
+//! and exit 3, the server having answered. No completion at all (network,
+//! TLS, unparsable stream) fails with the failure object.
 
 use std::fmt;
 
@@ -81,10 +79,8 @@ impl<T: fmt::Display> fmt::Display for ImapOutcome<T> {
     }
 }
 
-/// Prints the outcome of an IMAP exchange: the data when the server
-/// accepted it, the refusal when it did not, the refusal ending the
-/// command with the partial-outcome status. Any other error is returned
-/// as is.
+/// Prints the data the server accepted, or its refusal with the
+/// partial-outcome status; any other error is returned as is.
 pub fn print<T>(printer: &mut impl Printer, result: Result<T>) -> Result<()>
 where
     T: fmt::Display + Serialize,

@@ -26,9 +26,8 @@ pub struct MaildirConfig {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirKeywordsConfig {
-    /// Whether keywords are resolved through each mailbox's own
-    /// dovecot-keywords file, which maps a lowercase info-section letter
-    /// to a keyword, default `false` leaving those letters unread.
+    /// Whether lowercase info-section letters resolve to keywords through
+    /// each mailbox's dovecot-keywords file (default `false`: unread).
     #[serde(default)]
     pub dovecot: bool,
     /// The body header keywords are read from, unset reading none.
@@ -59,9 +58,8 @@ pub enum MaildirLayoutConfig {
     #[default]
     #[serde(rename = "fs")]
     Fs,
-    /// Maildir++, as Dovecot and Courier lay it out: the root is the
-    /// inbox, and every other Maildir a dot-named sibling of its `cur`,
-    /// `new` and `tmp` (`.a.b`).
+    /// Maildir++ (Dovecot, Courier): the root is the inbox, every other
+    /// Maildir a dot-named sibling of its `cur`, `new` and `tmp` (`.a.b`).
     #[serde(rename = "maildir++")]
     MaildirPlusPlus,
 }

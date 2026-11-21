@@ -63,8 +63,7 @@ mod tests {
     }
 
     /// clap checks argument ids only when a command is built, so a clash
-    /// between flattened arguments would otherwise surface as a panic on
-    /// the first run rather than in the test suite.
+    /// would otherwise panic on the first run rather than in tests.
     #[test]
     fn the_arguments_are_well_formed() {
         Harness::command().debug_assert();

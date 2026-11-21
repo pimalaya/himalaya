@@ -40,9 +40,8 @@ impl From<FormatArg> for GmailMessageFormat {
 }
 
 impl FormatArg {
-    /// The query of a `get` at this format: `format`, then one
-    /// `metadataHeaders` per header asked for, which Gmail honours under
-    /// the metadata format alone.
+    /// The query of a `get` at this format, with one `metadataHeaders` per
+    /// header, which Gmail honours under the metadata format alone.
     pub fn query(self, headers: &[String]) -> Vec<(String, String)> {
         let format = match self {
             Self::Minimal => "minimal",

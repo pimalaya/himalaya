@@ -47,9 +47,8 @@ pub fn to_addresses(list: &[Address<'_>]) -> Vec<crate::unified::email::address:
         .collect()
 }
 
-/// Turns an envelope address into the unified address shape, its personal
-/// name read as `message read` reads a header, `None` when absent or
-/// empty.
+/// The unified address, its name decoded as `message read` decodes a
+/// header, `None` when absent or empty.
 fn to_address(addr: &Address<'_>) -> crate::unified::email::address::Address {
     let name = addr
         .name

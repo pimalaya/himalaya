@@ -126,9 +126,8 @@ impl fmt::Display for GmailMessageGetOutput {
     }
 }
 
-/// The `(label, value)` rows of the leaf parts of a payload, in order:
-/// the part id, then its MIME type, file name, size and the attachment id
-/// `gmail attachments get` takes.
+/// The `(label, value)` rows of a payload's leaf parts, the attachment id
+/// among them being what `gmail attachments get` takes.
 fn leaf_parts(payload: &GmailMessagePayload) -> Vec<(String, String)> {
     if !payload.parts.is_empty() {
         return payload.parts.iter().flat_map(leaf_parts).collect();
@@ -182,13 +181,9 @@ impl From<GmailMessageHeader> for GmailMessageHeaderOutput {
 /// Folds the headers of a payload into output headers, keeping the names
 /// `--header` asked for and all of them when it asked for none.
 ///
-/// The filter runs here because Gmail honours `metadataHeaders` under the
-/// metadata format alone, the full format returning every header whatever
-/// was asked for. Matching is case-insensitive, and both the order and
-/// the repeats survive.
-///
-/// Only the top-level part is read, which is where Gmail puts the message
-/// headers, a nested part carrying its own MIME ones.
+/// Filtered here since the full format ignores `metadataHeaders`; matching
+/// is case-insensitive, order and repeats kept. Only the top-level part
+/// holds the message headers, nested ones carry their own MIME ones.
 pub(crate) fn message_headers(
     payload: Option<GmailMessagePayload>,
     names: &[&str],
@@ -307,9 +302,8 @@ mod tests {
         assert_eq!(json["payload"]["parts"][1]["body"]["attachmentId"], "ANGj");
     }
 
-    /// The message prints as Gmail sent it, a property io-gmail does not
-    /// model and the headers `--header` leaves out of the text kept, the
-    /// headers asked for narrowing the metadata request.
+    /// The message prints as sent, unmodelled properties and headers kept,
+    /// the headers asked for narrowing the metadata request.
     #[test]
     fn a_message_prints_as_gmail_sent_it() {
         let headers = json!([{"name": "Subject", "value": "hi"}, {"name": "To", "value": "b"}]);

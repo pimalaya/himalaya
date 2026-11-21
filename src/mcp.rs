@@ -4,13 +4,10 @@
 //! stdout exposing the unified API as tools, one per leaf command, and
 //! `account capability`.
 //!
-//! pimalaya-cli's [`mcp`] module answers the protocol and checks each call
-//! against its tool's input schema; this one lists the tools and runs the
-//! calls. A tool's input is its clap command's [`Grammar`], and a call
-//! turns back into an argv parsed by that same command, so the CLI, the
-//! [`crate::repl`] and MCP share one grammar. Commands run over the
-//! [`Session`] the server keeps and print into a [`CapturePrinter`], whose
-//! one JSON value becomes the call's structured result.
+//! pimalaya-cli's [`mcp`] module answers the protocol. A tool's input is
+//! its clap command's [`Grammar`], a call turned back into an argv for that
+//! command, so the CLI, the [`crate::repl`] and MCP share one grammar; the
+//! [`CapturePrinter`] value, run over the [`Session`], is the result.
 //!
 //! A tool may also take a `ServerArg`, an input the CLI says another
 //! way (a path the server keeps closed): declared on the tool in
@@ -112,9 +109,8 @@ const TOOLS: &[McpTool] = &[
     McpTool::send("vacation", "set"),
 ];
 
-/// The arguments turning a tool into one that changes the store, listed
-/// only under `--allow-write`: saving a composed message, flagging a read
-/// one as seen.
+/// The arguments that make a tool change the store (saving a composed
+/// message, flagging a read one seen), listed only under `--allow-write`.
 const WRITE_ARGS: &[&str] = &["save", "seen"];
 
 /// The arguments turning a tool into one that sends mail, or saying how
@@ -246,10 +242,8 @@ struct McpTool {
 /// An argument a tool takes that its command's grammar does not, for
 /// what the CLI says through a path or stdin the server keeps closed.
 ///
-/// It is a property of the tool's `inputSchema`, listed whenever the tool
-/// is, taken off the call before the argv is rebuilt so clap never sees
-/// it, then validated by `hand`, which sets it on the parsed command
-/// through a field clap skips (`#[arg(skip)]`), so no command line can
+/// Taken off the call before the argv is rebuilt, then validated by `hand`,
+/// which sets it through an `#[arg(skip)]` field, so no command line can
 /// reach it.
 struct ServerArg {
     /// The property name, spelled as a CLI flag would be.
@@ -325,9 +319,8 @@ impl McpTool {
         Self { server, ..self }
     }
 
-    /// Arguments appended to every call's argv, before its positionals:
-    /// the command runs as with them typed, and an argument they set is
-    /// no property, so the call cannot unset it.
+    /// Arguments appended to every call's argv, before its positionals; an
+    /// argument they set is no property, so the call cannot unset it.
     const fn fixed(self, fixed: &'static [&'static str]) -> Self {
         Self { fixed, ..self }
     }
@@ -361,10 +354,9 @@ struct McpToolSpec {
 impl McpToolSpec {
     /// The tools the gates allow, from the commands this build carries.
     ///
-    /// With a resolution, a tool the account's backends cannot serve at
-    /// all is left out, as the static capability tier knows without
-    /// connecting; one only the server decides stays listed and fails
-    /// with `capability-missing` when called.
+    /// With a resolution, a tool the static tier knows the backends cannot
+    /// serve is left out; one only the server decides stays listed and
+    /// fails with `capability-missing` when called.
     fn all(allow_write: bool, allow_send: bool, resolution: Option<&Resolution>) -> Vec<Self> {
         let mut cli = Cli::command();
         cli.build();
@@ -529,9 +521,8 @@ struct McpServer<'a, 'b> {
 }
 
 impl McpServer<'_, '_> {
-    /// Runs a tool call, listed and holding only the arguments its tool
-    /// declares, a failure being a result with `isError` rather than a
-    /// protocol error, so the caller reads it.
+    /// Runs a listed tool call holding only its declared arguments, failing
+    /// as an `isError` result the caller reads, not a protocol error.
     fn call(&mut self, call: &ToolCall) -> ToolResult {
         let Some(tool) = self
             .tools
@@ -619,10 +610,8 @@ struct McpLine {
     cmd: Command,
 }
 
-/// What the account's backend answers of the query language, appended to
-/// the `envelope_search` description so an agent writes a query it can
-/// run: the clauses and sort keys answered fully, in part and why, and
-/// not at all.
+/// The clauses and sort keys the backend answers fully, in part (and why)
+/// or not at all, for `envelope_search` so an agent writes runnable queries.
 fn search_options(resolution: &Resolution) -> String {
     let Some(backend) = resolution.storage else {
         return String::new();
@@ -903,9 +892,8 @@ fn part_schema(schema: &Value) -> Option<Value> {
     Some(part)
 }
 
-/// The URI of a part the server read,
 /// `himalaya://<account>/<mailbox>/<message-id>/<part-id>`, each segment
-/// percent-encoded, so it maps back onto the call that read it.
+/// percent-encoded, so it maps back onto the call that read the part.
 fn part_uri(account: &str, mailbox: &str, message_id: &str, part_id: &str) -> String {
     let segment = |segment: &str| utf8_percent_encode(segment, URI_SEGMENT).to_string();
     format!(
@@ -917,9 +905,8 @@ fn part_uri(account: &str, mailbox: &str, message_id: &str, part_id: &str) -> St
     )
 }
 
-/// A printed part split into its JSON without `data` and the embedded
-/// resource carrying `data`, already base64, as its blob; `None` when the
-/// value holds no `data` string.
+/// A printed part split into its JSON without `data` and a resource whose
+/// blob is that base64 `data`; `None` when there is no `data` string.
 fn embedded_part(mut part: Value, uri: String) -> Option<(Value, Value)> {
     let Value::String(blob) = part.as_object_mut()?.remove("data")? else {
         return None;

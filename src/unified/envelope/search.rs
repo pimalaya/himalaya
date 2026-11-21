@@ -118,9 +118,8 @@ pub struct EnvelopeSearchCommand {
 }
 
 impl EnvelopeSearchCommand {
-    /// What the search reaches: `envelope.search` and the options its
-    /// query uses, a query that does not parse failing here already, its
-    /// error one line under `json`.
+    /// `envelope.search` and the options its query uses; an unparsable
+    /// query fails here already, its error one line under `json`.
     pub fn capabilities(&self, json: bool) -> Result<Vec<Capability>> {
         let mut capabilities = vec![Capability::EnvelopeSearch];
         let text = query_text(self.query.as_deref());
@@ -272,9 +271,8 @@ fn query_parse_error_line(err: &SearchQueryError) -> String {
     line
 }
 
-/// Widens an error span to the whole word it starts, up to the next space
-/// or parenthesis, chumsky merging the errors raised at one place over
-/// the span of the first.
+/// Widens an error span to the whole word it starts, as chumsky merges the
+/// errors raised at one place over the span of the first.
 fn word_range(src: &str, range: Range<usize>) -> Range<usize> {
     let delimiter = |c: char| matches!(c, ' ' | '(' | ')');
 

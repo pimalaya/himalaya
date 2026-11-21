@@ -66,12 +66,9 @@ pub enum Outcome {
 
 /// Sends the bytes, saves them, or both, printing nothing.
 ///
-/// Saving resolves the mailbox through the account's aliases and attaches
-/// the given flags. Both asked for, the send goes first, so a failed send
-/// leaves no copy behind, unless the backend files the copy itself as
-/// part of the send; a save failing after the send is the
-/// [`Outcome::Unsaved`] of a message that went out. With neither, the
-/// bytes go to stdout.
+/// Both asked, the send goes first so a failed send leaves no copy; a save
+/// failing after it is [`Outcome::Unsaved`], the message having gone out.
+/// With neither, the bytes go to stdout.
 pub fn apply(
     account: &Account,
     client: &mut EmailClient,
@@ -146,10 +143,10 @@ pub fn route(
     }
 }
 
-/// Runs [`apply`] with `\Seen` as the saved flag and hands back its
-/// receipt, or prints the message itself when neither saving nor sending
-/// and hands back none. A save failing after the send is an item error of
-/// the receipt, beside `sent`.
+/// Runs [`apply`] saving with `\Seen` and hands back its receipt, `None`
+/// when it printed the message.
+///
+/// A save failing after the send is an item error beside `sent`.
 pub fn route_unprinted(
     printer: &mut impl Printer,
     account: &Account,
@@ -197,9 +194,8 @@ pub struct MessageRouteOutput {
     pub sent: bool,
     /// Whether a sync engine applies the write later rather than now.
     pub queued: bool,
-    /// What failed after the message went out (its copy, a reply's
-    /// answered flag), `[]` when nothing did: the command then exits 3,
-    /// and sending again would send twice.
+    /// What failed after the message went out (its copy, a reply's flag):
+    /// the command then exits 3, and sending again would send twice.
     pub errors: Vec<ItemError>,
     /// Whether a send was asked, done or queued, which the text form
     /// names.
@@ -293,9 +289,8 @@ pub struct MessageTemplateOutput {
     pub message_id: Option<String>,
     /// The text body, its line breaks LF, as an editor shows them.
     pub body: String,
-    /// The attached files, which ride along with the message: the template
-    /// carries their names, not their bytes, so handing it back means
-    /// passing them again through `--attach`.
+    /// The attached files: the template carries their names, not bytes, so
+    /// handing it back means passing them again through `--attach`.
     pub attachments: Vec<TemplateAttachment>,
 }
 

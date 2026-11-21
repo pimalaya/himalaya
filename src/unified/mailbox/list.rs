@@ -122,9 +122,8 @@ mod tests {
         },
     };
 
-    /// The counts print as one `unread/total` cell, and only with
-    /// `--counts`; a mailbox whose counts failed prints an `Error:` line
-    /// after the items.
+    /// Counts print as one `unread/total` cell only with `--counts`; failed
+    /// counts print an `Error:` line after the items.
     #[test]
     fn counts_print_as_unread_over_total() {
         let mailbox = |id: &str, role, counts: Option<(u64, u64)>| Mailbox {

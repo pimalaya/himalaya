@@ -4,10 +4,9 @@
 
 /// Rewrites bare line feeds to CRLF, idempotently.
 ///
-/// A `\n` already preceded by `\r` is left alone, so content read from a
-/// Unix source becomes RFC 5322 compliant without corrupting content that
-/// already is. Works on bytes, a raw message being free to carry 8-bit
-/// content in any charset.
+/// A `\n` after `\r` is left alone, so compliant RFC 5322 content is not
+/// corrupted. Works on bytes, as a raw message may carry 8-bit content in
+/// any charset.
 pub fn normalize(input: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len());
     let mut prev = 0;

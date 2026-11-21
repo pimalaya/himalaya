@@ -111,8 +111,7 @@ impl ImapClient {
 }
 
 /// Whether to sort client-side when `imap.sort.fallback` is unset: the
-/// server lacks SORT, or it is iCloud, whose SORT ignores its keys and
-/// `REVERSE`.
+/// server lacks SORT, or is iCloud, whose SORT ignores its keys and `REVERSE`.
 ///
 /// iCloud is told by its `X-APPLE-REMOTE-LINKS` capability, which holds
 /// behind a proxy and on every `*.mail.me.com` host.
@@ -171,9 +170,8 @@ pub fn build_imap_client(
     Ok((account, client))
 }
 
-/// The code of an IMAP refusal in an error chain: a completion naming
-/// `NOPERM` is `permission-denied`, one naming `OVERQUOTA`
-/// `quota-exceeded` (RFC 5530 §3).
+/// The code of an IMAP refusal in an error chain: `NOPERM` is
+/// `permission-denied`, `OVERQUOTA` is `quota-exceeded` (RFC 5530 §3).
 pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
     let status = cause.downcast_ref::<ImapClientError>()?.status()?;
 
@@ -212,9 +210,8 @@ mod tests {
         }
     }
 
-    /// A refusal the server codes `NOPERM` or `OVERQUOTA` codes the whole
-    /// command, through the context a command adds; any other stays
-    /// uncoded.
+    /// A `NOPERM` or `OVERQUOTA` refusal codes the whole command through
+    /// its context; any other stays uncoded.
     #[test]
     fn a_refusal_naming_its_reason_is_coded() {
         let noperm = Code::Other(CodeOther::unvalidated(b"NOPERM".as_slice()));

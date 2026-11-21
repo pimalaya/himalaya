@@ -12,10 +12,9 @@ use crate::config::{proxy::ProxyConfig, sasl::SaslConfig, tls::TlsConfig};
 pub struct SieveConfig {
     /// ManageSieve server address, a bare authority or a full URL.
     ///
-    /// RFC 5804 registers one port and reaches TLS on it through STARTTLS,
-    /// so a bare authority takes `sieve://` unlike the IMAP and SMTP ones.
-    /// `sieves://` is for the deployments the specification does not
-    /// define, listening for a handshake straight away.
+    /// RFC 5804 reaches TLS through STARTTLS on its one port, so a bare
+    /// authority takes `sieve://`; `sieves://` is for the undefined
+    /// deployments that expect a handshake straight away.
     pub server: String,
     /// TLS provider and custom certificate used by the connection.
     #[serde(default)]

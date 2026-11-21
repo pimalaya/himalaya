@@ -184,9 +184,8 @@ impl fmt::Display for SmtpSendOutput {
 /// the message reaching nobody.
 #[derive(Debug, Eq, PartialEq, Serialize, JsonSchema)]
 pub(crate) struct SmtpSendRefusalOutput {
-    /// The replies refusing the transaction, in the order received: one
-    /// for a refused `MAIL FROM` or `DATA`, one per recipient when the
-    /// server refused them all.
+    /// The refusing replies in order received: one for `MAIL FROM` or
+    /// `DATA`, one per recipient when the server refused them all.
     refusals: Vec<SmtpSendRefusal>,
 }
 
@@ -317,9 +316,8 @@ impl From<RetArg> for SmtpDsnRet {
     }
 }
 
-/// Clap value parser for ENVID: printable US-ASCII without `+` and `=`,
-/// so the value needs no xtext encoding, and at most 100 characters
-/// (RFC 3461 4.4).
+/// Parses an ENVID: at most 100 printable US-ASCII characters (RFC 3461
+/// 4.4), no `+` or `=` so it needs no xtext encoding.
 fn envid_parser(envid: &str) -> Result<String, String> {
     if envid.is_empty() || envid.len() > 100 {
         return Err(format!("expected 1 to 100 characters, got {}", envid.len()));

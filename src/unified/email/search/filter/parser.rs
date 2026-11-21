@@ -22,13 +22,9 @@ use crate::unified::email::{
 
 /// Parses a filter of space-separated conditions.
 ///
-/// They join with `not`, `and` and `or`, in that order of precedence, and
-/// group with parentheses. A pattern is quoted, or unquoted with its
-/// spaces backslash-escaped. `himalaya envelope search --help` is the
-/// grammar reference a user reads.
-///
-/// Its dates are read in the local zone, now taken once, as the parser is
-/// built ([`query_at`]).
+/// `himalaya envelope search --help` is the grammar reference. Dates are
+/// read in the local zone, now taken once as the parser is built
+/// ([`query_at`]).
 pub fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsFilterQuery, ParserError<'a>> + Clone {
     query_at(local_now())
 }
@@ -259,9 +255,8 @@ fn dated<'a, Tz: TimeZone + 'a>(
     choice((short, date_value(now).labelled(label)))
 }
 
-/// A date value: `today`, `yesterday`, `<n> <unit> ago`, a day in one of
-/// its four spellings or an RFC 3339 date-time, its seconds and offset
-/// optional, one with no offset read in the zone of `now`.
+/// A date value: `today`, `yesterday`, `<n> <unit> ago`, a day, or an RFC
+/// 3339 date-time whose seconds and offset are optional (none: `now`'s).
 fn date_value<'a, Tz: TimeZone + 'a>(
     now: DateTime<Tz>,
 ) -> impl Parser<'a, &'a str, DateValue, ParserError<'a>> + Clone {
@@ -291,9 +286,8 @@ fn date_value<'a, Tz: TimeZone + 'a>(
     ))
 }
 
-/// The value `<count> <unit> ago` names from `now`: a day, counted back
-/// in calendar terms, for `day` to `year`, an instant for `minute` and
-/// `hour`, each singular or plural.
+/// The value `<count> <unit> ago` from `now`: a calendar day for `day` to
+/// `year`, an instant for `minute` and `hour`.
 fn ago(now: DateTime<FixedOffset>, count: &str, unit: &str) -> Option<DateValue> {
     let count: u32 = count.parse().ok()?;
     let today = now.date_naive();

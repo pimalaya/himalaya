@@ -99,18 +99,17 @@ impl GmailClient {
         self.label_index = None;
     }
 
-    /// One page of the listing at `users/<user>/<collection>`, queried by
-    /// `params`, as Gmail sent it: the items under `collection` (`[]` when
-    /// Gmail leaves the key out of an empty page), the rest of the page
-    /// beside them and the `nextPageToken` taken out as the cursor.
+    /// One page of `users/<user>/<collection>` as Gmail sent it, its
+    /// `nextPageToken` taken out as the cursor.
+    ///
+    /// The items are `[]` when Gmail leaves the key out of an empty page.
     pub fn raw_list<P: Serialize>(&mut self, collection: &str, params: &P) -> Result<GmailRawPage> {
         let pairs = to_query_pairs(params).map_err(GmailSendError::from)?;
         self.raw_list_at(&[collection], collection, pairs)
     }
 
-    /// The listing at `users/<user>/<path>`, queried by `pairs`, as Gmail
-    /// sent it, its items under `collection`, as [`Self::raw_list`] reads
-    /// it: the settings listings, whose path and key differ.
+    /// [`Self::raw_list`] at `users/<user>/<path>` with items under
+    /// `collection`, for the settings listings whose path and key differ.
     pub fn raw_list_at(
         &mut self,
         path: &[&str],
@@ -251,10 +250,8 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
     refusal_of(err.api()?)
 }
 
-/// The code of what Gmail refused: a rate limit (a 429, or a 403 naming
-/// one, `rateLimitExceeded`, `userRateLimitExceeded` or `quotaExceeded`)
-/// and the daily quota ([`is_daily_limit`]) are `rate-limited`, as the
-/// family codes a Google quota, any other 403 `permission-denied`.
+/// The code of what Gmail refused: a rate limit (429, or a 403 naming one)
+/// or the daily quota is `rate-limited`, another 403 `permission-denied`.
 pub(crate) fn refusal_of(err: &GmailApiError) -> Option<ErrorCode> {
     if err.is_rate_limited() || is_daily_limit(err) {
         Some(ErrorCode::RateLimited)
@@ -265,9 +262,8 @@ pub(crate) fn refusal_of(err: &GmailApiError) -> Option<ErrorCode> {
     }
 }
 
-/// Whether Google refused the daily quota: the reason `dailyLimitExceeded`,
-/// or a message naming a daily limit or a quota per day, the daily limit
-/// of unauthenticated use aside, which a missing credential meets.
+/// Whether Google refused the daily quota, by reason or message; the
+/// unauthenticated daily limit aside, which a missing credential meets.
 fn is_daily_limit(err: &GmailApiError) -> bool {
     let text: String = err
         .message
@@ -280,9 +276,8 @@ fn is_daily_limit(err: &GmailApiError) -> bool {
     err.has_reason("dailyLimitExceeded") || (named && !text.contains("unauthenticated"))
 }
 
-/// The refusal of a Gmail error in a chain, for the `gmail` commands: the
-/// status, the first reason (else the canonical status) and the message
-/// of what Gmail answered.
+/// The refusal of a Gmail error in a chain: status, first reason (else the
+/// canonical status) and message.
 pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
     let err = match cause.downcast_ref::<GmailClientStdError>() {
         Some(GmailClientStdError::Send(err)) => err,
@@ -322,9 +317,8 @@ mod tests {
         Error::from(err).context("Cannot list Gmail labels")
     }
 
-    /// A whole command Gmail refused is coded by what it answered: a rate
-    /// limit `rate-limited`, another 403 `permission-denied`, the rest
-    /// uncoded.
+    /// A rate limit codes `rate-limited`, another 403 `permission-denied`,
+    /// the rest uncoded.
     #[test]
     fn a_whole_refusal_is_coded() {
         let code = |status, reason| error::code(&refused(status, reason));

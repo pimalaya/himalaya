@@ -53,9 +53,8 @@ pub struct MboxFlagListOutput {
     flags: Vec<MboxFlagRow>,
 }
 
-/// One mbox flag: the flag, as the unified flags print it, its letter as
-/// `raw` and `iana` `null` for `O`, which has none, and the header
-/// carrying the letter.
+/// One mbox flag as the unified flags print it, `raw` its letter and `iana`
+/// `null` for `O`, which has none, beside the header carrying it.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MboxFlagRow {

@@ -80,11 +80,10 @@ impl PimdirClient {
     }
 
     /// Queues `actions` on `collection` as one batch (pimdir STORAGE
-    /// §15.1), each passing the gate of §15.6 once, and answers their rows
-    /// in order: an action the gate refuses, or the store failing, leaves
-    /// nothing staged, the failure read by `context` with the id the gate
-    /// refuses alone, `None` when it refuses none. No action takes no
-    /// write transaction.
+    /// §15.1), each gated once (§15.6), and answers their rows in order.
+    ///
+    /// A gate refusal or store failure stages nothing, the failure read by
+    /// `context` with the refused id (`None` if none). No action, no write.
     pub(crate) fn enqueue_all(
         &self,
         collection: &str,
@@ -142,9 +141,8 @@ impl PimdirClient {
         })
     }
 
-    /// The handle `given` names under a store: as given when it names one,
-    /// a bare id named under this store's identity, as `pimdir queue list`
-    /// prints its handle.
+    /// The handle `given` names: as given when it names a store, else the
+    /// bare id under this store's identity, as `pimdir queue list` prints.
     pub(crate) fn named(&self, given: &PimdirActionHandle) -> Result<PimdirActionHandle> {
         if given.store.is_some() {
             return Ok(given.clone());
@@ -161,23 +159,9 @@ impl PimdirClient {
     /// Cancels one pending or parked row of the account's queue, returning
     /// its action kind.
     ///
-    /// A row parked unconfirmed (pimdir STORAGE §15.2) is cancelled as any
-    /// parked row is: its request was sent and may have taken effect, which
-    /// cancelling does not undo, so the caller says so before it asks.
-    ///
-    /// Cancelling is an owner write, and the only retraction a queued
-    /// creation has. The role is entered and released inside this call, so
-    /// Himalaya never holds a handle that could drain the queue or collect
-    /// the store. The row is read first, and one anchored on another
-    /// account's collection is refused before the role is taken.
-    ///
-    /// The store is opened as it stands, never created, migrated nor
-    /// reconciled: a store of another draft is refused, as is a damaged
-    /// one, both left as they are.
-    ///
-    /// A sync in flight owns the store, and that is refused at once rather
-    /// than waited out: the action is still queued, and may have been applied
-    /// by the time the user reads the message.
+    /// The owner role is held inside this call alone. Another account's
+    /// row, a foreign-draft or damaged store and a sync in flight are
+    /// refused at once; an unconfirmed row (§15.2) may have taken effect.
     pub fn cancel_queued(&self, handle: &PimdirActionHandle) -> Result<String> {
         let kind = match self.queue_row(handle)? {
             PimdirActionStatus::Pending { kind, .. }
@@ -211,12 +195,10 @@ impl PimdirClient {
 }
 
 impl PimdirClient {
-    /// The source performing an intent `capability` for this account
-    /// (pimdir STORAGE §15.6), `None` when the sources syncing `collection`
-    /// declare nothing, the case
-    /// [`undeclared_performer`](Self::undeclared_performer) names.
+    /// The source performing an intent `capability` (pimdir STORAGE
+    /// §15.6), `None` when `collection`'s sources declare nothing.
     ///
-    /// Several candidates and no recorded choice is the user's to settle:
+    /// Several candidates and no recorded choice are the user's to settle:
     /// Himalaya never picks one.
     pub(crate) fn performer(
         &self,
@@ -250,14 +232,10 @@ impl PimdirClient {
         }
     }
 
-    /// The source performing an intent anchored on `collection` when the
-    /// sources syncing it declare nothing (pimdir STORAGE §15.6, Annex
-    /// B.2): an undeclared source is gated by nothing, and the payload
-    /// still names it.
+    /// The one source syncing `collection` when its sources declare nothing
+    /// (pimdir STORAGE §15.6, Annex B.2), ungated but named in the payload.
     ///
-    /// The one source syncing `collection` is it. None, the collection
-    /// being only declared, and several, none of which says what it
-    /// performs, are refused rather than guessed.
+    /// None or several are refused rather than guessed.
     pub(crate) fn undeclared_performer(
         &self,
         producer: &PimdirProducer,
@@ -347,19 +325,9 @@ pub fn build_pimdir_client(
 
 /// The account this client reads, configured or derived.
 ///
-/// A store synced by one account groups its collections under that name, or
-/// under none in a store predating the grouping, so the common case needs no
-/// configuration.
-///
-/// A store several accounts share is what `pimdir.account` answers, and
-/// leaving it unset there errors rather than guess, under
-/// `store-account-ambiguous`: picking one would show the wrong mailbox
-/// set. Only the accounts holding mail count, so a store sharing one mail
-/// account with the contacts or calendars of others needs no
-/// configuration. An account named that a store holding collections does
-/// not hold is refused under `store-account-unknown`, rather than read as
-/// an empty one; on a store holding no collection yet, a first sync not
-/// having run, it is read as named.
+/// Several mail accounts and no `pimdir.account` errors as
+/// `store-account-ambiguous` rather than guess; a name a store with
+/// collections lacks errors as `store-account-unknown`, not read as empty.
 fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<Option<String>> {
     if let Some(account) = configured {
         let held = store
@@ -409,9 +377,8 @@ pub(crate) fn handle(identity: &PimdirStoreIdentity, id: i64) -> String {
     .to_string()
 }
 
-/// Why the queue row `handle` names, standing at `status`, cannot be
-/// cancelled: applied already, named under another store (`store-reset`),
-/// or not a row of the account's queue (`row-not-found`).
+/// Why the row `handle` names, at `status`, cannot be cancelled: applied,
+/// of another store (`store-reset`), or not queued (`row-not-found`).
 pub fn uncancellable(handle: &PimdirActionHandle, status: &PimdirActionStatus) -> anyhow::Error {
     match status {
         PimdirActionStatus::Applied { .. } => anyhow!("Row {handle} was applied already"),

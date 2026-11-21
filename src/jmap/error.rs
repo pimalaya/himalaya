@@ -42,8 +42,7 @@ pub trait JmapSetError {
 }
 
 /// The code of a refusal by its SetError type (RFC 8620 §5.3, RFC 8621
-/// §4.6): `forbidden` is `permission-denied`, `overQuota`
-/// `quota-exceeded`, `rateLimit` `rate-limited`.
+/// §4.6).
 fn set_error_code(type_name: &str) -> Option<ErrorCode> {
     match type_name {
         "forbidden" => Some(ErrorCode::PermissionDenied),
@@ -81,10 +80,8 @@ pub fn set_error<E: JmapSetError>(message: String, err: &E) -> Error {
     .into()
 }
 
-/// The code of a JMAP refusal in an error chain: an HTTP 429 is
-/// `rate-limited` and a 403 `permission-denied`, whichever request it
-/// answered, as is a method error `forbidden` (RFC 8620 §3.6.2), and a
-/// refused write is coded by its SetError type.
+/// The code of a JMAP refusal in an error chain: HTTP 429, 403 or method
+/// error `forbidden` (RFC 8620 §3.6.2), or a write's SetError type.
 pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<ErrorCode> {
     let cause = unwrapped(cause);
     if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
@@ -116,10 +113,8 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
     }
 }
 
-/// The refusal of a JMAP error in a chain, for the `jmap` commands: a
-/// non-2xx answer by its status (and its problem type, for a request the
-/// server refused whole), a method error or a refused write by its type
-/// and description.
+/// The refusal of a JMAP error in a chain: a non-2xx answer by status and
+/// problem type, a method error or refused write by type and description.
 pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refusal> {
     let cause = unwrapped(cause);
     if let Some(err) = cause.downcast_ref::<JmapSetRefusal>() {
@@ -155,9 +150,8 @@ pub(crate) fn refusal(cause: &(dyn std::error::Error + 'static)) -> Option<Refus
     Some(described(Some(status), None, cause.to_string()))
 }
 
-/// The error io-jmap's client error wraps transparently, `cause` itself
-/// otherwise: a transparent wrapper hands the chain the source of what
-/// it wraps, so the chain never lists the send, session or blob error.
+/// The error io-jmap's client error wraps transparently, else `cause`: a
+/// transparent wrapper skips the wrapped error in the chain.
 fn unwrapped<'a>(
     cause: &'a (dyn std::error::Error + 'static),
 ) -> &'a (dyn std::error::Error + 'static) {
@@ -503,9 +497,8 @@ mod tests {
         jmap::error::set_error,
     };
 
-    /// A whole command the server refused is coded by the HTTP status of
-    /// its answer, or by its method error, through the context a command
-    /// adds.
+    /// A whole refusal is coded by HTTP status or method error, through the
+    /// context a command adds.
     #[test]
     fn a_whole_refusal_is_coded() {
         let code = |err: JmapEmailGetError| {

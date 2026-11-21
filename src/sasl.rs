@@ -16,11 +16,9 @@ use crate::config::sasl::SaslConfig;
 impl SaslConfig {
     /// Resolves the configuration into a runtime [`Sasl`].
     ///
-    /// The host and port come from the live server URL. OAUTHBEARER alone
-    /// reads them, echoing them in its GS2 header.
-    ///
-    /// The credential goes through `resolver`, so an account whose IMAP,
-    /// SMTP and ManageSieve blocks name one command spawns it once.
+    /// The host and port, from the live server URL, feed the OAUTHBEARER
+    /// GS2 header. The credential goes through `resolver`, so a command
+    /// the IMAP, SMTP and ManageSieve blocks share spawns once.
     pub fn try_into_sasl(
         self,
         host: impl ToString,

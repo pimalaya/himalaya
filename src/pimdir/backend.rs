@@ -11,11 +11,9 @@
 //! producer, never the owner: it mutates no index and collects nothing,
 //! so a staged flag change cannot race a sync mid-hydration.
 //!
-//! A mailbox is its collection id, verbatim. The sync binds a source's
-//! collections under a namespace, so the mailbox a server calls `INBOX`
-//! is `imap/INBOX` here. The id is opaque to the store, so shortening it
-//! would guess at the sync's convention rather than look it up, and
-//! `mailbox.alias` is how a user avoids typing it.
+//! A mailbox is its collection id verbatim (`imap/INBOX`, not `INBOX`):
+//! the id is opaque to the store, so shortening it would guess at the
+//! sync's namespacing, and `mailbox.alias` is how a user avoids typing it.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -94,13 +92,11 @@ const WALK_MIN: usize = 64;
 const KEY_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 
 impl PimdirClient {
-    /// The collection a user-typed mailbox addresses: the mailbox itself,
-    /// a pimdir mailbox being its collection id verbatim, else the mailbox
-    /// carrying the role it names.
+    /// The collection a user-typed mailbox addresses: itself, else the
+    /// mailbox carrying the role it names.
     ///
-    /// The id is checked against the account's mail collections rather than
-    /// passed through, an id nothing was written under otherwise reading as
-    /// a mailbox that exists and is empty.
+    /// The id is checked against the account's mail collections, an unknown
+    /// id otherwise reading as an existing, empty mailbox.
     pub(crate) fn hub_id(&self, mailbox: &str) -> Result<String> {
         let resolved = self.resolve_mailbox_id(mailbox)?;
         let mut ids: Vec<String> = self
@@ -121,9 +117,8 @@ impl PimdirClient {
         )))
     }
 
-    /// Maps a mailbox onto its collection id: an id of the account passes
-    /// through, then a role name resolves to the mailbox the store records
-    /// it on, erroring when several do. Anything else goes back as it is.
+    /// Maps a mailbox onto its collection id: an account id passes, a role
+    /// resolves to its one mailbox (several error), anything else returns.
     ///
     /// A collection's name is not matched: two sources may each hold a
     /// mailbox of one name.
@@ -186,15 +181,12 @@ impl PimdirClient {
             .collect())
     }
 
-    /// How the store serves a unified write, read from what its sources
-    /// declare (pimdir STORAGE §15.6), nothing staged: `None` for a read or
-    /// an account feature, and for a store whose sources declare nothing,
-    /// where the backend's static row stands.
+    /// How the store serves a unified write per its sources' declarations
+    /// (pimdir STORAGE §15.6); `None` where the static row stands.
     ///
-    /// An intent (`collection.*`, `mail.submit`) is served when a source
-    /// performs it. An item write runs through the store's own gate in
-    /// each of the account's mail collections: refused in every one it is
-    /// `none`, in some of them or passing in part it is `partial`.
+    /// An intent is served when a source performs it. An item write runs
+    /// the gate in each mail collection: refused in all is `none`, in some
+    /// or in part is `partial`.
     pub fn store_support(&self, capability: Capability) -> Result<Option<StoreSupport>> {
         let Some(name) = capability.annex_b_name() else {
             return Ok(None);
@@ -268,10 +260,8 @@ impl PimdirClient {
         Ok(Some(support))
     }
 
-    /// Lists the account's mail collections, each addressed by its collection
-    /// id and named by the collection row's own name, sorted by id.
-    /// `with_counts` fills `total` with the live item count and `unread`
-    /// as [`Self::list_covered_mailboxes`] counts it.
+    /// Lists the account's mail collections by id, `with_counts` filling
+    /// the live `total` and `unread` as [`Self::list_covered_mailboxes`].
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         let collections = self.mail_collections()?;
 
@@ -306,14 +296,12 @@ impl PimdirClient {
         Ok(mailboxes)
     }
 
-    /// Lists the account's mailboxes as [`Self::list_mailboxes`] does with
-    /// counts, each with the coverage the store lists it with and the round
-    /// a source has under way.
+    /// Lists the mailboxes with counts, each with its coverage and the
+    /// round a source has under way.
     ///
-    /// The coverage is the narrowest of the collection's sources' (pimdir
-    /// STORAGE §14.1), `None` while one never closed a round, so a reader
-    /// says "mail since" from it and knows a search below it is not
-    /// exhaustive. A store its owner has not reconciled yet has none.
+    /// The coverage is the narrowest of the sources' (pimdir STORAGE
+    /// §14.1), `None` while one never closed a round; a search below it is
+    /// not exhaustive.
     pub fn list_covered_mailboxes(&mut self) -> Result<Vec<PimdirCoveredMailbox>> {
         let collections = self.mail_collections()?;
         let unread = self.count_unread(&collections)?;
@@ -348,11 +336,10 @@ impl PimdirClient {
         Ok(mailboxes)
     }
 
-    /// The unread mail of each collection as the overlaying reader lists
-    /// it: the store's unread count, which reads committed rows only, where
-    /// no queued action changes what the mailbox shows
-    /// (`PimdirReader::overlay_quiet`), else its items walked and those
-    /// without `\Seen` counted, as that count reads them.
+    /// The unread mail of each collection as the overlay shows it.
+    ///
+    /// The store's count reads committed rows only, so it serves only where
+    /// `PimdirReader::overlay_quiet`; elsewhere the items are walked.
     fn count_unread(&self, collections: &[PimdirCollection]) -> Result<BTreeMap<String, u64>> {
         let ids: Vec<&str> = collections.iter().map(|c| c.id.as_str()).collect();
         let mut unread = self
@@ -400,10 +387,8 @@ impl PimdirClient {
             .map(|(page, _)| page.envelopes)
     }
 
-    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
-    /// messages the collection holds: the store's live item count, a local
-    /// query rather than a walk of every item, which also says whether a
-    /// page follows.
+    /// Lists envelopes beside the collection's live item count, a query
+    /// rather than a walk, which also says whether a page follows.
     pub fn list_envelopes_counted(
         &mut self,
         mailbox: &str,
@@ -456,15 +441,12 @@ impl PimdirClient {
         Ok(paginate(envelopes, page, page_size))
     }
 
-    /// Searches envelopes in `mailbox`: builds them from the summaries,
-    /// applies the unified filter/sort/paginate. A query holding a body clause
-    /// reads each candidate's local body, and a message whose body is not
-    /// local matches no body clause; the other clauses read no body.
+    /// Searches envelopes in `mailbox`, built from the summaries; only a
+    /// body clause reads bodies, and a non-local body matches none.
     ///
-    /// The store is read newest first, within the date bounds the query
-    /// states and through the unread chip where it applies, and the read
-    /// stops one hit past the end of the page when the order is the store's
-    /// own (`PimdirPushdown`). Every clause is still matched in memory.
+    /// The read is narrowed by date bounds and the unread chip and stops
+    /// one hit past the page in the store's order (`PimdirPushdown`); every
+    /// clause is still matched in memory.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -483,10 +465,8 @@ impl PimdirClient {
         }
     }
 
-    /// [`Self::search_envelopes`] reading only the rows the query can
-    /// reach, `None` when a row read breaks the store's ordering contract
-    /// (its sort key is not its summary date), which the bounds and the
-    /// early stop rest on.
+    /// [`Self::search_envelopes`] over the reachable rows, `None` when a
+    /// sort key is not its summary date, breaking what the bounds rest on.
     fn search_pushed(
         &self,
         collection: &str,
@@ -583,9 +563,8 @@ impl PimdirClient {
         Ok(EnvelopePage { envelopes, more })
     }
 
-    /// Whether `item`, read as `envelope`, matches `filter`, its local body
-    /// read when the filter holds a body clause: an item with no local body,
-    /// or whose blob is gone, is matched with none.
+    /// Whether `item`, read as `envelope`, matches `filter`, a missing
+    /// local body or blob matched as no body.
     fn matches(
         &self,
         item: &PimdirItem,
@@ -616,12 +595,9 @@ impl PimdirClient {
     /// The mailbox's pending rows, every action kind, in append order, as
     /// `pimdir queue list` prints them.
     ///
-    /// A queued action carries no summary, the owner deriving one from the
-    /// body when it applies the action, so the subject is read off the body
-    /// the action pins, derived the same way.
-    ///
-    /// A row whose payload does not decode leaves the mailbox's rows
-    /// unread: the mailbox is then the one item error.
+    /// A queued action carries no summary, so the subject is derived from
+    /// the pinned body as the owner will. An undecodable payload makes the
+    /// mailbox the one item error.
     pub fn queued_rows(&self, mailbox: &str) -> Result<Outcome<Vec<PimdirQueueRow>>> {
         let collection = self.hub_id(mailbox)?;
         let queued = match self.store.pending_actions(&collection) {
@@ -667,9 +643,7 @@ impl PimdirClient {
     }
 
     /// The refusals standing in the mailbox, per message and source, as
-    /// `pimdir queue list` prints them beside its rows (pimdir STORAGE
-    /// §15.4): a change applied in the store that a server refused for good,
-    /// which the sync engine holds until the message changes again.
+    /// `pimdir queue list` prints them (pimdir STORAGE §15.4).
     pub fn refused_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRefused>> {
         let collection = self.hub_id(mailbox)?;
         let refusals = self
@@ -721,11 +695,10 @@ impl PimdirClient {
             .collect())
     }
 
-    /// What a row of `collection` holding `action` addresses: the message
-    /// it creates by its link id, the stored message it acts on by its
-    /// public id, and the subject of the body it pins, else of the message
-    /// it acts on. A parked `submit` names no body, its payload's subject
-    /// standing in.
+    /// What a row holding `action` addresses: a creation's link id or the
+    /// target's public id, and a subject from the pinned body or target.
+    ///
+    /// A parked `submit` names no body, its payload's subject standing in.
     fn addressed(&self, collection: &str, action: &PimdirAction) -> Addressed {
         let pinned = |hash: &PimdirHash| {
             let body = self.blobs.get(hash).ok().flatten()?;
@@ -787,10 +760,8 @@ impl PimdirClient {
     /// Reads one message's raw bytes from its content-addressed blob, and
     /// its flags.
     ///
-    /// An item with no local body fails as not fetched rather than as a data
-    /// loss, which is the cue to sync. So does one whose blob file is gone,
-    /// which a purge leaves not hydrated rather than broken (pimdir GUIDE
-    /// §14).
+    /// A missing local body or blob file (a purge, pimdir GUIDE §14) fails
+    /// as not fetched rather than as a data loss, the cue to sync.
     pub fn get_message(
         &mut self,
         mailbox: &str,
@@ -831,12 +802,9 @@ impl PimdirClient {
 
     /// Adds, sets, or removes `flags` on an id set, staged as `SetFlags`.
     ///
-    /// The action carries the whole set the message is left with. An add
-    /// or a remove also states the set it was read from (pimdir STORAGE
-    /// §15.3), so the owner applies the change alone to the set the
-    /// message holds by then, and a flag a sync landed or removed while
-    /// the row waited survives. A set states none: it replaces whatever
-    /// the message holds.
+    /// An add or remove also states the set it read (pimdir STORAGE §15.3),
+    /// so the owner applies only the change and a flag a sync moved while
+    /// the row waited survives; a set replaces whatever the message holds.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -868,16 +836,11 @@ impl PimdirClient {
         Ok(staged.value)
     }
 
-    /// Stages a flag op on the messages of `ids` the mailbox holds,
-    /// returning the queue row each message's `SetFlags` waits in, `None`
-    /// for one the op leaves as it shows, for which nothing is staged.
+    /// Stages a flag op on `ids`, returning each message's `SetFlags` row,
+    /// `None` where the op changes nothing; an unknown id is an item error.
     ///
-    /// An id the mailbox does not hold is an item error, so the caller
-    /// reports how many messages it found. The rows are appended as one batch
-    /// (pimdir STORAGE §15.1), each passing the gate of the sources'
-    /// declarations (§15.6) once: a change the gate refuses on any
-    /// message, or the store failing, leaves nothing staged. A partial
-    /// support passes, its warning logged once the batch is queued.
+    /// One batch (pimdir STORAGE §15.1), gated once each (§15.6): any
+    /// refusal or store failure stages nothing; partial support warns.
     fn stage_flag_op(
         &mut self,
         mailbox: &str,
@@ -958,15 +921,9 @@ impl PimdirClient {
     /// Stages a locally-authored message for the next sync to upload,
     /// returning its queue row and the link id it is stored under.
     ///
-    /// The body is written and the row appended in one step under the
-    /// producer's staging lock, the row pinning the body, so no collector
-    /// runs between the two and a refused add leaves no body behind.
-    ///
-    /// The link id is the bare `Message-ID`, derived the way the owner
-    /// derives it from the same body. One the mailbox already holds, or has
-    /// a creation queued under, is refused with `item-duplicate` and nothing
-    /// is staged: the owner would park the row rather than deduplicate or
-    /// mint a key of its own.
+    /// Body and pinning row land in one step under the staging lock. The
+    /// link id is the bare `Message-ID`; one held or queued already is
+    /// `item-duplicate`, since the owner would park it, not deduplicate.
     pub fn add_message(
         &mut self,
         mailbox: &str,
@@ -999,24 +956,9 @@ impl PimdirClient {
 
     /// Queues a message for the store's owner to send.
     ///
-    /// The body is stored as given, `Bcc:` included, and the row carries the
-    /// envelope derived from its headers, the `submit` intent any owner of
-    /// the store may perform, naming the source that performs it. The owner
-    /// holds the credentials and sends on its next run; nothing leaves from
-    /// here.
-    ///
-    /// The row is filed under `mailbox`, which must exist: an enqueue
-    /// creates the collection it names, and a send anchored on a made-up
-    /// name would add a mailbox to the store.
-    ///
-    /// With `copy`, the intent asks the owner to file a copy in `mailbox`
-    /// once the message is sent (pimdir STORAGE Annex B.2), so a failed
-    /// send leaves no copy behind. Against a source that declares nothing
-    /// the copy is left to the caller, an `add` beside the `submit`, as
-    /// Annex B.2 asks of a producer.
-    ///
-    /// Returns the queue row, the message's link id, and whether the intent
-    /// carries the copy.
+    /// Returns the row, link id and whether the intent carries the copy.
+    /// `mailbox` must exist, an enqueue creating what it names; `copy` is
+    /// filed after sending (Annex B.2), else left to the caller's `add`.
     pub fn send_message(
         &mut self,
         mailbox: Option<&str>,
@@ -1073,14 +1015,11 @@ impl PimdirClient {
         })
     }
 
-    /// Where the queue row `handle` names stands (pimdir STORAGE §15.4):
-    /// pending, parked, unconfirmed, applied with the item an `add`
-    /// created, unknown, or reset when the handle names another store. A
-    /// row anchored on a collection that is not one of the account's
-    /// mailboxes, another account's or another app's, reads as unknown.
+    /// Where the row `handle` names stands (pimdir STORAGE §15.4), reset
+    /// when of another store.
     ///
-    /// A row applied on a collection gone since (§15.4) names none, so no
-    /// account can be told from it and it reads as applied.
+    /// A row of another account's or app's collection reads as unknown,
+    /// one applied on a collection gone since as applied.
     pub fn queue_row(&self, handle: &PimdirActionHandle) -> Result<PimdirActionStatus> {
         let status = self
             .store
@@ -1142,10 +1081,9 @@ impl PimdirClient {
     /// Moves each id between two mailboxes, staged as one server-side move
     /// for the next sync.
     ///
-    /// A move states no resolution (pimdir SYNC §7): the owner parks it
-    /// over a message a sync left in conflict, as it does a remove, and
-    /// the message stays listed where it was (STORAGE §15.4). A move onto
-    /// its own mailbox stages nothing, counting the ids it holds.
+    /// A move resolves no conflict (pimdir SYNC §7): the owner parks it on
+    /// a conflicted message, left listed where it was (STORAGE §15.4). A
+    /// move onto its own mailbox stages nothing.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let source = self.hub_id(from)?;
         if source == self.hub_id(to)? {
@@ -1158,22 +1096,12 @@ impl PimdirClient {
         })
     }
 
-    /// Queues the creation of mailbox `name` for the store's owner, under
-    /// the mailbox `parent` when given, returning the queue row and the
-    /// source that performs it.
+    /// Queues creating mailbox `name` under `parent`, returning the row and
+    /// its performer.
     ///
-    /// The intent is anchored on `parent`, else on the account's first
-    /// mailbox: a mailbox that does not exist yet has no collection to file
-    /// a row under, and an enqueue on a made-up id would create one in the
-    /// store. The new mailbox arrives with the sync that performs it.
-    ///
-    /// The performer is named as for a send. A store whose sources declare
-    /// nothing has an owner predating the intent, which would never perform
-    /// it, so the creation is refused there rather than left to wait.
-    ///
-    /// A mailbox the performer's source already syncs under that name, or
-    /// whose creation is already queued, is refused with `mailbox-duplicate`
-    /// before anything is queued.
+    /// Anchored on `parent`, else the first mailbox, as an enqueue would
+    /// create a made-up id. Refused on an undeclaring store (an owner that
+    /// never performs it) and as `mailbox-duplicate` if held or queued.
     pub fn create_mailbox(
         &mut self,
         name: &str,
@@ -1217,11 +1145,11 @@ impl PimdirClient {
         Ok(PimdirQueuedIntent::new(enqueued, source, None))
     }
 
-    /// The mail collection of the account `source` syncs that creating
-    /// `name` under `parent` would make, if the store lists one: at the
-    /// top, one named `name`; under a parent, one named the parent's name,
-    /// a hierarchy delimiter (`/` or `.`, the store recording none) and
-    /// `name`. Names are the server's own, compared exactly.
+    /// The listed collection of `source` that creating `name` under
+    /// `parent` would make, names compared exactly.
+    ///
+    /// Under a parent it is the parent's name, `/` or `.` (the store records
+    /// no delimiter), then `name`.
     fn held_mailbox(
         &self,
         source: &str,
@@ -1287,15 +1215,11 @@ impl PimdirClient {
         }))
     }
 
-    /// Queues the renaming of `mailbox` to `name` for the store's owner,
-    /// returning the queue row and the source that performs it.
+    /// Queues renaming `mailbox` to `name`, returning the row and its
+    /// performer.
     ///
-    /// The intent is anchored on the mailbox itself, which the payload does
-    /// not restate. The mailbox keeps its parent: `name` is one level of the
-    /// hierarchy. The new name arrives with the sync that performs it.
-    ///
-    /// The performer is named as for a creation, and a store whose sources
-    /// declare nothing is refused the same way.
+    /// The mailbox keeps its parent, `name` being one level. An undeclaring
+    /// store is refused as for a creation.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<PimdirQueuedIntent> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
@@ -1314,15 +1238,11 @@ impl PimdirClient {
         Ok(PimdirQueuedIntent::new(enqueued, source, Some(collection)))
     }
 
-    /// Queues the deletion of `mailbox` and the messages it holds for the
-    /// store's owner, returning the queue row and the source that performs
-    /// it.
+    /// Queues deleting `mailbox` and its messages, returning the row and
+    /// its performer.
     ///
-    /// The intent is anchored on the mailbox itself and never takes another
-    /// one. The deletion arrives with the sync that performs it.
-    ///
-    /// The performer is named as for a creation, and a store whose sources
-    /// declare nothing is refused the same way.
+    /// Anchored on the mailbox itself; an undeclaring store is refused as
+    /// for a creation.
     pub fn delete_mailbox(&mut self, mailbox: &str) -> Result<PimdirQueuedIntent> {
         let collection = self.hub_id(mailbox)?;
         let mut producer = self.producer()?;
@@ -1344,15 +1264,9 @@ impl PimdirClient {
     /// Deletes each id `mailbox` holds, staged as `Remove` (the next sync
     /// pushes it as the backend's own disposal), returning how many it found.
     ///
-    /// Every id is checked before the rows are staged, an unknown one
-    /// skipped, so the caller reports how many messages it found. The rows
-    /// are one batch (pimdir STORAGE §15.1): an id the gate refuses leaves
-    /// nothing staged.
-    ///
-    /// The remove names no body it read and resolves no conflict (pimdir
-    /// STORAGE §15.3): it deletes whatever the message holds, and the
-    /// owner parks it over a message a sync left in conflict, Himalaya
-    /// deciding none.
+    /// Unknown ids are skipped; one batch (pimdir STORAGE §15.1) stages
+    /// nothing on a refusal. The remove resolves no conflict (§15.3): the
+    /// owner parks it on a conflicted message, Himalaya deciding none.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let collection = self.hub_id(mailbox)?;
         let Outcome {
@@ -1385,10 +1299,8 @@ impl PimdirClient {
     /// Stages one refiling action per id `from` holds, `build` deciding
     /// whether the source copy stays, returning how many it found.
     ///
-    /// Every id is checked before the rows are staged, an unknown one an
-    /// item error, so the caller reports how many messages it found. The
-    /// rows are one batch (pimdir STORAGE §15.1): an id the gate refuses
-    /// leaves nothing staged.
+    /// An unknown id is an item error; one batch (pimdir STORAGE §15.1)
+    /// stages nothing on a refusal.
     fn refile(
         &mut self,
         from: &str,
@@ -1426,9 +1338,8 @@ impl PimdirClient {
             .with_context(|| format!("Read `{id}` in `{collection}`"))
     }
 
-    /// The public ids of `ids` the collection holds, checked here so a stale
-    /// id is an item error rather than parked by the owner much later; a
-    /// malformed one fails.
+    /// The public ids of `ids` the collection holds, so a stale id is an
+    /// item error, not parked much later; a malformed one fails.
     fn found<'a>(&self, collection: &str, ids: &[&'a str]) -> Result<Outcome<Vec<(&'a str, i64)>>> {
         let mut found = Outcome::from(Vec::with_capacity(ids.len()));
         for id in ids {
@@ -1440,14 +1351,11 @@ impl PimdirClient {
         Ok(found)
     }
 
-    /// Walks a mailbox newest first by keyset pages, from below `start`
-    /// (a sort key and a public id) or from the newest, handing each item
-    /// to `visit`, which stops the walk or names the size of the next page;
-    /// the walk ends with the mailbox.
+    /// Walks a mailbox newest first by keyset pages from below `start`,
+    /// `visit` stopping the walk or sizing the next page.
     ///
-    /// `unread` reads through the store's unread chip, which reads the
-    /// committed rows only: the caller checks no queued action changes what
-    /// the mailbox shows (`PimdirReader::overlay_quiet`).
+    /// `unread` reads committed rows only: the caller checks
+    /// `PimdirReader::overlay_quiet`.
     fn walk(
         &self,
         collection: &str,
@@ -1509,9 +1417,8 @@ impl PimdirClient {
         Ok(entries.into_iter().map(|entry| entry.item).collect())
     }
 
-    /// Pulls every live item of a collection with its summary by keyset
-    /// paging, newest first (the read API is paginated; the unified
-    /// list/search commands paginate in memory, as the file backends do).
+    /// Pulls every live item of a collection with its summary, newest
+    /// first, for the unified commands to paginate in memory.
     fn scan_items(&self, collection: &str) -> Result<Vec<PimdirItem>> {
         let mut all: Vec<PimdirItem> = Vec::new();
         loop {
@@ -1530,9 +1437,8 @@ impl PimdirClient {
         Ok(all)
     }
 
-    /// The mailbox's parked rows, any action kind, in append order: what the
-    /// owner refused to apply and leaves to an operator (pimdir STORAGE
-    /// §15.3), which no listing shows otherwise.
+    /// The mailbox's parked rows in append order, left to an operator
+    /// (pimdir STORAGE §15.3) and shown by no other listing.
     pub fn parked_actions(&self, mailbox: &str) -> Result<Vec<PimdirParkedAction>> {
         let collection = self.hub_id(mailbox)?;
         let parked = self
@@ -1547,11 +1453,8 @@ impl PimdirClient {
             .collect())
     }
 
-    /// What the store holds of the account, as `pimdir status` reports
-    /// it: its mailboxes by id with how many messages carry a local body
-    /// (read off the summaries, no body opened) and how many creations
-    /// and sends are queued, the rows parked in them and the refusals
-    /// standing there.
+    /// What the store holds of the account, as `pimdir status` reports it,
+    /// local bodies counted off the summaries, no body opened.
     pub fn status(&self) -> Result<PimdirStatusOutput> {
         let accounts = self
             .store
@@ -1637,16 +1540,16 @@ impl PimdirClient {
     }
 }
 
-/// Whether a queued action is a message waiting for a public id: a create,
-/// or a send the owner performs.
-/// Logs each capability the sources support in part that the gate of
-/// pimdir STORAGE §15.6 passed `rows` with.
+/// Logs each partial support the gate (pimdir STORAGE §15.6) passed `rows`
+/// with.
 fn warn_partials(rows: &[PimdirEnqueued]) {
     for partial in rows.iter().flat_map(|row| &row.partial) {
         warn!("{partial}");
     }
 }
 
+/// Whether a queued action is a message waiting for a public id: a create,
+/// or a send the owner performs.
 fn is_queued_mail(action: &PimdirAction) -> bool {
     match action {
         PimdirAction::Add { .. } => true,
@@ -1769,9 +1672,8 @@ pub struct PimdirQueuedIntent {
 }
 
 impl PimdirQueuedIntent {
-    /// The intent `enqueued` queued for `source` on `mailbox`, warning
-    /// about each capability the source supports in part (pimdir STORAGE
-    /// §15.6).
+    /// The intent `enqueued` queued for `source` on `mailbox`, warning of
+    /// each partial support (pimdir STORAGE §15.6).
     fn new(enqueued: PimdirEnqueued, source: String, mailbox: Option<String>) -> Self {
         for partial in &enqueued.partial {
             warn!("{partial}");
@@ -1792,9 +1694,8 @@ pub struct PimdirFlagged {
     /// The `set-flags` row it waits in, `None` when the change left the
     /// message as it shows and nothing was staged.
     pub queue_id: Option<PimdirActionHandle>,
-    /// What a source supports of the change only in part, as its
-    /// declaration words it: the row is queued, and the server may keep
-    /// less than it asks.
+    /// Each partial support the source declares, as worded: the row is
+    /// queued, but the server may keep less than it asks.
     pub partial: Vec<String>,
 }
 
@@ -1810,15 +1711,11 @@ struct Addressed {
     subject: Option<String>,
 }
 
-/// Applies a flag op to a base set, producing the replacement set `SetFlags`
-/// stores. An add or a remove on an unknown base is refused: the base holds
-/// no markers to build on, and the replacement would erase whatever the
-/// server holds. A set replaces the whole set, so it needs no base.
+/// Applies a flag op to a base set, producing the set `SetFlags` stores.
 ///
-/// Flags are matched as [`Flag`]s rather than as strings, so a marker the
-/// store holds in another spelling than the one given, `\seen` for
-/// `\Seen` or Thunderbird's `Junk` for `$Junk`, is the one an add keeps
-/// and a remove drops.
+/// An add or remove on an unknown base is refused, as it would erase the
+/// server's set. Flags match as [`Flag`]s, so `\seen` or Thunderbird's
+/// `Junk` is the marker an add of `\Seen` or `$Junk` keeps.
 fn apply_flag_op(current: &PimdirFlags, flags: &[Flag], op: FlagOp) -> Result<PimdirFlags> {
     if matches!(op, FlagOp::Set) {
         return apply_flag_op(&PimdirFlags::Known(Default::default()), flags, FlagOp::Add);
@@ -1852,16 +1749,12 @@ fn parse_id(id: &str) -> Result<i64> {
         .map_err(|_| message_not_found(format!("Invalid message id `{id}` (expected a number)")))
 }
 
-/// What a search query states that the store's reads express, every
-/// clause still being matched in memory, so a bound only skips rows the
-/// query cannot match.
+/// The top-level `and` clauses the store's reads express, every clause
+/// still matched in memory, so a bound only skips unmatchable rows.
 ///
-/// Only clauses joined by `and` at the top of the query count. The bounds
-/// are days (`YYYY-MM-DD`) compared with the sort key, which for mail is
-/// the summary date as `YYYY-MM-DDTHH:MM:SSZ` (pimdir STORAGE §9.3, Annex
-/// A.1), empty for an undated row: the key of an instant on a day sorts at
-/// or above that day's own key and below the next one's. A date clause
-/// reads the day in UTC, the offset the store keeps.
+/// Bounds are UTC days compared with the sort key, the summary date as
+/// `YYYY-MM-DDTHH:MM:SSZ` (pimdir STORAGE §9.3, Annex A.1), which sorts
+/// at or above its day's key and below the next.
 #[derive(Debug, Default, PartialEq)]
 struct PimdirPushdown {
     /// The lowest sort key a match can have, inclusive: an undated row
@@ -1948,9 +1841,8 @@ fn next_day_key(day: NaiveDate) -> Option<String> {
     day.succ_opt().and_then(day_key)
 }
 
-/// Whether a search order is the store's own, date descending: none, or
-/// `date desc` alone, both sorting the undated last and keeping ties in
-/// the order read.
+/// Whether a search order is the store's own (none, or `date desc` alone),
+/// the undated last and ties in the order read.
 fn is_store_order(sort: Option<&[SearchEmailsSorter]>) -> bool {
     sort.is_none_or(|chain| {
         chain.is_empty()
@@ -1962,10 +1854,8 @@ fn is_store_order(sort: Option<&[SearchEmailsSorter]>) -> bool {
     })
 }
 
-/// Whether a row sits where its date files it, which the search bounds and
-/// early stop rest on: its sort key is its summary date written as
-/// `YYYY-MM-DDTHH:MM:SSZ`, or empty for a row whose date does not read and
-/// so sorts last.
+/// Whether a row's sort key is its summary date as `YYYY-MM-DDTHH:MM:SSZ`
+/// (empty when undated), which the search bounds and early stop rest on.
 fn in_store_order(item: &PimdirItem) -> bool {
     let date = mail_summary(item.summary.as_ref())
         .and_then(|mail| mail.date.as_deref())
@@ -2264,13 +2154,8 @@ mod tests {
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
 
-    /// A mailbox holding one `Message-ID` twice is ordinary, and the store
-    /// keys the second copy apart under a minted one rather than keep one of
-    /// the two.
-    ///
-    /// Both project as ordinary envelopes: the id a user sees is the `seq`,
-    /// which differs between them, so neither hides the other and the minted
-    /// key never shows.
+    /// A `Message-ID` held twice is keyed apart under a minted one, and
+    /// both list as envelopes under distinct `seq`s, the minted key hidden.
     #[test]
     fn two_items_sharing_a_message_id_project_two_public_ids() {
         let twice = || PimdirMailSummary {
@@ -2322,9 +2207,8 @@ mod tests {
         assert!(!removed.contains("\\Seen"));
     }
 
-    /// An add or a remove onto an unknown set is refused: the action
-    /// replaces the set, so it would erase whatever the server holds. A set
-    /// replaces it anyway, so it stages a known one.
+    /// An add or remove onto an unknown set is refused, as it would erase
+    /// the server's set; a set replaces it anyway, so it stages.
     #[test]
     fn a_flag_op_on_an_unknown_set_is_refused_but_a_set() {
         let seen = [Flag::from_raw("\\Seen")];
@@ -2340,10 +2224,8 @@ mod tests {
         assert!(staged.contains("\\Seen"));
     }
 
-    /// A queued add carries no summary, so its row's subject is derived
-    /// from the body it pins, the way the owner will derive it; the row
-    /// names the link id its receipt printed and no stored message, and
-    /// no placeholder stands in for the id the message lacks.
+    /// A queued add's row takes its subject from the pinned body and names
+    /// the receipt's link id, with no placeholder for the missing id.
     #[test]
     fn a_queued_creation_names_its_link_id_and_its_subject() {
         let (_dir, mut client) = sent_store();
@@ -2363,9 +2245,8 @@ mod tests {
         assert_eq!(rows[0].error, None);
     }
 
-    /// A pending row whose payload does not decode leaves its mailbox's
-    /// rows unread rather than failing the listing: the mailbox is one
-    /// item error, coded as io-pimdir codes the payload.
+    /// An undecodable pending row makes its mailbox one item error, coded
+    /// by io-pimdir, rather than failing the listing.
     #[test]
     fn an_undecodable_row_is_an_item_error_of_its_mailbox() {
         let (dir, mut client) = sent_store();
@@ -2403,9 +2284,8 @@ mod tests {
         assert_eq!(addressed.subject, None);
     }
 
-    /// A bare `pimdir queue list` covers the whole account, so a send
-    /// queued on the sent mailbox shows there; `--mailbox` narrows it to
-    /// one mailbox.
+    /// A bare `pimdir queue list` covers the whole account, a queued send
+    /// included; `--mailbox` narrows it to one mailbox.
     #[test]
     fn the_queue_list_covers_the_account_unless_narrowed() {
         use clap::Parser;
@@ -2594,9 +2474,8 @@ mod tests {
         );
     }
 
-    /// A `submit` names its performer, and an undeclared one is the source
-    /// syncing the mailbox: a mailbox no source syncs yet has none, and the
-    /// send is refused rather than queued for nobody.
+    /// A `submit` names its performer, by default the mailbox's syncing
+    /// source; with none the send is refused, not queued for nobody.
     #[test]
     fn a_send_no_source_performs_stages_nothing() {
         let (_dir, mut client) = sent_store();
@@ -2765,10 +2644,8 @@ mod tests {
         assert_eq!(pending[0].id, sent.staged.queue_id.id);
     }
 
-    /// Runs `stage` on a client of a store whose staging lock is held
-    /// exclusively, as the collector holds it (pimdir STORAGE §8), and
-    /// checks no body reached the blob tree before the lock was released,
-    /// and that the staged row landed after.
+    /// Runs `stage` under a collector's exclusive staging lock (pimdir
+    /// STORAGE §8), checking nothing lands before its release, the row after.
     fn assert_stages_after_the_collector(
         stage: impl FnOnce(&mut PimdirClient) -> Result<i64> + Send + 'static,
     ) {
@@ -2919,9 +2796,8 @@ mod tests {
         assert_eq!(store.pending_actions("imap/Sent").unwrap().len(), 1);
     }
 
-    /// A row another app queued on a collection of the same account, an
-    /// address book here, reads as unknown: it can be neither shown nor
-    /// cancelled, as Cardamum and Calendula keep to their own kind.
+    /// A row another app queued on the account's address book reads as
+    /// unknown, neither shown nor cancelled, each app keeping to its kind.
     #[test]
     fn a_queue_row_of_another_kind_is_unknown() {
         let (dir, client) = sent_store();
@@ -2957,9 +2833,8 @@ mod tests {
         assert_eq!(store.pending_actions("carddav/contacts").unwrap().len(), 1);
     }
 
-    /// A cancel takes the owner role on the store as it stands: a store
-    /// another draft wrote is refused, its stamp and its queue left as
-    /// they are, never reconciled to this draft.
+    /// A cancel refuses a store another draft wrote, its stamp and queue
+    /// left as they are, never reconciled.
     #[test]
     fn a_cancel_leaves_a_store_of_another_draft_alone() {
         let (dir, mut client) = sent_store();
@@ -3033,8 +2908,7 @@ mod tests {
     }
 
     /// A store of another draft is refused `store-version` in the shared
-    /// wording: an earlier one is synced out and set aside, a later one
-    /// asks for a later himalaya, and neither is ever deleted.
+    /// wording, earlier or later, and never deleted.
     #[test]
     fn a_store_of_another_draft_is_refused_saying_which_is_earlier() {
         for (version, asks) in [
@@ -3334,10 +3208,8 @@ mod tests {
         );
     }
 
-    /// A mailbox the performer's source syncs under the name asked, at the
-    /// top or under the parent, is refused `mailbox-duplicate` before anything
-    /// is queued, as is one whose creation is queued already; another
-    /// source's mailbox of that name is no obstacle.
+    /// A name the performer's source holds or has queued is refused
+    /// `mailbox-duplicate`; another source's mailbox of that name is not.
     #[test]
     fn a_mailbox_the_store_lists_is_not_created_again() {
         let (dir, mut client) = sent_store();
@@ -3426,10 +3298,8 @@ mod tests {
         assert_eq!(client.store_support(Capability::MessageRead).unwrap(), None);
     }
 
-    /// A store whose `msgraph` source syncs `msgraph/Drafts` and
-    /// `msgraph/Archive` and adds to its drafts folder alone, as neverest
-    /// declares a Graph source: `mail.message.add` `none` source-wide,
-    /// `full` on the folder of the drafts role.
+    /// A Graph source as neverest declares it, `msgraph/Drafts` and
+    /// `msgraph/Archive`, `mail.message.add` `full` on drafts alone.
     fn drafts_only_store() -> (tempfile::TempDir, PimdirClient) {
         use io_pimdir::capability::{PimdirCapability, PimdirSupport};
 
@@ -3472,8 +3342,7 @@ mod tests {
     }
 
     /// A collection's own `mail.message.add` row wins over its source's:
-    /// an add elsewhere is refused before anything is staged, naming the
-    /// mailbox, while the drafts folder takes it.
+    /// an add elsewhere is refused naming the mailbox, drafts take it.
     #[test]
     fn an_add_where_the_source_adds_nothing_is_refused_up_front() {
         let (_dir, mut client) = drafts_only_store();
@@ -3553,9 +3422,8 @@ mod tests {
         assert_eq!(payload, serde_json::json!({ "v": 1, "source": "imap" }));
     }
 
-    /// What the sync engine does once the server renamed the mailbox, its
-    /// id deriving from its name (pimdir STORAGE Annex B.2): the receipt
-    /// follows the collection to its new id.
+    /// Once the server renamed the mailbox, the receipt follows the
+    /// collection to its new id (pimdir STORAGE Annex B.2).
     #[test]
     fn a_performed_renaming_reads_applied_under_the_new_id() {
         let (dir, mut client) = sent_store();
@@ -3579,9 +3447,8 @@ mod tests {
         assert_eq!(seq, None);
     }
 
-    /// What the sync engine does once the server deleted the mailbox: the
-    /// receipt outlives the collection (pimdir STORAGE §15.4), so the row
-    /// still reads applied, naming no collection.
+    /// Once the server deleted the mailbox, the row still reads applied,
+    /// naming no collection (pimdir STORAGE §15.4).
     #[test]
     fn a_performed_deletion_reads_applied_once_the_mailbox_left() {
         let (dir, mut client) = sent_store();
@@ -3639,10 +3506,8 @@ mod tests {
         summary: Option<PimdirMailSummary>,
     }
 
-    /// `n` mails spread over six days of May 2026, with ties on the minute,
-    /// undated ones, rows with no summary, read and unread (`\Seen` in two
-    /// spellings), flagged, unknown flag sets, two senders on some, and an
-    /// attachment mark set, cleared or absent.
+    /// `n` mails over six days of May 2026, mixing the edge cases a search
+    /// pushdown must not drop: ties, undated, summaryless, flag spellings.
     fn mails(prefix: &str, n: usize) -> Vec<Seeded> {
         let words = ["release", "Invoice", "météo", "hello"];
         (0..n)
@@ -4050,10 +3915,8 @@ mod tests {
         assert_eq!(covered, expected);
     }
 
-    /// A row filed under another key than its date sends the search back
-    /// to the whole-mailbox read, which answers as before. io-pimdir files
-    /// every row it writes under its date, so the row is filed elsewhere as
-    /// a writer of its own could.
+    /// A row filed under another key than its date, as a foreign writer
+    /// could, sends the search back to the whole-mailbox read.
     #[test]
     fn a_row_out_of_date_order_searches_the_whole_mailbox() {
         let dir = tempfile::tempdir().unwrap();
@@ -4329,11 +4192,8 @@ mod tests {
         }
     }
 
-    /// A store holding `imap/INBOX` with five mails: `k0` carrying no flag,
-    /// `k1` the keyword `act`, `k2` `\Seen`, `k3` flags never read, and `k4`
-    /// `\seen` and Thunderbird's `Junk`, spellings other than the canonical
-    /// ones. `declared` is what the `imap` source declares, `None` leaving it
-    /// undeclared, which nothing gates.
+    /// `imap/INBOX` with `k0` unflagged, `k1` `act`, `k2` `\Seen`, `k3`
+    /// flags unknown, `k4` `\seen` and `Junk`; `declared` the source's gate.
     fn flag_store(
         declared: Option<&[(&str, io_pimdir::capability::PimdirSupport)]>,
     ) -> (tempfile::TempDir, PimdirClient) {
@@ -4401,10 +4261,8 @@ mod tests {
         Flag::from_raw(raw)
     }
 
-    /// A flag change applied, then refused for good by the server it was
-    /// pushed to, reads applied on its message with the refusal in `pimdir
-    /// queue show`, and lists beside the mailbox's queue (pimdir STORAGE
-    /// §15.4).
+    /// A flag change applied then refused for good reads applied with the
+    /// refusal, in `queue show` and the queue list (pimdir STORAGE §15.4).
     #[test]
     fn a_refused_push_shows_on_its_row_and_beside_the_queue() {
         use io_pimdir::{
@@ -4489,9 +4347,8 @@ mod tests {
         );
     }
 
-    /// A flag the store cannot hold, reaching the backend past the flag
-    /// commands' own check, is refused by the enqueue as `flag-invalid`,
-    /// and nothing is queued.
+    /// A flag the store cannot hold, past the commands' check, is refused
+    /// by the enqueue as `flag-invalid`, nothing queued.
     #[test]
     fn a_flag_the_store_cannot_hold_is_refused_and_stages_nothing() {
         let (_dir, mut client) = flag_store(None);
@@ -4583,9 +4440,8 @@ mod tests {
         assert!(text.contains(&format!("\nWarning: {warning}\n")), "{text}");
     }
 
-    /// A read asked to mark the message seen fails, as on Maildir and
-    /// mbox, when the store cannot stage the flag, rather than read it
-    /// unseen and exit 0.
+    /// A read marking the message seen fails, as on Maildir and mbox, when
+    /// the flag cannot stage, rather than exit 0 unseen.
     #[test]
     fn a_read_whose_seen_flag_is_refused_fails() {
         use io_pimdir::capability::{MAIL_FLAGS_SEEN, PimdirSupport};
@@ -4833,10 +4689,8 @@ mod tests {
         );
     }
 
-    /// An add or a remove states the set it was read from (pimdir STORAGE
-    /// §15.3), so the owner applies the change alone: a flag a sync lands
-    /// on the message while the row waits in the queue survives the
-    /// drain. A set states none and replaces whatever the message holds.
+    /// A flag a sync lands while an add or remove waits survives the drain
+    /// (pimdir STORAGE §15.3); a set replaces whatever the message holds.
     #[test]
     fn a_flag_synced_while_a_change_waits_survives_all_but_a_set() {
         let cases = [
@@ -4906,9 +4760,8 @@ mod tests {
         assert_eq!(client.store.pending_actions("imap/INBOX").unwrap().len(), 1);
     }
 
-    /// A refile or a delete stages the ids the mailbox holds and counts them,
-    /// an unknown one an item error; none known stages nothing, nor does a
-    /// move onto its own mailbox.
+    /// A refile or delete stages and counts the known ids, an unknown one
+    /// an item error; a move onto its own mailbox stages nothing.
     #[test]
     fn a_refile_or_delete_stages_the_ids_it_found() {
         let (dir, mut client) = flag_store(None);
@@ -4945,9 +4798,8 @@ mod tests {
         assert_eq!(queued(&client), 3);
     }
 
-    /// A copy of several ids is one queue transaction: the gate refusing
-    /// the second id leaves the first unstaged too, so a rerun stages it
-    /// once.
+    /// A copy of several ids is one transaction: a refused second id leaves
+    /// the first unstaged too, so a rerun stages it once.
     #[test]
     fn a_refile_refused_on_one_id_stages_none() {
         use io_pimdir::capability::{
@@ -5090,9 +4942,8 @@ mod tests {
         assert!(client.parked_actions("imap/Sent").unwrap().is_empty());
     }
 
-    /// A store whose `imap/Drafts` holds one draft a sync left in conflict
-    /// beside an empty `imap/Trash`, the client reading it, and the hash
-    /// of the diverging body.
+    /// A conflicted draft in `imap/Drafts` beside an empty `imap/Trash`,
+    /// the client, and the diverging body's hash.
     fn conflicted_store() -> (tempfile::TempDir, PimdirClient, PimdirHash) {
         use io_pimdir::{
             change::PimdirWriteOp,
@@ -5154,11 +5005,8 @@ mod tests {
         (dir, PimdirClient::new(config).unwrap(), theirs)
     }
 
-    /// A move states no resolution, so the owner parks one queued on a
-    /// message a sync left in conflict (pimdir SYNC §7, STORAGE §15.3) and
-    /// the reader folds nothing for it (§15.4): the message stays listed
-    /// where it was, and its row reads parked, naming the diverging body,
-    /// in the mailbox it was queued in.
+    /// A move on a conflicted message is parked (pimdir SYNC §7, STORAGE
+    /// §15.3): it stays listed where it was, its row parked naming the body.
     #[test]
     fn a_move_over_a_conflicted_message_stays_listed_and_parks() {
         use crate::pimdir::queue::show::{PimdirQueueShowOutput, PimdirQueueState};

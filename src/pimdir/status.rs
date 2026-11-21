@@ -203,9 +203,8 @@ mod tests {
 
     const STORE: &str = "e2646df031cd876334410c4df14ebd86";
 
-    /// The report prints the twins' keys, a parked row by its row and
-    /// handle, a mailbox under `mailboxId` in parked and refused rows; the
-    /// text lists each block after the mailboxes.
+    /// The report prints the twins' keys, parked rows by row and handle,
+    /// `mailboxId` in parked and refused rows, blocks after the mailboxes.
     #[test]
     fn a_status_prints_mailboxes_parked_rows_and_refusals() {
         let output = PimdirStatusOutput {

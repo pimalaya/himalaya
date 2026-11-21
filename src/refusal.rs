@@ -1,11 +1,9 @@
 //! # HTTP refusals
 //!
 //! What a `gmail`, `msgraph` or `jmap` command prints when the server
-//! refuses it: an HTTP 4xx or 5xx carrying the provider's error, or a JMAP
-//! method or set error. The refusal is the command's result, under
-//! `refusal`, and the command exits 3, the server having answered. A
-//! command that gets no answer at all (network, TLS, a body that does not
-//! parse, a local error) still fails with the failure object.
+//! refuses it (an HTTP 4xx or 5xx, a JMAP method or set error): the result,
+//! under `refusal`, exit 3. A command that gets no answer (network, TLS, an
+//! unparsable body, a local error) still fails with the failure object.
 
 use std::fmt;
 
@@ -30,16 +28,15 @@ pub struct Refusal {
     /// The HTTP status, `null` for a refusal answered inside a 2xx (a
     /// JMAP method or set error).
     pub status: Option<u16>,
-    /// The provider's name for the refusal, in its spelling: Gmail's
-    /// first reason (`notFound`), Graph's `error.code`
-    /// (`ErrorItemNotFound`), the JMAP error type (`invalidArguments`),
-    /// `null` when the provider names none.
+    /// The provider's name for the refusal, `null` when it names none.
+    ///
+    /// Gmail's first reason (`notFound`), Graph's `error.code`
+    /// (`ErrorItemNotFound`), the JMAP error type (`invalidArguments`).
     pub reason: Option<String>,
     /// The provider's message.
     pub message: String,
-    /// Himalaya's code of the refusal, as a failure would carry it
-    /// (`permission-denied`, `quota-exceeded`, `rate-limited`), `null`
-    /// when none applies.
+    /// Himalaya's code of the refusal (`permission-denied`, `quota-exceeded`,
+    /// `rate-limited`), `null` when none applies.
     pub code: Option<ErrorCode>,
     /// The seconds the server asked to wait before a retry, `null` when
     /// it asked none.
@@ -81,8 +78,7 @@ pub enum Refusable<T> {
 pub type Reader = fn(&(dyn std::error::Error + 'static)) -> Option<Refusal>;
 
 /// Ends a protocol command: its error unchanged, unless a reader finds a
-/// refusal in its chain, which then prints as the result and ends the
-/// command with the partial-outcome status.
+/// refusal in its chain, printed as the result with the partial status.
 pub fn print(printer: &mut impl Printer, readers: &[Reader], result: Result<()>) -> Result<()> {
     let err = match result {
         Ok(()) => return Ok(()),

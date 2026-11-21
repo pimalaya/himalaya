@@ -1,9 +1,8 @@
 //! # Raw JMAP calls
 //!
-//! The `Foo/query` chained into its `Foo/get` in one request, the
-//! `Foo/get` alone and the `Foo/set` creating one object, each answer kept
-//! as the server sent it, for the protocol commands, which print the
-//! server's payload rather than re-serialize it (pimalaya-cli output.md,
+//! `Foo/query` chained into `Foo/get`, `Foo/get` alone and a one-object
+//! `Foo/set`, each answer kept as sent: protocol commands print the server's
+//! payload rather than re-serialize it (pimalaya-cli output.md,
 //! *Protocol commands are raw-faithful*).
 
 use anyhow::{Context, Result};
@@ -26,8 +25,7 @@ pub struct JmapRawList {
     /// The ids the `Foo/get` did not find (`notFound`).
     pub not_found: Vec<String>,
     /// The other keys of both answers, the `ids` and `accountId` they
-    /// repeat left out: the query's `queryState`, `canCalculateChanges`,
-    /// `position` and `total`, the get's `state`.
+    /// repeat left out.
     pub rest: Map<String, Value>,
 }
 
@@ -263,8 +261,7 @@ mod tests {
         (client, requests)
     }
 
-    /// The objects print as the server sent them, a property no type
-    /// models included, beside the query's own keys; `notFound` stays
+    /// The objects print as sent beside the query's keys, `notFound` kept
     /// apart for the item errors.
     #[test]
     fn a_query_keeps_what_the_server_sent() {
@@ -314,9 +311,8 @@ mod tests {
         );
     }
 
-    /// A get without ids asks for every object (`ids` null), an identity
-    /// under the submission capability, and keeps each as sent beside the
-    /// get's `state`.
+    /// A get without ids sends `ids` null, an identity under the submission
+    /// capability, and keeps each object as sent.
     #[test]
     fn a_get_without_ids_asks_for_every_object() {
         let answer = json!({"methodResponses": [

@@ -10,10 +10,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A mailbox, also known as a folder.
 ///
-/// Strictly least-common-denominator: what is not first-class in every
-/// protocol, an IMAP delimiter, a Maildir path, is reached through the
-/// protocol-specific subcommands instead. The role is optional, so a
-/// backend without one still fits.
+/// What is not first-class in every protocol (an IMAP delimiter, a Maildir
+/// path) goes through the protocol-specific subcommands instead. The role
+/// is optional, so a backend without one still fits.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Mailbox {
@@ -58,10 +57,9 @@ pub struct MailboxIndex(pub Vec<Mailbox>);
 impl MailboxIndex {
     /// Maps a mailbox id, name or role onto its id.
     ///
-    /// A known id passes through, then a name match, then a role match,
-    /// either erroring when several mailboxes match. An unknown
-    /// value goes back as it is, so the backend surfaces the error or
-    /// takes it as a native name.
+    /// An id first, then a name, then a role, several matches erroring. An
+    /// unknown value goes back as is, for the backend to refuse or take as
+    /// a native name.
     #[cfg(any(feature = "imap", feature = "jmap", feature = "gmail"))]
     pub fn resolve(&self, mailbox: &str) -> Result<String> {
         if self.0.iter().any(|m| m.id == mailbox) {

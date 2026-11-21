@@ -180,9 +180,8 @@ impl EmailClient {
         }
     }
 
-    /// Creates the mailbox `name` at the top, or under `parent`,
-    /// returning its id, `None` when the backend queues the creation, and
-    /// its full name where the backend names the hierarchy by path.
+    /// Creates `name` at the top or under `parent`: its id (`None` when
+    /// queued) and its full name where the hierarchy is named by path.
     pub fn create_mailbox(
         &mut self,
         name: &str,
@@ -230,10 +229,8 @@ impl EmailClient {
         }
     }
 
-    /// Renames the last level of `mailbox` to `name`, its parent kept,
-    /// returning the id it has afterwards, `None` when the backend queues
-    /// the rename, and its full name where the backend names the hierarchy
-    /// by path.
+    /// Renames the last level of `mailbox` to `name`: its new id (`None`
+    /// when queued) and its full name where the hierarchy is named by path.
     #[cfg_attr(
         not(any(
             feature = "imap",
@@ -316,10 +313,10 @@ impl EmailClient {
         }
     }
 
-    /// Lists one page of envelopes from `mailbox`, beside how many messages
-    /// it holds when the backend answers it within the listing's own
-    /// exchanges, `None` otherwise (Gmail's count being an estimate, Graph's
-    /// a request of its own).
+    /// Lists one page of envelopes from `mailbox`, with its message count
+    /// when the listing's own exchanges answer it.
+    ///
+    /// `None` otherwise: Gmail's count is an estimate, Graph's a request.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -447,9 +444,8 @@ impl EmailClient {
     /// Fetches one message's raw RFC 5322 bytes and its flags, marking
     /// it seen when asked.
     ///
-    /// IMAP folds the flag into the fetch itself, where the other
-    /// backends issue a separate update. Each adapter resolves the
-    /// mailbox itself, JMAP, Gmail and Graph only when the message is not
+    /// IMAP folds the flag into the fetch, the others issue an update. JMAP,
+    /// Gmail and Graph resolve the mailbox only when the message is not
     /// where it was named.
     pub fn get_message(
         &mut self,
@@ -477,9 +473,8 @@ impl EmailClient {
         }
     }
 
-    /// Adds a raw message to a mailbox with the given flags, refusing a
-    /// flag the backend cannot keep. Returns the new message id, absent
-    /// when an IMAP or JMAP server does not report it.
+    /// Adds a raw message with `flags`, refusing one the backend cannot
+    /// keep: the new id, absent when an IMAP or JMAP server omits it.
     #[cfg_attr(
         not(any(
             feature = "imap",
@@ -584,10 +579,9 @@ impl EmailClient {
     /// The id of the mailbox the backend marks with `role`, `None` when it
     /// marks none.
     ///
-    /// JMAP, Gmail, Graph and pimdir carry roles, IMAP only the reserved
-    /// `INBOX` until SPECIAL-USE is read, mbox the spool as `INBOX`, and
-    /// Maildir none, the caller falling back on the
-    /// `mailbox.alias.<role>` entry.
+    /// IMAP knows only `INBOX` until SPECIAL-USE is read, mbox the spool as
+    /// `INBOX`, Maildir none: the caller falls back on
+    /// `mailbox.alias.<role>`.
     #[cfg_attr(
         not(any(
             feature = "imap",
@@ -687,9 +681,8 @@ impl EmailClient {
         &self.resolution
     }
 
-    /// The flags as the storage backend writes them, which a receipt
-    /// names: JMAP spells an IANA flag as its keyword (`$flagged`), the
-    /// other backends as given.
+    /// The flags as the backend writes them, for a receipt: JMAP spells an
+    /// IANA flag as its keyword (`$flagged`), the others as given.
     pub fn written_flags(&self, flags: Vec<Flag>) -> Vec<Flag> {
         match &self.storage {
             #[cfg(feature = "jmap")]
@@ -701,9 +694,8 @@ impl EmailClient {
         }
     }
 
-    /// Whether the storage backend queues its writes for a sync engine to
-    /// apply later rather than performing them, so a confirmation says the
-    /// write is queued rather than done.
+    /// Whether the backend queues writes for a sync engine, so a
+    /// confirmation says queued rather than done.
     pub fn queues_writes(&self) -> bool {
         #[cfg(feature = "pimdir")]
         if let Some(BackendClient::Pimdir(_)) = &self.storage {
@@ -712,9 +704,8 @@ impl EmailClient {
         false
     }
 
-    /// Whether the storage backend files every message it sends in its sent
-    /// mailbox itself, whatever is asked: Microsoft Graph does, its
-    /// `sendMail` saving to Sent Items.
+    /// Whether the backend files every sent message itself, whatever is
+    /// asked: Graph's `sendMail` saves to Sent Items.
     pub fn files_sent_copy(&self) -> bool {
         #[cfg(feature = "msgraph")]
         if let Some(BackendClient::Msgraph(_)) = &self.storage {
@@ -726,12 +717,9 @@ impl EmailClient {
     /// Sends a raw message through the storage backend when it can send,
     /// and through the SMTP transport otherwise.
     ///
-    /// `mailbox` is the sent mailbox, and `copy` asks for the message to
-    /// be filed there with `flags`. A backend may file that copy itself as
-    /// part of the send, [`SentCopy::Filed`]: pimdir, and Gmail, which
-    /// files every sent message under `SENT` and labels that one rather
-    /// than insert a second message differing from the one delivered. The
-    /// others owe the copy to the caller.
+    /// `copy` files it in the sent `mailbox` with `flags`. pimdir and Gmail
+    /// file it themselves ([`SentCopy::Filed`]), Gmail labelling its `SENT`
+    /// copy rather than insert a second, different one; others leave it.
     #[cfg_attr(not(feature = "gmail"), allow(unused_variables))]
     pub fn send_message(
         &mut self,
@@ -791,12 +779,9 @@ impl EmailClient {
     /// Maps a human mailbox name onto the backend-native id every
     /// operation method expects.
     ///
-    /// Identity where the name already is the id, and a cached listing
-    /// where the backend mints an opaque one. Every dispatching method
-    /// runs it first, so an adapter only ever receives ids.
-    ///
-    /// Idempotent, an already-resolved id passing through unchanged,
-    /// which is what lets a caller compare a mailbox against the trash.
+    /// Every dispatching method runs it first, so adapters only see ids.
+    /// Idempotent, an id passing through unchanged, which lets a caller
+    /// compare a mailbox against the trash.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -922,9 +907,8 @@ fn open_storage(
     Ok(client)
 }
 
-/// The addresses the account logs in as: the user names its IMAP and SMTP
-/// SASL blocks transmit holding an `@` (for PLAIN the identity acted as
-/// too), each once.
+/// The addresses the account logs in as, each once: the IMAP and SMTP SASL
+/// user names holding an `@` (for PLAIN the acted-as identity too).
 fn logins(account_config: &AccountConfig) -> Vec<String> {
     let blocks = [
         account_config.imap.as_ref().and_then(|c| c.sasl.as_ref()),

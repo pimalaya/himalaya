@@ -9,8 +9,7 @@
 //! The configuration is a plain model every build parses whole, the
 //! blocks of the backends it leaves out included, so every build accepts
 //! and refuses the same file. The features turn it into runtime values
-//! (TLS, proxy, SASL, server URL), so a build missing a backend leaves
-//! part of the model unread.
+//! (TLS, proxy, SASL, server URL).
 
 #![cfg_attr(
     not(all(
@@ -310,9 +309,8 @@ mod tests {
         assert!(err.contains("unknown field `emial`"), "{err}");
     }
 
-    /// The `tui` tables are himalaya-tui's, loaded whatever they hold at
-    /// the root and in an account, and the one exception: a table of
-    /// another name is refused.
+    /// The `tui` tables are himalaya-tui's, loaded whatever they hold, root
+    /// or account; a table of another name is refused.
     #[test]
     fn the_tui_tables_are_left_to_himalaya_tui() {
         let toml = "[tui]\ncontact-command = \"khard\"\ncontact-complete-key = \"tab\"\n\
@@ -326,8 +324,7 @@ mod tests {
     }
 
     /// The tables earlier versions read (`table`, `attachment`, `folder`,
-    /// the top-level `account`) are unknown keys like any other, at the
-    /// root and in an account, refused in serde's words alone.
+    /// top-level `account`) are unknown keys, refused in serde's words.
     #[test]
     fn the_tables_of_earlier_versions_are_unknown_keys() {
         let lines = [
@@ -364,9 +361,8 @@ mod tests {
         assert!(err.contains("unknown field `read`"), "{err}");
     }
 
-    /// himalaya-tui spells the identity `from` and `from-name`, and one
-    /// file backs both binaries, so a config it wrote must reach the same
-    /// fields the composers read.
+    /// One file backs both binaries, so the `from` and `from-name`
+    /// himalaya-tui writes must reach the fields the composers read.
     #[test]
     fn the_composing_config_reads_under_the_tui_spelling() {
         let config: Config = toml::from_str(
@@ -472,10 +468,8 @@ inbox = "~/spool""#,
         assert_eq!(mbox.inbox, Some(home.join("spool")));
     }
 
-    /// Checks config.sample.toml: one `[accounts.example]` table and no
-    /// other, parsed through the loader `-c` uses as written, then once per
-    /// rank with every line uncommented and that rank's value of each
-    /// field, `example` resolving as the default account each time.
+    /// Checks config.sample.toml parses as written and once per rank fully
+    /// uncommented, `example` its only account and the default each time.
     #[test]
     fn the_sample_configuration_parses_with_each_variant() {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config.sample.toml");
@@ -636,10 +630,11 @@ inbox = "~/spool""#,
         if replaces { values.max(2) } else { values }
     }
 
-    /// The sample at `rank`, every line uncommented: each field set once,
-    /// to its value of that rank, the last when it has fewer. A replacing
-    /// paragraph stays out at rank 1 and takes the place of the one above
-    /// it from rank 2.
+    /// The sample at `rank`, every line uncommented, each field set to its
+    /// value of that rank (the last when it has fewer).
+    ///
+    /// A replacing paragraph stays out at rank 1 and replaces the one
+    /// above it from rank 2.
     fn sample_variant(paragraphs: &[Vec<SampleLine>], rank: usize) -> String {
         let mut dropped = vec![false; paragraphs.len()];
 

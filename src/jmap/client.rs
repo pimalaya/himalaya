@@ -106,10 +106,8 @@ impl JmapClient {
 
     /// Downloads a blob, whose URL may live on another authority.
     ///
-    /// A matching host reuses the live session, a foreign one the
-    /// auxiliary connection to it ([`Self::auxiliary`]). Reusing the API
-    /// socket would send the request to the API server, which answers with
-    /// a redirect no download follows.
+    /// A foreign host goes through [`Self::auxiliary`]: the API socket would
+    /// reach the API server, which answers a redirect no download follows.
     pub fn download_blob(&mut self, download_url: &Url) -> Result<Vec<u8>> {
         let api_url = {
             let session = self
@@ -125,11 +123,11 @@ impl JmapClient {
         self.auxiliary(download_url, |client| client.blob_download(download_url))
     }
 
-    /// Runs `request` over the connection to the authority of `url`, one
-    /// the API session does not cover, opened with the credential the
-    /// session resolved and kept for the next request there. A request
-    /// failing over a kept connection, which the server may have closed
-    /// since, is sent once more over a fresh one.
+    /// Runs `request` over a kept connection to the authority of `url`,
+    /// opened with the session's credential.
+    ///
+    /// A request failing over a kept connection, which the server may have
+    /// closed since, is sent once more over a fresh one.
     pub fn auxiliary<T>(
         &mut self,
         url: &Url,
@@ -191,10 +189,8 @@ pub fn build_jmap_client(
     Ok((account, client))
 }
 
-/// Parses the JMAP `server` field into a [`Url`]. Accepts a full
-/// `http`/`https://host[:port][/path]` URL, a bare `host:port`, or a
-/// bare `host`; the last two default to `https://` (secure). Any other
-/// scheme is rejected.
+/// Parses the JMAP `server` field into a [`Url`], a bare host defaulting to
+/// `https://` and any scheme but `http`/`https` refused.
 pub fn parse_server_url(server: &str) -> Result<Url> {
     parse_server(server, "https", &["http", "https"])
 }
@@ -271,9 +267,8 @@ mod tests {
         assert_eq!(url.host_str(), Some("xn--bcher-kva.example"));
     }
 
-    /// Blob downloads on an authority other than the API's run the
-    /// credential command once, with the session, and share one
-    /// connection.
+    /// Blob downloads on a foreign authority run the credential command
+    /// once, with the session, and share one connection.
     #[test]
     fn blob_downloads_reuse_the_credential_and_the_connection() {
         use std::{

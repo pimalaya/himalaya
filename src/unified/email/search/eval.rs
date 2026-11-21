@@ -4,11 +4,10 @@
 //! [`Envelope`], for the backends that search locally, the sort chain
 //! then ordering the hits ([`crate::unified::email::search::sort::eval`]).
 //!
-//! The filter is matched against each envelope, `body` clauses reaching
-//! for the raw bytes. Date clauses read the `Date:` header, as the
-//! server-side backends do. The copy recipients, which an envelope does not
-//! carry, come from [`EnvelopeCopies`] when the caller has them, else from
-//! the raw headers, read only when a clause needs them.
+//! `body` clauses read the raw bytes, date clauses the `Date:` header as
+//! the server-side backends do. The copy recipients, which an envelope does
+//! not carry, come from [`EnvelopeCopies`] when given, else from the raw
+//! headers, read only when a clause needs them.
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use mime::{

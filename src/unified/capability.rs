@@ -160,10 +160,10 @@ impl Capability {
         }
     }
 
-    /// The pimdir STORAGE Annex B name of a write, the one a pimdir store's
-    /// sources declare: the domain word back, `mailbox.` read as
-    /// `collection.`, the trash a move. `None` for a read, which a store
-    /// answers locally, and for an account feature, which it does not hold.
+    /// The pimdir STORAGE Annex B name of a write, as a store's sources
+    /// declare it (`mailbox.` read as `collection.`, the trash a move).
+    ///
+    /// `None` for a read, answered locally, and an account feature, not held.
     #[cfg(feature = "pimdir")]
     pub fn annex_b_name(self) -> Option<&'static str> {
         let name = match self {
@@ -200,9 +200,8 @@ impl Capability {
         matches!(self, Self::Submit | Self::SubmitCopy)
     }
 
-    /// Whether it is a feature of the account rather than of a message,
-    /// which the first configured backend serving it answers, whatever the
-    /// storage backend.
+    /// Whether it is an account feature, answered by the first configured
+    /// backend serving it whatever the storage backend.
     fn is_account_feature(self) -> bool {
         matches!(self, Self::Vacation)
     }
@@ -254,9 +253,8 @@ impl Support {
     }
 }
 
-/// How a backend serves a capability as read at run time, its detail
-/// owned: what a pimdir store's sources declare, which its static row
-/// leaves to the store.
+/// How a backend serves a capability as read at run time: what a pimdir
+/// store's sources declare, which its static row leaves to the store.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StoreSupport {
     /// The level, as [`Support::level`] gives it.
@@ -340,9 +338,8 @@ pub struct Resolution {
     /// The sending transport: the storage backend when it sends, else
     /// SMTP when configured and allowed.
     pub sender: Option<Backend>,
-    /// The backend answering the account's features: the first of
-    /// [`STORAGE_ORDER`] configured and allowed that serves them, else the
-    /// storage backend, whose refusal then says what serves them instead.
+    /// The first [`STORAGE_ORDER`] backend configured, allowed and serving
+    /// the account's features, else the storage backend, which refuses.
     pub features: Option<Backend>,
     /// Whether a Maildir keeps keywords, in its dovecot-keywords file:
     /// `maildir.keywords.dovecot`, the header mode reading only.
@@ -444,9 +441,8 @@ impl Resolution {
         Ok(())
     }
 
-    /// Refuses a send asked to keep no copy (`--no-save`) when the sending
-    /// transport files every message it sends itself, which would keep one
-    /// anyway.
+    /// Refuses `--no-save` when the transport files every sent message
+    /// itself, which would keep a copy anyway.
     pub fn require_no_copy(&self) -> Result<()> {
         let Some(backend) = self.sender.filter(|b| FILES_SENT_COPY.contains(b)) else {
             return Ok(());
@@ -887,9 +883,8 @@ const MBOX: &[Row] = local_rows![
     (C::Vacation, Not(NO_VACATION)),
 ];
 
-/// pimdir: the store answers reads locally and
-/// queues writes for its sync engine, which refuses a write no source
-/// performs with pimdir's own codes (`unsupported`, `no-performer`).
+/// pimdir: reads answered locally, writes queued for the sync engine, which
+/// refuses one no source performs (`unsupported`, `no-performer`).
 const PIMDIR: &[Row] = storage_rows![
     (C::MailboxCreate, Full),
     (C::MailboxRename, Full),
@@ -1083,9 +1078,8 @@ pub fn leaf(group: &str, leaf: &str) -> Option<&'static Leaf> {
         .find(|known| known.group == group && known.leaf == leaf)
 }
 
-/// The `--help` footer of `group leaf`: for each capability it reaches,
-/// the backends declaring it by level, then what each detail says. The
-/// capabilities an argument reaches follow, the argument named.
+/// The `--help` footer of `group leaf`: the backends serving each
+/// capability it or one of its arguments reaches, by level, with details.
 ///
 /// Generated from the tables, so it never drifts from what the resolver
 /// enforces. Empty for a leaf reaching no transport.

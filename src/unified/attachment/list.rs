@@ -71,9 +71,8 @@ impl AttachmentListCommand {
     }
 }
 
-/// The attachment parts of a message, in part order, inline ones
-/// included: the attachment list of RFC 8621 §4.1.4 mime-rs computes,
-/// under the ids of the unified part walk.
+/// The RFC 8621 §4.1.4 attachments of a message, inline ones included, in
+/// part order under the ids of the unified part walk.
 pub(crate) fn attachments<'a>(message: &'a MimeCst) -> impl Iterator<Item = Attachment> + 'a {
     let listed = message.root.body_lists().attachments;
 

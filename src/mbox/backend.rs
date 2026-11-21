@@ -4,10 +4,9 @@
 //! io-mbox client [`MboxClient`] wraps.
 //!
 //! A mailbox is one mbox file and a message is addressed by its io-mbox
-//! content id, which a flag write, by Himalaya or any other client, does
-//! not change. Every operation first syncs the file's index through the
-//! [`crate::mbox::cache`], and a listing parses only the messages it has
-//! not seen before.
+//! content id, which no client's flag write changes. Every operation first
+//! syncs the index through [`crate::mbox::cache`], and a listing parses
+//! only the messages it has not seen before.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -58,9 +57,8 @@ use crate::{
     },
 };
 
-/// The fields the store owns: the flag fields, which an append writes from
-/// the flags it is given, and Thunderbird's, which a flag write keeps in
-/// step.
+/// The fields the store owns: the flag fields an append writes from its
+/// flags, and Thunderbird's, which a flag write keeps in step.
 const STORE_FIELDS: [&str; 6] = [
     "Status",
     "X-Status",
@@ -146,9 +144,8 @@ impl MboxClient {
             .map(|(listed, _)| listed.value.envelopes)
     }
 
-    /// Lists envelopes as [`Self::list_envelopes`] does, beside how many
-    /// messages the mailbox holds, every one the listing read. A message
-    /// holding no header field is an item error of the first page.
+    /// [`Self::list_envelopes`] beside the mailbox's message count; a
+    /// message holding no header field is a first-page item error.
     pub fn list_envelopes_counted(
         &self,
         mailbox: &str,
@@ -203,14 +200,11 @@ impl MboxClient {
         })
     }
 
-    /// Adds, sets or removes `flags` on the messages of `mailbox` among
-    /// `ids`, rewriting the file once for the whole set, and returns how
-    /// many it found, beside the error of each unknown id. None found writes
-    /// nothing.
+    /// Adds, sets or removes `flags` on `ids` in one rewrite, returning how
+    /// many it found beside each unknown id's error; none found writes nothing.
     ///
-    /// A set keeps the `O` (old) status, which no unified flag names, so
-    /// replacing the flags does not make a read message new again, and a
-    /// seen message is marked old too.
+    /// A set keeps the `O` (old) status, which no unified flag names, so a
+    /// read message never turns new again; a seen one is marked old too.
     pub fn store_flags(
         &self,
         mailbox: &str,
@@ -254,8 +248,7 @@ impl MboxClient {
         })
     }
 
-    /// Rewrites the flags of messages of the mbox at `path` to what `edit`
-    /// makes of their current ones, in one locked rewrite of the file. An
+    /// Rewrites the flags of `ids` through `edit` in one locked rewrite; an
     /// unknown id fails the whole set before any write.
     pub fn edit_flags(
         &self,
@@ -278,13 +271,10 @@ impl MboxClient {
         Ok(())
     }
 
-    /// Reads one message's raw RFC 5322 bytes, unquoted, and its flags
-    /// from `mailbox`, the bytes without the fields the store owns: the
-    /// flag fields, which the flags render, Thunderbird's status fields,
-    /// and the `Content-Length` of the mboxcl variants.
+    /// Reads one message's raw RFC 5322 bytes, unquoted and without the
+    /// fields the store owns or mboxcl `Content-Length`, and its flags.
     ///
-    /// An index another client made stale is rebuilt and the read tried
-    /// once more.
+    /// An index another client made stale is rebuilt and the read retried.
     pub fn get_message(
         &self,
         mailbox: &str,
@@ -363,9 +353,8 @@ impl MboxClient {
             .collect()
     }
 
-    /// Copies the messages of `from` among `ids` to the end of `to`,
-    /// returning how many it found beside the error of each unknown id.
-    /// None found writes nothing.
+    /// Appends `ids` of `from` to `to`, returning how many it found beside
+    /// each unknown id's error; none found writes nothing.
     pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         Ok(self.copy_message_ids(from, to, ids)?.map(|ids| ids.len()))
     }
@@ -403,9 +392,8 @@ impl MboxClient {
         })
     }
 
-    /// Moves the messages of `from` among `ids` to the end of `to`: a
-    /// copy, then a removal from the source. Returns how many it found
-    /// beside the error of each unknown id, none found writing nothing.
+    /// Copies then removes `ids` of `from` into `to`, returning how many it
+    /// found beside each unknown id's error; none found writes nothing.
     pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         Ok(self.move_message_ids(from, to, ids)?.map(|ids| ids.len()))
     }
@@ -469,9 +457,8 @@ impl MboxClient {
         require_all(&index, ids, path)
     }
 
-    /// Permanently removes the messages of `mailbox` among `ids`,
-    /// returning how many it found beside the error of each unknown id.
-    /// None found writes nothing.
+    /// Permanently removes `ids` of `mailbox`, returning how many it found
+    /// beside each unknown id's error; none found writes nothing.
     pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let path = self.open_mbox(mailbox)?;
 
@@ -488,11 +475,9 @@ impl MboxClient {
     /// Creates the empty mbox `name` at the top of the store, or under
     /// `parent`, with its parent directories, returning its id, its name.
     ///
-    /// In the plain layout a mailbox nests only under a directory: one
-    /// under an mbox file is refused, naming `mbox.thunderbird`. In the
-    /// Thunderbird layout a missing parent mbox is created empty, so the
-    /// children listed under it can be renamed with it. An existing mbox is
-    /// refused under `mailbox-duplicate`, a directory in its way uncoded.
+    /// Under an mbox file the plain layout refuses, naming `mbox.thunderbird`;
+    /// Thunderbird creates a missing parent so children rename with it. An
+    /// existing mbox is `mailbox-duplicate`, a directory in its way uncoded.
     pub fn create_mailbox(&self, name: &str, parent: Option<&str>) -> Result<String> {
         let name = match parent {
             Some(parent) => child_path(parent, '/', name),
@@ -536,12 +521,10 @@ impl MboxClient {
         Ok(to)
     }
 
-    /// Renames the mbox `from` to `to`, which must not exist. In the
-    /// Thunderbird layout the `.sbd` directory holding its children
-    /// follows, so they keep their parent.
+    /// Renames the mbox `from` to the absent `to`, its Thunderbird `.sbd`
+    /// following so children keep their parent.
     ///
-    /// The spool is refused either way, and so is a directory, which is
-    /// no mbox.
+    /// The spool is refused, and so is a directory, which is no mbox.
     pub fn rename_mbox(&self, from: &str, to: &str) -> Result<()> {
         validate_mbox_name(from, self.store.thunderbird)?;
         validate_mbox_name(to, self.store.thunderbird)?;
@@ -570,13 +553,11 @@ impl MboxClient {
         Ok(())
     }
 
-    /// Deletes the mbox `name` and every message in it, under lock so no
-    /// delivery lands in it meanwhile. In the Thunderbird layout an mbox
-    /// holding others is refused, naming them, and its emptied `.sbd`
-    /// directory goes with it.
+    /// Deletes the mbox `name` and its messages, under lock so no delivery
+    /// lands meanwhile.
     ///
-    /// The spool is refused, the mail system delivering to it, and so is
-    /// a directory, which is no mbox.
+    /// Thunderbird refuses one holding others, naming them, and drops its
+    /// emptied `.sbd`. The spool and a directory are refused.
     pub fn delete_mailbox(&self, name: &str) -> Result<()> {
         validate_mbox_name(name, self.store.thunderbird)?;
         let path = self.resolve_mbox(name)?;
@@ -611,9 +592,8 @@ impl MboxClient {
         Ok(())
     }
 
-    /// Fails when `path` is the spool `mbox.inbox` names: the mail system
-    /// delivers to it, and IMAP refuses to delete or rename `INBOX`
-    /// alike.
+    /// Fails on the `mbox.inbox` spool: the mail system delivers to it, and
+    /// IMAP refuses to delete or rename `INBOX` alike.
     fn refuse_spool(&self, path: &MboxFsPath, verb: &str, name: &str) -> Result<()> {
         let Some(spool) = &self.store.inbox else {
             return Ok(());
@@ -658,9 +638,8 @@ impl MboxClient {
         Ok(message.contents)
     }
 
-    /// Applies to `path`, under lock, the edits `plan` makes from its
-    /// index, caches the rewritten index and returns how many messages
-    /// were edited. No edit writes nothing.
+    /// Applies `plan`'s edits to `path` under lock, caching the new index
+    /// and returning how many were edited; no edit writes nothing.
     ///
     /// An update finding the index stale, another client having rewritten
     /// the file meanwhile, rebuilds it and starts over once.
@@ -708,18 +687,12 @@ impl MboxClient {
         })
     }
 
-    /// The envelope of every message of `path` that `keep` keeps, pseudo
-    /// message aside, in file order, beside the error of each message
-    /// holding no header field. `keep` is handed the message's bytes when
-    /// `contents` is set, dropped once it answered, so no listing holds
-    /// more than one message.
+    /// The envelopes `keep` keeps in file order, pseudo message aside,
+    /// beside the error of each message holding no header field.
     ///
-    /// Envelopes come from the cache when it has them, the flags always
-    /// from the fresh index. A message the cache lacks is read and parsed
-    /// once, then cached.
-    ///
-    /// A read finding the index stale, another client having rewritten the
-    /// file meanwhile, rebuilds it and starts over once.
+    /// With `contents`, `keep` gets one message's bytes at a time. Flags
+    /// come from the fresh index; a stale one, rewritten by another client,
+    /// is rebuilt and the read starts over once.
     fn envelopes(
         &self,
         path: &MboxFsPath,
@@ -786,7 +759,6 @@ impl MboxClient {
     }
 }
 
-/// Fails when `path` is a directory, which holds mailboxes but is none.
 /// Whether `a` and `b` name one mbox file, however spelled (a name, an
 /// absolute path, a link).
 fn same_mbox(a: &MboxFsPath, b: &MboxFsPath) -> bool {
@@ -865,9 +837,8 @@ fn found<'a>(index: &'a MboxIndex, ids: &[&str]) -> (Vec<&'a MboxEntry>, Vec<Ite
     (found, errors)
 }
 
-/// Leaves out of a stored message the header fields the store owns: the
-/// flag fields, and `Content-Length` when `content_length` (the mboxcl
-/// variants, whose append writes its own).
+/// Strips the flag fields, and `Content-Length` when `content_length`
+/// (mboxcl, whose append writes its own), from a stored message.
 fn strip_store_fields(contents: &[u8], content_length: bool) -> Vec<u8> {
     let mut out = Vec::with_capacity(contents.len());
     let mut dropping = false;
@@ -899,9 +870,8 @@ fn strip_store_fields(contents: &[u8], content_length: bool) -> Vec<u8> {
     out
 }
 
-/// Parses a message into a unified [`Envelope`], its id and flags left
-/// empty for the caller to fill from the index; `None` for one holding no
-/// header field.
+/// Parses a message into an [`Envelope`], id and flags left for the index
+/// to fill; `None` for one holding no header field.
 fn envelope_from(contents: &[u8]) -> Option<Envelope> {
     envelope::from_raw(contents, true)
 }
@@ -1348,9 +1318,8 @@ mod tests {
         assert_eq!(names(&client), ["G2", "G2/Kid"]);
     }
 
-    /// An mbox the store holds already, at the top or under a parent, is
-    /// refused `mailbox-duplicate` and left as it was; a directory in the
-    /// way is no mailbox, refused uncoded.
+    /// An existing mbox is refused `mailbox-duplicate` and left as it was;
+    /// a directory in the way is no mailbox, refused uncoded.
     #[test]
     fn an_existing_mbox_is_not_created_again() {
         let (root, client) = client(MboxFormatConfig::Mboxrd, false);

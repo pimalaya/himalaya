@@ -49,9 +49,8 @@ mod tests {
         http_script::{Script, ok},
     };
 
-    /// A rename sends the name alone through `labels.patch`, so the label
-    /// keeps the colour and the visibility a `labels.update` naming none
-    /// would clear.
+    /// A rename patches the name alone, keeping the colour and visibility a
+    /// `labels.update` would clear.
     #[test]
     fn a_rename_patches_the_name_alone() {
         let label = r#"{"id":"Label_1","name":"Renamed","type":"user"}"#;

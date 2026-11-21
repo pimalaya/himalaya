@@ -24,9 +24,7 @@ pub struct TlsConfig {
 }
 
 impl TlsConfig {
-    /// Takes from `account` each field this block leaves unset: the
-    /// provider, the rustls crypto, the trusted certificate and the
-    /// client certificate.
+    /// Takes from `account` each field this block leaves unset.
     pub fn inherit(&mut self, account: &TlsConfig) {
         if self.provider.is_none() {
             self.provider.clone_from(&account.provider);

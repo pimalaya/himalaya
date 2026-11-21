@@ -152,16 +152,13 @@ pub fn normalize_message_id(raw: &str) -> Option<String> {
     }
 }
 
-/// The envelope of a raw message, read from its header block, its id and
-/// flags left empty for the backend to fill; `None` when the bytes hold no
-/// header field named as RFC 5322 names one, which no message lacks.
+/// The envelope of a raw message's header block, id and flags left for the
+/// backend; `None` when no RFC 5322 header field is found.
 ///
 /// Refs: <https://datatracker.ietf.org/doc/html/rfc5322#section-2.2>
 ///
-/// `with_attachment` also splits the body, to say whether it holds an
-/// attachment ([`crate::unified::message::part::has_attachment`]); left
-/// `None` otherwise. The subject is read as the read view reads it, raw
-/// 8-bit bytes included.
+/// `with_attachment` also splits the body (`part::has_attachment`). The
+/// subject is read as the read view reads it, raw 8-bit bytes included.
 pub fn from_raw(raw: &[u8], with_attachment: bool) -> Option<Envelope> {
     use chrono::TimeZone;
     use mime::{

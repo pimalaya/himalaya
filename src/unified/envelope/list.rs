@@ -226,11 +226,8 @@ pub fn envelope_cells(env: &Envelope, datetime_fmt: &str, local_tz: bool) -> [St
     ]
 }
 
-/// Renders the flags of a message as four fixed columns: `*` when unread,
-/// `R` when answered, `!` when flagged and `@` when it has an attachment,
-/// a blank otherwise.
-///
-/// An unknown attachment is a blank.
+/// Renders the flags as four fixed columns: `*` unread, `R` answered, `!`
+/// flagged, `@` attachment, a blank otherwise or when unknown.
 pub fn format_flags(flags: &BTreeSet<Flag>, has_attachment: Option<bool>) -> String {
     let marks = [
         (!flags.iter().any(Flag::is_seen), '*'),
@@ -339,9 +336,8 @@ mod tests {
         }
     }
 
-    /// One aligned line per envelope: the id, the flags, the date, the
-    /// sender's name, then the subject, `-` standing for an empty value,
-    /// under the account, the mailbox and the page.
+    /// One aligned line per envelope (id, flags, date, sender, subject, `-`
+    /// when empty) under the account, the mailbox and the page.
     #[test]
     fn an_envelope_prints_on_one_line() {
         let mut envelopes = envelopes();
@@ -424,9 +420,8 @@ Page:     4, empty
         assert_eq!(envelopes.to_string(), expected);
     }
 
-    /// Each envelope the page could not list prints as one `Error:` line
-    /// after the items and a blank line, aligned among themselves, `-` for
-    /// an absent id or code.
+    /// Each envelope the page could not list prints an aligned `Error:` line
+    /// after the items and a blank line, `-` for an absent id or code.
     #[test]
     fn an_item_error_prints_after_the_items() {
         let mut envelopes = envelopes();

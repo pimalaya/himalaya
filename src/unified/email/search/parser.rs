@@ -38,14 +38,11 @@ pub fn parse(input: impl AsRef<str>) -> Result<SearchEmailsQuery, Error> {
     })
 }
 
-/// The error over the first parenthesis nesting deeper than
-/// [`MAX_NESTING`] or the first operator past [`MAX_OPERATORS`], read
-/// before the grammar recurses into the query or builds a tree the
-/// backends walk.
+/// The error over the first parenthesis past [`MAX_NESTING`] or operator
+/// past [`MAX_OPERATORS`], found before the grammar recurses.
 ///
-/// Quoted text and backslash-escaped characters are skipped, as the
-/// grammar reads them as patterns; a bare `and`, `or` or `not` counts
-/// wherever it stands.
+/// Quoted and escaped text is skipped, being a pattern; a bare `and`, `or`
+/// or `not` counts wherever it stands.
 fn past_bounds(input: &str) -> Option<Rich<'static, char>> {
     let mut depth = 0usize;
     let mut operators = 0usize;
@@ -108,9 +105,8 @@ fn query<'a>() -> impl Parser<'a, &'a str, SearchEmailsQuery, ParserError<'a>> +
     choice((sort_only, filtered)).then_ignore(end())
 }
 
-/// A whole word of the grammar, refused when the word read differs, so a
-/// longer word holding it (`orders`) or a prefix of it (`ord`) is no
-/// match and the diagnostic names `label` over the whole word.
+/// A whole word of the grammar, so `orders` or `ord` is no match and the
+/// diagnostic names `label` over the whole word.
 pub(crate) fn keyword<'a>(
     word: &'static str,
     label: &'static str,

@@ -80,9 +80,8 @@ const BATCH_MAX_WAIT: Duration = Duration::from_secs(10);
 const LIST_MAX_RESULTS: u32 = 500;
 
 impl GmailClient {
-    /// Lists every Gmail label as a mailbox. With `with_counts`, issues
-    /// one `labels.get` per label to fill totals/unread, a label Gmail
-    /// refuses it for listed without counts, beside its error.
+    /// Lists every Gmail label as a mailbox, counted by one `labels.get`
+    /// each; a label whose count Gmail refuses is listed without, beside.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         let labels = self.labels_list()?.response.labels;
 
@@ -113,9 +112,8 @@ impl GmailClient {
         })
     }
 
-    /// Lists envelopes from the `mailbox` label: the ids of the page
-    /// ([`Self::page_ids`]), then their metadata through batched
-    /// `messages.get`.
+    /// Lists envelopes from the `mailbox` label: the page's ids
+    /// ([`Self::page_ids`]), then their metadata by batched `messages.get`.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -130,10 +128,8 @@ impl GmailClient {
         Ok(listed(&ids, answers).map(|envelopes| EnvelopePage { envelopes, more }))
     }
 
-    /// Searches the `mailbox` label with the unified query: the filter
-    /// half translates into a `messages.list` `q` value, the sort half
-    /// orders the fetched page client-side, Gmail keeping a
-    /// newest-first list order with no server-side sort.
+    /// Searches the `mailbox` label: the filter becomes a `q` value, the
+    /// sort orders the page client-side, Gmail having no server-side sort.
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -163,11 +159,9 @@ impl GmailClient {
     /// The ids of the 1-indexed page `page` of the `mailbox` label, those
     /// matching `q` when given, and whether a page follows.
     ///
-    /// Gmail answers a next page token after an exactly full last page
-    /// too, so `messages.list` is read up to one id past the page, the
-    /// first call asking the pages before it and that id at once: a page
-    /// follows when that id exists. Without a page size, every page is
-    /// read, token after token, and none follows.
+    /// Gmail answers a next page token after an exactly full last page too,
+    /// so one id past the page is read: a page follows when it exists.
+    /// Without a page size, every page is read and none follows.
     fn page_ids(
         &mut self,
         mailbox: &str,
@@ -204,12 +198,11 @@ impl GmailClient {
         Ok((ids.split_off(start.min(ids.len())), more))
     }
 
-    /// Adds, sets, or removes `flags` via `messages.modify` on the ids
-    /// carrying the `mailbox` label, returning how many it modified beside
-    /// the error of each id it did not.
+    /// Applies `flags` via `messages.modify` to the ids the `mailbox` label
+    /// carries, returning how many it modified beside each id's error.
     ///
-    /// A patch left empty (`$Forwarded` has no label) sends nothing, an
-    /// empty `messages.modify` being a wasted request that could still fail.
+    /// An empty patch (`$Forwarded` has no label) sends nothing, an empty
+    /// `messages.modify` being a wasted request that could still fail.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -228,10 +221,8 @@ impl GmailClient {
         Ok(modified.after(found.errors))
     }
 
-    /// The ids of `ids` whose message carries the `mailbox` label, through
-    /// batched `messages.get` (minimal), Gmail ids being account-wide. An
-    /// id Gmail does not know, or whose message lacks the label, is an
-    /// item error, as is one Gmail could not answer for.
+    /// The ids of `ids` whose message carries the `mailbox` label, Gmail ids
+    /// being account-wide; any other id is an item error.
     fn ids_in(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<Vec<String>>> {
         let answers = self.messages_get_batch(ids, GmailMessageFormat::Minimal)?;
         Ok(labelled(mailbox, ids, answers))
@@ -302,13 +293,11 @@ impl GmailClient {
         })
     }
 
-    /// Fetches one message's raw RFC 5322 bytes via `messages.get`
-    /// (format=RAW), base64url-decoded, with the flags its labels carry.
+    /// Fetches one message's raw RFC 5322 bytes (format=RAW) with the flags
+    /// its labels carry.
     ///
-    /// The id names the message account-wide, so a message not carrying
-    /// the `mailbox` label is not found, as on the backends whose ids are
-    /// the mailbox's. The mailbox is resolved through the label listing
-    /// only when it is not one of the message's labels already.
+    /// The id names the message account-wide, so a message not carrying the
+    /// `mailbox` label is not found, as on the backends of per-mailbox ids.
     pub fn get_message(
         &mut self,
         mailbox: &str,
@@ -348,9 +337,8 @@ impl GmailClient {
     /// Appends a raw message under the `mailbox` label through
     /// `messages.insert`, returning the id Gmail assigned.
     ///
-    /// The flags become labels, an unseen message carrying `UNREAD`, and
-    /// the message's own `Date:` dates it, as an IMAP `APPEND` would.
-    /// Inserting files the message without sending it or running filters,
+    /// The flags become labels (unseen is `UNREAD`) and its own `Date:`
+    /// dates it, as IMAP `APPEND`; it is filed without sending or filters,
     /// in the thread of the message it answers.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let (mut label_ids, _) = label_patch(flags, FlagOp::Set);
@@ -373,9 +361,8 @@ impl GmailClient {
         Ok(self.run(coroutine)?.response.id)
     }
 
-    /// Copies the ids carrying the `from` label into `to` by adding `to`'s
-    /// label, returning how many it copied beside the error of each id it
-    /// did not.
+    /// Copies the ids carrying the `from` label into `to` by adding its
+    /// label, returning how many it copied beside each other id's error.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in(from, ids)?;
         let add = vec![to.to_string()];
@@ -385,10 +372,10 @@ impl GmailClient {
         Ok(copied.after(found.errors))
     }
 
-    /// Moves the ids carrying the `from` label to `to` by adding `to`'s
-    /// label and removing `from`'s, returning how many it moved beside the
-    /// error of each id it did not. A move onto the same label changes
-    /// nothing.
+    /// Moves the ids carrying the `from` label to `to` by swapping labels,
+    /// returning how many it moved beside each other id's error.
+    ///
+    /// A move onto the same label changes nothing.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in(from, ids)?;
         if from == to {
@@ -403,9 +390,8 @@ impl GmailClient {
         Ok(moved.after(found.errors))
     }
 
-    /// Permanently deletes the ids carrying the `mailbox` label
-    /// (`users.messages.delete`), returning how many it deleted beside the
-    /// error of each id it did not.
+    /// Permanently deletes the ids carrying the `mailbox` label, returning
+    /// how many it deleted beside each other id's error.
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let found = self.ids_in(mailbox, ids)?;
 
@@ -453,12 +439,11 @@ impl GmailClient {
         Ok(label.id)
     }
 
-    /// Renames the last level of the label `mailbox` to `name`, its parent
-    /// kept (`labels.patch`, so its colour and visibility survive),
-    /// returning its id, which a rename leaves as it is.
+    /// Renames the last level of the label `mailbox` to `name`, returning
+    /// its unchanged id.
     ///
-    /// Gmail nests labels by name alone, so each sublabel is renamed too,
-    /// as IMAP `RENAME` moves the inferiors.
+    /// `labels.patch` keeps its colour and visibility. Gmail nests labels by
+    /// name alone, so each sublabel is renamed too, as IMAP `RENAME` does.
     pub fn rename_mailbox(&mut self, mailbox: &str, name: &str) -> Result<String> {
         validate_level(name, '/')?;
 
@@ -505,9 +490,8 @@ impl GmailClient {
         })
     }
 
-    /// Changes what `patch` names of the auto-reply, the settings read
-    /// first so the rest survives `settings.updateVacation`, a
-    /// replacement, and returns it as it then stands.
+    /// Changes what `patch` names of the auto-reply and returns it; read
+    /// first since `settings.updateVacation` replaces the whole settings.
     pub fn set_vacation(&mut self, patch: VacationPatch) -> Result<Vacation> {
         let get = GmailVacationGet::new(&self.auth, &self.user_id)?;
         let mut settings = self.run(get)?.response;
@@ -539,9 +523,8 @@ impl GmailClient {
         self.get_vacation()
     }
 
-    /// Sends a raw RFC 5322 message via `messages.send` (Gmail both
-    /// stores it in Sent and delivers it), in the thread of the message
-    /// it answers, returning the id Gmail gave the sent message.
+    /// Sends a raw message via `messages.send`, which also stores it in Sent,
+    /// in the thread it answers, returning the sent message's id.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<String> {
         let message = GmailMessage {
             thread_id: self.reply_thread_id(&raw)?,
@@ -591,9 +574,8 @@ impl GmailClient {
     }
 }
 
-/// The `In-Reply-To:` message ids of `raw` a Gmail query can carry as
-/// they are, an id holding a space, a quote, a brace or a parenthesis
-/// being skipped rather than read as an operator.
+/// The `In-Reply-To:` ids of `raw` a Gmail query can carry, one holding a
+/// space, quote, brace or parenthesis skipped rather than read as operator.
 fn reply_parents(raw: &[u8]) -> Vec<String> {
     let message = parse_headers(raw);
 
@@ -672,13 +654,11 @@ fn names_existing_label(err: &GmailClientStdError) -> bool {
     matches!(err, GmailClientStdError::Send(err) if err.api().is_some_and(|api| api.status == 409))
 }
 
-/// Sends `requests` through `send`, at most [`BATCH_SIZE`] to a batch,
-/// sending a part Gmail throttled or failed transiently again after the
-/// longest `Retry-After` its round asked for, up to [`BATCH_RETRIES`]
-/// times.
+/// Sends `requests` at most [`BATCH_SIZE`] to a batch, retrying a throttled
+/// or transient part after the round's longest `Retry-After`.
 ///
-/// Returns one answer per request, in order, a part still failing keeping
-/// its last error and one left unanswered read as missing.
+/// Up to [`BATCH_RETRIES`] times; one answer per request, in order, a part
+/// still failing keeping its last error, an unanswered one missing.
 fn batch_all<T>(
     requests: &[GmailBatchRequest],
     mut send: impl FnMut(&[GmailBatchRequest]) -> Result<Vec<GmailBatchResponse<T>>>,
@@ -753,9 +733,8 @@ fn listed(
     outcome
 }
 
-/// The ids of `ids` whose message, in the `answers` to batched
-/// `messages.get`, carries the `mailbox` label, beside the error of each
-/// other one.
+/// The ids of `ids` whose message in `answers` carries the `mailbox` label,
+/// beside each other one's error.
 fn labelled(
     mailbox: &str,
     ids: &[&str],
@@ -833,9 +812,8 @@ fn mailbox_from(label: GmailLabel) -> Mailbox {
     }
 }
 
-/// The special-use role of a label, keyed by the system-label ids every
-/// Gmail account shares. There is no archive label, archiving being the
-/// loss of the `INBOX` one.
+/// The special-use role of a system label id. There is no archive label,
+/// archiving being the loss of `INBOX`.
 fn label_role(id: &str) -> Option<MailboxRole> {
     match id {
         "INBOX" => Some(MailboxRole::Inbox),
@@ -849,9 +827,8 @@ fn label_role(id: &str) -> Option<MailboxRole> {
     }
 }
 
-/// Folds a Gmail message (metadata format) into the unified [`Envelope`]
-/// shape. `has_attachment` is left `None`: Gmail metadata does not
-/// expose the MIME structure.
+/// Folds a Gmail metadata message into an [`Envelope`], `has_attachment`
+/// `None` since metadata does not expose the MIME structure.
 fn envelope_from(message: GmailMessage) -> Envelope {
     let flags = flags_from_labels(&message.label_ids);
     let size = message.size_estimate;
@@ -1028,9 +1005,8 @@ mod tests {
         unified::email::flag::{Flag, FlagOp, IanaFlag},
     };
 
-    /// A display name quoting a comma names one address, groups are
-    /// flattened and an empty group gives none, as the other backends read
-    /// them.
+    /// A quoted comma names one address, groups flatten and an empty one
+    /// gives none, as the other backends read them.
     #[test]
     fn an_address_header_reads_as_the_other_backends_read_it() {
         let addresses = parse_addresses("\"Doe, John\" <john@x.org>, Team: a@x.org, b@x.org;");
@@ -1326,10 +1302,8 @@ mod script_tests {
         (GmailClient::over(inner), requests)
     }
 
-    /// Two messages listed two a page: Gmail answers a next page token
-    /// after that exactly full last page, whose page is empty, so no page
-    /// follows. A page is asked one id longer, that id telling whether one
-    /// follows.
+    /// Two messages two a page: Gmail answers a next token after that full
+    /// last page, yet no page follows, the extra id asked telling so.
     #[test]
     fn an_exactly_full_last_page_has_no_next() {
         let (mut client, requests) = gmail(vec![
@@ -1387,9 +1361,8 @@ mod script_tests {
         assert_eq!(requests.len(), 2);
     }
 
-    /// Without a page size (`--page-size 0`) the listing follows every
-    /// next page token, asking the largest page each time, and says no page
-    /// follows only once Gmail served the last one.
+    /// Without a page size the listing follows every token at the largest
+    /// page, saying none follows once Gmail served the last.
     #[test]
     fn a_listing_without_page_size_reads_every_page() {
         let (mut client, requests) = gmail(vec![
@@ -1432,9 +1405,8 @@ mod script_tests {
         assert_eq!(asked, [(500, None), (1, Some("T".into()))]);
     }
 
-    /// A `Date:` naming the wrong weekday (15 November 2026 is a Sunday)
-    /// reads as the date it names, as on IMAP, Maildir and mbox, where the
-    /// envelope dropped it.
+    /// A `Date:` with the wrong weekday (15 November 2026 is a Sunday) keeps
+    /// its date, as on IMAP, Maildir and mbox.
     #[test]
     fn a_wrong_weekday_keeps_its_date() {
         let date = json!({"name": "Date", "value": "Mon, 15 Nov 2026 11:00:00 +0000"});
@@ -1454,10 +1426,8 @@ mod script_tests {
         ok("application/json", &message.to_string())
     }
 
-    /// A read names the mailbox it reads in, as IMAP and JMAP do: a
-    /// message not carrying its label is `message-not-found`, though Gmail
-    /// ids name messages account-wide, and one carrying it is read without
-    /// listing the labels.
+    /// A message not carrying the read's label is `message-not-found`
+    /// though Gmail ids are account-wide, one carrying it read directly.
     #[test]
     fn a_read_of_a_message_another_label_holds_is_not_found() {
         let labels = json!({"labels": [

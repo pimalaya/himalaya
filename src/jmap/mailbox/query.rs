@@ -252,9 +252,8 @@ impl From<RoleArg> for JmapMailboxRole {
     }
 }
 
-/// Resolves a standard `--role` or a free-form `--custom-role` into a
-/// JMAP mailbox role, when either is set. The two are mutually
-/// exclusive at the clap layer.
+/// Resolves `--role` or `--custom-role` into a JMAP mailbox role; clap
+/// makes the two mutually exclusive.
 pub(crate) fn role_from_args(
     role: Option<RoleArg>,
     custom: Option<String>,
@@ -306,8 +305,7 @@ mod tests {
     use crate::jmap::mailbox::query::JmapMailboxQueryOutput;
 
     /// A page names the next one only when the query says one follows,
-    /// never because it came back full: `nextPage` in JSON, `Next page:`
-    /// in text.
+    /// never because it came back full.
     #[test]
     fn a_full_page_names_the_next_only_when_one_follows() {
         let mailbox = |id: &str| {

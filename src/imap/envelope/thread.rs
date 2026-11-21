@@ -172,14 +172,12 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
     }
 }
 
-/// The most ids one `FETCH` of [`fetch_envelopes`] names, as io-imap's
-/// sort fallback chunks its own, keeping a gapped set's command line
-/// within what a server takes.
+/// The most ids one `FETCH` names, keeping a gapped set's command line
+/// within what a server takes (io-imap's sort fallback chunks alike).
 const FETCH_CHUNK: usize = 255;
 
-/// Fetches the envelope of every threaded message, keyed by the id the
-/// threads name it by, [`FETCH_CHUNK`] ids a command. Without `uid`, an
-/// envelope falls back to its message number as id.
+/// Fetches every threaded envelope, keyed by its thread id, [`FETCH_CHUNK`]
+/// ids a command; without `uid` the id is the message number.
 fn fetch_envelopes(
     client: &mut ImapClient,
     ids: &[NonZeroU32],
@@ -416,9 +414,8 @@ mod tests {
         (id, envelope)
     }
 
-    /// A reply follows the message it answers, its subject one step further
-    /// in: a run of members nests each under the one before, and the
-    /// answers of a message the mailbox lacks start back at the margin.
+    /// A reply nests one step under the message it answers; answers of a
+    /// message the mailbox lacks start back at the margin.
     #[test]
     fn replies_follow_what_they_answer() {
         let lunch = members(&[1], vec![members(&[2, 4], vec![]), members(&[3], vec![])]);
@@ -456,9 +453,8 @@ Mailbox:  INBOX
         assert_eq!(output.to_string(), expected);
     }
 
-    /// The envelopes of a long thread listing are fetched in chunks, so
-    /// no command line outgrows what a server takes, whatever the gaps
-    /// between the ids.
+    /// A long thread listing fetches in chunks, so no command line outgrows
+    /// what a server takes, whatever the gaps between the ids.
     #[test]
     fn a_long_thread_listing_fetches_in_chunks() {
         use std::{

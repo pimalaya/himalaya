@@ -29,10 +29,8 @@ pub struct SieveClient {
 }
 
 impl SieveClient {
-    /// Opens the ManageSieve session (TCP/TLS/STARTTLS, greeting, SASL),
-    /// resolving its credential through `resolver`, so an account whose
-    /// IMAP, SMTP and ManageSieve blocks name one credential command
-    /// spawns it once.
+    /// Opens the ManageSieve session through `resolver`, so a credential
+    /// command shared with IMAP and SMTP spawns once.
     pub fn new(config: SieveConfig, resolver: &mut SecretResolver) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn)?;
         let server = parse_sieve_server(&config.server)?;
@@ -66,14 +64,9 @@ impl SieveClient {
 
 /// Parses a ManageSieve server string into a URL.
 ///
-/// Accepts `sieve`/`sieves://host[:port]`, a bare `host:port`, or a
-/// bare `host` (the last two default to `sieve://`), or a
-/// `unix:///path` socket for a local proxy. Any other scheme is
-/// rejected.
-///
-/// The bare default differs from the IMAP and SMTP ones, which resolve
-/// to their implicit-TLS scheme: ManageSieve registers one port and no
-/// implicit-TLS twin.
+/// Accepts `sieve`/`sieves://host[:port]`, a `unix:///path` socket, or a
+/// bare `host[:port]` defaulting to `sieve://`, not to implicit TLS as IMAP
+/// and SMTP do: ManageSieve registers one port and no implicit-TLS twin.
 pub fn parse_sieve_server(server: &str) -> Result<Url> {
     parse_server(server, "sieve", &["sieve", "sieves", "unix"])
 }
@@ -92,9 +85,8 @@ impl DerefMut for SieveClient {
     }
 }
 
-/// Opens the ManageSieve session for an already-resolved account: takes
-/// the `[sieve]` block out of `account_config` and builds the merged
-/// [`Account`]. Bails when the account has no `[sieve]` block.
+/// Opens the ManageSieve session of a resolved account, failing when it has
+/// no `[sieve]` block.
 pub fn build_sieve_client(
     config: Config,
     name: String,

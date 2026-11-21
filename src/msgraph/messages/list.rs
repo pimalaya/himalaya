@@ -213,9 +213,8 @@ impl fmt::Display for MsgraphMessageListOutput {
     }
 }
 
-/// One page of the collection at `path` under the mailbox owner, queried
-/// by the OData `params` (`to_query_pairs`), its items kept as Graph sent
-/// them.
+/// One page of the collection at `path` under the mailbox owner, its items
+/// kept as Graph sent them.
 pub(crate) fn raw_page(
     client: &mut MsgraphClient,
     path: &str,
@@ -230,10 +229,11 @@ pub(crate) fn raw_page(
     Ok(client.page_get(url.as_str(), None)?.response)
 }
 
-/// The page behind `link`, the next link a Graph listing printed, sent as
-/// it is: it carries the query of the listing it resumes. A link off
-/// Graph's origin is refused before any request, the bearer token never
-/// leaving it.
+/// The page behind the next link `link`, sent as is since it carries the
+/// query.
+///
+/// A link off Graph's origin is refused before any request, so the bearer
+/// token never leaves it.
 pub(crate) fn resume<T: DeserializeOwned>(
     client: &mut MsgraphClient,
     link: &str,
@@ -245,9 +245,8 @@ pub(crate) fn resume<T: DeserializeOwned>(
     Ok(page.response)
 }
 
-/// The cursor of the next page, Graph's next link as Graph gives it,
-/// `None` without one or when it leads back to the page at `skip` (a
-/// `$top` of 0).
+/// Graph's next link as the cursor, `None` without one or when it leads
+/// back to the page at `skip` (a `$top` of 0).
 pub(crate) fn next_page(link: Option<String>, skip: Option<u32>) -> Option<String> {
     let link = link?;
 
@@ -314,9 +313,8 @@ mod tests {
         assert_eq!(next_page(Some(search.clone()), None), Some(search));
     }
 
-    /// The `msgraph messages list` of `token`, against a Graph server
-    /// answering `pages` in order: the JSON it printed, or its failure,
-    /// and the requests the server read.
+    /// Runs `msgraph messages list` against a server answering `pages`,
+    /// returning its JSON or failure and the requests read.
     fn list(token: Option<&str>, pages: &[Value]) -> (anyhow::Result<Value>, Vec<String>) {
         let responses = pages
             .iter()
@@ -347,10 +345,8 @@ mod tests {
         (result, requests)
     }
 
-    /// A listing prints Graph's next link as `nextPage`, a `$search` one
-    /// carrying no `$skip` included, and `--page-token` follows it as is,
-    /// the query it carries kept; a link off Graph's origin is refused
-    /// before any request.
+    /// A listing prints the next link as `nextPage`, `$search` ones too, and
+    /// `--page-token` follows it as is; a foreign link is refused first.
     #[test]
     fn a_listing_resumes_from_the_next_link_it_printed() {
         let first = "https://graph.microsoft.com/v1.0/me/messages?%24search=%22report%22&%24top=1&%24skiptoken=a";

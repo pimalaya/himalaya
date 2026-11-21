@@ -45,9 +45,8 @@ pub struct MsgraphClient {
 }
 
 impl MsgraphClient {
-    /// Opens a TLS connection to the Microsoft Graph API
-    /// (`https://graph.microsoft.com`) with the configured bearer
-    /// credential and user id.
+    /// Opens a TLS connection to `https://graph.microsoft.com` with the
+    /// configured bearer credential and user id.
     pub fn new(config: MsgraphConfig) -> Result<Self> {
         let mut resolver = SecretResolver::new();
         let token = msgraph_token(config.auth, &mut resolver)?;
@@ -65,12 +64,9 @@ impl MsgraphClient {
 
     /// Maps a folder id, path or role onto its opaque Graph folder id.
     ///
-    /// A value shaped like a folder id is asked of Graph first, which
-    /// reaches a hidden folder; then a path, only the folders leading to
-    /// it listed; then a role or a well-known name (`msgfolderroot`,
-    /// `outbox`), asked of Graph. Any other value, or one Graph knows no
-    /// folder by, is refused. It lives here so every backend method stays
-    /// a pure id consumer.
+    /// Tried as a folder id first (reaching a hidden folder), then a path,
+    /// then a role or well-known name; any other value is refused. It lives
+    /// here so every backend method stays a pure id consumer.
     pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         if let Some(id) = self.mailbox_ids.get(mailbox) {
             return Ok(id.clone());
@@ -96,9 +92,8 @@ impl MsgraphClient {
         self.mailbox_ids.clear();
     }
 
-    /// The resource at `segments` under the mailbox owner (`me` or
-    /// `users/<id>`), each segment percent-encoded, none naming the owner
-    /// itself, as Graph sent it.
+    /// The resource at `segments` under the mailbox owner, each segment
+    /// percent-encoded, as Graph sent it.
     pub fn raw_get(&mut self, segments: &[&str]) -> Result<Value> {
         let mut path = user_path(&self.user_id)?;
         for segment in segments {
@@ -208,9 +203,8 @@ impl DerefMut for MsgraphClient {
     }
 }
 
-/// Opens the Microsoft Graph client for an already-resolved account:
-/// takes the `[msgraph]` block out of `account_config` and builds the
-/// merged [`Account`]. Bails when the account has no `[msgraph]` block.
+/// Opens the Microsoft Graph client for a resolved account, refusing one
+/// without a `[msgraph]` block.
 pub fn build_msgraph_client(
     config: Config,
     name: String,
@@ -257,9 +251,8 @@ fn is_folder_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"-_=".contains(&byte))
 }
 
-/// Whether Graph's answer to a folder lookup means no such folder: an
-/// unknown id (404), a malformed one (400 `ErrorInvalidIdMalformed`), or a
-/// value no path segment can carry.
+/// Whether a folder lookup's answer means no such folder: 404, 400
+/// `ErrorInvalidIdMalformed`, or a value no path segment can carry.
 fn names_no_folder(err: &MsgraphSendError) -> bool {
     let malformed = err
         .api()
@@ -287,9 +280,8 @@ pub(crate) fn refusal_code(cause: &(dyn std::error::Error + 'static)) -> Option<
     refusal_of(err.status, &err.code)
 }
 
-/// The code of what Graph refused, by its status and its `error.code`:
-/// `ErrorQuotaExceeded` or a 507 is `quota-exceeded` whatever the
-/// status, then 429 `rate-limited` and 403 `permission-denied`.
+/// The code of what Graph refused, by status and `error.code`, a quota
+/// code winning over the status.
 pub(crate) fn refusal_of(status: u16, code: &str) -> Option<ErrorCode> {
     match (status, code) {
         (_, "ErrorQuotaExceeded") | (507, _) => Some(ErrorCode::QuotaExceeded),
@@ -366,9 +358,8 @@ mod tests {
         assert!(!names_no_folder(&refused(403, "ErrorAccessDenied")));
     }
 
-    /// A whole command Graph refused is coded by what it answered, through
-    /// the context a command adds: the 429 of a mailbox throttling its
-    /// concurrent requests `rate-limited`.
+    /// A whole refusal is coded through the context a command adds, a
+    /// throttling 429 being `rate-limited`.
     #[test]
     fn a_whole_refusal_is_coded() {
         let code = |status, code| {
@@ -425,9 +416,8 @@ mod tests {
         refused_with(404, body)
     }
 
-    /// A folder named by no id, path nor role is `mailbox-not-found`,
-    /// and so is an id Graph answers it knows no folder by, its answer
-    /// kept.
+    /// A folder named by no id, path nor role is `mailbox-not-found`, as is
+    /// an id Graph knows no folder by, its answer kept.
     #[test]
     fn a_missing_folder_is_coded() {
         let none = || reply(json!({"value": []}));
@@ -440,9 +430,8 @@ mod tests {
         }
     }
 
-    /// A path lists the folders leading to it alone: the top, then the
-    /// children of `Projets`, never those of a folder off the path, nor
-    /// the well-known folders, nor the folders again once resolved.
+    /// A path lists only the folders leading to it, never one off the path,
+    /// the well-known ones, nor any again once resolved.
     #[test]
     fn a_path_walks_only_the_folders_leading_to_it() {
         let top = json!({"value": [

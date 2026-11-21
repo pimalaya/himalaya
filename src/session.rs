@@ -3,11 +3,9 @@
 //! The clients the commands of one run share, each built the first time a
 //! command needs it and kept for the commands after it.
 //!
-//! A one-shot invocation runs a single command over a fresh [`Session`],
-//! so it builds exactly the client that command needs. The [`crate::repl`]
-//! keeps its session across lines and the [`crate::mcp`] server across
-//! tool calls, so each client connects once. A command that fails drops
-//! the client it ran on, its connection being possibly dead or left
+//! A one-shot run uses a fresh [`Session`]; the [`crate::repl`] and the
+//! [`crate::mcp`] server keep theirs, so each client connects once. A
+//! failed command drops its client, whose connection may be dead or left
 //! mid-exchange, and the next command builds it again.
 
 use std::path::PathBuf;
@@ -95,9 +93,8 @@ pub struct SessionAccount<'a> {
 
 #[cfg(any(backend, feature = "smtp", feature = "sieve"))]
 impl SessionAccount<'_> {
-    /// Runs a command over the client in `slot`, building it with `build`
-    /// when the slot is empty, and emptying the slot when the command
-    /// fails.
+    /// Runs a command over the client in `slot`, building it when empty and
+    /// emptying it when the command fails.
     pub fn run<P: Printer, C>(
         self,
         printer: &mut P,
@@ -134,10 +131,10 @@ impl Session<'_> {
         false
     }
 
-    /// Keeps the unified client's connection alive, for a caller idle on
-    /// purpose: `NOOP` on IMAP, nothing for a stateless backend or an
-    /// empty slot. A failure empties the slot, as a failed command does,
-    /// so the next command connects again.
+    /// Keeps the unified client's connection alive for an idle caller:
+    /// `NOOP` on IMAP, nothing for a stateless backend or an empty slot.
+    ///
+    /// A failure empties the slot, so the next command connects again.
     pub fn keep_alive(&mut self) -> anyhow::Result<()> {
         #[cfg(any(backend, feature = "smtp"))]
         if let Some((_, client)) = self.email.as_mut() {

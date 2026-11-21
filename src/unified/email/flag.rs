@@ -91,9 +91,8 @@ impl Flag {
         Self { raw, iana }
     }
 
-    /// Builds a [`Flag`] from an [`IanaFlag`] and its canonical wire
-    /// spelling, which is what an adapter whose format carries no casing,
-    /// a Maildir info letter, has to synthesise from.
+    /// Builds a [`Flag`] from an [`IanaFlag`] and its canonical spelling,
+    /// for a format carrying no casing (a Maildir info letter).
     pub fn from_iana(iana: IanaFlag) -> Self {
         Self {
             raw: canonical_raw(iana).to_string(),
@@ -101,9 +100,8 @@ impl Flag {
         }
     }
 
-    /// Builds a [`Flag`] from a store's own spelling and the IANA keyword
-    /// it stands for, which the spelling alone does not tell (a Maildir
-    /// info letter, an mbox status letter).
+    /// Builds a [`Flag`] from a store's own spelling (a Maildir or mbox
+    /// letter) and the IANA keyword it stands for, which it does not tell.
     #[cfg(any(feature = "maildir", feature = "mbox"))]
     pub fn spelled(raw: impl Into<String>, iana: Option<IanaFlag>) -> Self {
         Self {

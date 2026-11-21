@@ -9,12 +9,10 @@
 //!
 //! ## Place in the stack
 //!
-//! An application, the top of the Pimalaya stack: it writes no protocol
-//! and no storage logic of its own. A thin shell driving the sans-I/O io-*
-//! libraries below it, consuming their blocking `*Std` clients and
-//! rendering the results. It builds as a binary, and as this library for
-//! himalaya-tui alone, which pins it by git revision: the library carries
-//! no semver promise beyond the CLI grammar and its `--json` output.
+//! The top of the Pimalaya stack: no protocol or storage logic of its own,
+//! a thin shell over the blocking `*Std` clients of the io-* libraries. The
+//! library exists for himalaya-tui alone, which pins it by git revision: no
+//! semver promise beyond the CLI grammar and its `--json` output.
 //!
 //! ## Backends and plumbing
 //!
@@ -30,27 +28,24 @@
 //! ## Command families
 //!
 //! The command tree ([`cli`], `Command`) splits in three. The unified API
-//! ([`unified`]: mailbox, envelope, flag, message, attachment, vacation)
-//! is the cross-protocol surface, the union of what the backends serve,
-//! each verb meaning one thing wherever it runs. The crate root holds the
-//! code every family shares.
+//! ([`unified`]) is the cross-protocol surface, the union of what the
+//! backends serve, each verb meaning one thing wherever it runs. The crate
+//! root holds the code every family shares.
 //!
 //! The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, mbox,
-//! pimdir, smtp, sieve) each expose the full surface of one backend,
-//! including operations the unified API cannot model. The meta commands
-//! cover the accounts, the sessions (repl, mcp), completions, man pages
-//! and JSON Schemas.
+//! pimdir, smtp, sieve) each expose one backend's full surface, including
+//! what the unified API cannot model. The meta commands cover accounts,
+//! sessions (repl, mcp), completions, man pages and JSON Schemas.
 //!
 //! ## Unified commands and backend selection
 //!
-//! The unified commands run over a [`unified::client`] `EmailClient` owning
-//! one `BackendClient` variant per compiled-in backend: the first
-//! configured storage backend the global `--backend` flag allows, local
-//! before network, plus an SMTP transport for those that cannot send.
-//! The [`unified::capability`] resolver picks them from the account's
-//! blocks and refuses, before connecting, a verb the resolved backend
-//! does not serve, under `capability-missing`; its tables also write each
-//! unified command's `--help` footer and filter the MCP tool list.
+//! The unified commands run over a [`unified::client`] `EmailClient`: the
+//! first configured storage backend `--backend` allows, local before
+//! network, plus SMTP for those that cannot send. Its resolver picks them
+//! and refuses a verb the backend does not serve before connecting.
+//!
+//! The [`unified::capability`] tables also write each unified command's
+//! `--help` footer and filter the MCP tool list, so all three agree.
 //!
 //! Each unified method matches the active backend and calls its
 //! per-protocol adapter, which converts io-* results into the CLI's own
@@ -71,43 +66,35 @@
 //!
 //! ## Sessions
 //!
-//! Every command runs over a [`session`] `Session`, which builds the client
-//! the command needs on first use and keeps it, dropping it when a command
-//! fails on it. A one-shot run uses a fresh session for its single command;
-//! the [`repl`] keeps one across the lines of its stdin, so each client
-//! connects once for the whole session. The [`mcp`] server keeps one the
-//! same way, each tool call parsed back into a unified API command. Both
-//! run on pimalaya-cli's shared core (its `repl` loop, its `mcp` protocol
-//! answers and tool grammar), which claims stdin, so a command reading
-//! its input there is refused under `stdin-taken`.
+//! Every command runs over a [`session`] `Session`, which builds a client on
+//! first use, keeps it, and drops it when a command fails on it. The
+//! [`repl`] and the [`mcp`] server keep one session across their calls, so
+//! each client connects once.
+//!
+//! Both run on pimalaya-cli's shared core, which claims stdin, so a command
+//! reading its input there is refused under `stdin-taken`.
 //!
 //! ## Configuration and output
 //!
-//! Config is loaded by pimalaya-config from every existing canonical path
-//! (the rc file last), or the `-c` paths, one per flag, later paths
-//! deep-merged on top. The schema ([`config`]) is multi-account: a
-//! top-level block plus named account blocks carrying optional
-//! per-backend sub-blocks. pimalaya-config also takes the account `-a`
-//! names or the default one, its typed errors naming what is missing.
+//! pimalaya-config loads every existing canonical path (the rc file last),
+//! or the `-c` paths, later ones deep-merged on top, and picks the `-a`
+//! account or the default one. The schema ([`config`]) is multi-account:
+//! a top-level block plus account blocks with per-backend sub-blocks.
 //!
-//! Himalaya never writes a configuration: a person writes it from the
-//! documented sample. A person running Himalaya without one meets the
-//! welcome ([`cli::welcome`], pimalaya-cli's in Himalaya's words), which
-//! creates it from the sample shipped beside the binary or downloads it;
-//! a script or a JSON caller gets the error instead. A bare `himalaya`
-//! prints the help when a configuration exists.
+//! Himalaya never writes a configuration on its own. A person running it
+//! without one meets the welcome ([`cli::welcome`]), which creates it from
+//! the shipped sample or downloads it; a script or a JSON caller gets the
+//! error instead.
 //!
-//! Output follows the Pimalaya rule: data and errors go to stdout through
-//! the printer, `--json` switching every command to JSON, and stderr
-//! carries the logs, the welcome, the REPL's prompt and its help in a
-//! JSON session, and the failures of the MCP server, whose stdout is the
-//! protocol's. Text output is plain text, with no border, no colour and
-//! nothing sized to the terminal: a list prints in pimalaya-cli's listing
-//! frame (the fields placing it, one item per line as aligned columns,
-//! then the errors of the items it could not serve), and a record as
-//! aligned `Label: value` lines. Each command's doc comment is its
-//! `--help`, so `himalaya <command> --help` is the canonical usage
-//! reference.
+//! Data and errors go to stdout through the printer (`--json` switching to
+//! JSON), logs, prompts and the MCP server's failures to stderr. Text is
+//! plain, with no border, colour or terminal sizing: lists in pimalaya-cli's
+//! listing frame, records as aligned `Label: value` lines.
+//!
+//! Each command's doc comment is its `--help`, so `himalaya <command>
+//! --help` is the canonical usage reference.
+
+#![forbid(unsafe_code)]
 
 pub mod account;
 #[cfg(any(backend, feature = "smtp"))]

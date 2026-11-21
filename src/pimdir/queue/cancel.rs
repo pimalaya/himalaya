@@ -99,8 +99,7 @@ pub struct PimdirQueueCancelOutput {
     /// The queue row id cancelled.
     pub row: i64,
     /// The row's handle, its id under the store's identity (pimdir STORAGE
-    /// §4.5): the handle given, or the bare id given named under this
-    /// store's identity.
+    /// §4.5), a bare id given named under this store.
     pub handle: String,
     /// The action kind it held: `add`, `submit`, `set-flags`, ...
     pub kind: String,
@@ -127,9 +126,8 @@ impl fmt::Display for PimdirQueueCancelOutput {
 mod tests {
     use super::*;
 
-    /// Cancelling an unconfirmed row drops it from the queue and undoes
-    /// nothing its performer sent (pimdir STORAGE §15.2), so the output
-    /// never reads as a plain cancellation.
+    /// Cancelling an unconfirmed row undoes nothing already sent (pimdir
+    /// STORAGE §15.2), so the output never reads as a plain cancellation.
     #[test]
     fn cancelling_an_unconfirmed_row_says_it_may_have_taken_effect() {
         let cancelled = PimdirQueueCancelOutput {

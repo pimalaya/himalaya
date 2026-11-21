@@ -39,9 +39,8 @@ pub struct Account {
     pub name: Option<String>,
     /// Address the account sends as.
     pub email: Option<String>,
-    /// Addresses the account logs in as (its IMAP and SMTP logins holding
-    /// an `@`), which a reply to all leaves out beside `email`. Read from
-    /// the account's blocks before its client takes them.
+    /// The IMAP and SMTP logins holding an `@`, which a reply to all
+    /// leaves out beside `email`.
     pub logins: Vec<String>,
     /// Name that address carries.
     pub display_name: Option<String>,
@@ -111,10 +110,8 @@ impl Account {
 impl Account {
     /// Resolves the `From` header into an address and its name.
     ///
-    /// The two are kept apart so the MIME builder does the quoting.
-    /// `--from` wins whole, so a configured name is never grafted onto an
-    /// address the user spelled out, and a `None` address leaves the
-    /// header out.
+    /// Kept apart so the MIME builder quotes. `--from` wins whole, never
+    /// grafted onto the configured name; a `None` address omits the header.
     pub fn resolve_from<'a>(&'a self, over: Option<&'a str>) -> (Option<&'a str>, Option<&'a str>) {
         match over {
             Some(address) => (Some(address), None),
@@ -224,12 +221,9 @@ impl Account {
     /// Overlays the `mailbox.alias.<role>` entries onto the roles the
     /// backend reported.
     ///
-    /// An alias naming a listed mailbox gives it the role and takes it
-    /// from any other mailbox, so the configuration corrects a server
-    /// that mislabels. The alias names the mailbox by id, else by the
-    /// name of exactly one listed mailbox. `resolve` maps an alias onto
-    /// the id of a backend taking several spellings of one mailbox (a
-    /// Maildir named with a trailing slash or `./`), else `None`.
+    /// The aliased mailbox (by id, else by a unique name) takes the role
+    /// from any other, correcting a mislabelling server. `resolve` maps an
+    /// alias spelled several ways (a Maildir `./` or `/`) onto one id.
     pub fn apply_role_aliases(
         &self,
         mailboxes: &mut [Mailbox],

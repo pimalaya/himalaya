@@ -37,10 +37,10 @@ use io_maildir::{
 const READ_CHUNK: usize = 64;
 
 impl MaildirClient {
-    /// Lists every Maildir under the configured root, sorted by name,
-    /// the store's inbox marked with its role. `with_counts` is ignored
-    /// (Maildir does not surface counts cheaply). A folder the walk could
-    /// not read is an item error.
+    /// Lists every Maildir under the root by name, the inbox marked with its
+    /// role; an unreadable folder is an item error.
+    ///
+    /// `with_counts` is ignored: Maildir does not surface counts cheaply.
     pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Outcome<Vec<Mailbox>>> {
         self.ensure_root()?;
 
@@ -76,10 +76,8 @@ impl MaildirClient {
         })
     }
 
-    /// Lists envelopes from `mailbox`, sorted by `Date:` descending
-    /// then paginated. `with_attachment` is always honoured (the body
-    /// is parsed regardless). A file that cannot be read, or holding no
-    /// header field, is an item error of the first page.
+    /// Lists envelopes of `mailbox` by `Date:` descending, paginated; a file
+    /// unreadable or holding no header field is a first-page item error.
     pub fn list_envelopes(
         &self,
         mailbox: &str,
@@ -127,9 +125,8 @@ impl MaildirClient {
         Ok((listed, total))
     }
 
-    /// Searches envelopes in `mailbox`: lists them, then applies the
-    /// unified filter/sort/paginate client-side (body clauses reuse the
-    /// already-read message bytes).
+    /// Searches envelopes of `mailbox` client-side, body clauses reusing the
+    /// already-read message bytes.
     pub fn search_envelopes(
         &self,
         mailbox: &str,
@@ -169,10 +166,8 @@ impl MaildirClient {
         })
     }
 
-    /// Reads `entries` of `maildir` [`READ_CHUNK`] files at a time, handing
-    /// each file read to `visit` and dropping its bytes with its chunk, so a
-    /// listing holds a chunk of messages, never the mailbox; returns the
-    /// entries it could not read.
+    /// Reads `entries` [`READ_CHUNK`] files at a time into `visit`, so a
+    /// listing holds a chunk, never the mailbox; returns the unreadable ones.
     fn visit_entries(
         &self,
         maildir: &Maildir,
@@ -326,9 +321,8 @@ impl MaildirClient {
         Ok((id, path))
     }
 
-    /// Renames the last level of the Maildir `mailbox` to `name`, its
-    /// parent kept, returning its new id and name. The target must not
-    /// exist, and the root cannot be renamed.
+    /// Renames the last level of `mailbox` to `name`, returning its new id
+    /// and name; an existing target and the root are refused.
     pub fn rename_mailbox(&self, mailbox: &str, name: &str) -> Result<(String, String)> {
         self.validate_level(name)?;
 
@@ -355,11 +349,9 @@ impl MaildirClient {
     /// Deletes the Maildir `mailbox` and every message in it, returning
     /// its id.
     ///
-    /// The root is refused, being the whole store. A Maildir holding
-    /// others is refused, naming them, rather than removed with them, as
-    /// IMAP servers keeping inferiors refuse it; so is one holding any
-    /// directory besides `cur`, `new` and `tmp`, listed or not, which the
-    /// removal would take along.
+    /// Refuses the root (the whole store), a Maildir holding others (naming
+    /// them, as IMAP servers keeping inferiors do), and one holding any
+    /// directory besides `cur`, `new` and `tmp`, which removal would take.
     pub fn delete_mailbox(&self, mailbox: &str) -> Result<String> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         if self.is_root(&maildir) {
@@ -410,9 +402,8 @@ impl MaildirClient {
             .unwrap_or_default()
     }
 
-    /// Permanently deletes the messages of `ids` `mailbox` holds by
-    /// unlinking their files, returning how many it found beside the
-    /// unknown ids.
+    /// Permanently unlinks the messages of `ids`, returning how many it
+    /// found beside the unknown ids.
     pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<Outcome<usize>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let (found, errors) = self.found(&maildir, ids)?;
@@ -439,9 +430,8 @@ impl MaildirClient {
         Ok((found, errors))
     }
 
-    /// The ids of `ids` `maildir` holds, each entry once, every id checked
-    /// before the first write, as the raw commands want them: one unknown
-    /// id refuses the whole set, naming the unknown ones.
+    /// The ids of `ids`, each entry once, all checked before any write: one
+    /// unknown id refuses the whole set, naming the unknown ones.
     pub fn found_all<'a>(&self, maildir: &Maildir, ids: &[&'a str]) -> Result<Vec<&'a str>> {
         let (found, missing) = self.locate_all(maildir, ids)?;
 
@@ -494,9 +484,8 @@ fn mailbox_from(client: &MaildirClient, maildir: Maildir) -> Mailbox {
     }
 }
 
-/// Folds a fully-read Maildir entry into a unified [`Envelope`], reading
-/// the RFC 5322 headers and mapping the flags io-maildir resolved; `None`
-/// for a file holding no header field.
+/// Folds a fully-read Maildir entry into a unified [`Envelope`], `None` for
+/// a file holding no header field.
 fn envelope_from_entry(entry: &MaildirFullEntry) -> Option<Envelope> {
     Some(Envelope {
         id: entry.id().unwrap_or_default().to_string(),
@@ -538,9 +527,8 @@ fn flag_from_maildir(flag: &MaildirFlag) -> Flag {
     }
 }
 
-/// The item error of each entry a listing could not read, then of each
-/// holding no header field, on its first page only, so a later page does
-/// not repeat them.
+/// The item errors of unreadable then headerless entries, on the first
+/// page only so a later page does not repeat them.
 fn entry_errors(
     unreadable: Vec<MaildirUnreadableEntry>,
     headerless: Vec<String>,
@@ -699,9 +687,8 @@ mod tests {
         assert!(dir.path().join("A/Kid2/cur").is_dir());
     }
 
-    /// A folder the store holds already, at the top or under a parent, is
-    /// refused `mailbox-duplicate` and keeps its messages; a file in the
-    /// way is no mailbox, refused uncoded.
+    /// An existing folder is refused `mailbox-duplicate` and keeps its
+    /// messages; a file in the way is no mailbox, refused uncoded.
     #[test]
     fn an_existing_folder_is_not_created_again() {
         let (dir, client, id) = fixture();
@@ -927,9 +914,8 @@ mod tests {
         assert_eq!(raws, ["\\Seen", "\\Answered"]);
     }
 
-    /// A file holding no header field (empty, bytes, a line of text, bytes
-    /// before a colon) is a `message-unreadable` error of the first page,
-    /// out of the rows, as a file that cannot be read is.
+    /// A file holding no header field is a first-page `message-unreadable`
+    /// error out of the rows, as an unreadable file is.
     #[test]
     fn a_file_holding_no_header_field_is_an_item_error_of_the_first_page() {
         let (dir, client, _) = fixture();

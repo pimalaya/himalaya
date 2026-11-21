@@ -81,11 +81,9 @@ impl MaildirClient {
 
     /// Resolves a command's Maildir argument into a loaded [`Maildir`].
     ///
-    /// The argument is a name relative to the root, the id `mailbox list`
-    /// prints (the absolute path), or the name the root lists under;
-    /// see [`Self::logical_name`]. An `inbox` no folder answers to is
-    /// the store's inbox, see [`Self::inbox`]. Loading validates the
-    /// `cur`, `new` and `tmp` markers.
+    /// The argument is a [`Self::logical_name`], the absolute id `mailbox
+    /// list` prints, or the root's listed name; an `inbox` no folder answers
+    /// to is [`Self::inbox`]. Loading validates `cur`, `new` and `tmp`.
     pub fn resolve_maildir(&self, mailbox: &Path) -> Result<Maildir> {
         let name = self.logical_name(mailbox)?;
 
@@ -123,10 +121,9 @@ impl MaildirClient {
     /// The name, relative to the root, of the Maildir argument `mailbox`,
     /// empty for the root itself.
     ///
-    /// `.` components and trailing slashes are dropped. An absolute path
-    /// must lie under the root, and on Maildir++ an on-disk `.a.b` reads
-    /// as `a/b`. A `..` component is refused, so nothing resolves outside
-    /// the store.
+    /// An absolute path must lie under the root and a `..` component is
+    /// refused, so nothing resolves outside the store; on Maildir++ an
+    /// on-disk `.a.b` reads as `a/b`.
     pub fn logical_name(&self, mailbox: &Path) -> Result<String> {
         let relative = if mailbox.is_absolute() {
             match mailbox.strip_prefix(&self.root) {
@@ -166,9 +163,8 @@ impl MaildirClient {
         Ok(levels.join("/"))
     }
 
-    /// The store's inbox: on the fs layout a top-level folder named
-    /// `inbox` in any case, else the root when it is a Maildir; on
-    /// Maildir++ the root.
+    /// The store's inbox: the root on Maildir++; on the fs layout a top-level
+    /// `inbox` in any case, else the root when it is a Maildir.
     pub fn inbox(&self) -> Option<Maildir> {
         if !self.store.maildirpp {
             let entries = fs::read_dir(&self.root).ok()?;
@@ -185,9 +181,8 @@ impl MaildirClient {
         self.load_maildir("").ok()
     }
 
-    /// The name a Maildir is shown and selected by: its path relative
-    /// to the store root (`[Gmail]/Archive`), whatever the layout, so
-    /// nested Maildirs sharing a last segment stay apart.
+    /// A Maildir's shown name, its path relative to the root whatever the
+    /// layout, so nested Maildirs sharing a last segment stay apart.
     ///
     /// The root lists as `INBOX`, the store's inbox, or as `.` when a
     /// top-level folder named so takes the inbox.
@@ -214,9 +209,8 @@ impl MaildirClient {
         }
     }
 
-    /// Rejects a NAME that cannot be one level of the store: see
-    /// [`validate_maildir_level`], plus, on Maildir++, a dot, which that
-    /// layout reads as the hierarchy delimiter.
+    /// Rejects what [`validate_maildir_level`] does, plus a dot on Maildir++,
+    /// its hierarchy delimiter.
     pub fn validate_level(&self, name: &str) -> Result<()> {
         validate_maildir_level(name)?;
 
@@ -262,10 +256,8 @@ pub fn build_maildir_client(
     Ok((account, MaildirClient::new(maildir_config)))
 }
 
-/// Rejects a Maildir folder name that is empty, absolute, contains a
-/// `..` component, or names the root itself (`.`, `./`), so a folder
-/// operation joined to the account root cannot escape it nor act on the
-/// whole store.
+/// Rejects a folder name empty, absolute, with a `..`, or naming the root,
+/// so no folder operation escapes the store nor acts on all of it.
 pub fn validate_maildir_name(name: &Path) -> Result<()> {
     if name.as_os_str().is_empty() {
         bail!("Maildir folder name must not be empty");
@@ -288,10 +280,8 @@ pub fn validate_maildir_name(name: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Rejects a NAME that cannot be one level of a Maildir store: a blank
-/// one, one holding a control character or the `/` delimiter, a `cur`,
-/// `new` or `tmp` subdirectory name, or one starting with a dot, which
-/// the listing reads as hidden.
+/// Rejects a NAME blank, holding a control character or `/`, named `cur`,
+/// `new` or `tmp`, or starting with a dot, which the listing hides.
 pub fn validate_maildir_level(name: &str) -> Result<()> {
     validate_name(name)?;
     validate_level(name, '/')?;
@@ -307,9 +297,8 @@ pub fn validate_maildir_level(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Refuses creating the Maildir `name` at `target`, the path it resolves
-/// to, when something is there: a folder under `mailbox-duplicate`, any
-/// other file uncoded, being no mailbox.
+/// Refuses creating `name` at `target` when taken: a folder under
+/// `mailbox-duplicate`, any other file uncoded, being no mailbox.
 pub fn refuse_existing(target: &Path, name: &str) -> Result<()> {
     if target.is_dir() {
         return Err(mailbox_duplicate(name));
