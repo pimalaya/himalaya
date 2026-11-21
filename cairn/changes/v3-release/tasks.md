@@ -20,7 +20,7 @@ change: v3-release
 
 - [x] MIGRATION.md: the v2 to v3 section (drafted 2026-11-02, final once the JSON review is done)
 - [x] MIGRATION.md: the v2 to v3 section gains the breaking changes landed since its draft (the wizard, the table presets and colours and `-w/--max-width` removed, `-c` one path per flag, `HIMALAYA_CONFIG` removed, ASCII hosts, the plain text output)
-- [ ] A new screenshot.jpeg showing the plain columns, the current one showing the v2 coloured table (postponed by the owner on 2026-11-11)
+- [x] A new screenshot.jpeg showing the plain columns: replaced by the tested `envelope search --json` block of the README (the-pre-release-reading, 2026-11-21)
 - [x] Adopt the io-imap release handing raw bytes and land HIM-18 (the-schema-review-remainder), ruled before v3 on 2026-11-19 (2026-11-19: io-imap 0.12, the-releases-of-2026-11-19)
 - [ ] Bump the version to 3.0.0 (the schema `$id`s follow, `v3`)
 - [ ] Finalise the CHANGELOG `[Unreleased]` section into `[3.0.0]`, its breaking entries marked

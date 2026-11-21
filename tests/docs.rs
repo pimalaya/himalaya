@@ -1,13 +1,22 @@
-//! The documentation ceilings of the guidelines, checked over src/: a `//!`
-//! paragraph of four lines at most (inline-001), and a `///` block of one
-//! summary plus three lines after a blank (inline-002), clap items aside
-//! since their docs are the `--help` (inline-006).
+//! # Documentation rules
+//!
+//! The ceilings of the guidelines over src/: a `//!` paragraph of four
+//! lines (inline-001), a `///` block of a summary plus three lines
+//! (inline-002), clap items aside (inline-006). Then the README's budgets
+//! (readme-007, readme-008) and its header block, run for real.
 
+#[cfg(feature = "maildir")]
+use std::process::{Command, Stdio};
 use std::{
     fs,
     ops::RangeInclusive,
     path::{Path, PathBuf},
 };
+
+#[cfg(feature = "maildir")]
+use serde_json::Value;
+#[cfg(feature = "maildir")]
+use tempfile::TempDir;
 
 /// Every Rust file under `dir`, in path order.
 fn sources(dir: &Path) -> Vec<PathBuf> {
@@ -172,4 +181,157 @@ fn an_item_doc_holds_a_summary_and_three_lines_at_most() {
     }
 
     assert!(long.is_empty(), "{} docs:\n{}", long.len(), long.join("\n"));
+}
+
+/// The README, read from the repository root.
+fn readme() -> String {
+    fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md")).unwrap()
+}
+
+/// The README's `## ` sections, in order.
+fn readme_sections(readme: &str) -> Vec<&str> {
+    readme
+        .lines()
+        .filter_map(|line| line.strip_prefix("## "))
+        .collect()
+}
+
+#[test]
+fn the_readme_features_are_eight_short_bullets_at_most() {
+    let readme = readme();
+    let features: Vec<&str> = readme
+        .split("\n## Features\n")
+        .nth(1)
+        .expect("a Features section")
+        .split("\n## ")
+        .next()
+        .unwrap()
+        .lines()
+        .filter(|line| line.starts_with("- "))
+        .collect();
+
+    assert!(!features.is_empty() && features.len() <= 8, "{features:#?}");
+    for feature in features {
+        assert!(feature.chars().count() <= 120, "{feature}");
+    }
+}
+
+#[test]
+fn the_readme_sections_follow_the_cli_order() {
+    assert_eq!(
+        readme_sections(&readme()),
+        [
+            "Table of contents",
+            "Features",
+            "Installation",
+            "Configuration",
+            "Usage",
+            "License",
+            "Social",
+            "Sponsoring",
+        ]
+    );
+}
+
+/// The two messages from Alice the README's header block finds, and one
+/// from Bob it leaves out, as Maildir entries by file name.
+#[cfg(feature = "maildir")]
+const README_MAILDIR: [(&str, &str); 3] = [
+    (
+        "1:2,S",
+        "From: Alice <alice@example.org>\r\n\
+        To: me@example.org\r\n\
+        Subject: Lunch on Friday?\r\n\
+        Message-ID: <lunch@example.org>\r\n\
+        Date: Wed, 18 Nov 2026 12:30:00 +0100\r\n\
+        \r\n\
+        Pizza?\r\n",
+    ),
+    (
+        "2:2,",
+        "From: Alice <alice@example.org>\r\n\
+        To: me@example.org\r\n\
+        Subject: Slides for the review\r\n\
+        Message-ID: <slides@example.org>\r\n\
+        Date: Thu, 19 Nov 2026 09:15:00 +0100\r\n\
+        Content-Type: multipart/mixed; boundary=\"m\"\r\n\
+        \r\n\
+        --m\r\n\
+        Content-Type: text/plain\r\n\
+        \r\n\
+        Attached.\r\n\
+        --m\r\n\
+        Content-Type: application/pdf\r\n\
+        Content-Disposition: attachment; filename=\"slides.pdf\"\r\n\
+        \r\n\
+        PDF\r\n\
+        --m--\r\n",
+    ),
+    (
+        "3:2,S",
+        "From: Bob <bob@example.org>\r\n\
+        To: me@example.org\r\n\
+        Subject: Weekly report\r\n\
+        Message-ID: <report@example.org>\r\n\
+        Date: Fri, 20 Nov 2026 08:00:00 +0100\r\n\
+        \r\n\
+        Numbers.\r\n",
+    ),
+];
+
+/// The content of the first fenced block of `lang` in `text`, and the
+/// rest of `text` after it.
+#[cfg(feature = "maildir")]
+fn fenced<'a>(text: &'a str, lang: &str) -> (&'a str, &'a str) {
+    let open = format!("```{lang}\n");
+    let start = text.find(&open).expect("a fenced block") + open.len();
+    let end = start + text[start..].find("\n```").expect("a closing fence");
+    (&text[start..end], &text[end + 4..])
+}
+
+#[cfg(feature = "maildir")]
+#[test]
+fn the_readme_header_block_prints_what_it_shows() {
+    let readme = readme();
+    let (command, rest) = fenced(&readme, "sh");
+    let (shown, _) = fenced(rest, "json");
+    let args: Vec<&str> = command
+        .strip_prefix("$ himalaya ")
+        .expect("a himalaya command line")
+        .split_whitespace()
+        .collect();
+
+    let dir = TempDir::new().unwrap();
+    let inbox = dir.path().join("root").join("inbox");
+    for sub in ["cur", "new", "tmp"] {
+        fs::create_dir_all(inbox.join(sub)).unwrap();
+    }
+    for (name, message) in README_MAILDIR {
+        fs::write(inbox.join("cur").join(name), message).unwrap();
+    }
+
+    let config = dir.path().join("config.toml");
+    let root = dir.path().join("root");
+    let toml = format!(
+        "[accounts.me]\ndefault = true\nemail = \"me@example.org\"\nmaildir.root = \"{}\"\n",
+        root.display(),
+    );
+    fs::write(&config, toml).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
+        .arg("-c")
+        .arg(&config)
+        .args(&args)
+        .env("HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("TZ", "UTC")
+        .env_remove("XDG_CONFIG_DIRS")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let printed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let shown: Value = serde_json::from_str(shown).unwrap();
+    assert_eq!(printed, shown);
 }

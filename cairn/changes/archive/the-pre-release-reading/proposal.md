@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: the-pre-release-reading
-status: active
+status: landed
 created: 2026-11-21
 ---
 
@@ -9,7 +9,7 @@ created: 2026-11-21
 
 ## Why
 
-The maintainer's reading of himalaya before v3 found the code and its README behind the family model neverest set in its v1 review (neverest cairn/changes/the-v1-review, follow-ups F2 and F4). src/shared/ mixed two roles: the unified API (titled so in its header) and helpers the protocol namespaces share, while the unified API also spread over src/email/, src/backend.rs and src/capability.rs, and the crate root already plays the shared role. 490 `//` lines remained against inline-004 (A9: all removed but `SAFETY`, the owner re-adding any by hand). The README (531 lines) broke readme-007, readme-008, readme-010 and readme-017, and its screenshot showed the v1 bordered table the text output no longer prints.
+The maintainer's reading of himalaya before v3 found the code and its README behind the family model neverest set in its v1 review (neverest cairn/changes/the-v1-review, follow-ups F2 and F4). src/shared/ mixed two roles: the unified API (titled so in its header) and helpers the protocol namespaces share, while the unified API also spread over src/email/, src/backend.rs and src/capability.rs, and the crate root already plays the shared role. 490 `//` lines remained against inline-004 (A9: all removed but `SAFETY`, the owner re-adding any by hand). The README (531 lines) broke readme-007, readme-008, readme-010 and readme-017, and its screenshot showed the v2 bordered table the text output no longer prints.
 
 ## What
 

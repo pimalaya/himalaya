@@ -9,5 +9,5 @@ change: the-pre-release-reading
 - [x] Remove every `//` line, whys moved per inline-008.
 - [x] tests/docs.rs doc ceilings, docs trimmed to pass; `#![forbid(unsafe_code)]`.
 - [x] `Envelope` kebab-case serde aliases dropped.
-- [ ] README rewrite with the `envelope search --json` block, its test, GUIDELINES.md readme-006 amendment.
-- [ ] Log, change landed.
+- [x] README rewrite with the `envelope search --json` block, its test, GUIDELINES.md readme-006 amendment.
+- [x] Log, change landed.
