@@ -54,6 +54,7 @@ fn store(root: &Path) {
         level: PimdirLevel::Full,
         object: Some(hash.clone()),
         summary: derived.summary,
+        server_object_id: None,
         sort_key: derived.sort_key,
         flags: PimdirFlags::default(),
         status: PimdirStatus::Clean,

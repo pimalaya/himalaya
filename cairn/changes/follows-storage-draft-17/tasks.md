@@ -9,16 +9,16 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 
 ## 0. Start
 
-- [ ] Read frame.md, proposal.md, inventory.md; create journal.md (and later report.md) with the frontmatter `cairn: change`, `id: follows-storage-draft-17`, which cairn/verify.sh requires of every file here. Gate: `git status` clean at a2726f56 or a later owner head.
+- [x] Read frame.md, proposal.md, inventory.md; create journal.md (and later report.md) with the frontmatter `cairn: change`, `id: follows-storage-draft-17`, which cairn/verify.sh requires of every file here. Gate: `git status` clean at a2726f56 or a later owner head.
 
 ## 1. Build on 7f16b27 (A to D, one commit)
 
-- [ ] Cargo.toml:83 rev `7f16b27da3b11a42b9d81a522a3e6fa5eeeed994`; `cargo update -p io-pimdir`. Gate: the Cargo.lock diff is the io-pimdir source and its `libc` line; `cargo tree -e normal -i ical-rs` and `-i vcard-rs` print nothing.
-- [ ] src/pimdir/backend.rs:736-739 (`addressed`): `| PimdirAction::SetProperty { seq, .. }` joins the arm returning `stored(*seq)`.
-- [ ] `server_object_id: None` at src/pimdir/backend.rs:3589 and :4969, src/pimdir/index.rs:786, tests/pimdir_search.rs:67, tests/pimdir_queue.rs:50, tests/pimdir_attachments.rs:172.
-- [ ] src/pimdir/backend.rs:2913-2914: stamp `storage-draft-11` and `storage-draft-15` (move its directory aside), `storage-draft-99` (upgrade himalaya).
-- [ ] src/pimdir/index.rs:940 `UPDATE summary SET size = 'x' WHERE item = …`; tests/pimdir_search.rs:218 `UPDATE summary SET size = 'x' WHERE component = 'mail' AND title = 'Report 2'`; src/pimdir/backend.rs:2972 `DROP TABLE summary_value`.
-- [ ] Gate: the four tests of inventory.md §2 pass, then the whole gate. Commit `build!: follow pimdir storage-draft-17 and search-draft-17`.
+- [x] Cargo.toml:83 rev `7f16b27da3b11a42b9d81a522a3e6fa5eeeed994`; `cargo update -p io-pimdir`. Gate: the Cargo.lock diff is the io-pimdir source and its `libc` line; `cargo tree -e normal -i ical-rs` and `-i vcard-rs` print nothing.
+- [x] src/pimdir/backend.rs:736-739 (`addressed`): `| PimdirAction::SetProperty { seq, .. }` joins the arm returning `stored(*seq)`.
+- [x] `server_object_id: None` at src/pimdir/backend.rs:3589 and :4969, src/pimdir/index.rs:786, tests/pimdir_search.rs:67, tests/pimdir_queue.rs:50, tests/pimdir_attachments.rs:172.
+- [x] src/pimdir/backend.rs:2913-2914: stamp `storage-draft-11` and `storage-draft-15` (move its directory aside), `storage-draft-99` (upgrade himalaya).
+- [x] src/pimdir/index.rs:940 `UPDATE summary SET size = 'x' WHERE item = …`; tests/pimdir_search.rs:218 `UPDATE summary SET size = 'x' WHERE component = 'mail' AND title = 'Report 2'`; src/pimdir/backend.rs:2972 `DROP TABLE summary_value`.
+- [x] Gate: the four tests of inventory.md §2 pass, then the whole gate. Commit `build!: follow pimdir storage-draft-17 and search-draft-17`.
 - [ ] D5: `cargo update -p url` (2.5.9, form_urlencoded 1.2.3). Gate: `cargo-deny check` green. Commit `build: url 2.5.9 (RUSTSEC-2026-0592)`.
 
 ## 2. Inherited behaviour, pinned (E; each test fails on dc19b8d, inventory.md §4)

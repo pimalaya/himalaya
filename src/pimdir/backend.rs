@@ -736,7 +736,8 @@ impl PimdirClient {
             PimdirAction::SetFlags { seq, .. }
             | PimdirAction::Remove { seq, .. }
             | PimdirAction::Move { seq, .. }
-            | PimdirAction::Copy { seq, .. } => stored(*seq),
+            | PimdirAction::Copy { seq, .. }
+            | PimdirAction::SetProperty { seq, .. } => stored(*seq),
             PimdirAction::Unknown {
                 kind,
                 payload,
@@ -2911,7 +2912,8 @@ mod tests {
     fn a_store_of_another_draft_is_refused_saying_which_is_earlier() {
         for (version, asks) in [
             ("storage-draft-11", "move its directory aside"),
-            ("storage-draft-16", "upgrade himalaya"),
+            ("storage-draft-15", "move its directory aside"),
+            ("storage-draft-99", "upgrade himalaya"),
         ] {
             let (dir, _client) = sent_store();
             stamp_format(dir.path(), version);
@@ -2969,7 +2971,7 @@ mod tests {
     fn a_damaged_store_is_refused_as_corrupt() {
         let (dir, _client) = sent_store();
         let db = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
-        db.execute_batch("DROP TABLE item_address").unwrap();
+        db.execute_batch("DROP TABLE summary_value").unwrap();
         drop(db);
 
         let err = PimdirClient::new(PimdirConfig {
@@ -3593,6 +3595,7 @@ mod tests {
                         object: None,
                         level: PimdirLevel::Meta,
                         summary: mail.summary.clone().map(PimdirSummary::Mail),
+                        server_object_id: None,
                         sort_key,
                         flags: mail.flags.clone(),
                         status: PimdirStatus::Clean,
@@ -4973,6 +4976,7 @@ mod tests {
             object: Some(ours.clone()),
             level: PimdirLevel::Full,
             summary: derived.summary,
+            server_object_id: None,
             sort_key: derived.sort_key,
             flags: known(&[]),
             status: PimdirStatus::Conflict,

@@ -71,6 +71,7 @@ fn store(root: &Path) {
                     level: PimdirLevel::Full,
                     object: Some(hash.clone()),
                     summary,
+                    server_object_id: None,
                     sort_key,
                     flags: PimdirFlags::default(),
                     status: PimdirStatus::Clean,
@@ -215,7 +216,8 @@ fn a_message_the_store_cannot_read_is_an_item_error() {
     let conn = rusqlite::Connection::open(root.join("pimdir.db")).unwrap();
     conn.execute_batch("PRAGMA ignore_check_constraints = ON")
         .unwrap();
-    let sql = "UPDATE mail_summary SET size = 'x' WHERE subject = 'Report 2'";
+    let sql = "UPDATE summary SET size = 'x' \
+               WHERE component = 'mail' AND title = 'Report 2'";
     assert_eq!(conn.execute(sql, []).unwrap(), 1);
     drop(conn);
 

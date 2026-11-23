@@ -1105,13 +1105,14 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.19.1"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=dc19b8dba1a5fd9f68925e2be58d0f95dab5a22e#dc19b8dba1a5fd9f68925e2be58d0f95dab5a22e"
+source = "git+https://github.com/pimalaya/io-pimdir?rev=7f16b27da3b11a42b9d81a522a3e6fa5eeeed994#7f16b27da3b11a42b9d81a522a3e6fa5eeeed994"
 dependencies = [
  "blake3",
  "encoding_rs",
  "fs4",
  "ical-rs",
  "jiff",
+ "libc",
  "log",
  "mime-rs",
  "rusqlite",

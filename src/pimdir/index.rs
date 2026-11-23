@@ -795,6 +795,7 @@ mod tests {
                     date: Some("2026-05-17T10:00:00Z".into()),
                     ..Default::default()
                 })),
+                server_object_id: None,
                 sort_key: "2026-05-17T10:00:00Z".into(),
                 flags: flags.clone(),
                 status: PimdirStatus::Clean,
@@ -937,7 +938,7 @@ mod tests {
         conn.execute_batch("PRAGMA ignore_check_constraints = ON")
             .unwrap();
         let seq: i64 = lunch.parse().unwrap();
-        let sql = "UPDATE mail_summary SET size = 'x' \
+        let sql = "UPDATE summary SET size = 'x' \
                    WHERE item = (SELECT id FROM items WHERE seq = ?1)";
         assert_eq!(conn.execute(sql, [seq]).unwrap(), 1);
         drop(conn);
