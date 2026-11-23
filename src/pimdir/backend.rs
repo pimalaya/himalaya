@@ -2724,6 +2724,86 @@ mod tests {
         );
     }
 
+    /// A queued `set-property` names its message in `queue list`, reads
+    /// pending in `queue show`, and `queue cancel` drops it.
+    #[test]
+    fn a_set_property_row_names_its_message() {
+        use clap::Parser;
+        use pimalaya_cli::printer::CapturePrinter;
+
+        use crate::{
+            account::context::Account,
+            pimdir::queue::{
+                cancel::PimdirQueueCancelCommand, list::PimdirQueueListCommand,
+                show::PimdirQueueShowCommand,
+            },
+        };
+
+        let (dir, mut client) = sent_store();
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+        let PimdirActionStatus::Applied { seq: Some(seq), .. } =
+            client.queue_row(&staged.queue_id).unwrap()
+        else {
+            panic!("expected an applied add");
+        };
+
+        let mut producer =
+            io_pimdir::client::producer::PimdirProducer::open(dir.path(), "labeller").unwrap();
+        let labelled = PimdirAction::SetProperty {
+            seq,
+            key: "pimdir/label".into(),
+            add: vec!["todo".into()],
+            remove: Vec::new(),
+        };
+        let row = producer
+            .enqueue("imap/Sent", &labelled, None)
+            .unwrap()
+            .handle
+            .id
+            .to_string();
+        drop(producer);
+
+        let mut account = Account::default();
+        let mut run = |args: &[&str], client: &mut PimdirClient| {
+            let mut printer = CapturePrinter::default();
+            match args[0] {
+                "list" => PimdirQueueListCommand::try_parse_from(args)
+                    .unwrap()
+                    .execute(&mut printer, &mut account, client),
+                "show" => PimdirQueueShowCommand::try_parse_from(args)
+                    .unwrap()
+                    .execute(&mut printer, client),
+                _ => PimdirQueueCancelCommand::try_parse_from(args)
+                    .unwrap()
+                    .execute(&mut printer, client),
+            }
+            .unwrap();
+            printer.into_single().unwrap()
+        };
+
+        let listed = run(&["list"], &mut client);
+        let action = &listed["actions"][0];
+        assert_eq!(action["kind"], "set-property", "{listed}");
+        assert_eq!(action["itemId"], seq.to_string(), "{listed}");
+        assert_eq!(action["subject"], "hi", "{listed}");
+
+        let shown = run(&["show", &row], &mut client);
+        assert_eq!(shown["state"], "pending", "{shown}");
+        assert_eq!(shown["kind"], "set-property", "{shown}");
+
+        let cancelled = run(&["cancel", "--yes", &row], &mut client);
+        assert_eq!(cancelled["kind"], "set-property", "{cancelled}");
+        let listed = run(&["list"], &mut client);
+        assert_eq!(listed["actions"], serde_json::json!([]), "{listed}");
+    }
+
     /// A receipt names its row under the store's identity (pimdir STORAGE
     /// §4.5), and the bare id `queue list` prints is taken all the same.
     #[test]

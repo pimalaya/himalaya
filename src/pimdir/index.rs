@@ -1235,6 +1235,72 @@ mod tests {
         );
     }
 
+    /// A text of two characters or more beginning with `/` is kept for
+    /// regular expressions (SEARCH §8.3) and refused, not searched.
+    #[test]
+    fn a_reserved_form_is_refused_as_query_refused() {
+        for json in [true, false] {
+            let err = parse_query(&[String::from("/x")], json).err().unwrap();
+            assert_eq!(
+                pimalaya_cli::error::code_of::<ErrorCode>(&err),
+                Some(ErrorCode::QueryRefused),
+                "{err}"
+            );
+            assert!(err.to_string().contains("reserved-form"), "{err}");
+        }
+    }
+
+    /// A label the owner gave a message is found by `label:`, read from the
+    /// store, while `envelope search` refuses the field.
+    #[test]
+    fn a_label_is_read_from_the_store() {
+        use crate::unified::email::search::query::SearchEmailsQuery;
+
+        let (dir, client) = indexed_store();
+        let lunch: i64 = id_of(&client, "Lunch").parse().unwrap();
+
+        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        assert!(owner.add_property(lunch, "pimdir/label", "todo").unwrap());
+        drop(owner);
+
+        assert_eq!(subjects(&client, "label:todo"), ["Lunch"]);
+        assert!(subjects(&client, "label:other").is_empty());
+
+        let err = SearchEmailsQuery::new(Some(query("label:todo")), None, 0, TimeZone::UTC)
+            .err()
+            .unwrap();
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::SearchUnsupported),
+            "{err}"
+        );
+    }
+
+    /// A flag term reads the flags the store holds, so a flag the owner
+    /// applied after the last refresh counts, the index said to lag.
+    #[test]
+    fn a_flag_term_reads_the_store_while_the_index_lags() {
+        use crate::unified::email::flag::FlagOp;
+
+        let (dir, mut client) = indexed_store();
+        let clock = PimdirSearchClock::default();
+        let (before, _) = client.count_mail(query("is:flagged"), &clock).unwrap();
+        assert_eq!(before, 1);
+
+        let report = id_of(&client, "Quarterly report");
+        let flagged = [Flag::from_iana(IanaFlag::Flagged)];
+        client
+            .store_flags(INBOX, &[report.as_str()], &flagged, FlagOp::Add)
+            .unwrap();
+        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+
+        let (after, coverage) = client.count_mail(query("is:flagged"), &clock).unwrap();
+        assert_eq!(after, 2);
+        assert!(coverage.behind > 0, "{coverage:?}");
+    }
+
     #[test]
     fn a_missing_or_outdated_index_says_to_run_the_sync_engine() {
         let (dir, client) = indexed_store();

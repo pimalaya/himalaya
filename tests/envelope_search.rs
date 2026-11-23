@@ -2,8 +2,8 @@
 //!
 //! `envelope search` run as the built binary against a Maildir, asserting
 //! the `cc:`, `with:`, `date:`, `has:attachment` and `mid:` terms on
-//! io-pimdir's mail matcher, and that a refused query fails with the code
-//! `search-invalid`.
+//! io-pimdir's mail matcher, and that a refused query, a reserved form
+//! included, fails with the code `search-invalid`.
 
 #![cfg(all(backend, feature = "maildir"))]
 
@@ -16,7 +16,8 @@ use std::{
 use serde_json::Value;
 use tempfile::TempDir;
 
-/// A message copied to Carol, sent on 2026-03-02, with no attachment.
+/// A message copied to Carol, sent on 2026-03-02, with no attachment, its
+/// body holding a word written with a tilde.
 const COPIED: &str = "From: alice@example.org\r\n\
     To: bob@example.org\r\n\
     Cc: Carol <carol@example.org>\r\n\
@@ -24,7 +25,7 @@ const COPIED: &str = "From: alice@example.org\r\n\
     Message-ID: <copied-123@example.org>\r\n\
     Date: Mon, 02 Mar 2026 10:00:00 +0000\r\n\
     \r\n\
-    hello\r\n";
+    hello ~tilde\r\n";
 
 /// A message to Bob alone, sent on 2026-05-04, carrying a PDF.
 const ATTACHED: &str = "From: dave@example.org\r\n\
@@ -68,8 +69,8 @@ fn account(dir: &Path) -> PathBuf {
 }
 
 /// Runs `envelope search --json` with the given query and returns the exit
-/// status and the JSON it prints.
-fn search(config: &Path, home: &Path, query: &[&str]) -> (bool, Value) {
+/// code and the JSON it prints.
+fn search(config: &Path, home: &Path, query: &[&str]) -> (Option<i32>, Value) {
     let output = Command::new(env!("CARGO_BIN_EXE_himalaya"))
         .args([
             "-c",
@@ -87,13 +88,13 @@ fn search(config: &Path, home: &Path, query: &[&str]) -> (bool, Value) {
         .unwrap();
 
     let json = serde_json::from_slice(&output.stdout).unwrap();
-    (output.status.success(), json)
+    (output.status.code(), json)
 }
 
 /// The subjects of a successful search, in the order printed.
 fn subjects(config: &Path, home: &Path, query: &[&str]) -> Vec<String> {
-    let (ok, json) = search(config, home, query);
-    assert!(ok, "{json}");
+    let (code, json) = search(config, home, query);
+    assert_eq!(code, Some(0), "{json}");
 
     json["envelopes"]
         .as_array()
@@ -137,8 +138,28 @@ fn new_clauses_select_their_messages() {
 fn a_malformed_query_is_refused_with_its_code() {
     let dir = TempDir::new().unwrap();
     let config = account(dir.path());
-    let (ok, json) = search(&config, dir.path(), &["cc:"]);
+    let (code, json) = search(&config, dir.path(), &["cc:"]);
 
-    assert!(!ok);
+    assert_eq!(code, Some(1), "{json}");
     assert_eq!(json["code"], "search-invalid", "{json}");
+}
+
+/// A text beginning with `~` or `/` and a value beginning with `{` are
+/// kept for later forms (pimdir SEARCH §8.3) and refused, where quoting
+/// them searches the characters.
+#[test]
+fn a_reserved_form_is_refused_with_its_code() {
+    let dir = TempDir::new().unwrap();
+    let config = account(dir.path());
+    let home = dir.path();
+
+    for query in ["~tilde", "/slash", "subject:{brace}"] {
+        let (code, json) = search(&config, home, &[query]);
+        assert_eq!(code, Some(1), "{query}: {json}");
+        assert_eq!(json["code"], "search-invalid", "{query}: {json}");
+        let message = json.to_string();
+        assert!(message.contains("reserved-form"), "{query}: {json}");
+    }
+
+    assert_eq!(subjects(&config, home, &["\"~tilde\""]), ["Copied"]);
 }

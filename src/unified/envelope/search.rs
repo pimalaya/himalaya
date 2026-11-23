@@ -92,7 +92,11 @@ pub struct EnvelopeSearchCommand {
     ///   brackets optional.
     ///
     /// Days and instants with no offset are read in the local zone (`TZ`,
-    /// then the system's). A trailing `*` makes a word a prefix.
+    /// then the system's). A trailing `*` makes a word a prefix. A word or
+    /// value beginning with `~`, a word or value of two characters or more
+    /// beginning with `/`, and a value beginning with `{` are reserved and
+    /// refused (`reserved-form`): quote them to search the characters,
+    /// `"~tilde"`.
     #[arg(value_name = "QUERY")]
     pub query: Option<Vec<String>>,
 }

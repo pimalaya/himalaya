@@ -19,15 +19,15 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 - [x] src/pimdir/backend.rs:2913-2914: stamp `storage-draft-11` and `storage-draft-15` (move its directory aside), `storage-draft-99` (upgrade himalaya).
 - [x] src/pimdir/index.rs:940 `UPDATE summary SET size = 'x' WHERE item = …`; tests/pimdir_search.rs:218 `UPDATE summary SET size = 'x' WHERE component = 'mail' AND title = 'Report 2'`; src/pimdir/backend.rs:2972 `DROP TABLE summary_value`.
 - [x] Gate: the four tests of inventory.md §2 pass, then the whole gate. Commit `build!: follow pimdir storage-draft-17 and search-draft-17`.
-- [ ] D5: `cargo update -p url` (2.5.9, form_urlencoded 1.2.3). Gate: `cargo-deny check` green. Commit `build: url 2.5.9 (RUSTSEC-2026-0592)`.
+- [x] D5: `cargo update -p url` (2.5.9, form_urlencoded 1.2.3). Gate: `cargo-deny check` green. Commit `build: url 2.5.9 (RUSTSEC-2026-0592)`.
 
 ## 2. Inherited behaviour, pinned (E; each test fails on dc19b8d, inventory.md §4)
 
-- [ ] tests/envelope_search.rs `a_reserved_form_is_refused_with_its_code`: on Maildir, `~tilde`, `/slash`, `subject:{brace}` exit 1 `search-invalid` naming `reserved-form`; `'"~tilde"'` lists the message.
-- [ ] src/pimdir/index.rs tests: `a_reserved_form_is_refused_as_query_refused` (`pimdir search /x`); `a_label_is_read_from_the_store` (owner `add_property` of `pimdir/label` `todo` on one message: `label:todo` lists it; `envelope search label:todo` is `search-unsupported`); `a_flag_term_reads_the_store_while_the_index_lags` (owner sets `\Flagged` after the refresh: `pimdir count is:flagged` counts it, `coverage.behind` > 0).
-- [ ] src/pimdir/backend.rs `a_set_property_row_names_its_message`: a producer-queued `set-property` on imap/INBOX lists with `kind`, `itemId`, `subject`; `queue show` pending; `queue cancel --yes` drops it.
-- [ ] Help: src/unified/envelope/search.rs QUERY help names the reserved forms; src/pimdir/search.rs says flag terms read the store as the sync engine last wrote it and names `label:`, `property:`; tests/mcp.rs follows the `envelope_search` description if it changes.
-- [ ] Gate. Commit `feat(search)!: follow search-draft-17 (reserved forms, label:, property:)`.
+- [x] tests/envelope_search.rs `a_reserved_form_is_refused_with_its_code`: on Maildir, `~tilde`, `/slash`, `subject:{brace}` exit 1 `search-invalid` naming `reserved-form`; `'"~tilde"'` lists the message.
+- [x] src/pimdir/index.rs tests: `a_reserved_form_is_refused_as_query_refused` (`pimdir search /x`); `a_label_is_read_from_the_store` (owner `add_property` of `pimdir/label` `todo` on one message: `label:todo` lists it; `envelope search label:todo` is `search-unsupported`); `a_flag_term_reads_the_store_while_the_index_lags` (owner sets `\Flagged` after the refresh: `pimdir count is:flagged` counts it, `coverage.behind` > 0).
+- [x] src/pimdir/backend.rs `a_set_property_row_names_its_message`: a producer-queued `set-property` on imap/INBOX lists with `kind`, `itemId`, `subject`; `queue show` pending; `queue cancel --yes` drops it.
+- [x] Help: src/unified/envelope/search.rs QUERY help names the reserved forms; src/pimdir/search.rs says flag terms read the store as the sync engine last wrote it and names `label:`, `property:`; tests/mcp.rs follows the `envelope_search` description if it changes.
+- [x] Gate. Commit `feat(search)!: follow search-draft-17 (reserved forms, label:, property:)`.
 
 ## 3. Bugs (G)
 

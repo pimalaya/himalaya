@@ -37,13 +37,19 @@ use crate::{
 /// The query is pimdir SEARCH.md §8: words and "phrases" (a trailing `*`
 /// for a prefix), `field:value` terms (`from:`, `to:`, `subject:`,
 /// `body:`, `is:unread`, `has:attachment`, `date:2026-01..2026-03`,
-/// `folder:`, `thread:` and the others), `and`, `or`, `not` or a leading
-/// `-` (its word after `--`), and parentheses. It is read over the
-/// account's mail, its dates in the local zone (`TZ`, then the system's).
+/// `folder:`, `thread:`, `label:todo`, `property:<namespace>/<name>=<value>`
+/// and the others), `and`, `or`, `not` or a leading `-` (its word after
+/// `--`), and parentheses. It is read over the account's mail, its dates
+/// in the local zone (`TZ`, then the system's). A word or value beginning
+/// with `~`, one of two characters or more beginning with `/`, and a value
+/// beginning with `{` are reserved and refused (`reserved-form`): quote
+/// them to search the characters.
 ///
 /// The answer comes from the store's search index, which the sync engine
 /// builds and refreshes after each run: a message is found once it is
-/// synced and indexed, and a queued write shows in no answer. An
+/// synced and indexed, and a queued write shows in no answer. Flag terms
+/// (`is:`, `tag:`), `label:` and `property:` read the store as the sync
+/// engine last wrote it, not the index. An
 /// `Incomplete:` line above the list says what the answer could not see:
 /// messages whose body is not local, mail outside what the store holds,
 /// the index lagging the store.
