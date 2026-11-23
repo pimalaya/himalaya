@@ -58,7 +58,7 @@ The subject and display names of an IMAP `ENVELOPE`, as `envelope list`, `envelo
 - THEN its subject is 😂, as `message read` shows it
 
 ### Requirement: Network backends
-IMAP, JMAP, Gmail and Microsoft Graph SHALL each adapt their io-* high-level client. IMAP reuses io-imap's `select`/`fetch`/`store`/`copy`/`move`/`append`/`list`/`status`. JMAP reuses io-jmap's `mailbox_get`/`email_query`/`email_get`/`email_set`/`email_import`/`email_submission_set`/`blob_upload`/`blob_download`, addressing mailboxes by their JMAP id. Gmail treats labels as mailboxes over io-gmail's `labels`/`messages` surface; Graph treats mail folders as mailboxes over io-msgraph's `mail_folders`/`messages` surface.
+IMAP, JMAP, Gmail and Microsoft Graph SHALL each adapt their io-* high-level client. IMAP reuses io-imap's `select`/`fetch`/`store`/`copy`/`move`/`append`/`list`/`status`. JMAP reuses io-jmap's `mailbox_get`/`email_query`/`email_get`/`email_set`/`email_import`/`email_submission_set`/`blob_upload`/`blob_download`, addressing mailboxes by their JMAP id; `envelope list` asks `Email/query` for the newest `sentAt` first, as `envelope search` does without `--sort`, rather than leave the order to the server. Gmail treats labels as mailboxes over io-gmail's `labels`/`messages` surface; Graph treats mail folders as mailboxes over io-msgraph's `mail_folders`/`messages` surface.
 
 ### Requirement: IMAP move without the MOVE extension
 The IMAP adapter's `move_messages` SHALL use `UID MOVE` (RFC 6851) when the server advertises `MOVE`. Otherwise it SHALL `UID COPY` the set to the target, then flag `\Deleted` the source UIDs really copied and, when the server advertises `UIDPLUS` (RFC 4315), `UID EXPUNGE` them. Without `UIDPLUS` it SHALL skip the expunge, leave the messages flagged in the source, and log that at debug. Nothing is flagged or expunged when the copy affected nothing. A plain `EXPUNGE` SHALL NOT be issued, so unrelated `\Deleted` messages stay.
@@ -388,6 +388,13 @@ A rename keeps the mailbox's parent, `name` being one level of the hierarchy. Th
 
 ### Requirement: pimdir performer takes the intents Himalaya queues
 `pimdir performer <CAPABILITY> [SOURCE] [--clear]` SHALL take the capability of an intent Himalaya queues (pimdir STORAGE Annex B.2): `mail.submit`, `collection.create`, `collection.rename` or `collection.delete`. Any other SHALL be refused by the grammar, exit 2 and `usage-invalid` under `--json`, naming the ones it takes, rather than answering that no source performs it.
+
+A `SOURCE` SHALL be one of the candidates `pimdir performer <CAPABILITY>` lists; any other SHALL be refused coded `no-performer`, naming the candidates, nothing queued. The choice, and its withdrawal by `--clear`, SHALL be queued on the account's first mailbox by id, so `pimdir queue list`, `queue show` and `queue cancel` read it.
+
+#### Scenario: A source not performing the intent
+- GIVEN a pimdir account whose sources declare `collection.create` and not `collection.delete`
+- WHEN `himalaya pimdir performer collection.delete imap` runs
+- THEN it fails coded `no-performer` and nothing is queued
 
 #### Scenario: An unknown capability
 - GIVEN a pimdir account

@@ -91,8 +91,8 @@ impl JmapClient {
         })
     }
 
-    /// Lists envelopes from `mailbox` (a JMAP mailbox id), batching
-    /// `Email/query` + `Email/get` in one round-trip.
+    /// Lists envelopes from `mailbox` (a JMAP mailbox id), newest `sentAt`
+    /// first, batching `Email/query` + `Email/get` in one round-trip.
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -121,6 +121,7 @@ impl JmapClient {
 
         let output = self.email_query(JmapEmailQueryOptions {
             filter: Some(JmapFilter::from(filter)),
+            sort: Some(vec![sent_at_desc()]),
             position,
             limit,
             calculate_total: true,
@@ -2054,6 +2055,23 @@ mod tests {
             drop(client);
             server.join().unwrap();
             assert!(String::from_utf8(raw).unwrap().contains("/download/A/B1"));
+        }
+
+        /// A listing asks for the newest emails first rather than leave the
+        /// order to the server, page 1 holding the most recent.
+        #[test]
+        fn a_listing_asks_for_the_newest_first() {
+            let query = json!({ "ids": [], "position": 0, "total": 0, "queryState": "s" });
+            let (url, server) = serve(vec![("Email/query", query)]);
+
+            let mut client = client_at(&url);
+            let _ = client.list_envelopes("I", Some(1), Some(10), false);
+            drop(client);
+            let calls = server.join().unwrap();
+
+            let sort = &calls[0][1]["sort"];
+            assert_eq!(sort[0]["property"], "sentAt", "{sort}");
+            assert_eq!(sort[0]["isAscending"], false, "{sort}");
         }
 
         /// `jmap email get` lists the emails found, then one `errors` entry

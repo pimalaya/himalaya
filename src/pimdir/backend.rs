@@ -3400,6 +3400,41 @@ mod tests {
         );
     }
 
+    /// A chosen performer is a candidate, queued on a mailbox `pimdir
+    /// queue list` reads, not on an attachments collection.
+    #[test]
+    fn a_performer_choice_is_a_candidate_queued_on_a_mailbox() {
+        let (dir, client) = sent_store();
+        declare(dir.path(), &[capability::COLLECTION_CREATE]);
+        io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .ensure_collection("imap/\u{1}attachments", "application/octet-stream")
+            .unwrap();
+
+        let err = client
+            .set_performer(capability::COLLECTION_DELETE, Some("imap"))
+            .unwrap_err();
+        assert_eq!(
+            pimalaya_cli::error::code_of::<ErrorCode>(&err),
+            Some(ErrorCode::NoPerformer),
+            "{err:#}"
+        );
+        let err = client
+            .set_performer(capability::COLLECTION_CREATE, Some("smtp"))
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("imap"), "{err:#}");
+
+        client
+            .set_performer(capability::COLLECTION_CREATE, Some("imap"))
+            .unwrap();
+        client
+            .set_performer(capability::COLLECTION_DELETE, None)
+            .unwrap();
+
+        let pending = client.store.pending_actions("imap/Sent").unwrap();
+        assert_eq!(pending.len(), 2, "{pending:?}");
+    }
+
     /// A name the performer's source holds or has queued is refused
     /// `mailbox-duplicate`; another source's mailbox of that name is not.
     #[test]

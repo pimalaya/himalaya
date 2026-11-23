@@ -283,22 +283,38 @@ impl PimdirClient {
 
     /// Records `source` as the performer of `capability` for this account,
     /// or withdraws the choice when `None`, applied on the owner's next run.
+    ///
+    /// A source not performing `capability` is refused `no-performer`. The
+    /// row anchors on the account's first mailbox, so `pimdir queue` reads
+    /// it.
     pub fn set_performer(&self, capability: &str, source: Option<&str>) -> Result<()> {
+        if let Some(source) = source {
+            let (candidates, _) = self.performers(capability)?;
+            if !candidates.iter().any(|candidate| candidate == source) {
+                let message = match candidates.is_empty() {
+                    true => format!("No source of this account performs {capability}"),
+                    false => format!(
+                        "{source} does not perform {capability} for this account: \
+                         choose among {}",
+                        candidates.join(", ")
+                    ),
+                };
+                return Err(CodedError::new(ErrorCode::NoPerformer, message).into());
+            }
+        }
+
         let anchor = self
-            .store
-            .list_collections_by_account(self.account.as_deref())
-            .map_err(pimdir_error)
-            .context("List the account's collections")?
+            .mail_collection_ids()?
             .into_iter()
             .next()
-            .ok_or_else(|| anyhow!("The account holds no collection yet: run a sync first"))?;
+            .ok_or_else(|| anyhow!("The account holds no mailbox yet: run a sync first"))?;
         let action = PimdirAction::SetPerformer {
             capability: capability.to_owned(),
             source: source.map(String::from),
         };
 
         self.producer()?
-            .enqueue(&anchor.id, &action, None)
+            .enqueue(&anchor, &action, None)
             .map_err(pimdir_error)
             .context("Queue the choice of performer")?;
         Ok(())
