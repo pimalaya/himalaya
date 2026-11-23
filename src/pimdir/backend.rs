@@ -644,11 +644,17 @@ impl PimdirClient {
     /// `pimdir queue list` prints them (pimdir STORAGE §15.4).
     pub fn refused_rows(&self, mailbox: &str) -> Result<Vec<PimdirQueueRefused>> {
         let collection = self.hub_id(mailbox)?;
+        self.collection_refusals(collection)
+    }
+
+    /// The refusals standing in `collection`, an id the store lists, read
+    /// without resolving it again.
+    fn collection_refusals(&self, collection: String) -> Result<Vec<PimdirQueueRefused>> {
         let refusals = self
             .store
             .refusals(&collection)
             .map_err(pimdir_error)
-            .with_context(|| format!("Read the refusals of pimdir mailbox `{mailbox}`"))?;
+            .with_context(|| format!("Read the refusals of pimdir mailbox `{collection}`"))?;
 
         Ok(refusals
             .into_iter()
@@ -1452,6 +1458,36 @@ impl PimdirClient {
             .collect())
     }
 
+    /// The messages of `collection` holding a local body, of its `total`.
+    ///
+    /// The store's bodiless count reads committed rows only, so it serves
+    /// only where `PimdirReader::overlay_quiet`; elsewhere the items are
+    /// walked.
+    fn count_bodies(&self, collection: &str, total: u64) -> Result<u64> {
+        let quiet = self
+            .store
+            .overlay_quiet(collection)
+            .map_err(pimdir_error)
+            .with_context(|| format!("Read the queue of `{collection}`"))?;
+
+        if quiet {
+            let coverage = self
+                .store
+                .search_coverage(&[collection], None, None)
+                .map_err(pimdir_error)
+                .with_context(|| format!("Count the bodies of `{collection}`"))?;
+            let bodiless: u64 = coverage.local.kinds.values().map(|k| k.bodiless).sum();
+            return Ok(total.saturating_sub(bodiless));
+        }
+
+        let mut hydrated = 0;
+        self.walk(collection, None, false, SCAN_BATCH, |item| {
+            hydrated += u64::from(item.object.is_some());
+            ControlFlow::Continue(SCAN_BATCH)
+        })?;
+        Ok(hydrated)
+    }
+
     /// What the store holds of the account, as `pimdir status` reports it,
     /// local bodies counted off the summaries, no body opened.
     pub fn status(&self) -> Result<PimdirStatusOutput> {
@@ -1469,7 +1505,7 @@ impl PimdirClient {
         for collection in &collections {
             let id = collection.id.as_str();
             refused.extend(
-                self.refused_rows(id)?
+                self.collection_refusals(collection.id.clone())?
                     .into_iter()
                     .map(|row| PimdirRefusedStatus {
                         mailbox_id: row.collection,
@@ -1485,11 +1521,7 @@ impl PimdirClient {
                 .count_items(id)
                 .map_err(pimdir_error)
                 .with_context(|| format!("Count items in `{id}`"))?;
-            let mut hydrated = 0;
-            self.walk(id, None, false, SCAN_BATCH, |item| {
-                hydrated += u64::from(item.object.is_some());
-                ControlFlow::Continue(SCAN_BATCH)
-            })?;
+            let hydrated = self.count_bodies(id, total)?;
             let queued = self
                 .store
                 .pending_actions(id)
@@ -4341,7 +4373,7 @@ mod tests {
     }
 
     /// A flag change applied then refused for good reads applied with the
-    /// refusal, in `queue show` and the queue list (pimdir STORAGE §15.4).
+    /// refusal, in `queue show`, the queue list and `pimdir status`.
     #[test]
     fn a_refused_push_shows_on_its_row_and_beside_the_queue() {
         use io_pimdir::{
@@ -4394,6 +4426,12 @@ mod tests {
         assert_eq!(refused[0].item_id, id);
         assert_eq!(refused[0].source, "imap");
         assert_eq!(refused[0].reason, reason);
+
+        let status = client.status().unwrap();
+        assert_eq!(status.refused.len(), 1, "{:?}", status.refused);
+        assert_eq!(status.refused[0].mailbox_id, "imap/INBOX");
+        assert_eq!(status.refused[0].item_id, id);
+        assert_eq!(status.refused[0].reason, reason);
     }
 
     #[test]
@@ -5152,5 +5190,59 @@ mod tests {
 
         assert_eq!(listed(&mut client, "imap/Drafts"), drafts);
         assert!(listed(&mut client, "imap/Trash").is_empty());
+    }
+
+    /// `pimdir status` counts the local bodies of a mailbox as walking its
+    /// messages does, its queue quiet or busy.
+    #[test]
+    fn a_status_counts_bodies_as_the_walk_does() {
+        let dir = tempfile::tempdir().unwrap();
+        seed(dir.path(), "imap/INBOX", &mails("in", 3));
+        seed(dir.path(), "imap/Archive", &mails("ar", 1));
+        let mut client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        })
+        .unwrap();
+        client
+            .add_message("imap/INBOX", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+
+        let counts = |client: &PimdirClient| {
+            let status = client.status().unwrap();
+            let inbox = status.mailboxes.iter().find(|m| m.id == "imap/INBOX");
+            let inbox = inbox.unwrap();
+            (inbox.hydrated, inbox.total)
+        };
+        let walked = |client: &PimdirClient| {
+            let items = client.scan_items("imap/INBOX").unwrap();
+            let hydrated = items.iter().filter(|item| item.object.is_some()).count();
+            (hydrated as u64, items.len() as u64)
+        };
+
+        assert!(client.store.overlay_quiet("imap/INBOX").unwrap());
+        assert_eq!(counts(&client), (1, 4));
+        assert_eq!(counts(&client), walked(&client));
+
+        let bodiless = client
+            .scan_items("imap/INBOX")
+            .unwrap()
+            .into_iter()
+            .find(|item| item.object.is_none())
+            .unwrap()
+            .seq
+            .to_string();
+        client
+            .move_messages("imap/INBOX", "imap/Archive", &[bodiless.as_str()])
+            .unwrap();
+
+        assert!(!client.store.overlay_quiet("imap/INBOX").unwrap());
+        assert_eq!(counts(&client), (1, 3));
+        assert_eq!(counts(&client), walked(&client));
     }
 }

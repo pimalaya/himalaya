@@ -31,9 +31,9 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 
 ## 3. Bugs (G)
 
-- [ ] `pimdir status` takes 30 s at 517k, walking every summary to count bodies (src/pimdir/backend.rs:1487-1491): on a mailbox `overlay_quiet` answers quiet, `hydrated` = `count_items` minus the `bodiless` of `PimdirReader::search_coverage(&[id], None, None)` (`sql::COUNT_BODILESS`), the walk kept for a busy queue, as `count_unread` does. Test `a_status_counts_bodies_as_the_walk_does` (quiet and busy fixtures, a bodiless item in each). Gate; threshold under 500 ms at 517k; commit `perf(pimdir): status counts bodies without reading every summary`.
+- [x] `pimdir status` takes 30 s at 517k, walking every summary to count bodies (src/pimdir/backend.rs:1487-1491): on a mailbox `overlay_quiet` answers quiet, `hydrated` = `count_items` minus the `bodiless` of `PimdirReader::search_coverage(&[id], None, None)` (`sql::COUNT_BODILESS`), the walk kept for a busy queue, as `count_unread` does. Test `a_status_counts_bodies_as_the_walk_does` (quiet and busy fixtures, a bodiless item in each). Gate; threshold under 500 ms at 517k; commit `perf(pimdir): status counts bodies without reading every summary`.
 - [ ] N1, N2, N3 (needs-io-pimdir.md): once io-pimdir releases each, add its app test (named there), make it pass, gate, commit.
-- [ ] Re-check the closed lines of inventory.md §6 on the head of this step; reopen any that fails.
+- [x] Re-check the closed lines of inventory.md §6 on the head of this step; reopen any that fails.
 
 ## 4. Performance (H)
 
