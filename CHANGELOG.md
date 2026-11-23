@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `label:` and `property:<namespace>/<name>=<value>` to `pimdir search`, `count` and `tag` (pimdir search-draft-17), answered from the store's item properties; `envelope search` refuses both with `search-unsupported`. `pimdir queue list`, `queue show` and `queue cancel` take a `set-property` row another program queued, naming its message.
+
 - Added `date` and `messageId` to the `--json` template of `message compose|reply|forward`.
 - Added the exit 3 of a partial outcome to the help of `flag add|set|remove`, `message copy|move|delete` and `envelope list|search`.
 - Added an account-level `tls` table (`tls.provider`, `tls.rustls.crypto`, `tls.cert`, `tls.client.cert`, `tls.client.key`) inherited by every network backend field by field, a backend's own `tls` winning, so one trusted certificate reaches IMAP, SMTP, ManageSieve, JMAP, Gmail and Microsoft Graph alike. `account check` prints for each backend reached over TLS what it was configured with, `tls` `{provider, crypto, cert, clientCert}` (`null` for a local backend and a cleartext connection), and in text `TLS` and its parts after its outcome.
@@ -79,6 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `attachments` to the JSON template the composers print without `--save` or `--send`, each attached file as `{filename, mime, size}`: the template carries no bytes, so handing it back means passing the files again through `--attach`.
 ### Changed
 
+- **BREAKING**: Changed the pimdir backend to pimdir storage-draft-17 and search-draft-17 (io-pimdir from git, its 0.20.0 to come): a store an earlier build wrote, a development build's storage-draft-15 included, is refused `store-version`, and its index `index-version`. Drain it with the neverest that wrote it until `pimdir queue list` lists nothing, move its directory aside, then sync a new store with a neverest on the same io-pimdir (MIGRATION.md).
+- **BREAKING**: Changed a query word or value beginning with `~`, one of two characters or more beginning with `/` and a value beginning with `{` to be refused, coded `search-invalid` (`query-refused` in `pimdir search`, `count` and `tag`) naming `reserved-form` (pimdir SEARCH §8.3), where they were searched as words; quoted, the characters are searched.
+- Changed `pimdir search`, `count` and `tag` to read flag terms (`is:`, `tag:` on a system flag) from the store as the sync engine last wrote it, even while the index lags.
+- Changed `pimdir search`, `count` and `--threads` to answer 17 to 88 times faster at 517k messages (io-pimdir's search-draft-17 index).
 - **BREAKING**: Changed the `envelope search` query to the pimdir SEARCH language (§8), the one `pimdir search`, Calendula and Cardamum read, parsed by io-pimdir: `from:alice date:2026-11-02.. is:unread "weekly sync"`, `mid:<id>`, instants and `30min`, `5h`, `1mo` amounts; MIGRATION.md maps every v2 clause. The order is `--sort newest-first|oldest-first|title|sender|relevance`, `order by` gone, and no backend orders by recipient. Maildir and mbox match whole words through io-pimdir's mail matcher, where they matched a substring. A field outside mail fails with `search-unsupported`, and the `envelope.search.<option>` capabilities take io-pimdir's predicate names (`envelope.search.mid`, `envelope.search.sort.newest-first`). The chumsky grammar is removed.
 - **BREAKING**: Changed `pimdir search --sort` to `newest-first|oldest-first|title|sender|relevance`, where it took `date|name|relevance`.
 - Changed the `pimdir` cargo feature to enable io-pimdir's `client`, `search` and `mail` features, and the Maildir and mbox features its `mail` feature: no build pulls ical-rs or vcard-rs.
@@ -322,6 +328,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `pimdir queue list` reporting a whole mailbox as one `action-malformed` error when one of its pending rows did not decode: that row is the error, named by its handle, and the mailbox's other rows are listed (io-pimdir 2314084b).
+- Fixed a `message copy` or `message move` on a pimdir account into a mailbox where another source holds the message already: the sync engine joined a second message there; it joins the one held (io-pimdir 2314084b, needs a neverest on the same io-pimdir).
+- Fixed `pimdir status` listing every mailbox of the store twice per mailbox to read its refusals, and walking every summary to count bodies: 32 s at 3,313 mailboxes and 517k messages, 88 ms now.
 - Fixed, through pimalaya-cli 0.6.1 and pimalaya-config 0.6.0, the text error report writing the control characters of its causes raw to the terminal (each line is sanitized, the suggestions naming `--json` when a character was replaced), `--log-file` creating the file under the umask and following a symbolic link (it is created at 0600 and a link is refused), the manual pages printing `vv<version>`, a TOML parse error of the configuration printing its source line, and a refused secret echoing its value. A secret command that fails names the command and says to run it yourself, never printing its output.
 - Fixed `jmap request` refused whole (RFC 8620 §3.6.1, such as an HTTP 400 `unknownCapability`) printing the failure object and exiting 1: it prints `{refusal: {status, reason, message, code, retryAfter}}` and exits 3, as the typed `jmap` commands do.
 - Fixed a `tls.cert`, `tls.client.cert` or `tls.client.key` that cannot be opened failing with `No such file or directory (os error 2)`: the command fails before it connects, naming the file and its path.

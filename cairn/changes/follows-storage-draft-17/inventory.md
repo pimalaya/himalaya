@@ -100,3 +100,36 @@ Read: `pimdir status` walks every summary of every mailbox to count bodies (src/
 | R4, R1, K4 | pimdir changes/a-smaller-sync/report.md | open, io-pimdir's (N3) |
 | contract audit X1 to X15 | ledgers/cli-contract-audit-2026-11-20 | landed 2026-11-20 |
 | GitHub issues | `gh issue list -R pimalaya/himalaya` | none open |
+
+## 7. Performance after the migration
+
+Measured on 2026-11-23 from 18:08 by .lanes/himalaya/run.sh (bench/run.sh with two rows added): before is HEAD a2726f56 on dc19b8d over the storage-draft-15 copy, after is 55cf7c7c on cc3021bb over the storage-draft-17 copy (drop 2 changes neither path measured here), release builds, hyperfine medians in ms, CPU 15 under the measure lock, 10 runs, 3 on the slow rows, **load 14 to 21 while other lanes built**: indicative, not the quiet-window table of frame.md §5 (one copy, no A/A check, no interleaving).
+
+| command | before (dc19b8d, draft-15) ms | after (55cf7c7c on cc3021bb, draft-17) ms |
+| --- | --- | --- |
+| mailbox list | 17.24 | 15.13 |
+| envelope list -s 50 | 27.72 | 24.23 |
+| envelope list -s 50 -p 20 | 39.89 | 34.37 |
+| envelope search from:jeff.dasovich@enron.com | 25.92 | 24 |
+| envelope search is:unread | 26.93 | 26.66 |
+| envelope search california | 67.01 | 47.2 |
+| envelope search kiwi | 2046.55 | 1421.33 |
+| pimdir search california | 1810.41 | 44.72 |
+| pimdir search kiwi | 1191.24 | 15.3 |
+| pimdir search --threads california | 2710.29 | 51.27 |
+| pimdir count california | 1233.61 | 76.82 |
+| pimdir count is:unread | 1498.83 | 86.67 |
+| pimdir mailbox list | 106.4 | 81.21 |
+| envelope search mid: | 218.73 | 333.55 |
+| pimdir count mid: | 1082.38 | 707.78 |
+| pimdir status | 39645.54 | 79.87 |
+
+| the pimdir binary, after (7f16b27) | ms |
+| --- | --- |
+| search -n 50 california | 9.37 |
+| search -n 50 kiwi | 4.29 |
+| search --threads -n 50 california | 11.21 |
+| count california | 6.02 |
+| count is:unread | 5.52 |
+
+Against the thresholds of tasks.md step 4: `pimdir status` 79.9 ms, under 500 (step 3). `envelope list -s 50` 24.2, under 25. `pimdir search|count|--threads` 11 to 81 ms over the `pimdir` binary, against 5 allowed: io-pimdir's hit columns compiled out without `indexer` (needs-io-pimdir.md N6; with them, 14.3 ms for `count california`, journal 17:55), plus 4.3 ms of `accounts_of` (N7). `envelope search mid:` 218.7 then 333.6 and `pimdir mailbox list` 106.4 then 81.2: recorded, `mid:` not gated (D2, N5), the first the one row slower beyond 5%, to re-measure in a quiet window before reading it as a regression. Every other row is as fast or faster.
