@@ -328,6 +328,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a pending `move` or `remove` row of `pimdir queue list` and `queue show` printing `subject: null`, its message hidden by the queue it waits in: the subject is read from the message as the store committed it.
 - Fixed `pimdir queue list` reporting a whole mailbox as one `action-malformed` error when one of its pending rows did not decode: that row is the error, named by its handle, and the mailbox's other rows are listed (io-pimdir 2314084b).
 - Fixed a `message copy` or `message move` on a pimdir account into a mailbox where another source holds the message already: the sync engine joined a second message there; it joins the one held (io-pimdir 2314084b, needs a neverest on the same io-pimdir).
 - Fixed `pimdir status` listing every mailbox of the store twice per mailbox to read its refusals, and walking every summary to count bodies: 32 s at 3,313 mailboxes and 517k messages, 88 ms now.

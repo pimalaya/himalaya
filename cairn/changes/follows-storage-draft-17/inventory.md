@@ -133,3 +133,17 @@ Measured on 2026-11-23 from 18:08 by .lanes/himalaya/run.sh (bench/run.sh with t
 | count is:unread | 5.52 |
 
 Against the thresholds of tasks.md step 4: `pimdir status` 79.9 ms, under 500 (step 3). `envelope list -s 50` 24.2, under 25. `pimdir search|count|--threads` 11 to 81 ms over the `pimdir` binary, against 5 allowed: io-pimdir's hit columns compiled out without `indexer` (needs-io-pimdir.md N6; with them, 14.3 ms for `count california`, journal 17:55), plus 4.3 ms of `accounts_of` (N7). `envelope search mid:` 218.7 then 333.6 and `pimdir mailbox list` 106.4 then 81.2: recorded, `mid:` not gated (D2, N5), the first the one row slower beyond 5%, to re-measure in a quiet window before reading it as a regression. Every other row is as fast or faster.
+
+### On io-pimdir drop 3 (17d4ea80, N6 and N7)
+
+Measured on 2026-11-23 at 18:55 (CET), release builds of Himalaya on 17d4ea80 and of that commit's `pimdir` binary (`--features cli`), the storage-draft-17 copy, hyperfine medians in ms, 20 runs, the two commands of a row interleaved, CPU 15 under the measure lock, load 6 to 10 (indicative):
+
+| command (Himalaya) | Himalaya ms | `pimdir` binary, same query with `kind:mail`, `--refresh-timeout 0s` |
+| --- | --- | --- |
+| pimdir count california | 6.68 | 5.43 |
+| pimdir search -s 50 california | 10.23 | 7.55 |
+| pimdir search -s 50 --threads california | 11.37 | 9.03 |
+| pimdir count kiwi | 5.09 | 3.72 |
+| pimdir count is:unread | 6.43 | 5.32 |
+
+Every row within 5 ms of the binary (2.7 at most): P1 and P2 met by N6 and N7 with no change in Himalaya; `mail_hit`'s read per hit costs 0.06 ms a hit (`search -s 1` 9.1, `-s 50` 11.7, rough on CPU 3).

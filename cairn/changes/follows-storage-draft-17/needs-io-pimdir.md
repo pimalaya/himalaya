@@ -37,7 +37,7 @@ For the io-pimdir lane (io-pimdir cairn/changes/what-the-consumers-need). Read a
 - **App test.** None timing-based; tasks.md step 4 re-measures it.
 - **Meanwhile.** `envelope search mid:<id>` walks one mailbox and answers in milliseconds; nothing to do here.
 
-## N6, the hit columns read without `indexer`
+## N6, the hit columns read without `indexer` (landed on 17d4ea80)
 
 Added 2026-11-23, at cc3021bb.
 
@@ -47,7 +47,7 @@ Added 2026-11-23, at cc3021bb.
 - **App test.** None timing-based; tasks.md step 4 re-measures.
 - **Meanwhile.** Nothing: enabling `indexer` in Himalaya breaks proposal A (no ical-rs nor vcard-rs in the normal graph); P1 and P2 wait on this.
 
-## N7, `accounts_of` without the coverage join
+## N7, `accounts_of` without the coverage join (landed on 17d4ea80)
 
 Added 2026-11-23, at cc3021bb.
 

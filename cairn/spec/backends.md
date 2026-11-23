@@ -279,6 +279,11 @@ Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); 
 - WHEN `himalaya --json pimdir queue list -m imap/INBOX` runs, then `queue show` and `queue cancel --yes` on its row
 - THEN the row prints `"kind":"set-property"`, `"itemId":"7"`, `"linkId":null` and `"subject":"hi"`, reads `pending`, and the cancel drops it
 
+#### Scenario: A pending move names its message
+- GIVEN a pending `move` of message 7, whose subject is `hi`, out of `imap/INBOX`, which the queue overlay already shows without it
+- WHEN `himalaya --json pimdir queue list -m imap/INBOX` runs
+- THEN the row prints `"kind":"move"`, `"itemId":"7"` and `"subject":"hi"`, read from the message as the store committed it
+
 #### Scenario: A cancel on a store of another draft
 - GIVEN a store whose `store_meta.format_version` names another draft
 - WHEN `himalaya pimdir queue cancel` runs on one of its rows

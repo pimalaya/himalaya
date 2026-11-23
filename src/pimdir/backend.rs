@@ -28,7 +28,8 @@ use io_pimdir::{
         PimdirError,
         producer::{PimdirActionStatus, PimdirEnqueued, PimdirParkedAction},
         reader::{
-            PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
+            PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirReader,
+            PimdirRoundState,
         },
     },
     codec::{
@@ -714,6 +715,13 @@ impl PimdirClient {
             .collect())
     }
 
+    /// The item `seq` of `collection` as committed, which a pending move or
+    /// removal takes out of the overlaid read.
+    fn committed_item(&self, collection: &str, seq: i64) -> Option<PimdirItem> {
+        let reader = PimdirReader::open(&self.root).ok()?;
+        reader.get_item(collection, seq).ok().flatten()
+    }
+
     /// What a row holding `action` addresses: a creation's link id or the
     /// target's public id, and a subject from the pinned body or target.
     ///
@@ -726,7 +734,12 @@ impl PimdirClient {
         };
 
         let stored = |seq: i64| {
-            let item = self.store.get_item(collection, seq).ok().flatten();
+            let item = self
+                .store
+                .get_item(collection, seq)
+                .ok()
+                .flatten()
+                .or_else(|| self.committed_item(collection, seq));
             let subject = item.and_then(|item| {
                 mail_summary(item.summary.as_ref()).map(|mail| mail.subject.clone())
             });
@@ -2787,6 +2800,40 @@ mod tests {
             client.queue_row(&staged.queue_id).unwrap(),
             PimdirActionStatus::Unknown
         );
+    }
+
+    /// A pending move names its message's subject, which the queue overlay
+    /// already takes out of the mailbox the row is queued on.
+    #[test]
+    fn a_pending_move_names_its_subject() {
+        let (dir, mut client) = sent_store();
+        let store = io_pimdir::client::PimdirStore::open(dir.path()).unwrap();
+        store.ensure_collection("imap/Trash", MAIL_KIND).unwrap();
+        drop(store);
+        let staged = client
+            .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap");
+        assert_eq!(owner.drain().unwrap().applied, 1);
+        drop(owner);
+        let PimdirActionStatus::Applied { seq: Some(seq), .. } =
+            client.queue_row(&staged.queue_id).unwrap()
+        else {
+            panic!("expected an applied add");
+        };
+
+        let id = seq.to_string();
+        client
+            .move_messages("imap/Sent", "imap/Trash", &[id.as_str()])
+            .unwrap();
+
+        let rows = client.queued_rows("imap/Sent").unwrap().value;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].kind, "move");
+        assert_eq!(rows[0].item_id.as_deref(), Some(id.as_str()));
+        assert_eq!(rows[0].subject.as_deref(), Some("hi"));
     }
 
     /// A queued `set-property` names its message in `queue list`, reads
