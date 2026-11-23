@@ -317,11 +317,7 @@ fn a_call_answers_the_payload_and_refuses_what_it_does_not_take() {
             ),
             call(2, "envelope_list", json!({ "query": "hello" })),
             call(3, "flag_add", json!({})),
-            call(
-                4,
-                "envelope_search",
-                json!({ "query": ["subject:Hello"] }),
-            ),
+            call(4, "envelope_search", json!({ "query": ["subject:Hello"] })),
             call(
                 5,
                 "envelope_search",

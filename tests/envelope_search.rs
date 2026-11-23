@@ -112,12 +112,12 @@ fn new_clauses_select_their_messages() {
     assert_eq!(subjects(&config, home, &["cc:carol"]), ["Copied"]);
     assert_eq!(subjects(&config, home, &["with:dave"]), ["Attached"]);
     assert_eq!(subjects(&config, home, &["with:carol"]), ["Copied"]);
+    assert_eq!(subjects(&config, home, &["date:..2026-03-31"]), ["Copied"]);
+    assert_eq!(subjects(&config, home, &["has:attachment"]), ["Attached"]);
     assert_eq!(
-        subjects(&config, home, &["date:..2026-03-31"]),
+        subjects(&config, home, &["not", "has:attachment"]),
         ["Copied"]
     );
-    assert_eq!(subjects(&config, home, &["has:attachment"]), ["Attached"]);
-    assert_eq!(subjects(&config, home, &["not", "has:attachment"]), ["Copied"]);
     assert_eq!(
         subjects(&config, home, &["mid:copied-123@example.org"]),
         ["Copied"]
@@ -128,11 +128,7 @@ fn new_clauses_select_their_messages() {
     );
     assert!(subjects(&config, home, &["mid:copied-123"]).is_empty());
     assert_eq!(
-        subjects(
-            &config,
-            home,
-            &["not", "mid:copied-123@example.org"]
-        ),
+        subjects(&config, home, &["not", "mid:copied-123@example.org"]),
         ["Attached"]
     );
 }
