@@ -31,7 +31,10 @@ use io_pimdir::{
             PimdirCollection, PimdirItem, PimdirMailCursor, PimdirMailFilter, PimdirRoundState,
         },
     },
-    codec::{PimdirAction, PimdirActionHandle, action_from_payload},
+    codec::{
+        PimdirAction, PimdirActionError, PimdirActionHandle, PimdirPayloadOutcome,
+        action_from_payload, payload_outcome,
+    },
     collection::{self, PimdirCollectionId, PimdirCoverage},
     intent::{self, PimdirSubmit},
     object::PimdirHash,
@@ -614,13 +617,22 @@ impl PimdirClient {
             }
         };
         let identity = self.store_identity()?;
+        let mut errors = Vec::new();
 
         let rows: Vec<PimdirQueueRow> = queued
             .into_iter()
-            .map(|queued| {
+            .filter_map(|queued| {
+                if let Some(err) = undecodable(&queued.action) {
+                    let id = handle(&identity, queued.id);
+                    let err = pimdir_error(PimdirError::Action(err))
+                        .context(format!("Cannot decode queued row {id} of `{collection}`"));
+                    errors.push(ItemError::new(Some(&id), &err));
+                    return None;
+                }
+
                 let addressed = self.addressed(&queued.collection, &queued.action);
 
-                PimdirQueueRow {
+                Some(PimdirQueueRow {
                     row: queued.id,
                     handle: handle(&identity, queued.id),
                     kind: queued.action.kind().to_owned(),
@@ -633,11 +645,14 @@ impl PimdirClient {
                     unconfirmed: false,
                     error: None,
                     subject: addressed.subject,
-                }
+                })
             })
             .collect();
 
-        Ok(Outcome::from(rows))
+        Ok(Outcome {
+            value: rows,
+            errors,
+        })
     }
 
     /// The refusals standing in the mailbox, per message and source, as
@@ -1579,6 +1594,18 @@ fn warn_partials(rows: &[PimdirEnqueued]) {
     }
 }
 
+/// Why a pending row's payload does not decode, `None` for one that does
+/// or that names an action no schema here knows (pimdir STORAGE §15.3).
+fn undecodable(action: &PimdirAction) -> Option<PimdirActionError> {
+    let PimdirAction::Unknown { kind, payload, .. } = action else {
+        return None;
+    };
+    match payload_outcome(kind, payload) {
+        PimdirPayloadOutcome::Malformed => action_from_payload(kind, payload).err(),
+        PimdirPayloadOutcome::Valid | PimdirPayloadOutcome::Unknown => None,
+    }
+}
+
 /// Whether a queued action is a message waiting for a public id: a create,
 /// or a send the owner performs.
 fn is_queued_mail(action: &PimdirAction) -> bool {
@@ -2276,13 +2303,17 @@ mod tests {
         assert_eq!(rows[0].error, None);
     }
 
-    /// An undecodable pending row makes its mailbox one item error, coded
-    /// by io-pimdir, rather than failing the listing.
+    /// An undecodable pending row is one item error named by its handle,
+    /// coded by io-pimdir, the mailbox's other rows still listed.
     #[test]
-    fn an_undecodable_row_is_an_item_error_of_its_mailbox() {
+    fn an_undecodable_row_is_an_item_error_the_others_listed() {
         let (dir, mut client) = sent_store();
         let staged = client
             .add_message("imap/Sent", &[], DRAFT.to_vec())
+            .unwrap();
+        let other = b"Message-ID: <d2@x.org>\r\nSubject: other\r\n\r\nhello";
+        client
+            .add_message("imap/Sent", &[], other.to_vec())
             .unwrap();
 
         let conn = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
@@ -2291,9 +2322,11 @@ mod tests {
         drop(conn);
 
         let queued = client.queued_rows("imap/Sent").unwrap();
-        assert!(queued.value.is_empty(), "{:?}", queued.value);
+        assert_eq!(queued.value.len(), 1, "{:?}", queued.value);
+        assert_eq!(queued.value[0].subject.as_deref(), Some("other"));
         assert_eq!(queued.errors.len(), 1, "{:?}", queued.errors);
-        assert_eq!(queued.errors[0].id.as_deref(), Some("imap/Sent"));
+        let handle = staged.queue_id.to_string();
+        assert_eq!(queued.errors[0].id.as_deref(), Some(handle.as_str()));
         assert_eq!(queued.errors[0].code, Some(ErrorCode::ActionMalformed));
     }
 

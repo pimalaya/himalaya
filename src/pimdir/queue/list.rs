@@ -40,9 +40,8 @@ use crate::{
 /// the store applied the change, and the sync engine holds it until the
 /// message changes again or is removed (pimdir STORAGE §15.4).
 ///
-/// A mailbox holding a row whose payload does not decode lists none of
-/// its pending rows: it is an entry of `errors` instead, and the command
-/// exits 3.
+/// A row whose payload does not decode is an entry of `errors` named by
+/// its handle, the other rows listed, and the command exits 3.
 ///
 /// JSON output: `{"actions": [<row>], "parked": [<row>], "errors":
 /// [<item error>], "refused": [{"collection", "itemId", "source",
@@ -149,8 +148,8 @@ pub struct PimdirQueueListOutput {
     pub actions: Vec<PimdirQueueRow>,
     /// The parked rows, any kind, mailbox by mailbox.
     pub parked: Vec<PimdirQueueRow>,
-    /// The mailboxes whose pending rows could not be read, a row not
-    /// decoding, `[]` when none: the command then exits 3.
+    /// The pending rows whose payload does not decode, `[]` when none: the
+    /// command then exits 3.
     pub errors: Vec<ItemError>,
     /// The refusals standing, per message and source.
     pub refused: Vec<PimdirQueueRefused>,

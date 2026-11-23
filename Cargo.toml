@@ -80,4 +80,4 @@ simd-cpu = { version = "0.1", default-features = false, features = ["std"] }
 url = { version = "2.5", default-features = false }
 
 [patch.crates-io]
-io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "cc3021bbd0d08506f1ea55b24603dd92f9496b92" }
+io-pimdir = { git = "https://github.com/pimalaya/io-pimdir", rev = "2314084b5d8e6b4b9044c9f0351352068d4080db" }

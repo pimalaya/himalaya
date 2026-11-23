@@ -200,3 +200,63 @@ fn every_pending_row_lists_and_shows_as_it_lists() {
     }
     assert_eq!(shown["state"], "pending", "{shown}");
 }
+
+/// A copy into a mailbox where another source holds the message already
+/// joins it once the sync engine drains it, rather than minting a second
+/// message there (pimdir SYNC §4, K4 of pimdir's a-smaller-sync).
+#[test]
+fn a_copy_into_a_mailbox_holding_the_message_lists_one_envelope() {
+    let himalaya = Himalaya::new();
+    let root = himalaya.home.path().join("store");
+
+    let mut other = PimdirStore::open(&root)
+        .unwrap()
+        .for_account("work")
+        .for_source("jmap");
+    other.ensure_collection("imap/Archive", MAIL).unwrap();
+    let hash = hash::hash(STORED);
+    let derived = mail::derive(STORED);
+    other
+        .write(vec![PimdirWriteOp::UpsertPlacement(PimdirPlacement {
+            collection: PimdirCollectionId("imap/Archive".into()),
+            handle: PimdirHandle("j1".into()),
+            link_id: Some(derived.link_id),
+            level: PimdirLevel::Full,
+            object: Some(hash.clone()),
+            summary: derived.summary,
+            server_object_id: None,
+            sort_key: derived.sort_key,
+            flags: PimdirFlags::default(),
+            status: PimdirStatus::Clean,
+            conflict_revision: None,
+            conflict_object: None,
+            base: Some(PimdirBase {
+                flags: PimdirFlags::default(),
+                revision: None,
+                object: Some(hash),
+            }),
+            origin: None,
+        })])
+        .unwrap();
+    drop(other);
+
+    let archived = himalaya.json(&["envelope", "list", "-m", "imap/Archive"]);
+    assert_eq!(archived["envelopes"].as_array().unwrap().len(), 1);
+
+    let list = himalaya.json(&["envelope", "list", "-m", "imap/INBOX"]);
+    let stored = list["envelopes"][0]["id"].as_str().unwrap().to_owned();
+    let args = ["message", "copy", "-f", "imap/INBOX", "-t", "imap/Archive"];
+    himalaya.json(&[&args[..], &[&stored]].concat());
+
+    let mut owner = PimdirStore::open(&root)
+        .unwrap()
+        .for_account("work")
+        .for_source("imap");
+    let report = owner.drain().unwrap();
+    drop(owner);
+    assert_eq!((report.applied, report.parked), (1, 0));
+
+    let archived = himalaya.json(&["envelope", "list", "-m", "imap/Archive"]);
+    let envelopes = archived["envelopes"].as_array().unwrap();
+    assert_eq!(envelopes.len(), 1, "{archived}");
+}
