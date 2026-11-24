@@ -1065,9 +1065,9 @@ dependencies = [
 
 [[package]]
 name = "io-msgraph"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86a37b9a68d8d65069fe85dda21ec6d3d478504efbb110022150acabe615fdeb"
+checksum = "2969ed68c121c86ca07ef9ffbe7df384ef2ac4e7ec06f95b888eef2de4662e05"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1104,9 +1104,9 @@ dependencies = [
 
 [[package]]
 name = "io-pimdir"
-version = "0.20.3"
+version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43974465e955c16543c9619a9a40725a839c0a5b386fbbfc360e9ebdf8ed84b2"
+checksum = "59c1df840ffb7b5c3a775df87df36d15f5cd65d7fad23c66594a9e005652b0f5"
 dependencies = [
  "blake3",
  "encoding_rs",
