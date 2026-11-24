@@ -328,6 +328,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a `mid:` search over IMAP finding nothing on iCloud, which matches `HEADER Message-ID` on the whole bracketed value alone: the id is sent in angle brackets, a form substring-matching servers (Fastmail) still match. The UID lookup of an `APPEND` answered without `APPENDUID` sends it so too. Stalwart 0.16 answers no `HEADER Message-ID` in any form, so `mid:` still finds nothing there.
 - Fixed `envelope list` over JMAP leaving the order to the server, Stalwart answering the oldest first on page 1: the listing asks for the newest `sentAt` first, as `envelope search` does.
 - Fixed `pimdir performer <CAPABILITY> <SOURCE>` recording a source that does not perform the intent, which the sync engine then parked: it is refused coded `no-performer`, naming the candidates. The choice is queued on the account's first mailbox rather than its first collection (an attachments one), where `pimdir queue list`, `queue show` and `queue cancel` could not reach it.
 - Fixed a pending `move` or `remove` row of `pimdir queue list` and `queue show` printing `subject: null`, its message hidden by the queue it waits in: the subject is read from the message as the store committed it.

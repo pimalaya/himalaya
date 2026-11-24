@@ -531,11 +531,7 @@ impl ImapClient {
 
         self.select_mailbox(mailbox)?;
 
-        let field =
-            AString::try_from("Message-ID").map_err(|_| anyhow!("Invalid IMAP search header"))?;
-        let value = AString::try_from(message_id.clone())
-            .map_err(|_| anyhow!("Invalid IMAP search Message-ID value"))?;
-        let criteria = Vec1::from(SearchKey::Header(field, value));
+        let criteria = Vec1::from(message_id_key(&message_id)?);
         let uids = self.search(criteria, ImapMessageSearchOptions { uid: true })?;
         let uids = output_data("SEARCH", uids);
 
@@ -1466,7 +1462,7 @@ fn convert_filter_with(
         Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
         Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
         Q::Text(pattern) => SearchKey::Text(astring(pattern)?),
-        Q::MessageId(id) => SearchKey::Header(astring("Message-ID")?, astring(id)?),
+        Q::MessageId(id) => message_id_key(id)?,
         Q::Attachment => {
             return Err(unsupported(
                 filter,
@@ -1612,6 +1608,17 @@ fn convert_sorter(sorter: &SearchEmailsSorter) -> SortCriterion {
 fn astring(pattern: &str) -> Result<AString<'static>> {
     AString::try_from(String::from(pattern))
         .map_err(|_| anyhow!("Invalid IMAP search pattern `{pattern}`"))
+}
+
+/// The `HEADER Message-ID` key of a bare id, sent in angle brackets.
+///
+/// RFC 3501 matches a substring, so the bracketed id matches where the
+/// bare one does, and some servers (iCloud) match the whole value alone.
+fn message_id_key(id: &str) -> Result<SearchKey<'static>> {
+    Ok(SearchKey::Header(
+        astring("Message-ID")?,
+        astring(&format!("<{id}>"))?,
+    ))
 }
 
 /// Converts a date into the IMAP wire date a search key takes.
@@ -1781,7 +1788,7 @@ mod tests {
     fn a_message_id_is_a_header_key_rechecked_on_the_root_chain() {
         assert_eq!(
             search_line("mid:<a@b.org> from:c"),
-            "A UID SEARCH HEADER Message-ID a@b.org FROM c",
+            "A UID SEARCH HEADER Message-ID <a@b.org> FROM c",
         );
 
         let query: SearchEmailsQuery = "mid:a@b.org (mid:c@d.org or from:e)".parse().unwrap();

@@ -23,6 +23,9 @@ IMAP SHALL mark the reserved `INBOX` with the inbox role, and every other mailbo
 ### Requirement: iCloud SORT ignores its keys
 iCloud SHALL be treated as advertising `SORT` without honouring it: it answers every `SORT` in UID order, whatever the keys and `REVERSE`. A server advertising `X-APPLE-REMOTE-LINKS`, which only iCloud does, SHALL sort client-side when `imap.sort.fallback` is unset; `imap.sort.fallback = false` still forces the server `SORT`.
 
+### Requirement: Message-ID header search takes the bracketed id
+iCloud SHALL be treated as matching `HEADER Message-ID` on the whole value alone, angle brackets included, rather than as the RFC 3501 substring. Every IMAP `HEADER Message-ID` key (a `mid:` clause, the UID lookup of an `APPEND` answered without `APPENDUID`) SHALL send the id in angle brackets, a form substring-matching servers (Fastmail) match too. Stalwart 0.16 answers `HEADER` on `From`, `To` and `Subject` but on no other field tried (`Message-ID`, `In-Reply-To`, `References`, `Delivered-To`, `MIME-Version`, `Content-Type`, `X-Spam-Status`), and its `TEXT` does not find a whole Message-ID, so a `mid:` search over its IMAP finds nothing.
+
 ### Requirement: RFC 2971 ID after auth
 IMAP SHALL support sending an RFC 2971 `ID` command right after authentication, configured by `imap.id.{auto, fields}`, because some providers require it before serving other commands. Unset `fields` sends himalaya's canned `name`, `version`, `vendor` and `support-url`; an empty map sends `ID NIL`.
 
