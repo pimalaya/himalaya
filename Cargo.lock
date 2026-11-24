@@ -575,7 +575,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1004,9 +1004,9 @@ dependencies = [
 
 [[package]]
 name = "io-jmap"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cdbbd260f3ef7a9894d59e19b2a2607cb60c56c41190a5108459068486cbdd5"
+checksum = "a884f979ba07c6cccdcba1b3a73e72f77dc6a3ec8ea8b23257983732f0b22b78"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1065,9 +1065,9 @@ dependencies = [
 
 [[package]]
 name = "io-msgraph"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c4cb2124dedfa3717f994b3db6770793c60cfa373c3ceed40c90f5c26defb7"
+checksum = "86a37b9a68d8d65069fe85dda21ec6d3d478504efbb110022150acabe615fdeb"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1105,7 +1105,8 @@ dependencies = [
 [[package]]
 name = "io-pimdir"
 version = "0.20.0"
-source = "git+https://github.com/pimalaya/io-pimdir?rev=65a5026d9e8499ec7e24b401e9b689d3eebeea4e#65a5026d9e8499ec7e24b401e9b689d3eebeea4e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87fcb83227ca3e856dbea7512e5575d610d89e14d14559647c094193a3bf099d"
 dependencies = [
  "blake3",
  "encoding_rs",
@@ -1579,9 +1580,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pimalaya-cli"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8451b5a986c8e4e222440ee378344568805eaee4265450d02caedd07cd89e251"
+checksum = "63165905335de3f0bfaa3d47e9101bcd562e55722a51c5a4bfff0a560f7d135a"
 dependencies = [
  "anyhow",
  "base64-codec",
@@ -1875,7 +1876,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1933,7 +1934,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2285,7 +2286,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2552,7 +2553,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
