@@ -200,7 +200,7 @@ mod credentialed {
         let config = write_gmail_account(dir.path());
 
         let out = himalaya(&config, token(), &["--json", "account", "check"]);
-        let report = json(&out, 0);
+        let report = json(&out, 0)["accounts"][0].clone();
 
         assert_eq!(report["backends"][0]["backend"], "gmail", "{report}");
         assert_eq!(report["backends"][0]["ok"], true, "{report}");
@@ -276,7 +276,7 @@ mod credentialed {
         let config = write_imap_account(dir.path(), &subject());
 
         let out = himalaya(&config, token(), &["--json", "account", "check"]);
-        let report = json(&out, 0);
+        let report = json(&out, 0)["accounts"][0].clone();
 
         assert_eq!(report["backends"][0]["backend"], "imap", "{report}");
         assert_eq!(report["backends"][0]["ok"], true, "{report}");

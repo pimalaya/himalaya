@@ -227,7 +227,7 @@ mod credentialed {
         let config = write_graph_account(dir.path());
 
         let out = himalaya(&config, graph_token(), &["--json", "account", "check"]);
-        let report = json(&out, 0);
+        let report = json(&out, 0)["accounts"][0].clone();
 
         assert_eq!(report["backends"][0]["backend"], "msgraph", "{report}");
         assert_eq!(report["backends"][0]["ok"], true, "{report}");
@@ -318,7 +318,7 @@ mod credentialed {
         let config = write_imap_account(dir.path());
 
         let args = ["--json", "--backend", "imap", "account", "check"];
-        let report = json(&himalaya(&config, imap_token(), &args), 0);
+        let report = json(&himalaya(&config, imap_token(), &args), 0)["accounts"][0].clone();
 
         assert_eq!(report["backends"][0]["backend"], "imap", "{report}");
         assert_eq!(report["backends"][0]["ok"], true, "{report}");
