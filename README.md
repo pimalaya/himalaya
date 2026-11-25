@@ -348,6 +348,7 @@ himalaya mcp --allow-write
 - [NeoMutt](https://neomutt.org/): a terminal mail client, driven from its own interface rather than scripted
 - [aerc](https://aerc-mail.org/): a terminal mail client for IMAP, JMAP, Maildir and notmuch
 - [mblaze](https://github.com/leahneukirchen/mblaze): Unix utilities over a Maildir, local mail only
+- [gog](https://gogcli.sh/): a Google Workspace CLI with JSON output, Gmail only for mail
 
 ## License
 
