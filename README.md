@@ -47,8 +47,6 @@ $ himalaya envelope search --json --sort newest-first from:alice date:2026-11-02
 }
 ```
 
-Himalaya manages your mail from the command line: every command prints JSON for scripts, frontends and agents, or plain text for a person.
-
 ## Table of contents
 
 - [Features](#features)
@@ -61,6 +59,7 @@ Himalaya manages your mail from the command line: every command prints JSON for 
   - [Posteo](#posteo)
   - [iCloud Mail](#icloud-mail)
 - [Usage](#usage)
+- [Alternatives](#alternatives)
 - [AI policy](https://github.com/pimalaya/.github/blob/master/AI_POLICY.md)
 - [License](#license)
 - [Social](#social)
@@ -81,9 +80,53 @@ Himalaya manages your mail from the command line: every command prints JSON for 
 ## Installation
 
 <details>
+  <summary>Debian, Ubuntu</summary>
+
+  Himalaya is not in the official repositories yet, but the signed APT repository of [pkg.pimalaya.org](https://pkg.pimalaya.org) ships the latest release with its man pages and shell completions. Add the repository once:
+
+  ```sh
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://pkg.pimalaya.org/pimalaya.asc | sudo tee /etc/apt/keyrings/pimalaya.asc >/dev/null
+  sudo tee /etc/apt/sources.list.d/pimalaya.sources >/dev/null <<EOF
+  Types: deb
+  URIs: https://pkg.pimalaya.org/apt
+  Suites: stable
+  Components: main
+  Signed-By: /etc/apt/keyrings/pimalaya.asc
+  EOF
+  sudo apt update
+  ```
+
+  Then install Himalaya:
+
+  ```sh
+  sudo apt install himalaya
+  ```
+</details>
+
+<details>
+  <summary>Fedora, RHEL, Rocky Linux, AlmaLinux</summary>
+
+  Himalaya is not in the official repositories yet, but the signed DNF repository of [pkg.pimalaya.org](https://pkg.pimalaya.org) ships the latest release with its man pages and shell completions:
+
+  ```sh
+  sudo curl -fsSL -o /etc/yum.repos.d/pimalaya.repo https://pkg.pimalaya.org/pimalaya.repo
+  sudo dnf install himalaya
+  ```
+</details>
+
+<details>
+  <summary>Homebrew (macOS, Linux)</summary>
+
+  ```sh
+  brew install himalaya
+  ```
+</details>
+
+<details>
   <summary>Pre-built binary</summary>
 
-  Himalaya can be installed with the installer:
+  For other systems, Himalaya can be installed with the installer:
 
   *As root:*
 
@@ -97,7 +140,7 @@ Himalaya manages your mail from the command line: every command prints JSON for 
   curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
   ```
 
-  These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section. For a build of `master`, check out the [releases](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section.
+  These commands install the latest [release](https://github.com/pimalaya/himalaya/releases), built with the default cargo features. For a build of `master`, check out the [releases](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section.
 </details>
 
 <details>
@@ -299,6 +342,12 @@ himalaya imap raw 'a1 NAMESPACE'
 # Serve the account to an AI agent, writes allowed
 himalaya mcp --allow-write
 ```
+
+## Alternatives
+
+- [NeoMutt](https://neomutt.org/): a terminal mail client, driven from its own interface rather than scripted
+- [aerc](https://aerc-mail.org/): a terminal mail client for IMAP, JMAP, Maildir and notmuch
+- [mblaze](https://github.com/leahneukirchen/mblaze): Unix utilities over a Maildir, local mail only
 
 ## License
 

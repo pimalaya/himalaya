@@ -7,288 +7,317 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Himalaya 3 is a low-level CLI: plain text for humans, `--json` for scripts and frontends. The wizard, the m2dir backend and the table and colour options are gone, and an unknown configuration key fails the load. Every `--json` key is camelCase, a write prints what it acted on, a failure carries a stable `code` and a partial outcome exits 3. `envelope search` reads the pimdir query language, and `repl` and `mcp` serve the unified API over kept connections, the latter to AI agents.
+
+MIGRATION.md lists what to act on when upgrading from 2.x.
+
 ### Added
 
-- Added `label:` and `property:<namespace>/<name>=<value>` to `pimdir search`, `count` and `tag` (pimdir search-draft-17), answered from the store's item properties; `envelope search` refuses both with `search-unsupported`. `pimdir queue list`, `queue show` and `queue cancel` take a `set-property` row another program queued, naming its message.
+- Added the account-level `tls` table (`tls.provider`, `tls.rustls.crypto`, `tls.cert`, `tls.client.cert`, `tls.client.key`), inherited field by field by every network backend.
 
-- Added `date` and `messageId` to the `--json` template of `message compose|reply|forward`.
-- Added the exit 3 of a partial outcome to the help of `flag add|set|remove`, `message copy|move|delete` and `envelope list|search`.
-- Added an account-level `tls` table (`tls.provider`, `tls.rustls.crypto`, `tls.cert`, `tls.client.cert`, `tls.client.key`) inherited by every network backend field by field, a backend's own `tls` winning, so one trusted certificate reaches IMAP, SMTP, ManageSieve, JMAP, Gmail and Microsoft Graph alike. `account check` prints for each backend reached over TLS what it was configured with, `tls` `{provider, crypto, cert, clientCert}` (`null` for a local backend and a cleartext connection), and in text `TLS` and its parts after its outcome.
-- Added the refusals of pimdir storage-draft-13 (STORAGE §15.4): `pimdir queue show` prints, on an applied row, `refusals`, one `{collection, source, reason, refusedAt}` per source whose server refused for good the change the row led to, and a `Refused by <source> in <mailbox> at <instant>: <reason>` line each, `itemId` naming the message any applied row acted on; `pimdir queue list` prints the mailbox's refusals under `refused` (`{collection, itemId, source, reason, refusedAt}`), `refused` lines after the parked rows in text. The sync engine holds a refused change until the message is changed again or removed.
-- Added `jmap request <JSON>`, the name of an HTTP API's escape hatch across the family, taking and printing what Cardamum's `jmap request` does: one whole JMAP request object (`{"using": [...], "methodCalls": [...]}`, `using` the core and mail capabilities when absent), as a path to a JSON file, the JSON itself or `-` for stdin, and printing `{response}`, the server's `{methodResponses, createdIds, sessionState}`. `jmap query`, taking a method-calls array, keeps its shape, hidden from the help and the manual, under its schema key `himalaya-jmap-query`.
-- Added `gmail request <METHOD> <PATH> [JSON]` and `msgraph request <METHOD> <PATH> [JSON]`, the escape hatches of the Gmail and Microsoft Graph APIs, as Cardamum's `gpeople request` and `msgraph request`: the method (`get`, `post`, `patch`, `delete`, `put` on Gmail), a path joined onto `gmail/v1/` or `v1.0/` or a full URL on the same API, a URL off its origin refused before the session opens, coded `request-origin`, exit 1, so the bearer token never leaves for another host, a JSON body, printing `{response}`, the body the provider answered as it sent it.
-- Added `-V` and `--version` lines to `himalaya repl`, printing what the command line prints, after a command too, on stderr in a JSON session (pimalaya-cli 0.5.1).
-- Added the `envelope list` row to `message read --json`, `{id, messageId, inReplyTo, flags, subject, from, to, date, size, hasAttachment}`, then `etag` `null`, before the view: `id` the id the command took, the flags read in the same exchange as the message. `message parse` prints the view without them.
-- Added `account_capability` to `himalaya mcp`, a reading tool listed whatever the flags, answering the rows `account capability` prints, as Calendula and Cardamum do.
-- Added `total` to the `envelope list` JSON output: how many messages the mailbox holds, read within the listing itself (IMAP `SELECT` `EXISTS`, JMAP `calculateTotal`, the entries Maildir, mbox and pimdir hold), `null` on Gmail and Microsoft Graph and always for `envelope search`.
-- Added a library target, for himalaya-tui alone, which pins it by git revision and runs Himalaya's commands in-process; it carries no semver promise beyond the CLI grammar and its `--json` output.
-- Added `errors` to `envelope list`, `envelope search`, `mailbox list`, `flag add|set|remove`, `message copy`, `message move` and `message delete`: one item error `{id, code, error, sources}` per item the command could not list or act on, `[]` when there is none, `count` counting what was acted on.
+  A backend's own `tls` wins, so one trusted certificate reaches IMAP, SMTP, ManageSieve, JMAP, Gmail and Microsoft Graph alike.
 
-  A non-empty `errors` exits 3, printing nothing after the result. In text the entries print last, after a list's items or a write's sentence and one blank line, one `Error:` line each, aligned among themselves, as pimalaya-cli prints them. `json-schema` describes it under `himalaya-item-error`; `himalaya mcp` returns such a result as `structuredContent` with `isError`.
-- Added the error codes `message-unreadable`, `mailbox-unreadable`, `permission-denied`, `quota-exceeded`, `rate-limited` and `recipient-refused`.
-- Added the error codes `thread-not-found`, `identity-not-found` and `submission-not-found`, coding the `errors` entry of `jmap thread get`, `jmap identity get` and `jmap submission get|query` for an id the server did not find.
-- Added `tls.client.cert` and `tls.client.key` to every network backend, a client certificate presented when the server asks for one (mutual TLS). native-tls reads a PKCS#8 key only.
-- Added `--no-from`, `--no-to`, `--no-subject`, `--no-text` and `--no-html` to `vacation set`, clearing a field of the auto-reply (JMAP sends `null`, Gmail unsets it), so an auto-reply can go back to having nothing set.
-- Added the capabilities an argument reaches to the `Backends:` footer of `--help` (`submit (with --send, --no-save)`, `message.add (with --save)` on `message compose`, `reply` and `forward`, `compose` getting its footer), and left out of an MCP tool the argument the account cannot serve (`send` on an account with no transport), the tool kept.
-- Added the first-run welcome: run at a terminal without a configuration, bare `himalaya` and every command reading one print on stderr the missing path, the command creating it from config.sample.toml (copied from share/doc/himalaya/ when one ships beside the binary, downloaded with `curl` otherwise) and the first command to run, `himalaya envelope list`, then exit 1. Under `--json` or with stderr piped, the error names the path and the sample instead. A bare `himalaya` prints the help when a configuration exists.
-- Added config.sample.toml to the Nix package and the release archives as share/doc/himalaya/config.sample.toml, which install.sh copies under its prefix and the first-run welcome copies from.
-- Added `attach-data` to the MCP tools `message_compose`, `message_reply` and `message_forward`, attaching files given inline: a list of `{filename, mimeType, data, text}`, with `data` in base64 or `text` as UTF-8, `mimeType` guessed from the filename as `--attach` guesses it ([#806]). It is an argument of the server alone, not of the CLI, where `--attach` already takes a path. Each attachment over `himalaya mcp --max-attachment-size` (10 MiB by default) is refused before it is decoded, under the new error code `attachment-too-large`; a malformed one is refused under `attachment-invalid`. Under `--allow-send`, an agent can now send arbitrary binary data, not only text.
-- Added `--page-token` to `envelope list` and `envelope search`, which print `nextPage` (the next page number while a page follows, `null` once the page reaches the end of the listing, an exactly full last page included, each backend telling it from the listing's own exchanges, Gmail and Microsoft Graph asking each page one message longer since their page token or next link follows an exactly full last page too), and to `msgraph messages list`, `msgraph mail-folders list` and `msgraph mail-folders child-folders`, whose `nextPage` is Graph's next link as Graph gives it, `$search` pages included, `null` when the link leads back to the page asked (`--top 0`), and which `--page-token` follows as is.
-- Added a JSON Schema for every command, 217 in all, checked by a test walking the command tree, with `himalaya-imap-raw.events` and `himalaya-sieve-raw.events` describing the events those commands print.
-- Added events to the MCP tool results, one text content each before the result; a refused protocol completion or a failed `account check` keeps its result as `structuredContent` with `isError`.
-- Added `attachment_download` to `himalaya mcp`, a reading tool always run as `attachment download --stdout` and taking one part id, so an agent reads an attachment without a file being written ([#805]). Its structured content is the part without `data` (`{id, mime, filename, size}`), with that schema as output schema, and the bytes follow once as an embedded resource (`blob` in base64, the part's MIME type, the URI `himalaya://<account>/<mailbox>/<message-id>/<part-id>`). The server flag `--max-attachment-size` added with `attach-data` also refuses a larger part before it is encoded, under `attachment-too-large`.
-- Added `mailbox create <NAME> [--parent <MAILBOX>]`, `mailbox rename <MAILBOX> <NAME>` and `mailbox delete <MAILBOX>` to the unified API, on every backend: a name is one level of the hierarchy, a rename keeps the parent, a delete takes the messages the mailbox holds. IMAP joins the levels with the delimiter its `LIST` reports, Gmail and the local stores with `/`. On pimdir each is queued, its `id` `null`. Graph creates under a parent in two requests; what a delete leaves behind on JMAP, Gmail and Graph is in the `--help` footer.
-- Added the `important` and `junk` flags to `flag add|set|remove` (RFC 8457 `$Important`, `$Junk`). Graph has no junk mark and refuses it; on Gmail `junk` is the `SPAM` label, which moves the message to Spam.
-- Added `vacation get` and `vacation set`, reading and changing the auto-reply (`{enabled, start, end, subject, text, html}`, the window it answers in as `start` and `end`, RFC 3339 UTC, `Start:` and `End:` in text) on JMAP and Gmail. It resolves to the first configured backend keeping one, so an account syncing a Maildir from JMAP reaches JMAP. IMAP refuses it naming `himalaya sieve`; the MCP server lists `vacation_set` under `--allow-send` only, an auto-reply answering mail.
-- Added `account capability`, listing what the account serves of the unified API, one row per capability: the backend it resolves to (`null` when none is configured), its level (`full`, `partial`, `server`, `none`) and the detail, under `--backend` when given. It connects nowhere; on a pimdir account the writes are read from what the store's sources declare. Frontends read it to hide what the account cannot run.
-- Added a capability table per backend, naming each unified capability in pimdir's grammar (`message.copy`, `flags.answered`, `submit`, `envelope.search.attachment`) at a level, `full`, `partial`, `server` or `none`, with a detail saying what differs or why. A unified command reaching a capability its backend declares `none`, or one no configured transport answers, is refused before connecting, under the new error code `capability-missing`, naming the account, the capability, the backend and what serves it instead.
-- Added a generated `Backends:` footer to the `--help` of every unified command, listing per capability it reaches the backends at each level and the details.
-- Added the error codes `search-invalid`, for a query that does not parse, and `search-unsupported`, for a clause the account's backend cannot search, which names the clause as written: every flag on Microsoft Graph, `flag answered` and keywords on Gmail, `attachment` on IMAP. Nothing is searched and no clause is dropped.
-- Added the error codes `message-not-found`, carried by an id the mailbox does not hold: an `errors` entry of `flag add|set|remove` and `message copy|move|delete`, the refusal of `pimdir flag add|set|remove` when no given id exists and of the raw `maildir` id-taking commands given one unknown id, and `mailbox-not-found`, for a Maildir, an mbox or an IMAP mailbox that does not exist (``Maildir mailbox `X` not found``, ``Mbox mailbox `X` not found``, ``IMAP mailbox `X` not found``). The raw `mbox` id-taking commands given one unknown id, and a single message read whose id IMAP or mbox does not hold, carry `message-not-found` too. Nothing is done.
-- Added `maildir.layout`, `fs` by default or `maildir++` for a Dovecot or Courier store: the root is the inbox, `.a.b` lists as `a/b` and is taken under either spelling, and a level holding a dot is refused. A rename or delete takes the `.a.*` children of `a` along, as the fs layout does (io-maildir).
-- Added `himalaya mcp`, a Model Context Protocol server (revision 2025-06-18) over stdio for one account, exposing the unified API as tools named after their command (`envelope_list`, `message_read`), run over clients kept for the server's lifetime as in `himalaya repl`. `initialize` gives the agent instructions: how to find a mailbox and an envelope id, the query language of `envelope_search`, attachments read as embedded resources and given inline, the flags gating writing and sending. A tool's input schema is generated from its command, its arguments spelled as on the command line, and an argument it does not take is refused naming those it does; a result is the command's `--json` payload as structured content, with its JSON Schema as output schema where the payload has one shape, and a failure, a command printing no value or several included, is a tool error carrying the error object and its code. Each line is one JSON-RPC 2.0 object: a batch, a value that is no object or a request without `"jsonrpc": "2.0"` answers -32600, a line that is not UTF-8 -32700, and the server reads on. Only the reading tools are listed by default: `--allow-write` adds those changing the store and `--allow-send` those sending mail. `message parse` and the file arguments are not exposed, and a message given to a tool is never read from a path it spells. A server failing to start, its configuration missing included, says why on stderr, stdout carrying protocol messages only.
-- Added `himalaya repl`, a session over stdin and stdout for one account: each line is a command without the binary name, split as a shell splits it and run over clients built the first time a command needs them and kept for the session, so a client connects once rather than once per command. A blank line or a `#` comment is skipped; `quit`, `exit` or EOF ends it. The account, the configuration, the logs and `--backend` are the session's, a line setting `-a`, `-c`, `--log-level` or `-b` being refused naming the flag; `--json` on `repl` switches the session to JSON, on a line that line alone. Piped, every line gets exactly one answer on stdout, a failure printed as the error object, the help going to stderr in a JSON session, and the loop goes on after a parse or command error. A command that fails drops the client it ran on, which the next command builds again. A command that would read its input from stdin inside a session is refused with the new error code `stdin-taken`, and `message compose`, `reply` and `forward` read no body from it. `repl` and `mcp` are refused inside a session.
-- Added `pimdir search <QUERY>...`, searching the account's mail in the pimdir query language (pimdir SEARCH.md §8: words, phrases, `field:value` terms, `and`, `or`, `not`, parentheses) from the store's search index, which the sync engine builds and refreshes; Himalaya only reads it. `--sort date|name|relevance`, `--page`, `--page-size` and `--threads`; each hit carries its envelope, `mailboxes`, what `matched` (`body` or `summary`) and a `snippet`, and every answer a `coverage` (`bodiless`, `unindexed`, `behind`, `since`, `until`, `filling`, `complete`), printed as a line under the list when incomplete. A queued write shows in no answer. Its years, months, days, `today` and `yesterday` are read in the local zone, `TZ` then the system's, else UTC.
-- Added `pimdir count <QUERY>...`, counting the account's mail a query matches, with its coverage.
-- Added `pimdir thread <ID>`, listing the thread of a message from the search index, oldest first.
-- Added `from`, `date` and `flags` to each `imap thread` entry, the envelope of every threaded message being fetched with the thread.
-- Added `pimdir tag <QUERY>... --add <FLAG> --remove <FLAG>`, queueing one flag change per mailbox holding each matched message, every change checked against the sources before the first is queued; `--dry-run` queues nothing. A message whose flags were never synced, or whose mailbox several sources or none sync, is reported and left alone. Each row prints its flags as envelopes print one, `{raw, iana}`.
-- Added `pimdir flag list|add|set|remove`, reading and staging any flag of a pimdir message by its raw spelling, keywords included, as `imap store` does on IMAP ([#790]). A registered flag is taken in its canonical spelling only (`\Seen`, not `seen`); `\Deleted`, `\Recent`, a backslash before any other word, non-ASCII characters and the characters IMAP forbids in a flag (`(`, `)`, `{`, `%`, `*`, `"`, `]`, `\`) are refused; and a source declaring no keyword support refuses a keyword change, one supporting them in part staging it with its warning. The writes print the queue row of each message, `null` for a message the change leaves as it was, for which nothing is staged, and fail when no given id exists; `list` prints each flag as envelopes print one, `{raw, iana}`, and `null` for flags the sync engine never read.
-- Added `msgraph messages send-draft <ID>`, sending an existing Microsoft Graph draft (`POST /me/messages/{id}/send`), which Graph moves to Sent Items ([#787]).
-- Added `--no-categories` to `msgraph messages update`, removing every category from the message, which `--category` could not do.
-- Added `--all` (`-A`) to `message reply`, replying to everyone: `To` stays the source's `Reply-To` or `From`, and `Cc` takes the `To` and `Cc` of the source without the account's `email` nor anyone already in `To`, each address once. An explicit `--to` or `--cc` takes precedence over the list it would derive ([#779]).
-- Added `pimdir attachment list`, one page of the files a pimdir account's messages attach, newest message first, read from the stand-ins the store records as each body enters it (pimdir STORAGE §14.3): each with its `id`, `filename`, `mime`, `size` and IMAP `section`, spelled as `attachment list` spells them, and the `message`, `mailbox`, `from` (an address `{name, email}` or `null`) and `date` of its message, the ids being those `envelope list` and `message read` take, plus a `nextPage` token that `--page-token` takes. `pimdir attachment search <WORDS>` keeps the files every word of which is in the file name, the sender's address or the sender's name, ignoring case.
-- Added `--section <SECTION>` to `message parse`, writing the part at that IMAP section (`2`, `1.2`) as `--part` writes a part by its id: what a pimdir store records of an attachment.
-- Added `pimdir mailbox list`, listing each mailbox of a pimdir account with its `total` and `unread` counts, its `coverage` (`{since, until, at}`: the scope the sync engine last listed it within, `null` until every source closed a round on it) and the `round` under way (`{since, until, startedAt}`), so a reader can say which mail the store holds (pimdir scoped-mail-sync).
-- Added `message parse [EML]`, printing the `message read` view (the same JSON or text) of a raw message read from a file or stdin, with no account and no configuration, and `--part <PART-ID>`, writing one part's decoded bytes as `attachment download --stdout` does. A blank source is refused, and the `message-too-complex` bounds apply.
-- Added a designed `--json` view to `message read`, the same on every backend: `headers` (address lists as `{name, email}`, decoded subject, RFC 3339 date, ids without angle brackets, list headers), `text` and `html` bodies decoded to UTF-8, and `parts`, every leaf part with its id, role (`body`, `inline` or `attachment`), type, decoded file name, size, `contentId`, `charset` and calendar `method`. A message nested deeper than 8 levels, or holding more than 200 parts or 500 header lines, is refused with the error code `message-too-complex`.
-- Added `--stdout` to `attachment download`, writing the decoded bytes of one part to stdout and no file, or under `--json` printing `{id, mime, filename, size, data}` with `data` in base64.
+- Added `tls.client.cert` and `tls.client.key` to every network backend, a client certificate presented for mutual TLS.
+
+  native-tls reads a PKCS#8 key only.
+
+- Added `maildir.layout`, `fs` by default or `maildir++` for a Dovecot or Courier store.
+
+  The root is the inbox, `.a.b` lists as `a/b`, and a level holding a dot is refused.
+
+- Added `message.reply.posting-style` and `message.forward.posting-style`, global or per account, the style used without `--posting-style` ([#772]).
+- Added the first-run welcome: at a terminal without a configuration, a command prints the missing path and the commands copying config.sample.toml in place, then exits 1.
+
+  Under `--json` or with stderr piped, the error names the path and the sample instead.
+
+- Added config.sample.toml to the Nix package and the release archives as share/doc/himalaya/config.sample.toml, which install.sh installs under its prefix.
+- Added a stable `code` to the JSON failure object for the failures a caller is expected to act on, `null` otherwise.
+
+  `json-schema himalaya-error` describes the object and lists every code.
+
+- Added the item and mailbox codes `message-not-found`, `mailbox-not-found`, `message-unreadable`, `mailbox-unreadable`, `mailbox-duplicate`, `message-too-complex`, `thread-not-found`, `identity-not-found` and `submission-not-found`.
+- Added the server refusal codes `permission-denied`, `quota-exceeded`, `rate-limited` (a Google daily quota included) and `recipient-refused`.
+- Added the usage codes `usage-invalid`, `capability-missing`, `search-invalid`, `search-unsupported`, `page-token-invalid`, `stdin-taken`, `attachment-too-large`, `attachment-invalid` and `request-origin`.
+- Added the account codes `account-missing`, `account-default-missing`, `account-default-several` and `backend-not-built`, the last naming the cargo feature to rebuild with.
+- Added the pimdir codes io-pimdir gives a store, its queue and its search index.
+
+  Store: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `store-account-ambiguous`, `store-account-unknown`, `sync-version`, `lock-replaced`.
+
+  Queue and index: `body-pending`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer`, `ambiguous-performer`, `row-not-found`, `confirmation-required`, `index-missing`, `index-outdated`, `index-version`, `index-zone-unknown`, `index-fts5-missing`, `query-refused`, `query-unanswerable`, `tag-refused`.
+
+- Added `errors` to `envelope list|search`, `mailbox list`, `flag add|set|remove` and `message copy|move|delete`, one item error `{id, code, error, sources}` per item the command could not list or act on.
+
+  A non-empty `errors` exits 3. In text each entry prints as an `Error:` line after the items.
+
+- Added a JSON Schema for every command, `himalaya-error` for the failure object, and `.events` schemas for what `imap raw` and `sieve raw` print before their result.
+- Added `total` to `envelope list --json`, how many messages the mailbox holds, `null` on Gmail and Microsoft Graph and for `envelope search`.
+- Added `--page-token` to `envelope list|search` and `jmap email|mailbox|submission query`, taking back the `nextPage` a page printed, `null` on the last page.
+
+  It is refused beside `--page`, and a token no listing printed fails `page-token-invalid`.
+
+- Added `--page-token` to `msgraph messages list`, `mail-folders list` and `mail-folders child-folders`, following as is the Graph next link they print as `nextPage`.
+
+  A query option beside it is refused (exit 2), the link carrying the query.
+
+- Added a library target, which himalaya-tui pins by git revision to run Himalaya's commands in-process, with no semver promise beyond the CLI grammar and `--json`.
+- Added `himalaya repl`, a session running one command per line over clients connected once for the session.
+
+  Piped, every line gets exactly one answer; a line setting `-a`, `-c`, `--log-level` or `-b`, or reading stdin (`stdin-taken`), is refused.
+
+- Added `himalaya mcp`, a Model Context Protocol server over stdio exposing the account's unified API as tools named after their command.
+
+  Only the reading tools are listed by default: `--allow-write` adds the writes and `--allow-send` the sends, which keep no copy without `--allow-write`.
+
+- Added the MCP tool `attachment_download` and the `attach-data` argument of `message_compose`, `message_reply` and `message_forward` ([#805], [#806]).
+
+  Both refuse a part over `himalaya mcp --max-attachment-size`, 10 MiB by default, coded `attachment-too-large`.
+
+- Added `account capability`, listing what the account serves of the unified API: per capability its backend, its level (`full`, `partial`, `server`, `none`) and the detail.
+- Added a capability table per backend: a unified command reaching a capability its backend declares `none` is refused before connecting, coded `capability-missing`.
+
+  The `--help` of every unified command ends with a generated `Backends:` footer listing those levels.
+
+- Added `mailbox create`, `mailbox rename` and `mailbox delete` to the unified API, on every backend.
+
+  A delete takes the messages the mailbox holds; on pimdir each is queued for the sync engine.
+
+- Added the `important` and `junk` flags (RFC 8457 `$Important`, `$Junk`) to `flag add|set|remove`.
+
+  Graph refuses `junk`, Gmail's `junk` is the `SPAM` label, and Maildir needs `maildir.keywords.dovecot`.
+
+- Added `vacation get` and `vacation set`, reading and changing the auto-reply on JMAP and Gmail, whatever configured backend holds the mail.
+
+  IMAP refuses it, naming `himalaya sieve`.
+
+- Added `message parse [EML]`, printing the `message read` view of a raw message from a file or stdin with no account, `--part` and `--section` writing one part.
+- Added `--stdout` to `attachment download`, writing one part's decoded bytes to stdout, or `{id, mime, filename, size, data}` with `data` in base64 under `--json`.
 - Added `contentId` to `attachment list --json`.
-- Added `headers.invalid` to the `message read` and `message parse` views: for `to`, `cc`, `bcc`, `replyTo`, `from` and `sender`, the entries that are not readable as an address and so are absent from the lists, as decoded text in header order (group names and empty groups excluded).
-- Added to the `message read` view the reading of malformed but common mail: raw 8-bit header bytes as UTF-8 when valid and Windows-1252 otherwise (subject, names, list headers, file names), adjacent encoded words of one charset joined as bytes so a character split between them is rebuilt, UTF-8 bytes labelled `us-ascii` read as UTF-8, and an invalid `Content-Type` such as `text/` taken as `text/plain; charset=us-ascii`.
-- Added `message.reply.posting-style` and `message.forward.posting-style`, global or per account, the posting style used when `--posting-style` is not passed ([#772]).
-- Added the role of a pimdir mailbox: `mailbox list` shows the role the sync engine recorded from the server (`collections.role`), and a role name (`inbox`, `sent`, `drafts`, `trash`, …) addresses its mailbox wherever a mailbox is taken, as on JMAP, so `envelope list` without `-m` reads the inbox and `message delete` finds the trash without `mailbox.alias.trash`. A collection's name does not address it.
-- Added a stable `code` to the `--json` error output for failures a caller is expected to act on, found anywhere in the error chain. The first is `body-pending`: a pimdir message listed but whose body is not downloaded yet. A pimdir store failure carries the code io-pimdir gives it: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `sync-version`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `lock-replaced`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer` or `ambiguous-performer`, and a pimdir search failure `index-missing`, `index-outdated`, `index-version`, `index-zone-unknown`, `index-fts5-missing`, `query-refused`, `query-unanswerable` or `tag-refused`. An account the configuration cannot give is coded `account-missing`, `account-default-missing` or `account-default-several`, and an account whose backend this build leaves out `backend-not-built`, naming the cargo feature.
-- Added `pimdir message add` and `pimdir message send`, staging as the unified commands do and printing the message's link id as `id` with its queue row, and `pimdir queue show <ROW>`, saying whether a row is pending, parked (with why), applied (with the id of the message an add created; a message sent or a mailbox created once the sync engine acknowledges it) or unknown.
-- Added `pimdir mailbox create <NAME>`, queueing a `collection-create` intent for the sync engine to create the mailbox on its server.
-- Added `pimdir mailbox rename <MAILBOX> <NAME>`, queueing a `collection-rename` intent for the sync engine to rename the mailbox on its server, keeping its parent and its messages (pimdir STORAGE Annex B.2, capability `collection.rename`).
-- Added `pimdir mailbox delete <MAILBOX>`, queueing a `collection-delete` intent for the sync engine to delete the mailbox on its server with the messages it holds (capability `collection.delete`). A mailbox holding other mailboxes is never deleted with them: the row parks naming them. Once the deletion reaches the store, `pimdir queue show` reads the row as `unknown`, its receipt leaving with the mailbox.
-- Added the `pimdir performer` command, showing which sources can perform a capability such as `mail.submit` for the account and recording the user's choice among them (pimdir draft-03, STORAGE §15.6).
-- Added `--notify`, `--ret` and `--envid` to `smtp send`, requesting delivery status notifications (RFC 3461). The command fails when the server does not announce `DSN` ([#775]).
-- Added the `answered` flag to the source of `message reply --send` and the `forwarded` flag to the source of `message forward --send` once the message is sent, so it shows as replied to or forwarded in `envelope list` and in other clients. A message only printed or saved flags nothing, and a backend refusing the `$Forwarded` keyword does not fail the forward ([#778]).
-- Added the source's attachments to `message forward`, carried under their file names after the quoted body. Nameless ones are named from their subject (`.eml`) or MIME type. `--no-attachments` leaves them out ([#780]).
-- Added the IMAP mailbox roles: `mailbox list` shows the role a plain `LIST` marks with a special-use attribute (RFC 6154, sent unasked by Fastmail and iCloud), and a role word (`-m sent`, the trash `message delete` moves to) resolves through it, a `mailbox.alias.<role>` still winning. A server marking its roles only under `LIST RETURN (SPECIAL-USE)` still needs the aliases.
-- Added `attachments` to the JSON template the composers print without `--save` or `--send`, each attached file as `{filename, mime, size}`: the template carries no bytes, so handing it back means passing the files again through `--attach`.
+- Added `--all` (`-A`) to `message reply`, replying to everyone but the account's own address ([#779]).
+- Added the source's attachments to `message forward`, `--no-attachments` leaving them out ([#780]).
+- Added the `answered` flag to the source of `message reply --send` and the `forwarded` flag to that of `message forward --send` ([#778]).
+
+  Gmail and Microsoft Graph keep no `answered` flag, so a reply there flags nothing.
+
+- Added `date`, `messageId` and `attachments` to the JSON template `message compose|reply|forward` print without `--save` or `--send`.
+
+  `attachments` lists `{filename, mime, size}` with no bytes: hand the files back through `--attach`.
+
+- Added `--notify`, `--ret` and `--envid` to `smtp send`, requesting delivery status notifications (RFC 3461) ([#775]).
+
+  The command fails when the server does not announce `DSN`.
+
+- Added `from`, `date` and `flags` to each `imap thread` entry.
+- Added the IMAP mailbox roles a plain `LIST` marks with a special-use attribute (RFC 6154), shown by `mailbox list` and taken by `-m`.
+
+  A `mailbox.alias.<role>` still wins.
+
+- Added `jmap request`, sending one whole JMAP request object and printing `{response}`, as Cardamum's does.
+
+  `jmap query`, taking a method-calls array, stays as a hidden command.
+
+- Added `gmail request` and `msgraph request`, sending one request to the Gmail or Microsoft Graph API and printing `{response}`, the provider's answer.
+
+  A URL off the API's origin is refused before the session opens, coded `request-origin`.
+
+- Added `msgraph messages send-draft`, sending an existing Microsoft Graph draft ([#787]).
+- Added `--no-categories` to `msgraph messages update`, removing every category of the message.
+- Added `pimdir search`, searching the account's mail in the pimdir query language (SEARCH.md §8) from the store's search index.
+
+  `--sort`, `--threads` and `--page-token` shape the answer; each hit carries its envelope, mailboxes and a snippet, and `coverage` says what the index could not see.
+
+- Added `pimdir count`, counting the account's mail a query matches, with its coverage.
+- Added `pimdir thread`, listing the thread of a message from the search index, oldest first.
+- Added `pimdir tag`, queueing a flag change on every message a query matches, `--dry-run` queueing nothing.
+- Added `pimdir flag list|add|set|remove`, reading and staging any flag of a pimdir message by its raw spelling, keywords included ([#790]).
+- Added `pimdir mailbox list`, listing each mailbox with its `total` and `unread` counts and the `coverage` the sync engine last listed it within.
+- Added `pimdir mailbox create`, `rename` and `delete`, queueing the change for the sync engine to apply on the server.
+
+  A delete takes the messages; a mailbox holding other mailboxes parks, naming them.
+
+- Added `pimdir message add` and `pimdir message send`, staging a message and printing its link id as `id` with its queue row.
+- Added `pimdir queue show`, printing a row as `pimdir queue list` does, then its `state` (`pending`, `parked`, `unconfirmed`, `applied`), `appliedAt` and `refusals`.
+- Added `pimdir attachment list` and `pimdir attachment search`, the files the account's messages attach, newest first, each with the `part` `attachment download` takes.
+- Added `pimdir performer`, showing which sources can perform an intent (`mail.submit`, `collection.create`, `collection.rename`, `collection.delete`) and recording the user's choice.
+- Added `pimdir status`, reporting per mailbox how many messages carry a local body and how many writes are queued, with the parked rows and the standing refusals.
+- Added the role of a pimdir mailbox, recorded by the sync engine: `mailbox list` shows it, and a role name addresses the mailbox wherever one is taken.
+
 ### Changed
 
-- Changed to pimalaya-cli 0.8.1: `--log-file` refuses a symbolic link to an existing file too, as its help says, where the path was resolved before the open could see the link.
-- **BREAKING**: Changed the pimdir backend to pimdir storage-draft-17 and search-draft-17 (io-pimdir 0.20.0): a store an earlier build wrote, a development build's storage-draft-15 included, is refused `store-version`, and its index `index-version`. Drain it with the neverest that wrote it until `pimdir queue list` lists nothing, move its directory aside, then sync a new store with a neverest on the same io-pimdir (MIGRATION.md).
-- **BREAKING**: Changed a query word or value beginning with `~`, one of two characters or more beginning with `/` and a value beginning with `{` to be refused, coded `search-invalid` (`query-refused` in `pimdir search`, `count` and `tag`) naming `reserved-form` (pimdir SEARCH §8.3), where they were searched as words; quoted, the characters are searched.
-- Changed `pimdir search`, `count` and `tag` to read flag terms (`is:`, `tag:` on a system flag) from the store as the sync engine last wrote it, even while the index lags.
-- Changed `pimdir search`, `count` and `--threads` to answer 17 to 88 times faster at 517k messages (io-pimdir's search-draft-17 index).
-- **BREAKING**: Changed the `envelope search` query to the pimdir SEARCH language (§8), the one `pimdir search`, Calendula and Cardamum read, parsed by io-pimdir: `from:alice date:2026-11-02.. is:unread "weekly sync"`, `mid:<id>`, instants and `30min`, `5h`, `1mo` amounts; MIGRATION.md maps every v2 clause. The order is `--sort newest-first|oldest-first|title|sender|relevance`, `order by` gone, and no backend orders by recipient. Maildir and mbox match whole words through io-pimdir's mail matcher, where they matched a substring. A field outside mail fails with `search-unsupported`, and the `envelope.search.<option>` capabilities take io-pimdir's predicate names (`envelope.search.mid`, `envelope.search.sort.newest-first`). The chumsky grammar is removed.
-- **BREAKING**: Changed `pimdir search --sort` to `newest-first|oldest-first|title|sender|relevance`, where it took `date|name|relevance`.
-- Changed the `pimdir` cargo feature to enable io-pimdir's `client`, `search` and `mail` features, and the Maildir and mbox features its `mail` feature: no build pulls ical-rs or vcard-rs.
-- **BREAKING**: Changed `message add` to print the send receipt of `message send` and the composers, `{id, saved, sent, queued, errors}`, gaining `saved`.
-- **BREAKING**: Changed a send only queued (pimdir) to print `sent: false`, where it printed `true`.
-- **BREAKING**: Changed `message delete` to print `ids`, the messages acted on as given, beside `count`.
-- **BREAKING**: Changed `maildir create|rename|delete` to print the folder's path as `id`, the id the unified `mailbox` commands take, where they printed its name; `maildir list` rows gain `id`.
-- **BREAKING**: Changed a bare `himalaya --json` to fail coded `usage-invalid`, exit 2, where it printed the help, through pimalaya-cli's `clap::meet_bare_invocation`.
-- **BREAKING**: Changed `--page-token` beside `--page` on `envelope list|search` and the `jmap` queries to be refused, exit 2, where `--page` was ignored.
-- **BREAKING**: Changed `himalaya mcp --allow-send` without `--allow-write` to send keeping no copy, `--no-save` fixed on `message_send` and the composers and `no-save` listed under the send gate, but on a transport filing its own copy.
-- **BREAKING**: Changed `imap raw` to refuse a command given on the command line without a tag of its own, coded `usage-invalid`, exit 2, before connecting.
-- Changed a page token a listing did not print to fail coded `page-token-invalid` on `envelope list|search` and `jmap email|mailbox|submission query`.
-- Changed `pimdir mailbox create|rename|delete` on a store whose sources declare no capabilities to fail coded `capability-missing`.
-- Changed a `search-invalid` failure under `--json` to one line, where it carried the diagram drawn over the query.
+- **BREAKING**: Changed the top level, the account blocks and the `message` table to refuse an unknown key, naming it and its line, as every other table did.
+
+  An `m2dir` block, a v1 `backend` or `folder` table and the rest of a v1 `[message]` table are refused with them; himalaya-tui's keys go under `[tui]` and `[accounts.<name>.tui]`.
+
+- **BREAKING**: Changed the configuration loading to read every existing default path as a layer, each deep-merged on top of the ones before.
+
+  $XDG_CONFIG_HOME/himalaya/config.toml, then $HOME/.config/himalaya/config.toml, then $HOME/.himalayarc, which therefore overrides; `-c` still replaces them.
+
+- **BREAKING**: Changed `-c/--config` to take one path per flag, never split on `:`: repeat `-c` to merge several files.
+- **BREAKING**: Changed the default account resolution to refuse several accounts marked `default = true`, naming them.
+- **BREAKING**: Changed `-a default` to name an account called `default`, where it took the account marked default.
+- **BREAKING**: Changed `pimdir.account` left unset to be derived from the accounts holding mail, several being refused coded `store-account-ambiguous`.
+
+  A `pimdir.account` a store holding collections does not hold is refused coded `store-account-unknown`, where it read as an empty account.
+
+- **BREAKING**: Changed every `http` or `https` URL, a JMAP `server` and an HTTP proxy `url`, to take an ASCII host only: write an internationalised one in Punycode.
+- Changed the default of `envelope.list.datetime-fmt` to `%F %R` and of `envelope.list.datetime-local-tz` to true, printing dates in the local timezone.
+- Changed config.sample.toml into one account listing every key of every backend, commented at its default or an example value.
+- Changed `imap.id.auto` to send Himalaya's `name`, `version`, `vendor` and `support-url` when `imap.id.fields` is unset, rather than `ID NIL` ([#774]).
+
+  An explicit empty `imap.id.fields` still sends `ID NIL`.
+
+- Changed the Nix package to build from the repository's package.nix.
+- **BREAKING**: Changed every `--json` key to camelCase (`messagesTotal`, `nextPage`, `threadId`, `uidValidity`), values and provider passthrough keeping their spelling.
+
+  The TOML configuration stays kebab-case, and the `json-schema` titles are named `*Output` (`EnvelopeListOutput`).
+
+- **BREAKING**: Changed every `--json` output to data: a write prints what it acted on rather than a `{"message": ...}` sentence.
+
+  `message copy|move` print `{count, queued}`, a send or a save `{id, saved, sent, queued, errors}`, `message delete` `{action, count, ids, queued, errors}` and a protocol write `{id}` or `{ids}`. A send only queued on pimdir prints `sent: false`; MIGRATION.md lists every shape.
+
+- **BREAKING**: Changed byte outputs under `--json` to `{data, size, mime}` in base64: `message read --raw`, `jmap email export` and the raw Gmail and Graph `get`s and attachment downloads.
+- **BREAKING**: Changed the shapes a concept takes to one: flags `{raw, iana}`, `imap fetch` addresses `{name, email}`, `imap search` ids numbers, attachment rows `role` rather than `inline`.
+
+  Himalaya's own outputs print `null` rather than omit a key.
+
+- **BREAKING**: Changed `subject` to `null` for a message without one in every envelope and `imap thread` entry, where it printed `""`.
+- **BREAKING**: Changed an envelope's `size` to `null` when the backend gives none, where it printed `0`: always on Microsoft Graph, sometimes on JMAP and pimdir.
+- **BREAKING**: Changed a UTC instant to end with `Z` in `imap fetch --internal-date` and the `message read` view, where it ended with `+00:00`.
+- **BREAKING**: Changed `message read --json` to print the envelope row and a view the same on every backend, no longer mail-parser's model of the message.
+
+  The view holds `headers` (addresses as `{name, email}`, the unreadable ones under `invalid`), the decoded `text` and `html`, and `parts`. A message nested deeper than 8 levels, or holding more than 200 parts or 500 header lines, fails `message-too-complex`.
+
+- Changed piped `--json` output to print one value per line, and each `json-schema` schema to carry an `$id` naming the contract version.
+- **BREAKING**: Changed a command line Himalaya refuses under `--json` to print the failure object coded `usage-invalid` on stdout, still exiting 2.
+
+  Exit 2 is now clap's alone: a printed result that is not a full success exits 3.
+
+- **BREAKING**: Changed a bare `himalaya --json` to fail coded `usage-invalid`, exit 2, where it printed the help.
+- **BREAKING**: Changed a server's refusal in the `gmail`, `msgraph`, `jmap`, `sieve` and `smtp` namespaces to print as the command's result and exit 3, where it printed the failure object and exited 1.
+
+  An HTTP or JMAP refusal prints `{refusal: {status, reason, message, code, retryAfter}}`, a `sieve` `NO` `{status, code, text}`, a refused `smtp send` `{refusals: [{rcptTo, code, text}]}`.
+
+- **BREAKING**: Changed every `imap` command to print its completion, `status` beside what it understood, a `NO` or `BAD` printing `{status, text}` and exiting 3.
+
+  `imap raw` and `sieve raw` print untagged and data responses as events, then the completion, and `smtp raw` prints `{code, text}`; their text form prints every line as received.
+
+- **BREAKING**: Changed `imap raw` to print each response from its exact octets, one that is not UTF-8 printing as an `undecoded` event `{base64}`, where its 8-bit bytes became U+FFFD.
+- **BREAKING**: Changed the values a protocol command refuses itself to fail with the command line, coded `usage-invalid`, exit 2, before the password command runs.
+
+  An `imap fetch|store|copy|move` sequence set, `jmap submission create` given one side of the envelope, `msgraph messages update` naming no change, `smtp send --notify never` beside another condition, and an `imap raw` command without a tag of its own.
+
+- **BREAKING**: Changed the `gmail`, `msgraph` and `jmap` commands to print the provider's payload as it sent it, every property kept, where they printed typed rows dropping what the type did not model.
+
+  `gmail profile get` prints `emailAddress`, `gmail messages list` `messages` rather than `ids`, `gmail history list` Gmail's records rather than `messages-added-details`, the Gmail settings lists their own key rather than `response`, `msgraph messages list --count` Graph's `@odata.count`.
+
+- **BREAKING**: Changed `gmail labels get` and `msgraph mail-folders get` to take one id and print that label or folder, where they took several and printed a list.
+- **BREAKING**: Changed `jmap email delete|update|copy`, `jmap mailbox destroy`, `jmap identity delete` and `jmap submission cancel` to print `{ids, errors}` and exit 3 when the server refused part of the set, where they exited 1.
+- **BREAKING**: Changed `jmap email get|query`, `jmap mailbox get|query`, `jmap thread get`, `jmap identity get` and `jmap submission get|query` to print an `errors` entry per id the server did not find, exiting 3.
+- **BREAKING**: Changed `jmap email parse` to print `bodies` as `[{blobId, body}]`, beside `errors` for the blobs not found or not parsable, exiting 3.
+- **BREAKING**: Changed `sieve check` and `sieve put` to print the server's `warnings` as a list of lines, `[]` when none.
+- **BREAKING**: Changed `account check` to print `{accounts: [{account, backends}]}`, each backend row `{backend, ok, code, error, tls}`, and exit 3 when one fails, where it exited 0.
+
+  `tls` holds what a backend reached over TLS was configured with, `TLS` in text, and is `null` for a local backend or a cleartext connection.
+
+- **BREAKING**: Changed `account list` to name the backends the build serves under `backends` and the ones it leaves out under `notBuilt`.
+- **BREAKING**: Changed the composers' JSON template to carry addresses as envelopes do, `from` an object `{name, email}` or `null` and `to`, `cc` and `bcc` lists of them, where they were strings.
+- **BREAKING**: Changed `maildir create|rename|delete` to print the folder's path as `id`, the id the unified `mailbox` commands take, and `maildir list` rows to gain `id`.
+- **BREAKING**: Changed `maildir message save` and `mbox message save` to `maildir message add` and `mbox message add`, `save` staying a hidden alias.
+
+  Their JSON schemas are now `himalaya-maildir-message-add` and `himalaya-mbox-message-add`.
+
+- Changed `maildir message copy|move` and `mbox message copy|move` to print the ids the messages got in the target rather than the source ids.
+- Changed `imap copy` and `imap move` to print each of `sourceUids` beside the UID it got in `destinationUids`, in `COPYUID` order.
+- Changed `imap select` to print the first unseen message's number as `firstUnseen`, `unseen` being a count, and its text to show the recent count, the flags and the highest mod-sequence.
+- **BREAKING**: Changed every list to print as plain text, one item per line in columns two spaces apart, with no header row, border, colour or truncation, the way `mscan` prints a mailbox.
+
+  `Label: value` fields (`Account:`, `Mailbox:`, `Page:`, `Next page:`) print above the items and the item errors below, a blank line apart. A message prints its id, the `*` unread, `R` answered, `!` flagged and `@` attachment columns, its date, its senders and its subject.
+
+- **BREAKING**: Changed the records to print as aligned `Label: value` lines: `account check`, `imap select|status|id|fetch`, `jmap vacation-response get`, `sieve capability`, the Gmail and Microsoft Graph `get`s and the header block of `message read`.
+
+  `imap search` and `imap sort` no longer end with a count.
+
+- Changed `--help` to print without colour, each paragraph on one line.
 - Changed `attachment download` to print `Saved <size> bytes to <path>` per file written.
+- Changed the write confirmations on a pimdir account to say the write is queued (*Message queued for sending*), the sync engine applying it later.
+- **BREAKING**: Changed `envelope search` to read the pimdir SEARCH query language (§8), as `pimdir search`, Calendula and Cardamum do: `from:alice date:2026-11-02.. is:unread "weekly sync"`.
 
-- Changed the io-imap dependency to 0.12.
-- Changed the io-smtp dependency to 0.10.
-- Changed the io-sasl dependency to 0.3.
-- Changed the io-managesieve dependency to 0.6.
-- Changed the io-jmap dependency to 0.11, io-gmail to 0.10, io-msgraph to 0.10 and pimalaya-stream to 0.4.1.
-- Changed the io-pimdir dependency to 0.18.
-- Changed the pimalaya-cli dependency to 0.8.
-- **BREAKING**: Changed `imap raw` to print each response from its exact octets, as io-imap 0.12 frames them: one that is UTF-8 prints as text, parsed as before, one that is not, such as a response carrying an 8-bit literal, prints under `--json` as an `undecoded` event `{base64}`, its octets in standard base64, where io-imap's lossy decoding replaced each such byte by U+FFFD. A tagged response that is not UTF-8, its status left unread, exits 3. The text form prints such a response as one line, `undecoded (base64): ` then the same base64, where it printed it with each such byte replaced by U+FFFD.
-- Changed `attachment download` to name a saved part through pimalaya-cli's `sanitize::path_component`, the family's path component rule, its trimming, leading dots and `attachment` fallback kept: a name of dots and spaces, such as `. .`, no longer comes out as `.`.
-- **BREAKING**: Changed a pimdir queue row to print `row`, the row id, an integer, with `handle` beside it, the row under the store's identity: a string naming the store id, the incarnation and the row id joined by periods (`"e2646df031cd876334410c4df14ebd86.1.42"`, pimdir STORAGE §4.5), as Calendula and Cardamum print them. The receipts of `pimdir message add|send` (`copyRow` with `copyHandle`), `pimdir mailbox create|rename|delete`, `pimdir flag add|set|remove` and `pimdir tag` carry both, `null` both where nothing was staged, as do the rows of `pimdir queue list`, whose text prints the handle in place of the bare id, and `pimdir queue show|cancel`, a bare id given there named under the store's identity. `queue show` and `queue cancel` take the handle, checked against the store, or the bare id, unchecked. A handle of a restored copy of the store reads `reset` in `queue show` and is refused `store-reset` by `queue cancel`, the row left queued.
-- **BREAKING**: Changed a mailbox the backend does not hold to fail coded `mailbox-not-found` on IMAP, JMAP, Gmail and Microsoft Graph, where it printed `code: null`: an IMAP `SELECT`, `APPEND`, `COPY`, `MOVE`, `RENAME` or `DELETE` refused `NO [NONEXISTENT]` or `NO [TRYCREATE]`, or refused with a plain `NO` (as Fastmail answers) for a mailbox the one `LIST` then sent does not show, the server's answer kept in `sources`; a JMAP, Gmail or Graph name, id or role no mailbox, label or folder carries. The copy a send saves to such a mailbox is an `errors` entry so coded.
-- **BREAKING**: Changed `pimdir search` to page by cursor: `nextPage` is an opaque token naming where the next page starts, bound to the account, the query, the order and `--threads`, so a hit arriving or leaving between two pages neither repeats nor hides another; `--page-token` refuses a token of another query, coded `page-token-invalid`, and `--page` is gone.
-- **BREAKING**: Changed a Google daily quota (`dailyLimitExceeded`, or a refusal naming a daily limit) to be coded `rate-limited`, as the other Pimalaya programs code it, where Gmail commands coded it `permission-denied`.
-- Bumped io-pimdir to 0.16.0: search pages by cursor, a calendar `VTIMEZONE` with a huge `INTERVAL` no longer aborts the process, and the search index is extracted again once.
-- Bumped io-pimdir to 0.19.0 (pimdir draft-15): a store of draft-14 is refused (`store-version`), never migrated, and the search index is extracted again once.
-- **BREAKING**: Changed a server's refusal in the `gmail`, `msgraph`, `jmap`, `sieve` and `smtp` namespaces to print as the command's result and exit 3, as `imap` and the `raw` commands do (pimalaya-cli's *A protocol refusal is a result*), where it printed the failure object and exited 1: an HTTP 4xx or 5xx, a JMAP request or method error and a refused JMAP write print `{refusal: {status, reason, message, code, retryAfter}}`, the `request` commands included; a typed `sieve` command answered `NO` prints `{status, code, text}`; a refused `smtp send` prints `{refusals: [{rcptTo, code, text}]}`. Each command's JSON Schema admits the refusal.
-- **BREAKING**: Changed `jmap email delete|update|copy`, `jmap mailbox destroy`, `jmap identity delete` and `jmap submission cancel` to print `{ids, errors}`, the objects the server applied the write to and an item error per object it refused, exit 3, where a set applied in part printed only a failure naming the refused objects, exit 1.
-- **BREAKING**: Changed a send whose follow-up failed to print its receipt and exit 3, where it printed a failure object and exited 1: a copy refused after the send (`message send`, the composers, `message add --send`, Gmail filing the sent message) and a reply's answered flag are item errors of the receipt, which gains `errors`, `[]` when nothing failed; `message reply --send` prints one value, not the receipt then a failure object.
-- **BREAKING**: Changed `pimdir queue list` to list the whole account, mailbox by mailbox, `-m/--mailbox` narrowing it to one, where it listed the inbox when `-m` was omitted, so a queued send did not show.
-- **BREAKING**: Changed `gmail profile get`, `gmail drafts get`, `gmail messages get`, `gmail threads get`, the Gmail settings reads and sets, `msgraph messages get` and `jmap vacation-response get` to print the resource as the provider sent it, every property kept, its omissions its own (`emailAddress` where `gmail profile get` printed `email`; no `headers` list of Himalaya's own on `gmail messages get` and `threads get`, `--header` narrowing the text form).
-- **BREAKING**: Changed `message read --seen` on pimdir to fail, coded by its cause, when the `\Seen` cannot be staged, as every other backend does, where it read the message unseen and exited 0.
-- **BREAKING**: Changed the values the `imap`, `smtp`, `jmap`, `msgraph` and `gmail` commands refuse themselves to be refused with the command line, coded `usage-invalid`, exit 2, before the password command runs and the session opens: an `imap fetch|store|copy|move` sequence set, `jmap submission create` given one side of the envelope, `msgraph messages update` naming no change, the method of `gmail request` and `msgraph request`, and `smtp send --notify never` beside another condition.
-- **BREAKING**: Removed `deleted`, `deletedStorage` and `highestModSeq` from `imap status`, which never requested them and printed them `null`.
-- **BREAKING**: Changed the pimdir refusals to carry the codes the other pimdir programs give them: `store-uncreated` for a root holding no store (`account check` too), `mailbox-not-found`, `message-not-found` for an id that is no number, `row-not-found`, `confirmation-required` and `page-token-invalid`, the last three new; `pimdir queue cancel` refuses a row it cannot cancel before asking.
-- **BREAKING**: Changed `pimdir.account` left unset to be derived from the accounts holding mail, several refused coded `store-account-ambiguous`, and a `pimdir.account` a store holding collections does not hold to be refused coded `store-account-unknown`, where it read as an empty account; on a store holding no collection yet, a first sync not having run, it is read as named. Both codes are new.
-- **BREAKING**: Changed `pimdir mailbox list`'s coverage `at` to `closedAt`, the threads of `pimdir search --threads` and `pimdir thread` `first` and `last` to `firstDate` and `lastDate`, `sieve check|put` `warnings` to a list of lines (`[]` when none), and `jmap email parse` `bodies` to `[{blobId, body}]` beside `errors` for the blobs not found or not parsable, exit 3.
+  `order by` is now `--sort newest-first|oldest-first|title|sender|relevance`, Maildir and mbox match whole words, and a `~`, `/` or `{` form is reserved (`search-invalid`). A clause the backend cannot search fails `search-unsupported`; MIGRATION.md maps every v2 clause.
 
-
-- **BREAKING**: Changed `maildir message save` and `mbox message save` to `maildir message add` and `mbox message add`, `add` creating an item across the family; `save` stays a hidden alias of each, and the confirmation reads `successfully added`. The JSON schemas follow their commands: `himalaya-maildir-message-save` and `himalaya-mbox-message-save` are now `himalaya-maildir-message-add` and `himalaya-mbox-message-add`, breaking for a script reading them by name.
-- Bumped pimalaya-cli to 0.6.0: `Next page:` prints after the listing, one blank line below the items and above the item errors, and the header values sit two spaces past the longest label.
-- Bumped io-imap to 0.11.2: QRESYNC is used only when the server's `ENABLED` lists it, and a date sort ignores a wrong weekday.
-- Bumped io-msgraph to 0.9.2.
-- **BREAKING**: Changed the protocol commands still printing typed rows to print the provider's payload as it sent it, every property kept: `jmap thread get` and `jmap identity get` print each object beside the get's `state`, `jmap identity get` with no id asking for every identity; `jmap submission create` prints the submission as the server answered its creation (the properties it set) beside `oldState` and `newState`; `gmail labels list` and `gmail settings sendas|delegates|forwarding-addresses|filters list` print Gmail's answer under its own key; `msgraph profile get` prints Graph's user where it printed `{id, displayName, mail, userPrincipalName}`. `gmail labels get` and `msgraph mail-folders get` take one id and print the one label or folder, where they took several and printed `{labels}` or `{folders, nextPage}`; their text prints fields.
-- **BREAKING**: Changed the protocol listings to print the provider's payload as it sent it, every property kept, the provider's cursor alone lifted into `nextPage`, where they re-serialized typed rows that dropped what the type did not model: `gmail messages|threads|drafts list` keep Gmail's `resultSizeEstimate` (an empty page printing its collection as `[]`); `gmail history list` prints each record as Gmail sent it beside `historyId`, its `messagesAdded` holding Gmail's message objects, where it printed message ids and a `messagesAddedDetails` list; `msgraph messages list`, `mail-folders list|child-folders` and `attachments list` print every property Graph sent, a `$select` one included, and `msgraph messages list --count` prints Graph's `@odata.count`, absent without `--count`, where it printed `count`, `null` without it; `jmap email query|get`, `jmap mailbox query|get` and `jmap submission query|get` print each object as the server sent it beside the query's `queryState`, `canCalculateChanges`, `position` and `total` and the get's `state`, an object no longer turning into a `message-unreadable` or `mailbox-unreadable` entry.
-- **BREAKING**: Changed `msgraph messages list`, `msgraph mail-folders list` and `msgraph mail-folders child-folders` to refuse a query option beside `--page-token` (`--folder`, `--top`, `--skip`, `--filter`, `--search`, `--orderby`, `--select`, `--count`, `--hidden`, the parent folder), exit 2, the next link carrying the query, where they ignored it. `child-folders` takes its parent folder or a page token.
-- **BREAKING**: Changed the JSON template the composers print without `--save` or `--send` to carry addresses as envelopes do, `from` an object `{name, email}` or `null` and `to`, `cc` and `bcc` lists of them, `subject` `null` without one, where they were strings (`"Alice <a@x.org>"`); the text template is unchanged.
-- **BREAKING**: Changed `subject` to `null` for a message without one in every envelope (`envelope list|search`, `pimdir search`), thread entry (`imap thread`, `pimdir thread`) and `pimdir tag` row, where it printed `""`.
-- **BREAKING**: Changed `mailbox create`, `maildir create`, `mbox create` and `pimdir mailbox create` to fail coded with the new `mailbox-duplicate` when the mailbox exists, exiting 1 with nothing created nor staged, as the family codes a collection created twice: a Maildir folder or an mbox file already there (uncoded before), a pimdir mailbox the store lists or has queued (`item-duplicate` before, which now codes a message alone), an IMAP `CREATE` refused `ALREADYEXISTS` or refused with no code while `LIST` shows the mailbox, a JMAP `Mailbox/set` refused while a sibling holds the name, a Gmail 409 and a Microsoft Graph 409 `ErrorFolderExists` (uncoded before). A Graph folder under a parent is looked up among the parent's children first, so a duplicate is refused before a folder is created at the top. Every such refusal reads "Cannot create mailbox `<name>`: it exists already", as Cardamum and Calendula word a duplicate address book or calendar, what the backend or the store answered kept in `sources`. The protocol namespaces' own creates (`imap mailbox create`, `jmap mailbox create`, `gmail labels create`, `msgraph mail-folders create`) keep the server's refusal.
-- **BREAKING**: Changed `msgraph messages list`, `msgraph mail-folders list` and `msgraph mail-folders child-folders` to print Graph's next link as `nextPage`, as Graph gives it, and to follow it as is through `--page-token`, where they printed its `$skip` and refused a `$search` link they printed themselves; a link off Graph's origin is refused before any request. `msgraph attachments list` follows every next link, listing all the attachments of the message. The Gmail listings already printed Gmail's `nextPageToken` and the JMAP queries their next page number.
-- **BREAKING**: Changed `pimdir queue list` to print `{actions, parked, errors, refused}`, `actions` every pending row whatever its kind, where `messages` listed the pending `add` and `submit` rows alone, and `errors` the mailboxes whose pending rows do not decode, exiting 3.
-- **BREAKING**: Changed `pimdir queue show` to print the row `pimdir queue list` prints for it, then `state`, `appliedAt` and `refusals`, `seq` printed as `itemId`, a string; a row the queue does not hold fails `row-not-found`, a handle of another store `store-reset`, where they read `unknown` and `reset`.
-- **BREAKING**: Changed `pimdir message add` and `pimdir message send` to print the message's link id as `id`, where they printed it as `messageId`, and `pimdir mailbox create|rename|delete` to print `id`, the mailbox's, `null` for a creation.
-- **BREAKING**: Changed the rows of `pimdir queue list`, pending (`actions`) and parked (`parked`) alike, to the family's one queue row, every key printed: `{row, kind, collection, linkId, itemId, producer, queuedAt, attempts, unconfirmed, error, subject}`, `kind` the action as the store holds it (`add`, `submit`, `set-flags`, `move`), `attempts` an unsigned integer, `linkId` the `Message-ID` an add printed, `itemId` the message a parked flag change, move, copy or removal acts on, `error` `null` while pending and `subject` `null` when there is no body to read. A pending row drops `send` (its `kind` is `submit`) and `envelope` (its subject stays as `subject`). In text a row prints its id, its state, when it was queued, its kind, then its subject or why it was parked, the staged flags and recipients no longer printing.
-- Bumped pimalaya-config to 0.5.2: an unknown key's error lists no removed key.
-- **BREAKING**: Changed a Gmail or Microsoft Graph `message read`, and the source read of `message reply|forward` and `attachment list|download`, to fail `message-not-found`, naming the mailbox, when the mailbox given does not hold the message, as on IMAP and JMAP, where it read any message of the account: `message read -m sent <inbox id>` printed the inbox message. Gmail reads the message's `labelIds` in the `messages.get` bringing its bytes; Graph asks the message's `parentFolderId` (`GET /messages/{id}?$select=id,parentFolderId`) before its `$value`, one request more.
-- **BREAKING**: Changed `jmap thread get`, `jmap identity get` and `jmap submission get|query` to print `errors`, one item error per id the server did not find, coded with the new `thread-not-found`, `identity-not-found` and `submission-not-found`, exiting 3, where they printed an empty list and exited 0, the id reaching a log line alone. `jmap submission create` prints `errors` as `[]`.
-- **BREAKING**: Changed `mailbox create` and `pimdir mailbox create` on a pimdir account to refuse a mailbox the store lists already, coded `mailbox-duplicate`, its `sources` naming the mailbox the store lists or the creation it queued, before anything is queued: one the performing source syncs under the name at the top, or under the parent's name and `/` or `.`, or whose creation that source has queued already. The creation was queued, and the sync reported it done while the server refused it.
-- **BREAKING**: Changed `jmap email get|query` and `jmap mailbox get|query` to print `errors`, one item error per id the server did not find (`message-not-found`, `mailbox-not-found`), exiting 3, where they printed `{"emails":[]}` and exited 0, the id reaching a log line alone.
-- **BREAKING**: Changed a JMAP `message read`, and the source read of `message reply|forward` and `attachment list|download`, to fail `message-not-found`, naming the mailbox, when the mailbox given does not hold the email, as on IMAP, where it read any email of the account: `message read -m sent <inbox id>` printed the inbox email. The `Email/get` asks the email's `mailboxIds` beside its `blobId`.
-- **BREAKING**: Changed `pimdir attachment list|search` to print `part`, the id `attachment download` takes and `attachment list` and `message read` print, beside `section`, and to print it in text where the section was: passing the section to `attachment download` wrote another part. Each page opens its messages' bodies, once per message; `part` is `null` for a file whose body is no longer local.
-- **BREAKING**: Changed `pimdir performer` to take the intents Himalaya queues alone, `mail.submit`, `collection.create`, `collection.rename` and `collection.delete`, refusing any other with `usage-invalid` and exit 2, where `pimdir performer bogus.cap` answered no candidate and exited 0.
-- Changed `pimdir flag add|set|remove` to print `warnings`, what a source supports of the change only in part in its declaration's words (`Source gmail supports mail.flags.keywords in part: $Important only`), each once, `Warning:` lines in text, where the warning went to the log alone.
-- **BREAKING**: Changed `--no-save` on a send over Microsoft Graph (`message send`, `compose`, `reply` and `forward` with `--send`) to fail before connecting with `capability-missing`, naming the flag, where the send went on and printed `saved: true`: Graph files every message it sends in Sent Items, so no send there keeps no copy.
-- **BREAKING**: Changed the `size` of an envelope to `null` when the backend gives none, where it printed `0`: always on Microsoft Graph, whose message carries no raw size, and on JMAP and pimdir for a message whose size the server or the store does not hold.
-- **BREAKING**: Changed `mbox flag set` to require `-f`, as `maildir flag set` does, refusing the command line (exit 2) where it cleared every flag of the message: drop flags with `mbox flag remove`.
-- **BREAKING**: Changed an `m2dir` block and the v1 `backend` table to be refused as unknown keys, where they loaded, ignored.
-- Changed `table`, `attachment`, the top-level `account`, `envelope.list.table` and v1's `folder` to be refused as unknown keys by serde alone, with no by-name sentence.
-- **BREAKING**: Changed `pimdir search`, `pimdir count` and `pimdir tag` to read an option after the query as the option, where every word after the first query word was query: `pimdir search from:x -s 3` searched `from:x -s 3`, a trailing `--json` printed text, and `pimdir tag --add X <query> --dry-run` staged for real, `--dry-run` becoming a text term. The message of `message add|send` and the protocol saves, the script of `sieve put|check` and the method calls of `jmap query` read the options after them the same way (`message send "<message>" --save Sent` sent ` --save Sent` as body text). A word opening on a hyphen goes after `--`: a pimdir negation reads `-- -from:alice`, or `not from:alice`.
-- **BREAKING**: Changed `pimdir search` to page as every listing does: it prints `nextPage`, the next page number while hits or threads follow, `null` once the answer is complete, which the new `--page-token` takes back, where it printed `more`; `--page` and `--page-size` stay. A hit whose message the store cannot read is an entry of the new `errors`, coded `message-unreadable` unless the store names its own code, the other hits listed and the exit status 3, where the whole search failed.
-- **BREAKING**: Changed `envelope list` and `envelope search` on Maildir and mbox to list a message holding no header field (an empty file, stray bytes, a line of text) as an `errors` entry coded `message-unreadable` with its id, exiting 3, where they printed it as a row of empty cells and exited 0.
-- Changed `jmap email query`, `jmap mailbox query` and `jmap submission query` to print `nextPage`, the next page number while the query's `total` lies past the page (a full page standing for more on a server computing none), `null` otherwise, which the new `--page-token` takes back; an exactly full last page no longer prints `Next page:`. `jmap email get`, `jmap mailbox get`, `jmap submission get` and `jmap submission create`, printing the same shape, print `nextPage` `null`.
-- **BREAKING**: Changed `account list` to name under `backends` the blocks the build serves and under `notBuilt` the ones it leaves out, marked ` (not built)` in text, where `backends` named every declared block: only a reduced build lists differently, a full one adding `"notBuilt":[]`. `account list` and `account check` print pimalaya-cli's shared account outputs, the check's text sanitizing the account name and the errors.
-- Changed a `repl` or `mcp` line inside a session, by name, alias or prefix, to be refused coded `usage-invalid` by pimalaya-cli 0.5.1, where the refusal carried no code.
-- Changed a refused MCP tool call to name its argument as the tool's input names it (pimalaya-cli 0.5.1): a required argument left out is refused before the command runs, ``Missing argument `message-id` ``, and a value the command refuses reads ``Invalid value `-1` for `page-size`: <reason>``, where clap's text named the flag. `message_add` without `message` answers that refusal, where it failed `stdin-taken`.
-- **BREAKING**: Changed the top level, the account blocks and the `message` table to refuse a key they do not know, as every other table did, so a typo fails the load naming the key and its line instead of being ignored. The rest of a v1 `[message]` table (`read`, `write`, `send.backend`) is refused with them. himalaya-tui's own keys go under a `[tui]` table at the top level and `[accounts.<name>.tui]` in an account, which Himalaya loads whatever they hold and never reads: `keybinds`, `contact-command`, `contact-complete-key` and `theme` at the top level, `contact-command` in an account.
-- **BREAKING**: Changed `flag add|set|remove`, `message copy`, `message move` and `message delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on; given none it holds, they print `count: 0` where they printed the failure object and exited 1.
-- **BREAKING**: Changed `imap fetch --internal-date` to print `internalDate` with `Z` for a UTC instant (`2026-07-17T10:00:00Z`), where it printed `+00:00`, and the read view of `message read` and `message parse` its `headers.date` the same, as `envelope list`, `envelope search` and the `vacation` dates already did; any other offset is kept.
-- **BREAKING**: Changed the MCP tools `message_read`, `message_reply` and `message_forward` to take the message as `message-id`, as `attachment_list` and `attachment_download` do, where they took `id`; the positional prints as `<MESSAGE-ID>` in their `--help`.
-- Changed a whole command a server refused to carry the code of that refusal, in a one-shot run, a `repl` line, an MCP call and an `account check` row: an IMAP `NOPERM` `permission-denied` and `OVERQUOTA` `quota-exceeded`, a Gmail or Microsoft Graph refusal coded as an item's is (a Graph 429 `MailboxConcurrency` printed `code: null`), a JMAP HTTP 403 `permission-denied` or 429 `rate-limited`, a JMAP method error `forbidden`, and the SetError of a command's one write by its type.
-- Changed a read of an id the backend does not hold (`message read`, `attachment list|download`, the source of `message reply|forward`) to fail coded `message-not-found` on every backend, where Maildir, JMAP, Gmail, Microsoft Graph and pimdir failed uncoded (``Maildir message locate failed: message 999 not found``).
-- Changed the Nix package to build from the repository's package.nix, a replacement for the nixpkgs derivation, which default.nix overrode.
-- Changed `mailbox list --counts` to list a mailbox whose counts could not be fetched without them, beside a `mailbox-unreadable` entry: an IMAP `STATUS` refused or not decoding, a Gmail `labels.get` refused, an mbox index that does not sync. An IMAP `LIST` line that does not decode is a `mailbox-unreadable` entry with a `null` id.
-- Changed the Gmail listings to read the envelopes' metadata through batched `messages.get`, 50 per request, where they sent one request per message.
-
-  A part Gmail throttles (429, 403 `rateLimitExceeded` or `userRateLimitExceeded`) or fails with 500, 502, 503 or 504 is sent again up to three times, after the longest `Retry-After` asked (1 second without one, 10 at most). A message deleted since the list was read is left out; one still throttled is a `rate-limited` entry, one it otherwise refuses with 403 `permission-denied`, one the batch leaves unanswered an entry coded `null`.
-- Changed the Gmail writes to look their ids up through batched `messages.get`, then to flag, copy and move through batched `messages.modify` and delete through batched `messages.delete`, 50 per request with the retries of the listings, where they sent one request per message and stopped at the first failure.
-
-  Each message Gmail refuses is an entry coded by its status, the others written.
-- Changed the Microsoft Graph writes to patch, copy, move and delete through `$batch`, four requests at a time with the retries of the lookups, where they sent one request per message and stopped at the first failure.
-
-  A part answered 404, or 400 `ErrorInvalidIdMalformed`, is `message-not-found`, `ErrorQuotaExceeded` or a 507 `quota-exceeded` whatever the status, 429 after the retries `rate-limited`, 403 `permission-denied`, any other an entry coded `null` with Graph's `error.code` in `sources`, and a part the answer left out an entry.
-- Changed `message send` to fail coded `recipient-refused` when the server refuses a recipient, the message sent to nobody: over SMTP naming the first refused address, over JMAP (`invalidRecipients`) every address the server lists.
-- Changed an IMAP `message read` whose `FETCH` answer does not decode to fail coded `message-unreadable`.
-- Changed the JMAP listings to report an email or a mailbox that does not deserialize as a `message-unreadable` or `mailbox-unreadable` entry, its id when known, where the whole command failed; a write's id whose email does not deserialize is `message-unreadable`.
-- Changed `attachment list` and `attachment download` to print `No attachments` under the header when the message has no part to list, where the header stood alone.
-- Changed `himalaya message --help` to list the subcommands by purpose, `read` and `parse`, the builders `compose`, `reply` and `forward`, the raw `send` and `add`, then `copy`, `move` and `delete`, and their help to say what each does: a builder prints the message unless `--save` or `--send`, `send` and `add` take a raw message as it is, `parse` reads a file or its contents on stdin.
-- **BREAKING**: Changed `mailbox list` on Microsoft Graph to leave `total` and `unread` `null` without `--counts`, as every other backend does, where it filled them whatever the flag.
-- **BREAKING**: Changed every `--json` output to data, pimalaya-cli dropping its `Message` wrapper ([pimalaya-cli every-output-is-data](https://github.com/pimalaya/cli)). Writes print what they acted on rather than a `{"message": ...}` sentence: `message copy|move` `{count, queued}`, `message send` and a composer's save or send `{id, saved, sent, queued}`, the shared receipts `queued`, a protocol write `{id}` or `{ids}`, Gmail settings writes the settings, `jmap email import` `{id, blobId}`, `jmap email read` the emails, `smtp send` the envelope, `sieve check|put` the server's `warnings`. MIGRATION.md lists every shape.
-- **BREAKING**: Changed byte outputs under `--json` to `{data, size, mime}` in base64: `message read --raw` (lossy text before), `jmap email export` (failing on non-UTF-8 before), the raw Gmail and Graph `get`s and their attachment downloads (raw bytes on a JSON stdout before).
-- **BREAKING**: Changed `account check` to print a list of accounts, pimalaya-cli's `{accounts: [{account, backends}]}`, every backend's row `{backend, ok, code, error, tls}`, and exit 3 when one fails, where it exited 0 whatever failed.
-- **BREAKING**: Changed every `imap` command to print its completion, `status` beside what it understood (a select's state, an expunge's numbers, a store's FETCH data, `APPENDUID`, `COPYUID`), a `NO` or `BAD` printing `{status, text}` and exiting 3. `imap raw` prints untagged and continuation responses as events, then the completions split into `tag`, `status`, `code` and `text`; `sieve raw` prints data lines as events and the completion; `smtp raw` prints `{code, text}`; each exits 3 on a refusal.
-- **BREAKING**: Changed a command line Himalaya refuses (an unknown flag, a missing argument, a bad value) under `--json` to print the failure object coded `usage-invalid` on stdout, still exiting 2, where clap's text went to stderr whatever `--json` said ([pimalaya-cli a-refused-line-exits-two](https://github.com/pimalaya/cli)). A refused `repl` line and an MCP tool argument the grammar refuses (undeclared, of the wrong type or count, or a value clap refuses) carry the same code. Exit 2 is now clap's alone: a printed result that is not a full success (`account check` with a failed backend, a refused IMAP, SMTP or ManageSieve completion) exits 3.
-- **BREAKING**: Changed the shapes a concept takes to one: flags written as `{raw, iana}`, `inReplyTo` a list in the read view, `imap fetch` addresses `{name, email}`, `imap search` ids numbers, attachment rows `role` instead of `inline` and `path: null`, maildir and mbox `flag list` rows `{raw, iana}`, Himalaya's own outputs printing `null` rather than omitting a key, the failure object's `code` included.
-- **BREAKING**: Changed pimdir queue rows to `row` (`queueId`, `copyQueueId`, the queue view's `id`), `pimdir flag add|set|remove` to `{messages: [{id, row}]}`, and the tag statuses and search `matched` values to kebab-case.
-- **BREAKING**: Changed `gmail messages list` to print `messages` rather than `ids`, and the Gmail settings lists to print the provider's key rather than `response`.
-- Changed IMAP flag writes to refuse, under `capability-missing`, a keyword the mailbox's `PERMANENTFLAGS` lists neither by name nor by `\*`, which the server would keep for the session only.
-- **BREAKING**: Changed the configuration loading to read every existing default path as a layer, each deep-merged on top of the ones before: $XDG_CONFIG_HOME/himalaya/config.toml, $HOME/.config/himalaya/config.toml, then $HOME/.himalayarc, which therefore overrides. Only the first one found was read, so an rc file beside a config.toml was silently ignored. A file named by two paths, a symlinked rc file being one, is read once; `-c` still replaces the default paths.
-- **BREAKING**: Changed the default account resolution to refuse several accounts marked `default = true`, naming them, where one was picked in an order that changed from run to run. Naming an account with `-a` still works.
-- **BREAKING**: Changed `-a default` to name an account called `default`, where it took the account marked default: leave `-a` out for that one (pimalaya-config 0.5).
-- Changed an account whose only backend this build leaves out to fail coded `backend-not-built`, naming the cargo feature to rebuild with, where it said the account configured no supported backend. Its block still loads.
-- **BREAKING**: Changed `-c/--config` to take one path per flag, never split: a value was split on `:`, which cut every absolute Windows path at its drive letter (`-c C:\Users\me\config.toml` reached the loader as `C` and `\Users\me\config.toml`). Repeat `-c` to merge several files, the first one the base and the next ones deep-merged on top.
-- Changed config.sample.toml into one account listing every key of every backend, commented at its default or an example value so the sample takes no decision for the user, the other values of an enumeration listed in brackets at the end of its comment (`[bottom, none]`), the structural variants (`password.raw`, XOAUTH2 for Microsoft 365, a bearer token for Fastmail) one more commented line or paragraph. It names no OAuth broker nor sync engine: token commands are `exit 127` placeholders like password commands. The test suite parses it as written and once per alternative rank.
-- Changed the MIME parsing and composing to mime-rs (github.com/pimalaya/mime-rs, 0.2), replacing mail-parser and mail-builder: `message read`, `message parse`, `attachment list|download`, the search evaluator, the Maildir and mbox envelopes and the composers. On well-formed mail the part ids and the `--json` views stay as they were. The `text` of a `format=flowed` part, and the quote of a reply to one, is now unwrapped (RFC 3676). The plain `message read` view shows the same part types, sizes and names as the JSON view.
-- Changed the composed messages to mime-rs's layout: the same headers and parts, a `Date` and `Message-ID` written by Himalaya, charset names lowercased (`utf-8''` in an RFC 2231 file name).
-- Changed UTF-7 (RFC 2152) text to be shown as written: mime-rs reads the WHATWG charsets, which leave UTF-7 out.
-- Changed `himalaya mcp` to list only the tools the account's transports can serve (an SMTP-only account lists `message_send`, not `envelope_list`), and to end the `envelope_search` description with the clauses and sort keys the account's backend answers fully, in part and not at all.
-- Changed `message add` on Microsoft Graph, and a save asked of a composer without `--send` there, to fail before connecting with `capability-missing`, where `message add` failed with an uncoded error. A send on Graph ignores `--save` and `message.send.save-copy`, Graph filing every message it sends in Sent Items itself (`submit.copy` `partial`), and its receipt says `saved: true`; it failed after sending, or failed every send when `message.send.save-copy` was set.
-- Changed a JMAP send to fail with `capability-missing` before uploading anything when the server's session lacks `urn:ietf:params:jmap:submission`, rather than leave the message in the drafts mailbox.
-- Changed the unified commands to be the same in every build carrying a mail transport: a build compiling SMTP alone now parses `envelope`, `flag`, `mailbox` and `attachment` and refuses them with `capability-missing`, and the shared `json-schema` output, error codes included, no longer varies with the backends compiled in.
-- Changed the shared send over SMTP to connect for each send and close after it, rather than keep the connection for the rest of the process.
-- Changed `hasAttachment` on a pimdir account, and the files `pimdir attachment list` lists, to follow the store's new attachment mark (io-pimdir 925b8a1, pimdir STORAGE Annex A.1): a part with no `Content-Disposition` counts when it is neither text nor multipart and no `Content-ID` names it (a lone PDF, a forwarded message), an unknown disposition counts, and the parts of an encrypted message and the signature of a signed one never do. A message stored before keeps the mark it was stored with.
-- Changed a `$Important` or `$Junk` flag change on a pimdir account to be checked against the source's `mail.flags.important` or `mail.flags.junk` when it states one, rather than `mail.flags.keywords`, so a source taking these two but no other keyword (Gmail's labels, Graph's importance) accepts them (io-pimdir 908db2b, pimdir STORAGE Annex B.1).
-- Changed the confirmations of `message send`, `message add`, `message delete`, `message move`, `message copy`, `flag add|set|remove` and the composers' save and send to say the write is queued on a pimdir account (*Message queued for sending*), where the sync engine applies it later. The JSON outputs are unchanged.
-- Changed `message add`, `pimdir message add` and the composers' save on a pimdir account to refuse a message whose `Message-ID` the mailbox holds or has a creation queued under, with the code `item-duplicate`, staging nothing. The row used to be queued, reported as saved, then parked by the sync engine.
-- Changed the pimdir store refusals: a store of another draft is refused with `store-version`, saying to upgrade Himalaya when the store's sync engine is newer, else to reinstall the store as neverest's MIGRATION.md says, never to delete the store and let it resync, which loses the queued writes.
-- Changed `message copy`, `message move` and `message delete` on a pimdir account to stage the ids the mailbox holds and report how many they found, an unknown id an `errors` entry, as on the other backends. They used to fail on the first unknown id after staging the ones before it.
-- Changed `pimdir queue list` to list the mailbox's parked rows, any action kind, with why the sync engine parked each (`parked` under `--json`), and `pimdir queue cancel` to take one, naming the row's action kind (`kind` under `--json`) rather than calling every row a message.
-- Bumped ctutils to 0.4.6, rustls-webpki to 0.103.16 and webpki-root-certs to 1.0.11, fixing RUSTSEC-2026-0382, RUSTSEC-2026-0383 and RUSTSEC-2026-0385.
-- **BREAKING**: Changed every `--json` key to camelCase, the spelling JMAP, Microsoft Graph and the Google APIs already use, so each key is reachable by dot access in jq and JavaScript: `messages-total` becomes `messagesTotal`, `next_page` becomes `nextPage`, `thread-id` becomes `threadId`, `uid_validity` becomes `uidValidity`. Values keep their spelling (error codes, flags, mailbox roles stay kebab-case or lowercase), provider passthrough keeps the provider's keys, and the TOML configuration stays kebab-case. The `json-schema` titles follow the output types, now all named `*Output` (`Envelopes` becomes `EnvelopeListOutput`).
-- Changed piped `--json` output to print one value per line, each schema of `json-schema` to carry an `$id` naming the contract version (`v2`), and added `himalaya-error`, the schema of the JSON failure object (pimalaya-cli `55b6693`).
-- Changed `imap.id.auto` to send himalaya's canned `name`, `version`, `vendor` and `support-url` when `imap.id.fields` is unset, rather than `ID NIL`, which 163.com acknowledges and then refuses with `Unsafe Login`. An explicit empty `imap.id.fields` still sends `ID NIL` ([#774]).
-- Changed `envelope list` and `envelope search` on a pimdir account to read only what the page needs: newest first by keyset pages up to the end of the page, a search bounded by its date clauses and reading unread mail through the store's unread index, rather than every message of the mailbox. Output is unchanged; on 50,000 mails `envelope list -s 50` goes from 3.65 s to 28 ms.
-- **BREAKING**: Changed the `--json` output of `message read`, which no longer prints mail-parser's own model of the message but the view above.
-- Changed the size `attachment list` reports, and the bytes `attachment download` writes, to be the part's bytes once its transfer encoding is undone, in its own charset: a text attachment is no longer converted to UTF-8, and an attached message is written alone rather than with the whole message holding it.
-- Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why, and a send to be refused while several sources can send and none is chosen. A write a source supports only in part logs a warning.
-- Changed a pimdir send asking for a copy to carry it in the queued send, so the copy is filed only once the message is sent; a store whose owner declares no capabilities still gets the copy queued beside the send.
-- Changed `flag add`, `flag set`, `flag remove`, `message move`, `message copy` and `message delete` (when it moves to the trash) to fail, exit code 1, when none of the given ids exists in the mailbox. Over IMAP the flag commands reported a success for such an id, and `message move` and `message copy` exited 0 on "no id matched". The flag commands now report how many messages they found, as `count` under `--json` ([#777]).
-- Bumped io-pimdir to 0.11, io-msgraph to 0.7, io-jmap to 0.7, io-gmail to 0.6 and io-http to 0.6, whose fixes bound what a server can make the client hold: an HTTP response head is capped at 64 KiB and a body at 256 MiB, failing with a typed error rather than buffering without end, an IMAP greeting carrying a literal fails rather than panicking, a `STARTTLS` response line is capped, and `LOGIN` and `AUTHENTICATE` no longer log credentials at trace level. A JMAP submission refused as `tooLarge`, `forbidden`, `overQuota` or `rateLimit` now names that type rather than `unknown`. The pimdir reads take no date floor; outputs are unchanged.
-- Bumped io-imap to 0.11, io-smtp to 0.8, io-jmap to 0.10, io-gmail to 0.9, io-msgraph to 0.8, io-managesieve to 0.3, io-maildir to 0.5, io-mbox to 0.2, io-sasl to 0.2 and io-http to 0.7, all from crates.io. A PLAIN or SCRAM password is prepared with SASLprep (RFC 4013) before it is sent or derived from, a SCRAM server announcing fewer than 4096 or more than five million iterations is refused, and an IMAP command line holding a literal waits for the server's go-ahead before sending it.
-- Changed `imap copy` and `imap move` to print each of `sourceUids` beside the UID it got in `destinationUids`, in the order of the `COPYUID`, where each list was sorted on its own. A `COPYUID` of over a million messages is not listed.
-- Changed `smtp send` to check `--mail-from` and `--rcpt-to` as RFC 5321 mailboxes when the command line is read: a space, a control character, a line break or a second `@` is refused, a quoted local part and an address literal are taken.
-- Changed the mbox backend to refuse a keyword holding a whitespace, a comma or a control character, or longer than 255 bytes, which `X-Keywords` would not give back (io-mbox).
-- Changed an mbox mailbox name holding a NUL or a `.` or `..` level, or a level ending in `.lock` or `.msf`, to be refused wherever a mailbox is taken, the reads included (io-mbox).
-- Changed `message copy` and `message move` on a pimdir account to fail for a message whose body is not downloaded when the account does not sync the target mailbox yet, no copy being able to reach it (io-pimdir 0c70144, pimdir SYNC §7).
-- Bumped pimalaya-cli and pimalaya-config to 0.5.
-- Changed the pimdir backend to follow pimdir storage-draft-14, sync-draft-14 and search-draft-14 (io-pimdir 0.17.0). A store of another format version, storage-draft-13 and earlier included, is refused, never migrated (`store-version`), in io-pimdir's one wording every pimdir program shows (`PimdirFormatRefusal`): it names both versions and says which is the earlier, a store an earlier sync engine wrote being synced with that engine until nothing is queued, then its directory moved aside and a new store synced, a later one asking to upgrade himalaya; a search index of an earlier draft is refused `index-version`. A store whose directory or pimdir.db another user can read is refused with `store-exposed`; restrict it (`chmod 700` the directory, `chmod 600` pimdir.db). The test-only rusqlite moves to 0.41, as io-pimdir requires.
-- Changed `flag add`, `flag remove` and the `\Seen` a read stages on a pimdir account to state the flags they were read from (pimdir STORAGE §15.3), so a flag a sync lands or removes while the change waits in the queue survives it, where the staged set used to overwrite it. `flag set` still replaces the whole set.
-- Changed a flag change on several pimdir messages to be queued as one batch, all or none: a change one source refuses on any message stages nothing, as before, and a store failing part-way no longer leaves the first rows queued.
-- Changed `pimdir queue show` to read `unconfirmed` for a send or a mailbox change the sync engine sent without learning its outcome, with what the engine recorded as `error`, where it read `parked`; to read `applied` with `collection` `null` for a row whose mailbox was deleted since, where it read `unknown`; and to know the state `reset`. `pimdir queue list` marks an unconfirmed row (`unconfirmed`, and `unconfirmed` for `parked` in the plain output), and `pimdir queue cancel` prints `unconfirmed` beside `row` and `kind`, its question and its answer saying that such a row was sent and may have taken effect.
-- Changed the coverage of `pimdir search`, `count` and `tag` to carry `missing`, `unparseable` and `encrypted`, the messages in scope whose body the index could not read, could not parse or holds encrypted. They are counted whatever the query, as `bodiless` is, and leave the answer incomplete, and the `Incomplete:` line naming them, only while a term reads what they hide (pimdir SEARCH §8.2): a message whose body is not local counts against a term reading a message's body, `thread:` among them, and against `has:attachment`, so a mailbox listed and not fetched answers `is:unread` or a `date:` whole.
-- Changed a `message delete` or a `message move` queued on a pimdir message a sync left in conflict to be parked by the sync engine rather than applied (pimdir SYNC §7, STORAGE §15.3), Himalaya deciding no conflict: the message stays listed where it was, and `pimdir queue list` on its mailbox and `pimdir queue show` read the row `parked` with why.
-- Changed a pimdir send to name its performer in the queued `submit` whatever the sources declare, the one source syncing the mailbox when none declares capabilities; a mailbox no source syncs yet is refused with `no-performer`, staging nothing.
-- Changed `pimdir flag` and `pimdir tag` to refuse a flag the store cannot hold (empty, or holding whitespace, a control or a non-ASCII character) with the code `flag-invalid`.
-- Changed `pimdir search`, `count` and `tag` to refuse a query past the SEARCH §8.3 bounds (1,024 characters, 32 groups open at once, 128 terms) with `query-refused`, naming `limit-exceeded` and the span.
-- Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
-- Changed the default of `envelope.list.datetime-fmt` to `%F %R` and of `envelope.list.datetime-local-tz` to true: a date prints as `2026-11-12 10:15` in the local timezone, where it printed `%F %R%:z` at the offset it was sent with.
-- **BREAKING**: Changed every list to print as plain text, the way `mscan` prints a mailbox: one item per line in columns two spaces apart, with no header row, no border, no colour and no truncation, under the fields placing it.
-
-  Above the items, a blank line apart, one block of fields: `Account:` names the account and the backend answering, followed by what is listed (`Mailbox:`, `Message:`, `Query:`, `Folder:`, `Thread:`); on a paged list, `Page:` names the page and what it holds (`2, envelopes 26 to 50`, `25 messages`, `, the last`, `empty`) and `Next page:` the `--page` or `--page-token` reaching the next one. `pimdir search` and `pimdir tag` print what the answer could not see as `Incomplete:`, `gmail history list` the new history id as `History id:`, `pimdir queue list` the command cancelling a row as `Cancel:`; the values start in one column, past the longest label. Nothing prints under the items but the errors of the items the command could not serve.
-
-  A message prints its id, four flag columns (`*` unread, `R` answered, `!` flagged, `@` attachment, a space otherwise), its date, its senders' names (the address of a nameless one) and its subject: `envelope list|search` (or `to ` and the recipients with `--recipient`, the size no longer printing), `jmap email query|get`, `msgraph messages list`, `pimdir search` (its mailboxes and what matched before the senders, the snippet left to `--json`), and the threads `imap thread` and `pimdir thread`, a reply's subject indented two spaces per level. `pimdir tag` and `pimdir queue list` print the same shape with their status, mailbox, queue row or action.
-
-  Every other list prints its short cells first and its free text last (`mailbox list` ends with the name), a multi-valued cell joining its values with `,`, a yes-or-no cell printing its word (`default`, `active`, `permanent`, `inline`, `subscribed`), a size with no blank (`1KiB`) and a mailbox's unread and total counts as one cell (`3/120`), so a line splits on blanks; `mailbox list` prints that cell with `--counts` only. `gmail history list` prints one line per message change. The `--json` output is unchanged.
-
-- **BREAKING**: Changed the records to print as aligned `Label: value` lines: `account check`, `imap select`, `imap status`, `imap id`, `imap fetch`, `vacation get|set`, `jmap vacation get`, `sieve capability`, the Gmail and Microsoft Graph `get`s and the header block of `message read` and `message parse`.
-
-  `jmap thread get` lists one email per line, and `imap search` and `imap sort` no longer end with a count.
-
-- Changed `--help` to print without colour and each paragraph on one line, no longer wrapped to the terminal width.
-- **BREAKING**: Changed every `http` or `https` URL Himalaya parses, a JMAP `server` and an HTTP proxy `url`, to take an ASCII host only, an internationalised one written in Punycode (`https://xn--bcher-kva.example` for `bücher.example`). IMAP, SMTP and ManageSieve servers never went through IDNA, a non-ASCII host there never resolving.
-- Changed the subject and display names of an IMAP envelope (`envelope list`, `envelope search`, `imap fetch`, `imap thread`) to read as `message read` reads a header: a character split across two encoded words is rebuilt, raw 8-bit bytes that are not UTF-8 read as Windows-1252 rather than Latin-1, an encoded word beside them is decoded, and a UTF-7 encoded word is shown as written.
-- Replaced the base64 crate with [base64-codec](https://crates.io/crates/base64-codec) in `imap fetch --body`, `attachment download --stdout`, the JMAP `Basic` header and the MCP `attach-data`, byte for byte as before, and turned on the SIMD features of the CPU, detected at startup, for it and for the base64 and quoted-printable codecs mime-rs reads messages with. An `attach-data` item whose `data` is not base64 keeps its `attachment-invalid` code, its message naming the form taken rather than the offset of the first bad byte.
-- **BREAKING**: Changed `-f/--flag` of `message add`, `pimdir message add`, `imap append`, `imap store`, `maildir message add` and `mbox message add` to take one value per occurrence, so the message or the sequence set after it is never read as a flag: repeat `-f` for several flags. The message positional no longer needs `--` unless it opens on a hyphen.
-- Changed `imap select` to name the first unseen message's number `firstUnseen` under `--json`, `unseen` reading as a count, and its plain output to show it, the recent count, the flags, the permanent flags and the highest mod-sequence too.
-- **BREAKING**: Changed `envelope list` and `envelope search` to refuse `--page 0` and the page token `0`, which listed every envelope: `--page-size 0` lists the whole mailbox.
+- **BREAKING**: Changed `flag add|set|remove` and `message copy|move|delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on ([#777]).
+- **BREAKING**: Changed a send whose follow-up failed to print its receipt and exit 3: a copy refused after the send and a reply's `answered` flag are item errors of the receipt.
+- **BREAKING**: Changed a JMAP, Gmail or Microsoft Graph `message read`, and the source read of `message reply|forward` and `attachment list|download`, to fail `message-not-found` when the mailbox given does not hold the message.
+- **BREAKING**: Changed `envelope list` and `envelope search` on Maildir and mbox to list a message holding no header field as a `message-unreadable` entry, exiting 3.
+- **BREAKING**: Changed `envelope list` and `envelope search` to refuse `--page 0`, which listed every envelope: `--page-size 0` lists the whole mailbox.
 - **BREAKING**: Changed `--no-save` of `message compose`, `reply` and `forward` to require `--send`.
-- Changed `vacation set` given none of its options to fail as a usage error before connecting, where it printed the auto-reply unchanged.
-- Changed the receipts of `mailbox create` and `mailbox rename` on IMAP, Maildir and mbox to print the full name `mailbox list` prints (`Archive/2026`) rather than NAME as given, and that of `mailbox delete` the id `mailbox list` prints (a Maildir's path).
-- Changed the `important` and `junk` flags on a Maildir account to be refused with `capability-missing` unless `maildir.keywords.dovecot` is on: a keyword is kept only in the dovecot-keywords file, the header mode only reading.
-- Changed the MCP tool inputs to take a lone value where the command takes one: `attachment_download`'s `attachment-id` is a string rather than an array of one, `page` and `page-size` are integers, and a repeated argument (`query`) takes a string or an array of words.
-- Changed `maildir message copy` and `maildir message move`, and `mbox message copy` and `mbox message move`, to print the ids the messages got in the target rather than the source ids, each message once (io-maildir's `r#move` returning the minted id).
-- Changed the root Maildir to list as `INBOX` with the inbox role, or as `.` when a top-level folder named `inbox` in any case is a Maildir and takes the role, where it listed under its folder's basename, which no command took back. `-m` takes that name, `.` or the root's path, and an omitted mailbox reaches the inbox without `mailbox.alias.inbox`; the raw `maildir` default `Inbox` falls back to the root too.
-- Changed a Maildir mailbox to be taken by its name, its absolute path, with `.` segments or a trailing slash, every spelling resolving to one id; `..` and a path outside the root are refused.
-- Changed a `mailbox.alias.<role>` naming no mailbox id to mark the role of the one listed mailbox carrying that name, on every backend; on Maildir an alias spelled with a trailing slash or `./` marks it too.
-- **BREAKING**: Changed `maildir flag set` to require at least one `-f`, as `flag set` does: name the flags to drop with `maildir flag remove`.
-- Changed `maildir create` and `maildir rename` to refuse what `mailbox create` and `rename` refuse at each level and an existing folder, `maildir rename` also the root and, on the fs layout, a target whose parent does not exist. A blank level or one holding a control character is refused too, which created folders listing under a blank or mangled name. `maildir create`, `rename` and `delete` print the name relative to the root.
-- **BREAKING**: Changed `maildir message add` to refuse `-f` with `--subdir new`, its default, a Maildir keeping no flags in `new`: pass `--subdir cur`.
-- Changed `message delete` on an account with neither `mailbox.alias.trash` nor a mailbox the backend marks as the trash to fail with `capability-missing`, before anything is moved.
-- Changed the IMAP capability rows: `envelope.search` is `partial`, text being matched as the server matches it (RFC 3501 asks for a case-insensitive substring, Cyrus and Fastmail match whole words), which `envelope search --help` says too; `message.trash` is `server`, `mailbox.alias.trash` else the mailbox the server marks `\Trash`; `mailbox.delete` is `partial`, a mailbox holding others being refused by the servers keeping inferior names. Gmail's `envelope.search.attachment` is `partial`, its `has:attachment` counting inline images.
-- Changed an IMAP account on iCloud, told by its `X-APPLE-REMOTE-LINKS` capability, to sort client-side when `imap.sort.fallback` is unset: iCloud advertises `SORT` but answers in UID order whatever the keys.
-- Changed the text form of `imap raw` and `sieve raw` to print every response line as received, the untagged and data lines included, which only reached a terminal as events; the events print under `--json` only.
-- Changed `message reply --send` on Gmail and Microsoft Graph, which keep no `answered` flag, to skip flagging the source rather than fail after the send.
-- Changed `message send --save`, `message add --send` and a composer's `--send --save` on Gmail to label the message Gmail sent and filed under `SENT` with the mailbox and the flags, and report its id, rather than insert a second message.
-- Changed `gmail messages get --format full` to print the MIME `payload` under `--json` (`null` under the other formats), and its parts with their type, file name, size and attachment id in text.
+- **BREAKING**: Changed `-f/--flag` of `message add`, `imap append`, `imap store`, `maildir message add` and `mbox message add` to take one value per occurrence: repeat `-f` for several flags.
+- **BREAKING**: Changed `message add|send`, the protocol saves, `sieve put|check`, `jmap query` and `envelope search` to read an option after their positional as the option, where it became message, script or query text.
+
+  A word opening on a hyphen goes after `--`.
+
+- **BREAKING**: Changed `maildir flag set` and `mbox flag set` to require at least one `-f`, where `mbox flag set` without one cleared every flag.
+- **BREAKING**: Changed `maildir message add` to refuse `-f` with `--subdir new`, its default: pass `--subdir cur`.
+- **BREAKING**: Changed `--no-save` on a Microsoft Graph send to fail before connecting with `capability-missing`, Graph filing every message it sends in Sent Items.
+- Changed a Microsoft Graph send to ignore `--save` and `message.send.save-copy`, and `message add` or a composer's save without `--send` there to fail before connecting with `capability-missing`.
+- **BREAKING**: Changed `mailbox list` on Microsoft Graph to leave `total` and `unread` `null` without `--counts`.
+- **BREAKING**: Changed `message read --seen` on pimdir to fail when the `\Seen` cannot be staged, where it read the message unseen and exited 0.
+- Changed `mailbox list --counts` to list a mailbox whose counts could not be fetched without them, beside a `mailbox-unreadable` entry.
+- Changed IMAP flag writes to refuse a keyword the mailbox's `PERMANENTFLAGS` does not allow, coded `capability-missing`.
+- Changed `message delete` on an account with neither `mailbox.alias.trash` nor a mailbox the backend marks as the trash to fail with `capability-missing` before moving anything.
 - Changed a `--backend` naming a block the account does not configure to fail with `capability-missing`.
-- Changed `account check` to list the Maildir stores, so a store the listing cannot walk fails the check.
-- Changed the `json-schema` output to describe every key and both alternatives of a command printing one of two shapes, in JSON's terms (`null`, not `None`), to list the values of `sieve raw` `status` and `pimdir performer` `capability`, and to name the read view's addresses `Address` as the envelopes' are.
+- Changed a JMAP send to fail with `capability-missing` before uploading anything when the server lacks `urn:ietf:params:jmap:submission`.
+- Changed every build carrying a mail transport to parse the same unified commands, refusing those it cannot serve with `capability-missing`.
+
+  `json-schema` no longer varies with the backends compiled in.
+
+- Changed the shared send over SMTP to connect for each send and close after it.
+- Changed `smtp send` to check `--mail-from` and `--rcpt-to` as RFC 5321 mailboxes when the command line is read.
+- Changed a PLAIN or SCRAM password to be prepared with SASLprep (RFC 4013) before it is sent or derived from.
+- Changed the Gmail listings and writes to batch their requests, 50 messages a request, where they sent one request per message.
+
+  A throttled part is sent again up to three times; a message Gmail refuses is an `errors` entry, the others listed or written.
+
+- Changed the Microsoft Graph writes to patch, copy, move and delete through `$batch`, where they sent one request per message and stopped at the first failure.
+
+  Each message Graph refuses is an `errors` entry coded by its status, the others written.
+
+- Changed the JMAP listings to report an email or a mailbox that does not deserialize as an `errors` entry, where the whole command failed.
+- Changed `message send --save`, `message add --send` and a composer's `--send --save` on Gmail to label the message Gmail filed under `SENT`, rather than insert a second message.
+- Changed an IMAP account on iCloud to sort client-side when `imap.sort.fallback` is unset.
+- Changed the subject and display names of an IMAP envelope to be decoded as `message read` decodes a header, raw 8-bit bytes that are not UTF-8 reading as Windows-1252.
+- Changed `message read` to unwrap a `format=flowed` text part (RFC 3676), and a reply to quote it unwrapped.
+- Changed `message read` to read malformed but common mail: raw 8-bit headers, a character split between encoded words, UTF-8 labelled `us-ascii`, an invalid `Content-Type`.
+- Changed UTF-7 (RFC 2152) text to be shown as written.
+- Changed the size `attachment list` reports and the bytes `attachment download` writes to be the part's decoded bytes in its own charset, an attached message written alone.
+- Changed the root Maildir to list as `INBOX` with the inbox role, or `.` when a top-level `inbox` folder takes the role, where it listed under its folder's basename.
+- Changed a Maildir mailbox to be taken by its name, its absolute path, with `.` segments or a trailing slash, every spelling resolving to one id.
+- Changed a `mailbox.alias.<role>` naming no mailbox id to mark the role of the listed mailbox carrying that name, on every backend.
+- Changed the mbox backend to refuse a keyword `X-Keywords` would not give back: holding a whitespace, a comma or a control character, or longer than 255 bytes.
+- Changed an mbox mailbox name holding a NUL or a `.` or `..` level, or a level starting with `.` or ending in `.lock`, `.lck` or `.msf`, to be refused wherever a mailbox is taken.
+- **BREAKING**: Changed the pimdir backend to pimdir storage-draft-17 and search-draft-17: a store an earlier build wrote is refused `store-version` and its index `index-version`, never migrated.
+
+  Drain it with the neverest that wrote it until `pimdir queue list` lists nothing, move its directory aside, then sync a new store (MIGRATION.md).
+
+- Changed a pimdir store whose directory or pimdir.db another user can read to be refused with `store-exposed`: `chmod 700` the directory and `chmod 600` pimdir.db.
+- **BREAKING**: Changed the pimdir queue rows to print `row`, the integer row id, with `handle` beside it, the row under the store's identity, where they printed `queueId`.
+
+  `pimdir queue show` and `queue cancel` take the handle, checked against the store, or the bare row id.
+
+- **BREAKING**: Changed `pimdir queue list` to list the whole account, `-m/--mailbox` narrowing it to one, where it listed the inbox when `-m` was omitted.
+- **BREAKING**: Changed `pimdir queue list` to print `{actions, parked, errors, refused}`, each row `{row, handle, kind, collection, linkId, itemId, producer, queuedAt, attempts, unconfirmed, error, subject}`.
+
+  Every pending row is listed whatever its kind, the parked ones with why, a row that does not decode under `errors` (exit 3), a change a server refused for good under `refused`.
+
+- Changed `pimdir queue cancel` to take a parked row and print its `kind` and `unconfirmed`, refusing a row it cannot cancel before asking.
+- Changed the pimdir writes to be refused before they are queued when a source of the store does not support them, naming the capability, the source and why.
+
+  A send is refused while several sources can send and none is chosen, and coded `no-performer` when no source syncs the mailbox.
+
+- Changed `flag add`, `flag remove` and the `\Seen` a read stages on a pimdir account to state the flags they were read from, so a flag a sync changes meanwhile survives.
+- Changed a `message delete` or `message move` queued on a pimdir message a sync left in conflict to be parked by the sync engine rather than applied.
+- Changed a pimdir send asking for a copy to carry it in the queued send, so the copy is filed only once the message is sent.
+- Changed `message add` and a composer's save on a pimdir account to refuse a message whose `Message-ID` the mailbox holds or has queued, coded `item-duplicate`.
+- Changed `message copy` and `message move` on a pimdir account to fail for a message whose body is not local when the account does not sync the target mailbox yet.
+- Changed `envelope list` and `envelope search` on a pimdir account to read only what the page needs, where they read every message of the mailbox.
 
 ### Deprecated
 
@@ -296,204 +325,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **BREAKING**: Removed `-t` from `pimdir attachment list` and `pimdir attachment search`: `--page-token` is long only, `-t` being `--to` across Himalaya.
-- **BREAKING**: Removed the m2dir backend: the `himalaya m2dir` commands, the `m2dir` value of `-b/--backend`, the `m2dir` cargo feature, its JSON Schemas and the io-m2dir dependency.
+- **BREAKING**: Removed the configuration wizard: bare `himalaya` running it, the `configure` command (alias `wizard`), the `wizard` cargo feature and the `himalaya-configure` JSON Schema.
 
-  io-m2dir left the Pimalaya family, pimdir superseding it. An `m2dir` block is refused as an unknown key: move to a Maildir or a pimdir store.
+  Write the configuration from config.sample.toml, as the first-run welcome shows.
 
-- **BREAKING**: Removed the configuration wizard: bare `himalaya` running it, the `configure` command (alias `wizard`), the offer a command made without a configuration, the `wizard` cargo feature, the `himalaya-configure` JSON Schema and the io-pim-discovery dependency.
+- **BREAKING**: Removed the m2dir backend: the `himalaya m2dir` commands, `-b m2dir`, the `m2dir` cargo feature and its JSON Schemas.
 
-  It handed OAuth 2.0 to `ortie configure`, which Ortie 3.0 removed. Write the configuration from config.sample.toml, as the first-run welcome shows.
+  An `m2dir` block is refused as an unknown key: move to a Maildir or a pimdir store.
 
 - **BREAKING**: Removed the `*.list.table.*-color` options, `table.preset` and `table.arrangement`.
 
-  A colour key under `mailbox` is refused as unknown; the `table` and `attachment` blocks, at the top level or in an account, and the top-level `account` block are refused as unknown keys.
+  The `table`, `attachment` and top-level `account` blocks are refused as unknown keys.
 
-- **BREAKING**: Removed the `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` options.
-
-  The envelope lists name the state in words (`unread`, `answered`, `flagged`, `attachment`), and the `envelope.list.table` block is refused as an unknown key, whatever it holds.
-
+- **BREAKING**: Removed the `envelope.list.table.unseen-char`, `replied-char`, `flagged-char` and `attachment-char` options, the `envelope.list.table` block being refused as an unknown key.
 - **BREAKING**: Removed `envelope.list.datetime-relative` ([#510]), now refused as an unknown key.
-
-  A relative date is a reader's comfort, which a frontend gives: the CLI prints a date as `envelope.list.datetime-fmt` and `datetime-local-tz` configure it.
-
-- **BREAKING**: Removed the `HIMALAYA_CONFIG` environment variable, with the `:`-delimited list it took: write `-c "$HIMALAYA_CONFIG"` for one path, one `-c` per path for several.
-
-- **BREAKING**: Removed `-w/--max-width` from `envelope list`, `envelope search`, `mailbox list`, `pimdir search`, `pimdir thread`, `pimdir tag`, `pimdir mailbox list` and `pimdir attachment list|search`, nothing being truncated anymore.
-
-- Removed Himalaya's direct dependencies on open, convert_case, uds_windows, rfc2047-decoder, shellexpand and crossterm, and the toml one from the binary (the tests keep it).
-
-  crossterm still comes with pimalaya-cli's prompt in a build with `pimdir`, and shellexpand with pimalaya-cli and pimalaya-config.
-
-- **BREAKING**: Removed `tmp` from the `--subdir` values of `maildir message add|copy|move`: no reader lists a message there, and Maildir readers delete what stays in it for 36 hours.
+- **BREAKING**: Removed the `HIMALAYA_CONFIG` environment variable: pass `-c "$HIMALAYA_CONFIG"`, one `-c` per path.
+- **BREAKING**: Removed `-w/--max-width` from `envelope list`, `envelope search` and `mailbox list`, nothing being truncated anymore.
+- **BREAKING**: Removed `tmp` from the `--subdir` values of `maildir message add|copy|move`.
+- **BREAKING**: Removed `deleted`, `deletedStorage` and `highestModSeq` from `imap status`, which never requested them and printed them `null`.
 
 ### Fixed
 
-- Fixed a `mid:` search over IMAP finding nothing on iCloud, which matches `HEADER Message-ID` on the whole bracketed value alone: the id is sent in angle brackets, a form substring-matching servers (Fastmail) still match. The UID lookup of an `APPEND` answered without `APPENDUID` sends it so too. Stalwart 0.16 answers no `HEADER Message-ID` in any form, so `mid:` still finds nothing there.
-- Fixed `envelope list` over JMAP leaving the order to the server, Stalwart answering the oldest first on page 1: the listing asks for the newest `sentAt` first, as `envelope search` does.
-- Fixed `pimdir performer <CAPABILITY> <SOURCE>` recording a source that does not perform the intent, which the sync engine then parked: it is refused coded `no-performer`, naming the candidates. The choice is queued on the account's first mailbox rather than its first collection (an attachments one), where `pimdir queue list`, `queue show` and `queue cancel` could not reach it.
-- Fixed a pending `move` or `remove` row of `pimdir queue list` and `queue show` printing `subject: null`, its message hidden by the queue it waits in: the subject is read from the message as the store committed it.
-- Fixed `pimdir queue list` reporting a whole mailbox as one `action-malformed` error when one of its pending rows did not decode: that row is the error, named by its handle, and the mailbox's other rows are listed (io-pimdir 2314084b).
-- Fixed a `message copy` or `message move` on a pimdir account into a mailbox where another source holds the message already: the sync engine joined a second message there; it joins the one held (io-pimdir 2314084b, needs a neverest on the same io-pimdir).
-- Fixed `pimdir status` listing every mailbox of the store twice per mailbox to read its refusals, and walking every summary to count bodies: 32 s at 3,313 mailboxes and 517k messages, 88 ms now.
-- Fixed, through pimalaya-cli 0.6.1 and pimalaya-config 0.6.0, the text error report writing the control characters of its causes raw to the terminal (each line is sanitized, the suggestions naming `--json` when a character was replaced), `--log-file` creating the file under the umask and following a symbolic link (it is created at 0600 and a link is refused), the manual pages printing `vv<version>`, a TOML parse error of the configuration printing its source line, and a refused secret echoing its value. A secret command that fails names the command and says to run it yourself, never printing its output.
-- Fixed `jmap request` refused whole (RFC 8620 §3.6.1, such as an HTTP 400 `unknownCapability`) printing the failure object and exiting 1: it prints `{refusal: {status, reason, message, code, retryAfter}}` and exits 3, as the typed `jmap` commands do.
-- Fixed a `tls.cert`, `tls.client.cert` or `tls.client.key` that cannot be opened failing with `No such file or directory (os error 2)`: the command fails before it connects, naming the file and its path.
-- Fixed `envelope search --help` saying every date clause reads the `Date:` header: it names Gmail, and JMAP under `or` or `not`, which compare the received date.
-- Fixed install.sh exiting 127 after a successful install (`die"…"` missing its space) and saving an HTTP error page as the archive: the download fails on an HTTP error (`curl -fsSLo`).
-- Fixed a JMAP `date` or `after` search missing mail whose `Date:` carries an offset east of UTC, received the day before in UTC.
+- Fixed a `mid:` search over IMAP finding nothing on iCloud: the id is sent in angle brackets, as is the UID lookup of an `APPEND` answered without `APPENDUID`.
+- Fixed `envelope list` over JMAP leaving the order to the server: it asks for the newest first, as `envelope search` does.
+- Fixed a `message copy` or `message move` on a pimdir account joining a second message into a mailbox another source holds it in already.
+
+  It needs a neverest on the same io-pimdir.
+
+- Fixed the text error report writing the control characters of its causes raw to the terminal.
+- Fixed `--log-file` creating the file under the umask and following a symbolic link: it is created at 0600 and a link is refused.
+- Fixed `himalaya manual` printing `vv<version>`, leaving out the pages of the nested commands and pointing SEE ALSO at pages it did not write.
+- Fixed a configuration parse error printing its TOML source line, and a refused secret echoing its value.
+- Fixed a failing secret command saying nothing: it names its program and exit status, never its output ([#745]).
+- Fixed a `tls.cert` that cannot be opened failing with a bare `No such file or directory`: the command fails before connecting, naming the file.
+- Fixed install.sh exiting 127 after a successful install and saving an HTTP error page as the archive.
+- Fixed a JMAP date search missing mail whose `Date:` carries an offset east of UTC.
 - Fixed `message read`, `attachment list|download`, `message reply` and `message forward` on IMAP sending `SELECT sent` for a role: the mailbox resolves as `envelope list` resolves it.
-- Fixed a pimdir `message delete`, `copy` or `move` of several ids staging the ids before the one the store's gate refused: the rows are one batch, all staged or none.
-- Fixed the Gmail envelopes splitting an address header on commas (`"Doe, John" <john@x.org>` listed as two senders) and the read view filing a quoted name holding angle brackets under `invalid`: every address header is read by mime-rs.
-- Fixed `gmail labels update` clearing the label's colour and visibility: it renames through `labels.patch`.
-- **BREAKING**: Fixed the IMAP `ENVELOPE` group markers printing as addresses in `envelope list`, `envelope search` and `imap fetch`: `To: undisclosed-recipients:;` lists no recipient, as on Maildir and mbox.
-- Fixed `imap thread` fetching every threaded message in one command line: it fetches 255 ids a `FETCH`.
-- Fixed `attachment download` writing parts before refusing an id the message does not hold, and failing whole on a name past 255 bytes: ids are checked first, and a long name is cut at a character boundary, its extension kept.
-- Fixed `attachment download` creating its files readable by others, in the shared temporary directory when no download directory is known: they are created 0600.
+- Fixed the Gmail envelopes splitting an address header on a comma inside a quoted name (`"Doe, John" <john@x.org>`).
+- Fixed `gmail labels update` clearing the label's colour and visibility.
+- **BREAKING**: Fixed the IMAP `ENVELOPE` group markers printing as addresses in `envelope list`, `envelope search` and `imap fetch`: `To: undisclosed-recipients:;` lists no recipient.
+- Fixed `attachment download` writing parts before refusing an id the message does not hold, and failing on a name past 255 bytes, now cut at a character boundary.
+- Fixed `attachment download` keeping control and bidirectional formatting characters in a file name, which can disguise an extension, and naming a part `. .` as `.`.
+- Fixed `attachment download` creating its files readable by others: they are created 0600.
+- Fixed `attachment download` following a dangling symlink, or overwriting an existing file once the name suffixes ran out.
+- Fixed `attachment download` without an id writing the inline parts `attachment list` leaves out: they are written with the new `--inline` only.
 - Fixed saving the mbox cache taking time quadratic in the mailbox.
-- Fixed the ids of a write being deduplicated and its errors ordered in time quadratic in their number.
-- Fixed a Maildir write reading the folder once per id to look its ids up: one read looks them all up.
-- Fixed the Maildir and mbox listings holding every message of the mailbox in memory: Maildir reads 64 files at a time, mbox drops each message's bytes before the next.
-- Fixed each JMAP blob download on another host running the credential command again and opening a new connection: the session's credential and one connection per host are kept.
-- Fixed every Microsoft Graph command naming a mailbox listing the whole folder tree and the well-known folders first: a path lists only the folders leading to it, a role or a well-known name is one request, a folder id is asked of Graph, and a resolved mailbox is not looked up again.
-- Fixed `attachment download` saving a part under a name keeping its control and bidirectional formatting characters, which can disguise an extension (`invoice\u{202E}fdp.exe`): each is replaced by `_`.
-- Fixed a Gmail search flattening an `and` under an `or`: `from alice and subject invoice or from bob` went out as `{from:alice subject:invoice from:bob}`, which Gmail reads as three alternatives, and a `date` clause beside an `or` matched the whole label. An alternative holding more than one term is now wrapped in parentheses, `{(from:alice subject:invoice) from:bob}`.
-- Fixed `envelope list` and `envelope search` with `--page-size 0` on Gmail reading the first 100 messages and saying the listing was complete: they follow every next page token, 500 messages a page, as Microsoft Graph and IMAP list the whole mailbox.
-- Fixed `pimdir queue show` and `pimdir queue cancel` reaching a row another app of the store queued on an address book or calendar of the same account: such a row reads `unknown` and is refused, as Cardamum and Calendula keep to their own kind.
-- Fixed `himalaya mcp` over an mbox account reading and appending to an mbox outside `mbox.root` given as an absolute mailbox path: the server refuses it, read or write. The command line still opens any mbox by its absolute path.
-- Fixed `imap raw` panicking (exit 101) on a literal holding a byte that is no UTF-8, and splitting such a literal's tail into responses, so a body line `A1 NO forged` read as a tagged completion: each response is framed by io-imap with its literals.
-- Fixed a message past the MIME parser's own caps (more than 10,000 parts) being read in part, one unsplit `multipart/mixed` part hiding what it held from `message read`, `attachment list|download` and the MCP tools: it is refused with `message-too-complex`.
-- Fixed a mistyped path holding a colon (a Maildir file name's `:2,S`, a Windows drive `C:\`) being stored as a message made of the path by `message add` and the other commands taking a message: a message must open on a header field named with letters, digits, `-`, `_` and `.`. A file under a path holding a backslash followed by `n` or `r` is now found, the path being looked up before the escapes of an inline message are decoded.
-- Fixed the mbox envelope cache being readable by every user of the host under the usual umask: `<XDG cache>/himalaya/mbox/` is created and kept at mode 0700, its files written at 0600.
-- Fixed `sieve activate ""` deactivating every script and reporting an activation (RFC 5804 reads `SETACTIVE ""` as a deactivation): an empty name is refused as a usage error before connecting; `sieve deactivate` deactivates.
-- Fixed `message reply --all` keeping the user's own address in `Cc` when the account sets no `email`: it leaves out the reply's `From` (`--from`, else `email`) and the account's logins, the user names its IMAP and SMTP SASL blocks hold when they read as an address.
-- Fixed `pimdir mailbox create --json` leaving `parent` out for a mailbox at the top: it prints `null`.
-- Fixed a move whose source and target are one mailbox writing anyway: on mbox, `message move -f A -t A` and `mbox message move -m A -t A` rewrote the file, the message at its end, then failed with "Cannot find the message appended"; on IMAP the server gave the messages new UIDs; on pimdir a move was queued. Each now changes nothing and counts the messages, as JMAP, Gmail, Microsoft Graph and Maildir did.
-- Fixed a Gmail envelope whose `Date:` names the wrong weekday (`Mon, 15 Nov 2026`, a Sunday) printing a `null` date and sorting first: it is read without the weekday, as IMAP, Maildir, mbox and `message read` read it.
-- Fixed `INBOX` on an mbox account without `mbox.inbox` failing uncoded: it is coded `mailbox-not-found`, as a missing Maildir is.
-- Fixed `mailbox list --counts` on Microsoft Graph counting a folder's contacts and events with its messages: `total` is the folder's message count, Graph's `@odata.count` over its `/messages` through `$batch`, one request per folder holding items, where it was its `totalItemCount` (a Deleted Items printed 835 for 26 messages); `unread` stays its `unreadItemCount`, which counts its unread messages alone. A count Graph refuses lists the folder without counts beside a `mailbox-unreadable` entry.
-- Fixed an IMAP `message delete` in the trash that found no id reporting `flagged` and advising an expunge ([#814]): with UIDPLUS it reports `deleted` with `count` 0, and the expunge advice prints only when messages were flagged.
-- Fixed an IMAP listing dropping a message whose `FETCH` line does not decode, with a warning only ([#801]): the message is listed with the items that decoded, `hasAttachment` `null` when `BODYSTRUCTURE` failed, beside a `message-unreadable` entry naming its UID and the failed items; a line that does not decode at all is an entry with a `null` id.
-- Fixed a Maildir listing skipping an unreadable message file or folder with a warning only: each is a `message-unreadable` or `mailbox-unreadable` entry with its id, a file's on the first page of a paged listing.
-- Fixed the Microsoft Graph lookups counting every 400 as an id or a folder not found: only one Graph codes `ErrorInvalidIdMalformed` is, another 400 being an entry coded `null` for a message id and a failure for a folder.
-- Fixed a send over SMTP running again the credential command the IMAP block already ran, which `message send` with `save-copy` asked for twice ([#813]).
-- Fixed a message sent over SMTP, or queued on a pimdir account, taking from its headers an envelope address holding a control character, and `message send` over SMTP an address the transaction cannot carry (a space, a line break): the send fails naming the address before anything is written (io-smtp).
-- Fixed `scram-sha-256` on IMAP and SMTP failing as an unsupported mechanism: the `imap` and `smtp` cargo features enable the SCRAM-SHA-256 of io-imap and io-smtp.
-- Fixed an IMAP answer holding lines that do not decode being printed as whole: a warning says how many were skipped, a `message read` whose message was among them fails rather than report it missing, and a server `ALERT` is logged as a warning (io-imap).
-- Fixed an mbox flag change or removal failing, or editing the wrong bytes, on an index another client made stale: the index is rebuilt and the write planned again, once (io-mbox).
-- Fixed a JMAP send saying nothing when the server sends the message and refuses to move it out of the drafts: a warning says it stays a draft (io-jmap).
-- Fixed a JMAP send the server refused leaving the imported message in the drafts mailbox, one more on each retry where duplicates are allowed: the email the send created is destroyed, an email the account already held is kept, and a destroy that fails is a warning naming its id.
-- Fixed a Gmail label type or setting value Himalaya does not know failing the whole answer: the text form prints it as `unknown` (io-gmail).
-- Fixed IMAP commands failing with `Decode IMAP response error` when a server answers `NO` with UTF-8 in its text (Dovecot naming a non-ASCII mailbox): the refusal is printed, its 8-bit bytes read as `?` (io-imap).
-- Fixed `mailbox create` and `rename` accepting a blank NAME, and the unified mbox writes a NAME holding `/`.
-- Fixed `envelope search` reading options typed after the query (`... order by subject -s 2`) as query words.
-- Fixed `message read` printing MIME parameters unquoted: a value that is no RFC 2045 token is quoted.
-- Fixed the `message copy|move --to` help, which named no role nor id although both resolve.
-- Fixed `mailbox list --counts` on pimdir leaving `unread` `null`: it is counted as `pimdir mailbox list` counts it.
-- Fixed malformed multiparts reading with the wrong structure: a part an outer delimiter closes is no longer swallowed by a nested multipart (three attached messages read as one), a line opening with a boundary followed by text is no longer taken for a delimiter (the text after it was hidden), and parts mail-parser dropped (a delimiter with no blank line after it) are listed. Part ids follow the corrected structure on such mail.
-- Fixed a field whose name holds a blank (`Sub ject: x`) being read as the field it spells, and a body line being read as `From:` after an unusual `Date` zone.
-- Fixed `flag add|set|remove` with `answered` or `draft` on Gmail and Microsoft Graph reporting every message flagged while changing nothing: neither has a field for them, so the command fails with `capability-missing`.
-- Fixed Gmail date clauses being off by a day: Gmail reads a bare date as midnight in PST, so `after 2026-09-08` kept that day's mail and `date 2026-09-08` spanned two days. Each bound is now sent as Unix seconds of the UTC day.
-- Fixed a JMAP search whose date clause sits under `not` or `or` checking the date as if it stood alone: `not after 2026-01-01` listed nothing, and `date 2026-01-01 or subject x` only that day's mail. Such a clause now reads the server's received date; a date clause joined to the rest by `and` alone keeps its exact sent-date check.
-- Fixed `hasAttachment` reading differently per backend ([#802]).
+- Fixed the mbox envelope cache being readable by every user of the host: its directory is kept at 0700 and its files at 0600.
+- Fixed a Maildir write reading the folder once per id: one read looks them all up.
+- Fixed the Maildir and mbox listings holding every message of the mailbox in memory.
+- Fixed each JMAP blob download on another host running the credential command again and opening a new connection.
+- Fixed every Microsoft Graph command naming a mailbox listing the whole folder tree first.
+- Fixed a Gmail search flattening an `and` under an `or` into alternatives: an alternative holding more than one term is wrapped in parentheses.
+- Fixed `envelope list|search --page-size 0` on Gmail reading the first 100 messages and on Microsoft Graph 10: every page is read.
+- Fixed `pimdir queue cancel` cancelling a row of another account or app sharing the store.
+- Fixed `pimdir queue cancel` reshaping the store's schema to Himalaya's io-pimdir revision, dropping what another app's revision keeps.
+- Fixed `imap raw` panicking on a literal holding a byte that is no UTF-8, and splitting such a literal into responses.
+- Fixed a mistyped path, such as one holding a colon, being stored as a message by `message add` and the other commands taking a message: a value naming no file must open on a header field.
+- Fixed `sieve activate ""` deactivating every script: an empty name is refused, `sieve deactivate` deactivating.
+- Fixed a move onto its own mailbox writing anyway on mbox, Maildir, IMAP and pimdir: it changes nothing and counts the messages.
+- Fixed a `Date:` naming the wrong weekday reading as no date on Gmail and misplacing the message in IMAP's client-side date sort.
+- Fixed `mailbox list --counts` on Microsoft Graph counting a folder's contacts and events with its messages.
+- Fixed an IMAP `message delete` in the trash that found no id reporting `flagged` and advising an expunge ([#814]).
+- Fixed an IMAP listing dropping a message whose `FETCH` line does not decode: it is listed with the items that decoded, beside a `message-unreadable` entry ([#801]).
+- Fixed a Maildir listing skipping an unreadable message file or folder with a warning only: each is a `message-unreadable` or `mailbox-unreadable` entry.
+- Fixed the Microsoft Graph lookups counting every 400 as an id or a folder not found.
+- Fixed a send over SMTP running again the credential command the IMAP block already ran ([#813]).
+- Fixed a send taking from its headers an envelope address holding a control character or a line break: it fails naming the address before anything is written.
+- Fixed `scram-sha-256` on IMAP and SMTP failing as an unsupported mechanism.
+- Fixed an IMAP answer holding lines that do not decode being printed as whole: a warning counts the skipped lines, and a server `ALERT` is logged.
+- Fixed an IMAP command line holding a literal being sent before the server's go-ahead.
+- Fixed an IMAP greeting carrying a literal panicking.
+- Fixed IMAP commands failing to decode a `NO` with UTF-8 in its text, such as Dovecot naming a non-ASCII mailbox.
+- Fixed mbox writes and listings failing, or editing the wrong bytes, on an index another client made stale: the index is rebuilt and the operation tried once more.
+- Fixed a JMAP send the server refused leaving the imported message in the drafts mailbox.
+- Fixed a JMAP send saying nothing when the server sends the message but leaves it in the drafts: a warning says so.
+- Fixed a JMAP submission refused as `tooLarge`, `forbidden`, `overQuota` or `rateLimit` reading as `unknown`.
+- Fixed a Gmail label type or setting value Himalaya does not know failing the whole answer.
+- Fixed `message read` printing unquoted a MIME parameter value that is no RFC 2045 token.
+- Fixed `mailbox list --counts` on pimdir leaving `unread` `null`.
+- Fixed malformed multiparts reading with the wrong structure, such as three attached messages read as one; part ids follow the corrected structure on such mail.
+- Fixed a header field whose name holds a blank being read as the field it spells, and a body line being read as `From:` after an unusual `Date` zone.
+- Fixed `flag add|set|remove` with `answered` or `draft` on Gmail and Microsoft Graph, and `message add -f answered|draft` on Gmail, reporting success while changing nothing: they fail with `capability-missing`.
+- Fixed `flag set` on Gmail failing whole by naming the `DRAFT` label.
+- Fixed Gmail date clauses being off by a day: each bound is sent as the Unix seconds of the UTC day.
+- Fixed a JMAP date clause under `not` or `or` being checked as if it stood alone: it reads the server's received date.
+- Fixed `hasAttachment` reading differently per backend: IMAP, Maildir, mbox and pimdir follow one rule ([#802]).
 
-  IMAP missed a PDF or an attached message without a `Content-Disposition`, and Maildir and mbox counted parts marked `inline`. All three, and the local `attachment` search clause, now follow the rule of the pimdir mark: any disposition but `inline` counts; with none, a part counts unless text, multipart or named by a `Content-ID`; the signature of a signed message and the parts of an encrypted one never count. `attachment list` still lists those. An mbox cache written by an older version is rebuilt once.
+  Any disposition but `inline` counts; with none, a part counts unless text, multipart or named by a `Content-ID`; a signature or an encrypted part never does.
 
-- Fixed `account list` never naming `pimdir` among an account's backends, in the BACKENDS column and the `--json` `backends` alike.
-- Fixed `account check` refusing an account declaring only a pimdir block as configuring no backend: the store is opened, its mailboxes listed, and a producer probed without writing anything, so a store whose staging lock a collector holds fails the check at once with `store-busy`.
-- Fixed `pimdir queue cancel` reshaping the store's schema to Himalaya's io-pimdir revision, which dropped the tables and columns another app's revision keeps: the store is opened as it stands, and one of another draft is refused with `store-version`.
-- Fixed `pimdir queue cancel` cancelling a row of another account or app sharing the store: only a row of the account's queue is taken.
-- Fixed a pimdir add or send writing the message body before taking the store's staging lock, so a collector running in between could delete the body of a queued message.
-- Fixed a pimdir add or send the store refuses (a duplicate, a copy the sending source does not declare) leaving its body in the store until a collector runs: the body is written only once the write is accepted.
-- Fixed `body` search clauses never matching on a pimdir account, and `not body` matching every message: the local body is read. A message whose body is not local matches no body clause.
-- Fixed `message read` on a pimdir message whose body file is gone failing without a code: it fails with `body-pending`, the body being not local yet.
-- Fixed flag changes on a pimdir account queueing a row for a message that already shows the result.
-- Fixed the plain output of `message add`, `message send`, the composers' save and send and `pimdir queue cancel` not ending with a newline.
-- Fixed `flag add` and `flag remove` on a pimdir account replacing every flag a message carries on the server when the sync engine never read them: they now fail saying the flags were never synced. `flag set`, which replaces the whole set by design, is unchanged.
-- Fixed `flag remove` on a pimdir account leaving a flag the store holds in another spelling than the canonical one, `\seen` or Thunderbird's `Junk`, and `flag add` adding the canonical spelling beside it: flags are now matched as flags, not as strings.
-- Fixed `flag add`, `flag set` and `flag remove` on a pimdir account staging the change on the first messages of a call and then failing on a later one: every message is now checked against the sources before the first row is queued, so a call the check refuses stages nothing, and an id the mailbox does not hold is an `errors` entry and counted out, as on the other backends.
-- Fixed Maildir mailboxes being named by their last path segment, so `Archive` and `[Gmail]/Archive` both listed as `Archive`: `mailbox list` and `maildir list` now name them by their path relative to `maildir.root`, the name `-m` takes, in both layouts ([himalaya-tui#22](https://github.com/pimalaya/himalaya-tui/issues/22)).
-- Fixed a secret command failing silently: it now names its program and exit status instead of an empty `Secret command error` ([#745]).
-- Fixed attachment downloads following dangling symlinks or overwriting existing files after filename suffixes are exhausted. Concurrent downloads now reserve filenames exclusively.
-- Fixed control and bidi characters from messages and servers (bodies, headers, MIME metadata, names and ids) reaching the terminal through the plain output; the JSON and explicitly requested raw outputs are unchanged.
-- Fixed pimdir queue details leaking into the unified outputs: `envelope list` no longer reports a `queued` count, and `message send`, `message add --send` and the composers no longer print a `queueId`. `himalaya pimdir queue list` shows what is queued, and a queued send logs its row id at info level.
-- Fixed `message compose`, `reply` and `forward` writing a `Message-ID` on the hostname of the machine (`<…@myhost>`), which disclosed it to every recipient. The id now sits on the domain of the `From` address; without one, or with a domain that is not a plain dot-atom, the hostname is still used.
-- Fixed `message move` on an IMAP server without MOVE whose `COPYUID` cannot be read, such as Mailo's UIDVALIDITY 0: the message was copied, left in the source and reported as not found. Mailo's `COPYUID` is now read despite its UIDVALIDITY 0, so a copy, or a move without MOVE, is counted without an extra round trip. Without a readable `COPYUID`, `message copy` and `message move` count the requested UIDs a `UID SEARCH` finds in the source, so a message that no longer exists is still reported as not found ([#781]).
-- Fixed a raw message piped on stdin (`message send`, `message add`, `smtp send`, every `save`, `import` and `insert`) being cut at its first line that is not valid UTF-8 and still reported as sent or saved, or refused as empty when that line was the first. Stdin and message files are now read whole as bytes, so a message in another 8-bit charset goes through intact. `imap raw` and `smtp raw` read stdin whole too and refuse invalid UTF-8 rather than truncating ([#786]).
-- Fixed the plain output of `flag add`, `flag set`, `flag remove` and `message delete` not ending with a newline ([#777]).
-- Fixed the plain output of `maildir|mbox message add`, the Gmail draft writes, `jmap query`, `sieve get`, `sieve list` and `sieve capability` not ending with a newline, and `jmap email parse` running its bodies together.
-- Fixed the query errors of `envelope search` and the pimdir search commands carrying ANSI colour escapes on a terminal, even inside the `--json` error string: they render without colour.
-- Fixed a raw message positional (`message add`, `message send`, the protocol saves) naming no file being stored as a message made of that path: a value naming no file must open on a header field, and over MCP a message opening on none is refused, never read from disk.
-- Fixed `message delete` in a JMAP trash destroying an email other mailboxes held too: an email the trash alone holds is destroyed, one held elsewhere only leaves the trash.
-- Fixed `flag add|set|remove`, `message copy`, `message move` and `message delete` on JMAP, Gmail and Microsoft Graph acting on an id of another mailbox and counting it found, their ids being account-wide: an id counts only when its message is in the mailbox given, and a move onto its own mailbox changes nothing, where JMAP took the message out of it. On Graph, `message delete -m trash` given the id of a message in another folder deleted it for good, and a write given an unknown id among known ones stopped part-way: each id's folder is now read first, and an unknown or malformed id counts as not found.
-- Fixed `message delete` in the trash reporting every id given as deleted: it counts the ids the trash held and fails when it held none.
-- Fixed `flag add|set|remove`, `message copy|move|delete` given no id running on none, and a repeated id acted on and counted twice: ids are required and each counts once. The raw `maildir` and `mbox` `message copy|move` and `maildir` and `mbox` `flag add|set|remove` require their ids too.
-- Fixed Maildir and mbox writes given an unknown id among known ones failing part-way or counting it: every id is looked up before the first write, an unknown one an `errors` entry, and none found changes nothing. The raw `maildir` `message copy|move` and `flag add|set|remove` refuse the whole set when one id is unknown, naming every unknown one, where they wrote part of it first; so do the raw `mbox` ones, which named the first only, and the raw flag commands print each id once.
-- Fixed a Maildir store listing failing with `Not a directory` on a plain file beside its folders (dovecot-uidlist, dovecot-keywords), and the info flags written out of ASCII order (`:2,SF` for `:2,FS`), in io-maildir. `maildir flag list` and the `-f` values list the letters in that order too (`D`, `F`, `P`, `R`, `S`, `T`), and the `maildir` NAME help says it is the path relative to the root. A listing also skips, with a warning, a message file or a folder it cannot read and a symlink back to a folder it reached, which listed phantom mailboxes, and an experimental `:1,` info section is no longer read as flags nor rewritten as `:2,` by a flag write.
-- Fixed a missing `maildir.root` listing as an empty store: it fails naming the root.
-- Fixed `mailbox create` and `rename` taking an empty NAME, one holding a control character or the hierarchy delimiter, or one naming no listable level (Maildir `cur`, `new`, `tmp`, a leading dot on Maildir), and creating over or renaming onto an existing Maildir.
-- Fixed `mailbox delete` on Maildir and Thunderbird-layout mbox removing the mailboxes held under the one deleted: it is refused, naming them. On IMAP a server's refusal names them too. `mailbox delete .` on Maildir emptied the whole store: the root is refused however named (`.`, `INBOX`, its path), by `mailbox rename` and the raw `maildir delete|rename` too, and a Maildir holding a folder the listing does not show (a hidden one, a half-made one) is refused, naming it.
-- Fixed IMAP `mailbox create --parent` and `rename` with a non-ASCII parent or `--parent Inbox` in another case, and a missing mailbox reading as a server error: it reads `IMAP mailbox X not found`. A `--parent` the server marks `\Noinferiors` (RFC 3501 section 7.2.2) is refused before the `CREATE`.
-- Fixed mbox `flag add|set|remove`, `message copy|move|delete` given ids the mailbox lacks: an unknown id is an `errors` entry, a repeated one counted once, and none found changes nothing.
-- Fixed mbox reads carrying the `Status`, `X-Status` and `X-Keywords` fields the store writes, Thunderbird's `X-Mozilla-Status`, `X-Mozilla-Status2` and `X-Mozilla-Keys`, and the `Content-Length` of mboxcl and mboxcl2, so `message read --raw` gives back the message added.
-- Fixed a Thunderbird-layout mbox rename orphaning the <name>.sbd directory of its children (it moves with the mbox, refused when the target's exists) and a delete orphaning them (refused, naming them). A flag write now keeps the read, replied, flagged and deleted bits of an existing `X-Mozilla-Status` and the keywords of an existing `X-Mozilla-Keys` in step, where a `flag set` left a dropped label for Thunderbird, a delete or rename removes the mbox's `.msf` summary, and creating `a/b` creates a missing parent `a` empty, where the child was listed under a parent no command could rename (io-mbox).
-- Fixed `mailbox create --parent` under an mbox file in the plain layout, which holds no mailbox: it is refused naming `mbox.thunderbird`, and `mailbox.create` is `partial` on mbox.
-- Fixed `mailbox list` on a missing `mbox.root` listing nothing: it fails naming the root.
-- Fixed `mailbox delete` and `mailbox rename` deleting or renaming the mbox spool, which the mail system delivers to, from the CLI, the raw `mbox` commands and MCP alike: it is refused, as IMAP refuses it for `INBOX`, and so is a directory below the root, which is no mbox.
-- Fixed `INBOX` on mbox without `mbox.inbox` silently addressing a missing file of that name below the root, and a spool that is a directory failing with an I/O error: both fail naming `mbox.inbox`, the latter in `account check` too, and a directory spool is left out of `mailbox list`.
-- Fixed mbox listing files that are no mbox and appending to them: a non-empty file that does not open on a `From_` line is left out, and every message command refuses it before taking a lock, where a listing named so read as empty and a save into a symlink to a protected file failed on the dotlock (io-mbox).
-- Fixed mbox mailbox names a listing hides being accepted: a level starting with `.` or ending in `.lock`, `.lck` or `.msf`, or `.sbd` with `mbox.thunderbird`, is refused, the last as the folder suffix of that layout.
-- Fixed an mboxcl or mboxcl2 `Content-Length` running past the end of the file or into a later message merging the messages after it under one id: a length is trusted only when it ends on a message boundary (io-mbox).
-- Fixed an mbox listing or search failing when another client rewrote the file after the index was synced: the index is rebuilt and the listing tried once more, as a read was. The cache version is raised, so older caches are rebuilt.
-- Fixed a busy mbox lock failing with no code and a dotlock the user may not create failing with a bare permission error: a lock held past `mbox.lock.timeout` fails with `store-busy`, and a denied dotlock names `mbox.lock.dotlock = false`. A huge `mbox.lock.timeout` no longer panics a debug build (io-mbox).
-- Fixed `message delete` on Maildir moving the messages of the trash to the trash again when the trash was named by path, with a trailing slash or through an alias: every spelling resolves to one id, so they are deleted.
-- Fixed `message move` and `maildir message move` (without `--subdir`) whose source and target are one Maildir, under any spellings, re-delivering the messages under new ids: it changes nothing.
-- Fixed a copy or move between Maildirs, `message delete` to the trash included, carrying dovecot keyword letters verbatim, so a keyword took the meaning the target's `dovecot-keywords` gave the same letter: with `maildir.keywords.dovecot` the letters are renamed through the target's file (io-maildir).
-- Fixed a Maildir named with `-m` that cannot be searched reading as `missing cur/ subdirectory`: the permission error goes out naming the path (io-maildir).
-- Fixed the local `body` search clause matching case-insensitively in ASCII only: it lowercases Unicode text, as `subject` does.
-- Fixed `order by` splitting a quoted or escaped pattern holding the words, an empty `order by` being accepted, and an unterminated quote being read as a literal.
-- Fixed the `envelope search` diagnostics: one report over the whole query with one `Error:`, each label quoting the word found and what was expected (`found foo, expected date after after`), no keyword fragment (`'d'`) listed, and blanks after `(` accepted. The `--help` lists one clause per line.
-- Fixed the client-side sort of Maildir, mbox, pimdir, Gmail and Microsoft Graph, and IMAP's fallback (io-imap), to follow RFC 5256: `subject` on the base subject, `from` and `to` on the first address's mailbox, case ignored, ties kept in order.
-- Fixed an IMAP `flag` clause naming a registered keyword in another case being searched as typed: `flag junk` sends `KEYWORD $Junk`.
-- Fixed IMAP searches negating a group or an `address` clause, which iCloud answered wrongly: negations are pushed onto single keys (`not address x` sends `NOT FROM x NOT TO x NOT CC x NOT BCC x`).
+- Fixed `account list` never naming `pimdir` among an account's backends.
+- Fixed `account check` refusing an account declaring only a pimdir block: the store is opened, its mailboxes listed and a producer probed.
+- Fixed a pimdir add or send writing its body before the store accepted the write, so a collector could delete it or a refused write leave it behind.
+- Fixed `body` search clauses never matching on a pimdir account.
+- Fixed a pimdir flag change queueing a row for a message that already shows the result.
+- Fixed `flag add` and `flag remove` on a pimdir account replacing every flag of a message whose flags the sync engine never read: they fail saying so.
+- Fixed `flag remove` on a pimdir account missing a flag the store holds in another spelling (`\seen`, Thunderbird's `Junk`).
+- Fixed a pimdir write on several messages staging the first ones before failing on a later one: the rows are one batch, all staged or none.
+- Fixed Maildir mailboxes being named by their last path segment: they are named by their path relative to `maildir.root` ([himalaya-tui#22](https://github.com/pimalaya/himalaya-tui/issues/22)).
+- Fixed control and bidi characters from messages and servers reaching the terminal through the plain output.
+- Fixed pimdir queue details in the unified outputs: `envelope list` reports no `queued` count and a send prints no `queueId`, `pimdir queue list` showing what is queued.
+- Fixed `message compose`, `reply` and `forward` writing a `Message-ID` on the machine's hostname: it sits on the domain of the `From` address.
+- Fixed `message copy|move` on IMAP without MOVE reporting a copied message as not found when the `COPYUID` cannot be read, such as Mailo's UIDVALIDITY 0 ([#781]).
+- Fixed a raw message piped on stdin being cut at its first line that is not valid UTF-8 and still reported as sent or saved: stdin and message files are read whole as bytes ([#786]).
+- Fixed the plain output of the writes, `sieve get|list|capability` and `jmap query` not ending with a newline, and `jmap email parse` running its bodies together ([#777]).
+- Fixed the `envelope search` query errors carrying ANSI colour escapes, even inside the `--json` error string.
+- Fixed `message delete` in a JMAP trash destroying an email other mailboxes held too.
+- Fixed the writes on JMAP, Gmail and Microsoft Graph acting on an id of another mailbox: an id counts only when its message is in the mailbox given.
+
+  On Graph, `message delete -m trash` given the id of a message in another folder deleted it for good.
+
+- Fixed `message delete` in the trash reporting every id given as deleted: it counts the ids the trash held.
+- Fixed `flag add|set|remove` and `message copy|move|delete` running on no id, and acting twice on a repeated one.
+- Fixed Maildir and mbox writes given an unknown id among known ones failing part-way: every id is looked up before the first write.
+- Fixed a Maildir store listing failing on a plain file beside its folders (dovecot-uidlist), and listing phantom mailboxes through a symlink back to a folder.
+- Fixed the Maildir info flags being written out of ASCII order (`:2,SF` for `:2,FS`), and an experimental `:1,` info section being read as flags.
+- Fixed a missing `maildir.root` or `mbox.root` listing as an empty store: it fails naming the root.
+- Fixed the Maildir and mbox mailbox writes taking a blank name or one holding a control character, and creating over or renaming onto an existing Maildir.
+- Fixed `maildir delete` and a Thunderbird-layout `mbox delete` removing the mailboxes held under the one deleted, and the Maildir root being deletable: both are refused.
+- Fixed a Thunderbird-layout mbox rename orphaning the `.sbd` directory of its children: it moves with the mbox.
+- Fixed an mbox flag write leaving Thunderbird's `X-Mozilla-Status` and `X-Mozilla-Keys` out of step.
+- Fixed mbox reads carrying the `Status`, `X-Status`, `X-Keywords`, `X-Mozilla-*` and `Content-Length` fields the store writes, so `message read --raw` gives back the message added.
+- Fixed the mbox commands deleting or renaming the spool the mail system delivers to: it is refused, as IMAP refuses it for `INBOX`.
+- Fixed `INBOX` on mbox without `mbox.inbox` addressing a missing file of that name below the root: it fails naming `mbox.inbox`.
+- Fixed mbox listing and appending to files that are no mbox: a non-empty file not opening on a `From_` line is left out and refused.
+- Fixed an mboxcl or mboxcl2 `Content-Length` running past a message boundary merging the messages after it under one id.
+- Fixed a busy mbox lock failing uncoded: a lock held past `mbox.lock.timeout` fails `store-busy`, and a denied dotlock names `mbox.lock.dotlock = false`.
+- Fixed `message delete` on Maildir moving the trash's messages to the trash again when the trash was named by path or alias.
+- Fixed a copy or move between Maildirs carrying dovecot keyword letters verbatim: with `maildir.keywords.dovecot` they are renamed through the target's file.
+- Fixed a Maildir that cannot be searched reading as `missing cur/ subdirectory`: the permission error names the path.
+- Fixed the local `body` search clause matching case-insensitively in ASCII only.
+- Fixed the client-side sort of Maildir, mbox, pimdir, Gmail, Microsoft Graph and IMAP's fallback to follow RFC 5256: base subject, first address's mailbox, case ignored.
+- Fixed an IMAP keyword search naming a registered keyword in another case being sent as typed: `junk` sends `KEYWORD $Junk`.
+- Fixed IMAP searches negating a group or an address clause, which iCloud answered wrongly: negations are pushed onto single keys.
 - Fixed a UID Fastmail's `SORT` lists twice being listed twice.
-- Fixed `message read` of an id an IMAP mailbox lacks failing without naming it: it names the id and the mailbox.
-- Fixed `imap list` sending a non-ASCII pattern unencoded and its subscribed listing (`LSUB`) an unquoted one, which iCloud refuses (io-imap), and a refused `LSUB` failing rather than printing its completion.
-- Fixed `imap fetch --structure` printing the server's uppercase MIME types (it lowercases them) and a bad sequence set failing without naming it, on `fetch`, `store`, `copy` and `move`.
-- Fixed `imap copy` and `imap move` saying the messages were copied or moved when no `COPYUID` said so: the text names the UIDs, or says none came back.
-- Fixed `imap thread` on a server without the algorithm's `THREAD=` capability failing with the server's parse error: it is refused with `capability-missing` before anything is sent.
-- Fixed a JMAP write failing whole on an id gone beside known ones: each id the server refuses is an `errors` entry coded by its SetError type (`notFound`, `forbidden`, `overQuota`, `rateLimit`), the others written.
-- Fixed `message add`, a save and a send on a JMAP server forbidding duplicates (Fastmail) failing on bytes the account holds: the existing email is filed into the mailbox with the flags and its id reported, or submitted.
-- Fixed the JMAP set and method errors dropping the type, description and arguments a server sent (`invalidArguments [filter/inMailbox]`), and a stray backtick in their message.
-- Fixed `vacation set` on Fastmail failing after the update was applied, its `newState` being `null` and its answer echoing only the properties sent (io-jmap).
-- Fixed the flag receipts on JMAP printing the flag as given rather than the keyword written (`$flagged`).
-- Fixed a JMAP mailbox name matching none being sent to the server, answered `invalidArguments`, and a name two mailboxes carry resolving to the first: both are refused, the second naming the ids.
+- Fixed `imap list` sending a non-ASCII pattern unencoded and an `LSUB` pattern unquoted, which iCloud refuses.
+- Fixed `imap fetch --structure` printing the server's uppercase MIME types.
+- Fixed `imap copy` and `imap move` saying the messages were copied or moved when no `COPYUID` said so.
+- Fixed `imap thread` on a server without the algorithm's `THREAD=` capability failing with a parse error: it is refused with `capability-missing`.
+- Fixed a JMAP write failing whole on one refused id: each is an `errors` entry coded by its SetError type, the others written.
+- Fixed `message add`, a save and a send on a JMAP server forbidding duplicates (Fastmail) failing on bytes the account holds: the existing email is filed or submitted.
+- Fixed the JMAP set and method errors dropping the type, description and arguments the server sent.
+- Fixed setting the JMAP vacation response on Fastmail failing after the update was applied.
+- Fixed a JMAP mailbox name matching none being sent to the server, and one two mailboxes carry resolving to the first: both are refused.
 - Fixed `jmap email read` printing server values unsanitized, running two emails together and exiting 0 when no id named one.
-- Fixed the JMAP `query` commands returning the objects in the server's order rather than the query's (io-jmap).
-- Fixed `jmap email update` dropping the patches a replacement overrode (`--keywords` with `--add-keyword`, `--mailboxes` with `--add-mailbox`) and accepting no change at all: both are refused.
-- Fixed `message add -f answered` and `-f draft` on Gmail: the flags are checked against the account's capabilities, like `flag add`.
-- Fixed `flag set` on Gmail failing whole by naming the `DRAFT` label, which Gmail refuses from a client.
-- Fixed `mailbox rename` on Gmail leaving the sublabels under the old name: they are renamed with it, as IMAP `RENAME` moves the inferiors.
-- Fixed a Gmail search pattern widening the search with the operators it held (`OR`, `AND`, braces, parentheses, `from:`): each pattern is a literal, and one holding no word is refused with `search-unsupported`.
-- Fixed a Gmail reply or forward added or sent outside its thread: it carries the `threadId` of the first `In-Reply-To:` parent the account holds.
-- Fixed `gmail history list` printing an added message without its labels.
+- Fixed the JMAP `query` commands returning the objects in the server's order rather than the query's.
+- Fixed `jmap email update` dropping the patches a replacement overrode and accepting no change: both are refused.
+- Fixed a Gmail search pattern widening the search with the operators it held: each pattern is a literal.
+- Fixed a Gmail reply or forward added or sent outside its thread: it carries the parent's `threadId`.
 - Fixed a Gmail mailbox naming no label failing with Gmail's error: it is refused naming the value.
-- Fixed the Gmail snippets printing their `<b>` marks and HTML entities, and `gmail settings sendas get` printing `true` and `false` rather than `yes` and `no`.
-- Fixed Gmail ids, label ids and addresses reaching the request paths unencoded (io-gmail).
-- Fixed the Microsoft Graph roles dropping at random, `-m sent` then sent to Graph as a folder id: the well-known folders are looked up four to a `$batch`, as Graph serves four concurrent requests per mailbox, a throttled lookup is sent again after its `Retry-After`, and one failing other than 404 fails the command.
-- Fixed `mailbox list` on Microsoft Graph leaving out the nested folders and every folder past the first page: every folder but the hidden ones is listed, a nested one named by its path (`Projets/Alpha`), which `-m` takes.
-- Fixed a Microsoft Graph mailbox naming no folder being sent into the request path (`Projets/Alpha` as two segments): it is refused with `Mailbox X not found`, unless a well-known name or a folder id, then looked up. Every id reaches the path percent-encoded (io-msgraph).
-- Fixed `envelope list -s 0` and `envelope search -s 0` on Microsoft Graph listing 10 messages: every page is read.
-- Fixed the Microsoft Graph envelopes being dated by arrival: the date is the `Date:` header (`sentDateTime`), else the arrival.
-- Fixed a Microsoft Graph search pattern holding KQL syntax (`OR`, `x:y`, `alpha*`) widening the search: each word is a quoted KQL phrase.
-- Fixed `flag set` on Microsoft Graph leaving the categories it did not name: the keyword flags given replace them, none clearing them (io-msgraph).
-- Fixed `msgraph messages list --search` failing on a value holding `:` or `-`, now quoted for Graph unless it opens on a double quote, and `--count` printing nothing: Graph's count prints as `count`, `Count:` in text (io-msgraph).
-- Fixed an attached `message/rfc822` being written base64, which RFC 2046 forbids (mime-rs), and a forward dropping the `Content-Type` parameters (`charset`) of the source's attachments.
-- Fixed a composed single-part message not ending with a line break, a quoted empty line written `> ` with a trailing blank, and the JSON template of a reply or forward carrying CRLF line breaks.
-- Fixed the text view of `message read` printing `<>` for an address entry it cannot read: it prints `(unreadable: <entry>)`, as `headers.invalid` lists it.
-- Fixed `attachment download` without an id writing the inline parts `attachment list` leaves out: they are written only with the new `--inline`, as `attachment list --inline` lists them.
-- Fixed `himalaya manual` leaving out the pages of the nested commands, titling a page by its last word and pointing SEE ALSO at pages it did not write (pimalaya-cli).
-- Fixed the `--help` of the raw commands promising a batch of commands, which only `imap raw` takes.
+- Fixed the Gmail snippets printing their `<b>` marks and HTML entities.
+- Fixed Gmail ids, label ids and addresses reaching the request paths unencoded.
+- Fixed the Microsoft Graph roles dropping at random, `-m sent` then reaching Graph as a folder id.
+- Fixed `mailbox list` on Microsoft Graph leaving out the nested folders and every folder past the first page: a nested one is named by its path (`Projets/Alpha`).
+- Fixed a Microsoft Graph mailbox naming no folder being sent into the request path: it is refused, and every id is percent-encoded.
+- Fixed the Microsoft Graph envelopes being dated by arrival: the date is the `Date:` header, else the arrival.
+- Fixed a Microsoft Graph search pattern holding KQL syntax widening the search: each word is a quoted KQL phrase.
+- Fixed `flag set` on Microsoft Graph leaving the categories it did not name.
+- Fixed `msgraph messages list --search` failing on a value holding `:` or `-`.
+- Fixed `msgraph attachments list` listing the first page alone: it follows every next link.
+- Fixed an attached `message/rfc822` being written base64, which RFC 2046 forbids, and a forward dropping the `Content-Type` parameters of the source's attachments.
+- Fixed a composed single-part message not ending with a line break, a quoted empty line carrying a trailing blank, and the reply or forward JSON template carrying CRLF line breaks.
+
+### Security
+
+- Bumped rustls to 0.23.46, fixing RUSTSEC-2026-0346 to RUSTSEC-2026-0349: TLS secrets exposed by `Debug`, a downgrade to classical key exchange, and an unbounded certificate decompression.
+- Bumped ctutils to 0.4.6, rustls-webpki to 0.103.16 and webpki-root-certs to 1.0.11, fixing RUSTSEC-2026-0382, RUSTSEC-2026-0383 and RUSTSEC-2026-0385.
+- Fixed IMAP `LOGIN` and `AUTHENTICATE` logging credentials at trace level.
+- Fixed a server making Himalaya buffer without end: an HTTP response head is capped at 64 KiB, a body at 256 MiB, and a `STARTTLS` response line is capped too.
+- Fixed a SCRAM server announcing fewer than 4096 or more than five million iterations being accepted.
 
 ## [2.2.1] - 2026-10-02
 

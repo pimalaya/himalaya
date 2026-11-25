@@ -226,6 +226,7 @@ fn the_readme_sections_follow_the_cli_order() {
             "Installation",
             "Configuration",
             "Usage",
+            "Alternatives",
             "License",
             "Social",
             "Sponsoring",
