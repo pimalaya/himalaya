@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Himalaya 3 is a low-level CLI: plain text for humans, `--json` for scripts and frontends. The wizard, the m2dir backend and the table and colour options are gone, and an unknown configuration key fails the load. Every `--json` key is camelCase, a write prints what it acted on, a failure carries a stable `code` and a partial outcome exits 3. `envelope search` reads the pimdir query language, and `repl` and `mcp` serve the unified API over kept connections, the latter to AI agents.
+## [3.0.0] - 2026-11-25
 
-MIGRATION.md lists what to act on when upgrading from 2.x.
+Himalaya 3 is a low-level CLI over a unified mail API: the same commands on every backend, the protocol-specific ones beside them, plain text for a glance and `--json` for scripts, frontends and AI agents. Daily-mail comfort (tables, colours, relative dates, rich composition) moves to frontends such as himalaya-tui and to mml, and the offline side to the pimdir store Neverest syncs, which Himalaya reads and queues its writes into.
+
+The wizard, the m2dir backend and the display options are gone, an unknown configuration key fails the load, and every failure carries a stable `code`. MIGRATION.md lists what to act on when upgrading from 2.x.
 
 ### Added
 
@@ -1898,7 +1900,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.2.1...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/pimalaya/himalaya/compare/v2.2.1...v3.0.0
 [2.2.1]: https://github.com/pimalaya/himalaya/compare/v2.1.0...v2.2.1
 [2.2.0]: https://github.com/pimalaya/himalaya/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/pimalaya/himalaya/compare/v2.0.0...v2.1.0
