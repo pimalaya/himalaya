@@ -33,21 +33,21 @@ pub enum SearchEmailsFilterQuery {
     /// Emails sent strictly before that instant, to the second.
     BeforeInstant(DateTime<FixedOffset>),
     /// Emails holding the text anywhere: a header or a text body.
-    Text(String),
+    Text(SearchEmailsFilterText),
     /// Emails whose `From:` header holds the text.
-    From(String),
+    From(SearchEmailsFilterText),
     /// Emails whose `To:` header holds the text.
-    To(String),
+    To(SearchEmailsFilterText),
     /// Emails whose `Cc:` header holds the text.
-    Cc(String),
+    Cc(SearchEmailsFilterText),
     /// Emails whose `Bcc:` header holds the text.
-    Bcc(String),
+    Bcc(SearchEmailsFilterText),
     /// Emails whose `From:`, `To:`, `Cc:` or `Bcc:` header holds the text.
-    Address(String),
+    Address(SearchEmailsFilterText),
     /// Emails whose `Subject:` header holds the text.
-    Subject(String),
+    Subject(SearchEmailsFilterText),
     /// Emails one of whose text bodies holds the text.
-    Body(String),
+    Body(SearchEmailsFilterText),
     /// Emails carrying the flag.
     Flag(Flag),
     /// Emails holding at least one attachment.
@@ -55,6 +55,41 @@ pub enum SearchEmailsFilterQuery {
     /// The email whose `Message-ID:` is the id, held bare, without its
     /// angle brackets.
     MessageId(String),
+}
+
+/// The text of a text or address leaf: a word, a prefix or a phrase, as
+/// the query wrote it (pimdir SEARCH §8.3).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SearchEmailsFilterText {
+    /// The text, without its quotes or its wildcard.
+    pub text: String,
+    /// Whether it was quoted: its words match together, in order.
+    pub phrase: bool,
+    /// Whether a trailing `*` makes it a prefix.
+    pub prefix: bool,
+}
+
+/// A plain word, neither a prefix nor a phrase.
+impl From<&str> for SearchEmailsFilterText {
+    fn from(text: &str) -> Self {
+        Self {
+            text: text.to_owned(),
+            phrase: false,
+            prefix: false,
+        }
+    }
+}
+
+/// Renders the text as the language writes it: a phrase quoted, a prefix
+/// followed by its `*`.
+impl fmt::Display for SearchEmailsFilterText {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self.phrase, self.prefix) {
+            (true, _) => write!(f, "\"{}\"", self.text.replace('"', " ")),
+            (false, true) => write!(f, "{}*", Text(&self.text)),
+            (false, false) => write!(f, "{}", Text(&self.text)),
+        }
+    }
 }
 
 /// Renders the filter in the pimdir SEARCH language, so an error can quote
@@ -72,14 +107,14 @@ impl fmt::Display for SearchEmailsFilterQuery {
             Q::AfterInstant(instant) => write!(f, "date:{}..", instant.to_rfc3339()),
             Q::BeforeDate(date) => write!(f, "date:..{}", date.pred_opt().unwrap_or(*date)),
             Q::BeforeInstant(instant) => write!(f, "date:..{}", instant.to_rfc3339()),
-            Q::Text(text) => write!(f, "{}", Text(text)),
-            Q::From(text) => write!(f, "from:{}", Text(text)),
-            Q::To(text) => write!(f, "to:{}", Text(text)),
-            Q::Cc(text) => write!(f, "cc:{}", Text(text)),
-            Q::Bcc(text) => write!(f, "bcc:{}", Text(text)),
-            Q::Address(text) => write!(f, "with:{}", Text(text)),
-            Q::Subject(text) => write!(f, "subject:{}", Text(text)),
-            Q::Body(text) => write!(f, "body:{}", Text(text)),
+            Q::Text(text) => write!(f, "{text}"),
+            Q::From(text) => write!(f, "from:{text}"),
+            Q::To(text) => write!(f, "to:{text}"),
+            Q::Cc(text) => write!(f, "cc:{text}"),
+            Q::Bcc(text) => write!(f, "bcc:{text}"),
+            Q::Address(text) => write!(f, "with:{text}"),
+            Q::Subject(text) => write!(f, "subject:{text}"),
+            Q::Body(text) => write!(f, "body:{text}"),
             Q::Flag(flag) => match flag.raw() {
                 "\\Seen" => write!(f, "is:read"),
                 "\\Flagged" => write!(f, "is:flagged"),

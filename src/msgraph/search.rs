@@ -10,7 +10,13 @@
 use anyhow::Result;
 use chrono::NaiveDate;
 
-use crate::unified::email::search::{error::unsupported, filter::query::SearchEmailsFilterQuery};
+use crate::unified::{
+    capability::GRAPH_DAYS,
+    email::search::{
+        error::unsupported,
+        filter::query::{SearchEmailsFilterQuery, SearchEmailsFilterText},
+    },
+};
 
 /// Translates the filter half of a unified query into the quoted `$search`
 /// value Graph takes.
@@ -44,10 +50,7 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::AfterDate(date) => format!("sent>{}", date_kql(*date)),
         SearchEmailsFilterQuery::BeforeDate(date) => format!("sent<{}", date_kql(*date)),
         SearchEmailsFilterQuery::AfterInstant(_) | SearchEmailsFilterQuery::BeforeInstant(_) => {
-            return Err(unsupported(
-                filter,
-                "Microsoft Graph search compares days alone; give a day, or `today`",
-            ));
+            return Err(unsupported(filter, GRAPH_DAYS));
         }
         SearchEmailsFilterQuery::From(pattern) => format!("from:{}", value_kql(pattern)),
         SearchEmailsFilterQuery::To(pattern) => format!("to:{}", value_kql(pattern)),
@@ -75,12 +78,25 @@ fn filter_to_kql(filter: &SearchEmailsFilterQuery) -> Result<String> {
     })
 }
 
-/// Renders a pattern as KQL, each word an escaped quoted phrase so KQL
-/// syntax (`OR`, `x:y`, `alpha*`) matches as a word; a `"` is dropped.
-fn value_kql(pattern: &str) -> String {
-    let words: Vec<String> = pattern
+/// Renders a text as KQL, a `"` dropped.
+///
+/// A phrase is one quoted string, a prefix quoted with its `*`, and any
+/// other word an escaped quoted phrase, so KQL syntax (`OR`, `x:y`,
+/// `alpha*`) matches as a word.
+fn value_kql(text: &SearchEmailsFilterText) -> String {
+    let quote = |word: &str, star: &str| format!("\\\"{}{star}\\\"", word.replace('"', ""));
+
+    if text.phrase {
+        return quote(&text.text, "");
+    }
+    if text.prefix {
+        return quote(&text.text, "*");
+    }
+
+    let words: Vec<String> = text
+        .text
         .split_whitespace()
-        .map(|word| format!("\\\"{}\\\"", word.replace('"', "")))
+        .map(|word| quote(word, ""))
         .collect();
 
     match words.as_slice() {
@@ -97,7 +113,10 @@ fn date_kql(date: NaiveDate) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::unified::email::flag::{Flag, IanaFlag};
+    use crate::unified::email::{
+        flag::{Flag, IanaFlag},
+        search::query::SearchEmailsQuery,
+    };
 
     #[test]
     fn a_lone_message_id_is_a_filter_and_refused_in_a_search() {
@@ -118,12 +137,19 @@ mod tests {
 
     /// KQL compares days alone: an instant is refused, coded
     /// `search-unsupported`, nothing searched.
+    ///
+    /// The words are the capability check's for `date.instant`.
     #[test]
     fn an_instant_is_refused() {
         let at = chrono::DateTime::parse_from_rfc3339("2026-11-14T10:00:00Z").unwrap();
         let err = filter_to_search(&SearchEmailsFilterQuery::AfterInstant(at)).unwrap_err();
         let code = pimalaya_cli::error::code_of::<crate::error::ErrorCode>(&err);
         assert_eq!(code, Some(crate::error::ErrorCode::SearchUnsupported));
+        assert_eq!(
+            err.to_string(),
+            "Cannot search `date:2026-11-14T10:00:00+00:00..`: Microsoft Graph search \
+             compares days alone; give a day (`date:2026-11-24..`) or `today`"
+        );
     }
 
     #[test]
@@ -185,6 +211,25 @@ mod tests {
         assert_eq!(kql("OR"), r#"from:\"OR\""#);
         assert_eq!(kql("x:y"), r#"from:\"x:y\""#);
         assert_eq!(kql("say \"hi\""), r#"from:(\"say\" \"hi\")"#);
+    }
+
+    /// A prefix reaches KQL with its `*`, a phrase as one quoted string,
+    /// so neither is answered as other words.
+    #[test]
+    fn a_prefix_and_a_phrase_keep_their_meaning() {
+        let kql = |query: &str| {
+            let query: SearchEmailsQuery = query.parse().unwrap();
+            filter_to_kql(&query.filter.unwrap()).unwrap()
+        };
+
+        assert_eq!(kql("subject:repo*"), r#"subject:\"repo*\""#);
+        assert_eq!(kql("quart*"), r#"\"quart*\""#);
+        assert_eq!(kql("from:ali*"), r#"from:\"ali*\""#);
+        assert_eq!(
+            kql("subject:\"report weekly\""),
+            r#"subject:\"report weekly\""#
+        );
+        assert_eq!(kql("\"a OR b\""), r#"\"a OR b\""#);
     }
 
     #[test]

@@ -1207,49 +1207,49 @@ fn convert_filter(
         Q::Not(inner) => JmapFilter::not(vec![convert_filter(inner, None)]),
 
         Q::Text(text) => condition(JmapEmailFilter {
-            text: Some(text.clone()),
+            text: Some(text.text.clone()),
             ..Default::default()
         }),
         Q::From(pattern) => condition(JmapEmailFilter {
-            from: Some(pattern.clone()),
+            from: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::To(pattern) => condition(JmapEmailFilter {
-            to: Some(pattern.clone()),
+            to: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::Cc(pattern) => condition(JmapEmailFilter {
-            cc: Some(pattern.clone()),
+            cc: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::Bcc(pattern) => condition(JmapEmailFilter {
-            bcc: Some(pattern.clone()),
+            bcc: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::Address(pattern) => JmapFilter::or(vec![
             condition(JmapEmailFilter {
-                from: Some(pattern.clone()),
+                from: Some(pattern.text.clone()),
                 ..Default::default()
             }),
             condition(JmapEmailFilter {
-                to: Some(pattern.clone()),
+                to: Some(pattern.text.clone()),
                 ..Default::default()
             }),
             condition(JmapEmailFilter {
-                cc: Some(pattern.clone()),
+                cc: Some(pattern.text.clone()),
                 ..Default::default()
             }),
             condition(JmapEmailFilter {
-                bcc: Some(pattern.clone()),
+                bcc: Some(pattern.text.clone()),
                 ..Default::default()
             }),
         ]),
         Q::Subject(pattern) => condition(JmapEmailFilter {
-            subject: Some(pattern.clone()),
+            subject: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::Body(pattern) => condition(JmapEmailFilter {
-            body: Some(pattern.clone()),
+            body: Some(pattern.text.clone()),
             ..Default::default()
         }),
         Q::Flag(flag) => condition(JmapEmailFilter {
@@ -1448,6 +1448,25 @@ mod tests {
         let query: SearchEmailsQuery = query.parse().unwrap();
         let converted = build(Some(&query), String::from("inbox"));
         post_match(envelope, &converted.post_filters)
+    }
+
+    /// JMAP matches text as the server defines it: a prefix is sent as its
+    /// stem, a phrase as one string.
+    #[test]
+    fn a_prefix_is_its_stem_and_a_phrase_one_string() {
+        let subject = |query: &str| {
+            let query: SearchEmailsQuery = query.parse().unwrap();
+            match convert_filter(query.filter.as_ref().unwrap(), None) {
+                JmapFilter::Condition(condition) => condition.subject,
+                other => panic!("{other:?}"),
+            }
+        };
+
+        assert_eq!(subject("subject:repo*").as_deref(), Some("repo"));
+        assert_eq!(
+            subject("subject:\"report weekly\"").as_deref(),
+            Some("report weekly")
+        );
     }
 
     #[test]

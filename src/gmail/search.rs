@@ -4,9 +4,9 @@
 //! syntax, the same one the Gmail search box speaks.
 //!
 //! The filter half becomes one `q` string, negations expanded through De
-//! Morgan so a `-` only prefixes a leaf, the shape Gmail matches reliably.
-//! `flag answered` (replies are not searchable) and the keywords are refused
-//! with `search-unsupported` rather than return wrong hits.
+//! Morgan so a `-` only prefixes a leaf. `flag answered`, the keywords and
+//! a prefix, which Gmail cannot search, are refused with
+//! `search-unsupported` rather than return wrong hits.
 //!
 //! A date clause is sent as Unix seconds bounding the UTC day, Gmail
 //! reading a bare date as midnight in PST. It compares them with the
@@ -25,7 +25,10 @@ use chrono::{Duration, NaiveDate, NaiveTime};
 
 use crate::unified::email::{
     flag::{Flag, IanaFlag},
-    search::{error::unsupported, filter::query::SearchEmailsFilterQuery},
+    search::{
+        error::unsupported,
+        filter::query::{SearchEmailsFilterQuery, SearchEmailsFilterText},
+    },
 };
 
 /// Translates the filter half of a unified query into a Gmail `q` value.
@@ -51,21 +54,21 @@ pub(super) fn filter_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::BeforeInstant(instant) => {
             Ok(format!("before:{}", instant.timestamp()))
         }
-        SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", value_q(filter, pattern)?)),
-        SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", value_q(filter, pattern)?)),
-        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", value_q(filter, pattern)?)),
-        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("bcc:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::From(pattern) => Ok(format!("from:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::To(pattern) => Ok(format!("to:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("cc:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("bcc:{}", text_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Address(pattern) => {
-            let value = value_q(filter, pattern)?;
+            let value = text_q(filter, pattern)?;
             Ok(format!(
                 "{{from:{value} to:{value} cc:{value} bcc:{value}}}"
             ))
         }
         SearchEmailsFilterQuery::Subject(pattern) => {
-            Ok(format!("subject:{}", value_q(filter, pattern)?))
+            Ok(format!("subject:{}", text_q(filter, pattern)?))
         }
         SearchEmailsFilterQuery::Body(pattern) | SearchEmailsFilterQuery::Text(pattern) => {
-            value_q(filter, pattern)
+            text_q(filter, pattern)
         }
         SearchEmailsFilterQuery::Flag(flag) => flag_q(filter, flag),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("has:attachment")),
@@ -98,23 +101,21 @@ fn not_to_q(filter: &SearchEmailsFilterQuery) -> Result<String> {
         SearchEmailsFilterQuery::BeforeInstant(instant) => {
             Ok(format!("-before:{}", instant.timestamp()))
         }
-        SearchEmailsFilterQuery::From(pattern) => {
-            Ok(format!("-from:{}", value_q(filter, pattern)?))
-        }
-        SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", value_q(filter, pattern)?)),
-        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", value_q(filter, pattern)?)),
-        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("-bcc:{}", value_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::From(pattern) => Ok(format!("-from:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::To(pattern) => Ok(format!("-to:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Cc(pattern) => Ok(format!("-cc:{}", text_q(filter, pattern)?)),
+        SearchEmailsFilterQuery::Bcc(pattern) => Ok(format!("-bcc:{}", text_q(filter, pattern)?)),
         SearchEmailsFilterQuery::Address(pattern) => {
-            let value = value_q(filter, pattern)?;
+            let value = text_q(filter, pattern)?;
             Ok(format!(
                 "-from:{value} -to:{value} -cc:{value} -bcc:{value}"
             ))
         }
         SearchEmailsFilterQuery::Subject(pattern) => {
-            Ok(format!("-subject:{}", value_q(filter, pattern)?))
+            Ok(format!("-subject:{}", text_q(filter, pattern)?))
         }
         SearchEmailsFilterQuery::Body(pattern) | SearchEmailsFilterQuery::Text(pattern) => {
-            Ok(format!("-{}", value_q(filter, pattern)?))
+            Ok(format!("-{}", text_q(filter, pattern)?))
         }
         SearchEmailsFilterQuery::Flag(flag) => Ok(format!("-{}", flag_q(filter, flag)?)),
         SearchEmailsFilterQuery::Attachment => Ok(String::from("-has:attachment")),
@@ -152,6 +153,19 @@ fn group(q: &str) -> String {
     } else {
         q.to_string()
     }
+}
+
+/// Renders the text of `clause` as a Gmail query value, a phrase quoted,
+/// refusing a prefix: Gmail matches whole words and has no wildcard.
+fn text_q(clause: &SearchEmailsFilterQuery, text: &SearchEmailsFilterText) -> Result<String> {
+    if text.prefix {
+        return Err(unsupported(
+            clause,
+            "Gmail search matches whole words and has no prefix search",
+        ));
+    }
+
+    value_q(clause, &text.text)
 }
 
 /// Renders the pattern of `clause` as a Gmail query value matching it
@@ -301,6 +315,27 @@ mod tests {
     fn operator_lookalikes_get_quoted() {
         assert_eq!(q("body:\"from:alice\""), "\"from:alice\"");
         assert_eq!(q("not body:-draft"), "-\"-draft\"");
+    }
+
+    /// Gmail has no prefix search: a trailing `*` is refused before any
+    /// request rather than sent as the whole word, and a phrase is quoted.
+    #[test]
+    fn a_prefix_is_refused_and_a_phrase_quoted() {
+        for query in ["subject:repo*", "zebr*", "from:ali*", "not body:quart*"] {
+            let filter = SearchEmailsQuery::from_str(query).unwrap().filter.unwrap();
+            let err = filter_to_q(&filter).unwrap_err();
+            assert_eq!(
+                code_of::<ErrorCode>(&err),
+                Some(ErrorCode::SearchUnsupported),
+                "{query}: {err}"
+            );
+        }
+
+        assert_eq!(
+            q_err("subject:repo*"),
+            "Cannot search `subject:repo*`: Gmail search matches whole words and has no prefix search"
+        );
+        assert_eq!(q("subject:\"report weekly\""), "subject:\"report weekly\"");
     }
 
     #[test]

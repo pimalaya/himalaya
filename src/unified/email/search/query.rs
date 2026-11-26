@@ -9,7 +9,7 @@ use ariadne::{Config, Label, Report, ReportKind, Source};
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use io_pimdir::search::query::{
     PimdirQuery, PimdirQueryDate, PimdirQueryDateRange, PimdirQueryError, PimdirQueryErrorCode,
-    PimdirQueryPredicate, PimdirQueryTextField,
+    PimdirQueryPredicate, PimdirQueryText, PimdirQueryTextField,
 };
 use jiff::{Timestamp, tz::TimeZone};
 use pimalaya_cli::error::CodedError;
@@ -21,7 +21,7 @@ use crate::{
         email::{
             flag::Flag,
             search::{
-                filter::query::SearchEmailsFilterQuery,
+                filter::query::{SearchEmailsFilterQuery, SearchEmailsFilterText},
                 sort::query::{
                     SearchEmailsSorter, SearchEmailsSorterKind, SearchEmailsSorterOrder,
                 },
@@ -238,12 +238,12 @@ fn lower(query: &PimdirQuery, now: i64, zone: &TimeZone) -> Result<SearchEmailsF
         PimdirQuery::Group(operand) => lower(operand, now, zone)?,
         PimdirQuery::Term(term) => match &term.predicate {
             PimdirQueryPredicate::Text { field, text } => match field {
-                PimdirQueryTextField::Title => Q::Subject(text.text.clone()),
-                PimdirQueryTextField::Body => Q::Body(text.text.clone()),
-                _ => Q::Text(text.text.clone()),
+                PimdirQueryTextField::Title => Q::Subject(leaf(text)),
+                PimdirQueryTextField::Body => Q::Body(leaf(text)),
+                _ => Q::Text(leaf(text)),
             },
             PimdirQueryPredicate::Address { role, text } => {
-                let text = text.text.clone();
+                let text = leaf(text);
                 match role.map(|role| role.as_str()) {
                     Some("from") => Q::From(text),
                     Some("to") => Q::To(text),
@@ -264,6 +264,15 @@ fn lower(query: &PimdirQuery, now: i64, zone: &TimeZone) -> Result<SearchEmailsF
     };
 
     Ok(lowered)
+}
+
+/// The text of a leaf, its prefix and phrase marks kept.
+fn leaf(text: &PimdirQueryText) -> SearchEmailsFilterText {
+    SearchEmailsFilterText {
+        text: text.text.clone(),
+        phrase: text.phrase,
+        prefix: text.prefix,
+    }
 }
 
 /// A date range as the clauses bounding it: a side a calendar point
@@ -374,5 +383,26 @@ impl std::str::FromStr for SearchEmailsQuery {
             false => Some(PimdirQuery::parse(text).map_err(|err| anyhow::anyhow!("{err}"))?),
         };
         Self::new(query, order, 1_795_262_400, TimeZone::UTC)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SearchEmailsQuery;
+
+    /// The lowered filter keeps a prefix and a phrase, as the server
+    /// translations and their refusals read them.
+    #[test]
+    fn a_prefix_and_a_phrase_survive_the_lowering() {
+        for text in [
+            "subject:repo*",
+            "zebr*",
+            "from:ali*",
+            "subject:\"report weekly\"",
+            "\"a b\"",
+        ] {
+            let query: SearchEmailsQuery = text.parse().unwrap();
+            assert_eq!(query.filter.unwrap().to_string(), text);
+        }
     }
 }

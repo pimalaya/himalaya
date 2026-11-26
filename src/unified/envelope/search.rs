@@ -31,11 +31,14 @@ use crate::{
 /// The query is pimdir SEARCH §8, the language `pimdir search`, Calendula
 /// and Cardamum read: `from:alice date:2026-11.. is:unread "weekly sync"`.
 /// A text term is matched as the backend matches text: whole words on
-/// Maildir, mbox, pimdir, Gmail and Microsoft Graph, a substring on IMAP
-/// and JMAP. A date reads the `Date:` header, the sent-at, but where the
-/// server compares the received date: on Gmail, and on JMAP under `or` or
-/// `not`. A field the backend cannot search is refused with
-/// `search-unsupported`, never dropped.
+/// Maildir, mbox, pimdir, Gmail and Microsoft Graph, as the server matches
+/// it on IMAP and JMAP (a substring by the RFCs, whole words on some
+/// servers). A prefix (`repo*`) is a prefix there, its stem sent as a
+/// substring on IMAP and JMAP, and refused on Gmail, which has no prefix
+/// search; a phrase is sent whole. A date reads the `Date:` header, the
+/// sent-at, but where the server compares the received date: on Gmail,
+/// and on JMAP under `or` or `not`. A field the backend cannot search is
+/// refused with `search-unsupported`, never dropped.
 ///
 /// A message the listing cannot read is an entry of `errors`, the rest
 /// of the page still listed; the command then exits 3.
@@ -92,11 +95,11 @@ pub struct EnvelopeSearchCommand {
     ///   brackets optional.
     ///
     /// Days and instants with no offset are read in the local zone (`TZ`,
-    /// then the system's). A trailing `*` makes a word a prefix. A word or
-    /// value beginning with `~`, a word or value of two characters or more
-    /// beginning with `/`, and a value beginning with `{` are reserved and
-    /// refused (`reserved-form`): quote them to search the characters,
-    /// `"~tilde"`.
+    /// then the system's). A trailing `*` makes a word a prefix, refused on
+    /// Gmail. A word or value beginning with `~`, a word or value of two
+    /// characters or more beginning with `/`, and a value beginning with `{`
+    /// are reserved and refused (`reserved-form`): quote them to search the
+    /// characters, `"~tilde"`.
     #[arg(value_name = "QUERY")]
     pub query: Option<Vec<String>>,
 }

@@ -772,10 +772,15 @@ const JMAP_DATE: &str = "under `or` or `not`, compared with the received date ra
 
 /// Where a server matching substrings differs from the words pimdir SEARCH
 /// matches (§8.5).
-const SUBSTRING: &str = "a substring as the server matches it, where the query matches whole words; RFC 3501 asks for a case-insensitive substring, some servers (Cyrus, Fastmail) match whole words";
+const SUBSTRING: &str = "a substring as the server matches it, where the query matches whole words, a prefix sent as its stem and a phrase as one string; RFC 3501 asks for a case-insensitive substring, some servers (Cyrus, Fastmail) match whole words, so a prefix finds only the whole word there and a phrase its words in any order";
 
 /// Where JMAP's text conditions differ.
-const JMAP_TEXT: &str = "text as the server defines `text` and the header conditions (RFC 8621 section 4.4.1), often a substring";
+const JMAP_TEXT: &str = "text as the server defines `text` and the header conditions (RFC 8621 section 4.4.1), often a substring, a prefix sent as its stem and a phrase as one string";
+
+/// Why Graph answers no instant, nor an amount back from now: the one
+/// refusal its capability check and its translation give.
+pub(crate) const GRAPH_DAYS: &str =
+    "Microsoft Graph search compares days alone; give a day (`date:2026-11-24..`) or `today`";
 
 /// Why Graph answers no flag.
 const GRAPH_FLAG: &str = "KQL has no flag property, and Graph takes no `$filter` beside `$search`";
@@ -785,17 +790,19 @@ const NO_RANK: &str = "no ranking without an index; a pimdir store's index ranks
 
 /// Gmail.
 const GMAIL: &[Row] = storage_rows![
-    (C::Search(O::Text), Full),
-    (C::Search(O::Title), Full),
+    (C::Search(O::Text), Partial(GMAIL_TEXT)),
+    (C::Search(O::Title), Partial(GMAIL_TEXT)),
     (
         C::Search(O::Body),
-        Partial("a word anywhere in the message, headers included")
+        Partial(
+            "a word anywhere in the message, headers included; a prefix (a trailing `*`) refused, Gmail having no prefix search"
+        )
     ),
-    (C::Search(O::From), Full),
-    (C::Search(O::To), Full),
-    (C::Search(O::Cc), Full),
-    (C::Search(O::Bcc), Full),
-    (C::Search(O::With), Full),
+    (C::Search(O::From), Partial(GMAIL_TEXT)),
+    (C::Search(O::To), Partial(GMAIL_TEXT)),
+    (C::Search(O::Cc), Partial(GMAIL_TEXT)),
+    (C::Search(O::Bcc), Partial(GMAIL_TEXT)),
+    (C::Search(O::With), Partial(GMAIL_TEXT)),
     (C::Search(O::IsRead), Full),
     (C::Search(O::IsFlagged), Full),
     (C::Search(O::IsAnswered), Not("Gmail has no label for it")),
@@ -852,6 +859,10 @@ const GMAIL: &[Row] = storage_rows![
     (C::SubmitCopy, Full),
 ];
 
+/// Where Gmail's text clauses differ.
+const GMAIL_TEXT: &str =
+    "whole words and phrases; a prefix (a trailing `*`) refused, Gmail having no prefix search";
+
 /// Where Gmail's date clauses differ.
 const GMAIL_DATE: &str = "compared with the received date, in UTC days, rather than `Date:`";
 
@@ -872,7 +883,7 @@ const MSGRAPH: &[Row] = storage_rows![
     (C::Search(O::Tag), Not(GRAPH_FLAG)),
     (C::Search(O::HasAttachment), Full),
     (C::Search(O::Date), Full),
-    (C::Search(O::DateInstant), Not("KQL compares days")),
+    (C::Search(O::DateInstant), Not(GRAPH_DAYS)),
     (
         C::Search(O::Mid),
         Partial("alone, Graph taking no `$filter` beside `$search`")

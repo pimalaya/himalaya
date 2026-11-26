@@ -195,6 +195,18 @@ fn jmap_refuses_a_message_id_clause_before_connecting() {
     );
 }
 
+/// An instant is refused before connecting in the words the translation
+/// refuses an amount back from now with (src/msgraph/search.rs).
+#[test]
+fn graph_refuses_an_instant_before_connecting() {
+    refused(
+        MSGRAPH,
+        &["envelope", "search", "date:5h"],
+        "search-unsupported",
+        "Cannot search `date.instant` over msgraph: Microsoft Graph search compares days alone; give a day (`date:2026-11-24..`) or `today`",
+    );
+}
+
 #[test]
 fn a_backend_filter_narrows_the_resolution() {
     refused(

@@ -1444,7 +1444,7 @@ fn convert_filter_with(
         Q::BeforeInstant(instant) => {
             SearchKey::SentBefore(imap_date(InstantBand::of(instant).end)?)
         }
-        Q::Address(pattern) => return address_key(pattern, negated),
+        Q::Address(pattern) => return address_key(&pattern.text, negated),
 
         Q::Date(date) => SearchKey::SentOn(imap_date(*date)?),
 
@@ -1455,13 +1455,13 @@ fn convert_filter_with(
 
         Q::BeforeDate(date) => SearchKey::SentBefore(imap_date(*date)?),
 
-        Q::From(pattern) => SearchKey::From(astring(pattern)?),
-        Q::To(pattern) => SearchKey::To(astring(pattern)?),
-        Q::Cc(pattern) => SearchKey::Cc(astring(pattern)?),
-        Q::Bcc(pattern) => SearchKey::Bcc(astring(pattern)?),
-        Q::Subject(pattern) => SearchKey::Subject(astring(pattern)?),
-        Q::Body(pattern) => SearchKey::Body(astring(pattern)?),
-        Q::Text(pattern) => SearchKey::Text(astring(pattern)?),
+        Q::From(pattern) => SearchKey::From(astring(&pattern.text)?),
+        Q::To(pattern) => SearchKey::To(astring(&pattern.text)?),
+        Q::Cc(pattern) => SearchKey::Cc(astring(&pattern.text)?),
+        Q::Bcc(pattern) => SearchKey::Bcc(astring(&pattern.text)?),
+        Q::Subject(pattern) => SearchKey::Subject(astring(&pattern.text)?),
+        Q::Body(pattern) => SearchKey::Body(astring(&pattern.text)?),
+        Q::Text(pattern) => SearchKey::Text(astring(&pattern.text)?),
         Q::MessageId(id) => message_id_key(id)?,
         Q::Attachment => {
             return Err(unsupported(
@@ -1781,6 +1781,18 @@ mod tests {
         assert_eq!(
             search_line("from:a not (subject:b or not (to:c cc:d))"),
             "A UID SEARCH FROM a NOT SUBJECT b TO c CC d",
+        );
+    }
+
+    /// IMAP matches a substring: a prefix is sent as its stem, a phrase as
+    /// one string.
+    #[test]
+    fn a_prefix_is_its_stem_and_a_phrase_one_string() {
+        assert_eq!(search_line("subject:repo*"), "A UID SEARCH SUBJECT repo");
+        assert_eq!(search_line("quart*"), "A UID SEARCH TEXT quart");
+        assert_eq!(
+            search_line("subject:\"report weekly\""),
+            "A UID SEARCH SUBJECT \"report weekly\"",
         );
     }
 
