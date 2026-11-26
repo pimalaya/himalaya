@@ -13,10 +13,10 @@ change: envelope-search-speaks-pimdir
 - [x] IMAP, JMAP, Gmail and Graph: the query lowered to the filter tree their translators read (a `Text` leaf added for free text), the translators kept. Deviation from the proposal: lowering rather than rewriting each translator over `PimdirQuery`, so their tested pushdowns stay.
 - [x] Maildir and mbox through `search::mail` (`SearchEmailsQuery::matches`).
 - [x] pimdir: the walk and its pushdown kept, each item matched by `search::mail` (`PimdirMail::read` or `from_summary`).
-- [ ] pimdir answering `envelope search` from its index when the store has one, `--sort relevance` with it: not done, the walk answers as before.
+- [x] ~~pimdir answering `envelope search` from its index when the store has one, `--sort relevance` with it~~ Moved 2026-11-26 to cairn/changes/envelope-search-reads-the-index: future work, the walk answers as before.
 - [x] `mid:`, instants and the orders.
 - [x] Help, README block, spec search.md, MIGRATION.md, CHANGELOG.
 - [x] Tests: the backend tests' queries rewritten to §8 (a one-off conversion, then reviewed), tests/envelope_search.rs, tests/capability.rs, tests/mcp.rs.
 - [ ] Live runs on the Google, Microsoft and Fastmail test accounts, owner's go first.
 - [x] Path patch swapped for a git pin on io-pimdir dc19b8d (2026-11-21).
-- [ ] Git pin replaced by io-pimdir 0.20.0; landed.
+- [x] Git pin replaced by a release: io-pimdir 0.20.0 (f6471b0a), then 1.0.0 from crates.io (944ba0ad); landed.

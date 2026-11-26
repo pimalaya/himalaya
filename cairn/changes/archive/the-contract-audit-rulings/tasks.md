@@ -20,4 +20,4 @@ change: the-contract-audit-rulings
 - [x] src/imap/raw.rs, src/imap/cli.rs, src/cli.rs: `ImapCommand::check`; test tests/early_refusal.rs.
 - [x] src/shared/envelope/search.rs, cli.rs: `query_parse_error_line`; test `a_refused_query_is_one_line_under_json`. Help paragraphs naming exit 3. src/shared/attachment/download.rs: the `Saved` lines.
 - [x] Fold into cairn/spec/commands.md, backends.md, config.md, mcp.md; CHANGELOG; MIGRATION.md; the log entry.
-- [ ] Before commit: replace the path patch with the released pimalaya-cli pin.
+- [x] Before commit: replace the path patch with the released pimalaya-cli pin (296dcef2 committed on pimalaya-cli 0.8.0 from crates.io; 944ba0ad requires 0.8.1, no `[patch.crates-io]` table, no git source in Cargo.lock, checked 2026-11-26).

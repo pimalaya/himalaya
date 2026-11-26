@@ -1,11 +1,13 @@
 ---
 cairn: change
 id: envelope-search-speaks-pimdir
-status: active
+status: landed
 created: 2026-11-21
 ---
 
 # Envelope search speaks pimdir
+
+Closed 2026-11-26 as landed (log 2026-11-21): the io-pimdir release replaced the git pin; the index-answered search moved to cairn/changes/envelope-search-reads-the-index.
 
 ## Why
 

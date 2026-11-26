@@ -32,7 +32,7 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 ## 3. Bugs (G)
 
 - [x] `pimdir status` takes 30 s at 517k, walking every summary to count bodies (src/pimdir/backend.rs:1487-1491): on a mailbox `overlay_quiet` answers quiet, `hydrated` = `count_items` minus the `bodiless` of `PimdirReader::search_coverage(&[id], None, None)` (`sql::COUNT_BODILESS`), the walk kept for a busy queue, as `count_unread` does. Test `a_status_counts_bodies_as_the_walk_does` (quiet and busy fixtures, a bodiless item in each). Gate; threshold under 500 ms at 517k; commit `perf(pimdir): status counts bodies without reading every summary`.
-- [ ] N1 parked; N2, N3 landed on drop 2 (journal 18:25). N1, N2, N3 (needs-io-pimdir.md): once io-pimdir releases each, add its app test (named there), make it pass, gate, commit.
+- [x] N1 parked; N2, N3 landed on drop 2 (journal 18:25). N1, N2, N3 (needs-io-pimdir.md): once io-pimdir releases each, add its app test (named there), make it pass, gate, commit. (2026-11-26: N2, N3 landed; N1 ruled by pimdir storage-v1 §13 (Flags), a system flag compared by its exact bytes, `\seen` a keyword; no source writes one, so no app test was owed; Himalaya's `Flag::from_raw` still classifies `\seen` as read, a gap left to the owner, reported in the v3 pass.)
 - [x] Re-check the closed lines of inventory.md §6 on the head of this step; reopen any that fails.
 
 ## 4. Performance (H)
@@ -40,7 +40,7 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 - [x] (closed by N6, N7 on drop 3, journal 18:56) P1 `pimdir count california` 73 ms where the `pimdir` binary counts `(california) kind:mail` in 8.1 ms (inventory.md §5), the gap growing with the hits (`kiwi` 8.3 ms): profile a release build with `CARGO_PROFILE_RELEASE_STRIP=false CARGO_PROFILE_RELEASE_DEBUG=line-tables-only` under `perf record -e cpu-clock --user-callchains -g` (DWARF unwinding is refused at perf_event_paranoid 2); first suspect, the store opened twice in shared-cache mode (`PimdirClient`'s reader and the index's attach). Fix the cause; threshold within 5 ms of the binary.
 - [x] (closed by N6, N7 on drop 3, journal 18:56) P2 `pimdir search -s 50 california` 35 ms against the binary's 10.9 ms, about 0.4 ms per hit: `mail_hit` (src/pimdir/index.rs:268-297) reads `get_item` per hit; build the envelope from one read per page, or from what the hit carries; same threshold.
 - [x] P3 `envelope search` matching: src/pimdir/backend.rs:569-596 calls `match_mails(&[mail])` per item (`kiwi`, 11,896 bodies, 987 ms); profile as P1 and batch per walked page when the call is over 10% of the samples.
-- [ ] (measured under load, inventory.md §7; quiet re-run at the lane's end) Re-run inventory.md §5 in a quiet window per frame.md §5 (three copies, A/A within 1%, interleaved; notmuch on .bench-notmuch/runs/x1 beside). Thresholds: no row slower than before beyond 5%; `pimdir search|count|--threads` within 5 ms of the `pimdir` binary on the same store; `pimdir status` under 500 ms at 517k; `envelope list -s 50` under 25 ms; `envelope search kiwi` and `mid:` recorded, not gated (D2, N5). Fixtures: the two copies of inventory.md §5, rebuilt by the same `cp -a` if gone (the draft-15 one from .bench-notmuch/runs/x1/pd/store, else imported from ~/code/pimalaya/.pimdir-night/sync-perf/corpus with `pimbench sync`, io-pimdir's bench/ crate whose `path = ".."` dependency points at an archive of dc19b8d). Table into inventory.md, commit `docs(cairn): measures after storage-draft-17`.
+- [x] ~~(measured under load, inventory.md §7; quiet re-run at the lane's end) Re-run inventory.md §5 in a quiet window per frame.md §5 (three copies, A/A within 1%, interleaved; notmuch on .bench-notmuch/runs/x1 beside). Thresholds: no row slower than before beyond 5%; `pimdir search|count|--threads` within 5 ms of the `pimdir` binary on the same store; `pimdir status` under 500 ms at 517k; `envelope list -s 50` under 25 ms; `envelope search kiwi` and `mid:` recorded, not gated (D2, N5). Fixtures: the two copies of inventory.md §5, rebuilt by the same `cp -a` if gone (the draft-15 one from .bench-notmuch/runs/x1/pd/store, else imported from ~/code/pimalaya/.pimdir-night/sync-perf/corpus with `pimbench sync`, io-pimdir's bench/ crate whose `path = ".."` dependency points at an archive of dc19b8d). Table into inventory.md, commit `docs(cairn): measures after storage-draft-17`.~~ Superseded 2026-11-26: io-pimdir 1.0.0 replaced the measured revision; the quiet re-run is moot.
 
 ## 5. Docs (I)
 
@@ -55,10 +55,10 @@ Every cargo run: `CARGO_TARGET_DIR=target CARGO_PROFILE_DEV_DEBUG=0 taskset -c 2
 
 ## 7. Release (K, the owner's)
 
-- [ ] io-pimdir 0.20.0 released by its tag workflow (N4); neverest, cardamum, calendula and carillon on it.
-- [ ] Cargo.toml: io-pimdir `0.20.0` in both tables, `[patch.crates-io]` removed; gate; commit `build: io-pimdir 0.20.0`. Closes envelope-search-speaks-pimdir's last task.
-- [ ] v3-release: bump, CHANGELOG `[3.0.0]`, provider reports, tag, by the owner.
+- [x] io-pimdir 0.20.0 released by its tag workflow (N4); neverest, cardamum, calendula and carillon on it. (2026-11-24, then 0.20.1 to 0.20.4 and 1.0.0.)
+- [x] Cargo.toml: io-pimdir `0.20.0` in both tables, `[patch.crates-io]` removed; gate; commit `build: io-pimdir 0.20.0`. Closes envelope-search-speaks-pimdir's last task. (2750462e on 2026-11-24 dropped the git patch; 944ba0ad requires 1.0.0.)
+- [x] ~~v3-release: bump, CHANGELOG `[3.0.0]`, provider reports, tag, by the owner.~~ Tracked by cairn/changes/v3-release.
 
 ## 8. Report (L)
 
-- [ ] report.md here: what landed (hashes), the measures, what waits on io-pimdir, the decisions taken; status `landed` once step 7's pin swap is in.
+- [x] report.md here: what landed (hashes), the measures, what waits on io-pimdir, the decisions taken; status `landed` once step 7's pin swap is in. (written 2026-11-23; status `landed` 2026-11-26.)

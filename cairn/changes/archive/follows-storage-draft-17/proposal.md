@@ -1,11 +1,13 @@
 ---
 cairn: change
 id: follows-storage-draft-17
-status: active
+status: landed
 created: 2026-11-23
 ---
 
 # Himalaya follows storage-draft-17
+
+Closed 2026-11-26 as landed (log 2026-11-23): its release steps aimed at io-pimdir 0.20.0 and storage-draft-17, superseded by io-pimdir 1.0.0 (log 2026-11-26-follows-pimdir-v1).
 
 ## Why
 

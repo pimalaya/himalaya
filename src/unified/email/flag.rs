@@ -34,8 +34,7 @@ pub struct Flag {
 /// IANA-registered email keywords, per the canonical table at
 /// <https://www.iana.org/assignments/imap-jmap-keywords/>.
 ///
-/// Declaration order is the derived `Ord`, which is what gives stable
-/// per-keyword sorting.
+/// The values are listed in the order keywords sort in.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]

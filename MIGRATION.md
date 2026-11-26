@@ -114,6 +114,7 @@ v3 makes Himalaya a low-level CLI: plain text for a human to glance at, `--json`
 | `order by from` | `--sort sender` |
 | `order by to`, a descending subject or sender | none |
 
+- **A relative amount is an instant** (`date:2d` is the last 48 hours), which Microsoft Graph refuses with `search-unsupported`, its search comparing days: write a day there, `date:2026-11-24..`.
 - **Text matches whole words** on Maildir, mbox and pimdir, where v2 matched a substring: `subject:repo*` finds `report`.
 - **The capability options take the predicate names**: `envelope.search.message-id` is `envelope.search.mid`, `envelope.search.sort.date` is `sort.newest-first` and `sort.oldest-first`.
 - **`pimdir search --sort date|name` is `--sort newest-first|title`**.

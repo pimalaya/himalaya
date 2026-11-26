@@ -1,11 +1,13 @@
 ---
 cairn: change
 id: the-live-night-findings
-status: active
+status: landed
 created: 2026-11-24
 ---
 
 # The live night findings
+
+Closed 2026-11-26 as landed (log 2026-11-24): H1 to H3 landed or ruled; the Gmail settings writes left are a live check, not code.
 
 The live test night of 2026-11-23 (workspace .lanes/live/report.md) ran every himalaya command on Stalwart (IMAP, SMTP, Sieve, JMAP), Fastmail (IMAP, SMTP, JMAP), Gmail, Graph, iCloud, Maildir, mbox, posteo (read) and every pimdir account. c93b1b03 fixed the JMAP listing order and the performer choice. The pimdir failures seen through himalaya (a dropped sent copy, a submit parked after a rename) are neverest's (its cairn/changes/the-live-night-findings).
 
