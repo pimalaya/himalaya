@@ -152,8 +152,8 @@ pub enum ErrorCode {
     /// The pimdir search index was built by another version: its sync
     /// engine rebuilds it.
     IndexOutdated,
-    /// The pimdir search index is of another draft or shape: its sync
-    /// engine rebuilds one of an earlier draft, and leaves any other.
+    /// The pimdir search index is of another version or shape: its sync
+    /// engine rebuilds one of an earlier version, and leaves any other.
     IndexVersion,
     /// The zone the pimdir search index reads floating times in is not
     /// an IANA zone.

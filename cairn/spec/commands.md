@@ -231,10 +231,10 @@ A command SHALL exit 0 when it succeeds and 1 when it prints the failure object.
 | `quota-exceeded` | the write would exceed the account's quota: a JMAP `overQuota`, an IMAP `OVERQUOTA`, Graph's `ErrorQuotaExceeded` or 507 whatever the status |
 | `rate-limited` | the server still throttled the item, or the command, after the retries: an HTTP 429, a Gmail 403 `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or `dailyLimitExceeded` (or a message naming a daily limit or a quota per day, the unauthenticated one aside), as the family codes a Google quota, a JMAP `rateLimit` |
 | `recipient-refused` | `message send` reached nobody because the server refused a recipient: an SMTP `RCPT TO` refused, naming the first refused address, or a JMAP `invalidRecipients`, naming the addresses it lists |
-| `store-version` | a pimdir store is of another format version; the message says which is the earlier: sync an earlier one out with its engine and move its directory aside, or upgrade Himalaya for a later one |
+| `store-version` | a pimdir store is a draft's, names no format version, or is a later release's Himalaya cannot read or queue into; the message says which is the earlier: sync an earlier one out with its engine and move its directory aside, or upgrade Himalaya for a later one |
 | `store-uncreated` | a pimdir store has no schema yet, or its root holds none; its sync engine creates it |
 | `store-foreign` | the database at a pimdir root is not a pimdir store; another program wrote it |
-| `store-corrupt` | a pimdir store's version records disagree, or its schema is not its draft's |
+| `store-corrupt` | a pimdir store's version records disagree, or its schema is not its version's |
 | `store-not-current` | a pimdir store holds no schema yet and the verb creates none; its sync engine creates it |
 | `store-hash-algo` | a pimdir store names its bodies with a hash Himalaya does not compute |
 | `sync-version` | a pimdir store's sync state was written by another version of its sync engine |
@@ -254,7 +254,7 @@ A command SHALL exit 0 when it succeeds and 1 when it prints the failure object.
 | `ambiguous-performer` | several sources of the pimdir store can perform the intent and none is chosen |
 | `index-missing` | a pimdir store has no search index yet; its sync engine builds it |
 | `index-outdated` | a pimdir search index was built by another version; its sync engine rebuilds it |
-| `index-version` | a pimdir search index is of another draft or shape; its sync engine rebuilds one of an earlier draft |
+| `index-version` | a pimdir search index is a draft's, of another version or of another shape; its sync engine rebuilds a draft's or an earlier version's |
 | `index-zone-unknown` | the zone a pimdir search index reads floating times in is no IANA zone |
 | `index-fts5-missing` | the SQLite Himalaya links lacks what a pimdir search index needs (FTS5, 3.43 or later) |
 | `query-refused` | a pimdir search query breaks a SEARCH §8.4 rule; nothing is searched |

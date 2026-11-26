@@ -50,7 +50,8 @@ fn account(dir: &Path, account: Option<&str>, collections: &[Collection]) -> Pat
             let store = PimdirStore::open(&root)
                 .unwrap()
                 .for_account(*account)
-                .for_source(*source);
+                .for_source(*source)
+                .unwrap();
             store.ensure_collection(collection, kind).unwrap();
             store
         })

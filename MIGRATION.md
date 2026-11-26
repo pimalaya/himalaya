@@ -127,7 +127,7 @@ v3 makes Himalaya a low-level CLI: plain text for a human to glance at, `--json`
 - **The root Maildir is named `INBOX`** (`.` when a top-level `Inbox` folder exists) instead of its folder's basename: match `INBOX` or its id.
 - **`maildir message save` and `mbox message save` are `message add`**, the old names still working: a JSON schema read by its name moves to `himalaya-maildir-message-add` or `himalaya-mbox-message-add`.
 - **`maildir message copy|move` and `mbox message copy|move` print the target ids**, where they echoed the source ones: read a moved message by the printed id.
-- **A pimdir store of an earlier draft is refused** with `store-version` (its index `index-version`): run the sync engine that wrote it until nothing is queued, then move its directory aside and sync a new store (see neverest's MIGRATION.md).
+- **A pimdir store an earlier release wrote is refused** with `store-version` (its index `index-version`), Himalaya reading pimdir v1 alone: sync it with the neverest that wrote it until `pimdir queue list` lists nothing, then move its directory aside and let a v1 neverest sync a new store.
 
 ### pimdir queue
 

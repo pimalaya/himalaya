@@ -173,7 +173,7 @@ The store's search index (index.db) SHALL be opened read-only, never created, re
 
 An envelope SHALL be built from the item's typed mail summary and the addresses joined to it (pimdir STORAGE Annex A.1, A.6): every `From` and `To` address with its display name, the `In-Reply-To` list, the date, the size and the attachment mark as stored, with no body read. `hasAttachment` SHALL be `true` or `false` as the store marks it, and `null` on a row that holds no mark. A listing SHALL take the store's own order, newest first, the mail sort key being the date.
 
-The reader SHALL overlay the queue (pimdir STORAGE §15.4), so an action this client staged is visible on the next read rather than on the next sync: a staged `set-flags`, `update`, `remove`, `move` or `copy` changes what a listing shows. A row the owner would park folds into nothing: a `remove` or a `move` staged on a message a sync left in conflict leaves it listed where it was, and a `move` brings it into no other mailbox. Each addresses a message that already exists and keeps its public id, so a staged write never changes how a message is addressed.
+The reader SHALL overlay the queue (pimdir STORAGE §15.4), so an action this client staged is visible on the next read rather than on the next sync: a staged `set-flags`, `update`, `remove`, `move` or `copy` changes what a listing shows. A row the owner would park folds into nothing: a `remove` or a `move` staged on a message a sync left in conflict leaves it listed where it was, and a `move` brings it into no other mailbox; so does a `move` into a mailbox no source syncs (pimdir SYNC §7), which the owner parks. Each addresses a message that already exists and keeps its public id, so a staged write never changes how a message is addressed.
 
 A write SHALL be staged as a queued `PimdirAction` through a producer handle (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`), addressed by the public `seq`, for the store's owner to apply and push. The backend SHALL NOT write the index, load a collection, or run the owner's object sweep: a sweep run beside a sync destroys the bodies it has streamed but not yet attached, which STORAGE §14 explicitly invites it to leave pending. A body an action references SHALL be written to the blob store in the transaction appending the action, the queue row being what pins it. The rows one flag change, copy, move or delete stages SHALL be appended as one batch (pimdir STORAGE §15.1, io-pimdir `enqueue_batch`), each passing the capability gate (§15.6) once: an id the gate refuses, or the store failing, leaves none of them staged, the failure naming the id the gate refuses, so a rerun stages each row once.
 
@@ -223,12 +223,17 @@ A pimdir write carrying a body (`add_message`, `send_message`) SHALL hand the bo
 ### Requirement: A pimdir store failure carries its code
 A failure io-pimdir reports SHALL keep io-pimdir's message as a cause and carry, under `--json`, the code `PimdirError::code()` gives it, spelled the same, when it is one a caller acts on: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `sync-version`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `lock-replaced`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer` and `ambiguous-performer`. An SQL, I/O or JSON failure carries none. Himalaya SHALL NOT derive a code from a message, and SHALL NOT advise deleting the store.
 
-Himalaya reads storage-draft-17. A store of another draft of the format (pimdir STORAGE §4.2), earlier or later, or one naming no format version, is `store-version`, every store an earlier build wrote among them (storage-draft-15 for a development build of v3): drafts are exact, so it opens under no other draft and nothing reconciles or migrates it. Its message SHALL be io-pimdir's one wording, `version::PimdirFormatRefusal` naming `himalaya`, which orders the two versions by pimdir STORAGE §4.2 and says which is the earlier: a store an earlier sync engine wrote is synced with that engine until nothing is queued, then its directory moved aside and a new store synced; a later one asks to upgrade himalaya; one whose version the order does not read says both. It never says to delete the store. A store whose directory or pimdir.db another user can read or write, or a link where a lock file belongs, is `store-exposed`, refused before anything in it is read, its message saying to restrict it.
+Himalaya reads storage-v1, schema version 1. A store a draft of the format wrote (pimdir STORAGE §4.2), or one naming no format version, is `store-version`, every store a 0.x sync engine or Himalaya 3.0.0 read among them (storage-draft-17): a draft's store is read by no release, so nothing reconciles or migrates it. A store a later release wrote is judged by its `store_meta` alone: Himalaya reads it while its `read_version` is at most 1 and queues into it while its `produce_version` is too, a table or column it does not know refusing nothing; past either it is `store-version`. Its message SHALL be io-pimdir's one wording, `version::PimdirFormatRefusal` naming `himalaya`, which orders the two versions by pimdir STORAGE §4.2 and says which is the earlier: a store an earlier sync engine wrote is synced with that engine until nothing is queued, then its directory moved aside and a new store synced; a later one asks to upgrade himalaya; one whose version the order does not read says both. It never says to delete the store. A store whose directory or pimdir.db another user can read or write, or a link where a lock file belongs, is `store-exposed`, refused before anything in it is read, its message saying to restrict it.
 
-#### Scenario: A store another draft wrote
-- GIVEN a pimdir store whose `store_meta.format_version` names another draft than Himalaya's io-pimdir follows
+#### Scenario: A store a draft wrote
+- GIVEN a pimdir store whose `store_meta.format_version` names a draft, such as `storage-draft-17`
 - WHEN any pimdir command opens it
-- THEN the command fails with the code `store-version`, naming both drafts, saying the store is the earlier and to sync it out then move its directory aside, or the later and to upgrade himalaya, and never to delete it
+- THEN the command fails with the code `store-version`, naming `storage-v1` and the draft, saying the store is the earlier and to sync it out then move its directory aside, and never to delete it
+
+#### Scenario: A later store
+- GIVEN a pimdir store stamped `storage-v2`, schema version 2
+- WHEN any pimdir command opens it
+- THEN it reads the store when `read_version` is 1, and fails with the code `store-version`, saying to upgrade himalaya, when `read_version` is 2
 
 #### Scenario: A store others can read
 - GIVEN a pimdir store whose directory is mode `0755`
@@ -262,7 +267,7 @@ Under `--json` it SHALL print `{"actions": [<row>], "parked": [<row>], "errors":
 
 `queue cancel` SHALL retract one pending or parked row of the account's queue, confirming first unless `--yes`, and SHALL name the row's action kind in its prompt and output: `{"row", "handle", "kind", "unconfirmed"}`, `row` the row id and `handle` the row under the store's identity, a bare id given named under this store's. An unconfirmed row (pimdir STORAGE §15.2) is cancelled as a parked one, which undoes nothing its performer sent: the prompt and the plain output SHALL say it was sent and may have taken effect, and `unconfirmed` is `true`. A row anchored on a collection that is not one of the account's mailboxes (another account's, or an address book or calendar another app of the store queued on), or one neither pending nor parked, SHALL be refused before anything is opened or asked, and stays as it was, coded `row-not-found` unless it was applied. With no terminal to answer and no `--yes`, the cancel SHALL be refused coded `confirmation-required` before anything is opened.
 
-Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); the backend read and write paths SHALL NOT reach it. The cancel SHALL open the store only as it stands (io-pimdir `open_current`): it SHALL NOT create, migrate nor reconcile the schema. A store of another draft SHALL be refused as `store-version` and a damaged one as `store-corrupt`, each left as it is. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
+Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); the backend read and write paths SHALL NOT reach it. The cancel SHALL open the store only as it stands (io-pimdir `open_current`): it SHALL NOT create, migrate nor reconcile the schema. A store a draft wrote, or one of a schema version other than 1, SHALL be refused as `store-version` and a damaged one as `store-corrupt`, each left as it is. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
 
 #### Scenario: A queued creation is listed from its body
 - GIVEN a queued `add` of the message `d1@x.org` pinning a body whose `Subject:` is `hi`
@@ -284,8 +289,8 @@ Taking the owner role briefly is what cancelling costs (pimdir STORAGE §15.5); 
 - WHEN `himalaya --json pimdir queue list -m imap/INBOX` runs
 - THEN the row prints `"kind":"move"`, `"itemId":"7"` and `"subject":"hi"`, read from the message as the store committed it
 
-#### Scenario: A cancel on a store of another draft
-- GIVEN a store whose `store_meta.format_version` names another draft
+#### Scenario: A cancel on a store a draft wrote
+- GIVEN a store whose `store_meta.format_version` names a draft
 - WHEN `himalaya pimdir queue cancel` runs on one of its rows
 - THEN the command fails with the code `store-version`, saying the store is the earlier and to sync it out then move its directory aside, and neither the store's stamp nor the row changes
 

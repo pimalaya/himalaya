@@ -7,7 +7,10 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use io_pimdir::client::search::{PimdirSearchCursor, PimdirSearchOptions, PimdirSearchSort};
+use io_pimdir::{
+    client::search::PimdirSearchOptions,
+    search::plan::{PimdirSearchCursor, PimdirSearchSort},
+};
 use pimalaya_cli::{
     listing::{Listing, ListingPage},
     printer::Printer,
@@ -364,7 +367,7 @@ impl PimdirSearchPlace {
 
 #[cfg(test)]
 mod tests {
-    use io_pimdir::{client::search::PimdirSearchCursor, search::coverage::PimdirSearchUnread};
+    use io_pimdir::search::{coverage::PimdirSearchUnread, plan::PimdirSearchCursor};
 
     use crate::{
         error::{ErrorCode, ItemError},

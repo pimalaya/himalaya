@@ -77,7 +77,8 @@ fn store(dir: &Path) {
     let mut store = PimdirStore::open(dir)
         .unwrap()
         .for_account(ACCOUNT)
-        .for_source("imap");
+        .for_source("imap")
+        .unwrap();
     store.ensure_collection("imap/INBOX", MAIL).unwrap();
     store.ensure_collection("imap/Archive", MAIL).unwrap();
 
@@ -520,7 +521,8 @@ fn an_account_holding_no_attachments_lists_none() {
         let mut store = PimdirStore::open(dir)
             .unwrap()
             .for_account(ACCOUNT)
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         store.ensure_collection("imap/INBOX", MAIL).unwrap();
         let derived = mail::derive(&message(
             "a@x.test",

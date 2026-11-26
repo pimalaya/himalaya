@@ -2068,7 +2068,8 @@ mod tests {
         {
             let mut store = io_pimdir::client::PimdirStore::open(dir.path())
                 .unwrap()
-                .for_source("imap");
+                .for_source("imap")
+                .unwrap();
             for id in ["imap/INBOX", "imap/Work"] {
                 store.ensure_collection(id, MAIL_KIND).unwrap();
             }
@@ -2815,7 +2816,8 @@ mod tests {
             .unwrap();
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
         let PimdirActionStatus::Applied { seq: Some(seq), .. } =
@@ -2857,7 +2859,8 @@ mod tests {
             .unwrap();
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
         let PimdirActionStatus::Applied { seq: Some(seq), .. } =
@@ -3087,8 +3090,8 @@ mod tests {
         );
     }
 
-    /// Stamps the store in `dir` as another draft of the format wrote it,
-    /// as a store an earlier or a later neverest left.
+    /// Stamps the store in `dir` as a draft of the format wrote it, as a
+    /// store a 0.x neverest left.
     fn stamp_format(dir: &std::path::Path, version: &str) {
         let db = rusqlite::Connection::open(dir.join("pimdir.db")).unwrap();
         db.execute(
@@ -3098,17 +3101,37 @@ mod tests {
         .unwrap();
     }
 
-    /// A store of another draft is refused `store-version` in the shared
-    /// wording, earlier or later, and never deleted.
+    /// Stamps the store in `dir` as release `version` wrote it, reading
+    /// it taking schema version `read` and enqueueing `produce`.
+    fn stamp_release(dir: &std::path::Path, version: i64, read: i64, produce: i64) {
+        let db = rusqlite::Connection::open(dir.join("pimdir.db")).unwrap();
+        db.execute(
+            "UPDATE store_meta SET format_version = ?1, version = ?2, \
+             read_version = ?3, produce_version = ?4 WHERE id = 1",
+            rusqlite::params![format!("storage-v{version}"), version, read, produce],
+        )
+        .unwrap();
+        db.pragma_update(None, "user_version", version).unwrap();
+    }
+
+    /// A draft's store, or a later one Himalaya cannot read, is refused
+    /// `store-version` in the shared wording, and never deleted.
     #[test]
-    fn a_store_of_another_draft_is_refused_saying_which_is_earlier() {
+    fn a_store_of_another_version_is_refused_saying_which_is_earlier() {
         for (version, asks) in [
             ("storage-draft-11", "move its directory aside"),
-            ("storage-draft-15", "move its directory aside"),
-            ("storage-draft-99", "upgrade himalaya"),
+            ("storage-draft-17", "move its directory aside"),
+            ("storage-draft-99", "move its directory aside"),
+            ("storage-v2", "upgrade himalaya"),
         ] {
             let (dir, _client) = sent_store();
-            stamp_format(dir.path(), version);
+            match version.strip_prefix("storage-v") {
+                Some(major) => {
+                    let major = major.parse().unwrap();
+                    stamp_release(dir.path(), major, major, major);
+                }
+                None => stamp_format(dir.path(), version),
+            }
 
             let err = PimdirClient::new(PimdirConfig {
                 root: dir.path().to_path_buf(),
@@ -3128,6 +3151,21 @@ mod tests {
             assert!(err.contains(asks), "{err}");
             assert!(!err.contains("delete"), "{err}");
         }
+    }
+
+    /// A later release's store opens while its `read_version` is at most
+    /// Himalaya's, judged by `store_meta` alone (pimdir STORAGE §4.2).
+    #[test]
+    fn a_later_store_himalaya_still_reads_opens() {
+        let (dir, _client) = sent_store();
+        stamp_release(dir.path(), 2, 1, 1);
+
+        let client = PimdirClient::new(PimdirConfig {
+            root: dir.path().to_path_buf(),
+            account: None,
+        });
+
+        assert!(client.is_ok(), "{:#}", client.err().unwrap());
     }
 
     #[test]
@@ -3157,7 +3195,7 @@ mod tests {
         );
     }
 
-    /// A store of this draft whose schema lacks a canonical table is
+    /// A store of this version whose schema lacks a canonical table is
     /// refused as corrupt, never reshaped nor deleted.
     #[test]
     fn a_damaged_store_is_refused_as_corrupt() {
@@ -3293,7 +3331,8 @@ mod tests {
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
 
@@ -3315,6 +3354,7 @@ mod tests {
         io_pimdir::client::PimdirStore::open(dir)
             .unwrap()
             .for_source("imap")
+            .unwrap()
             .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
                 collection: io_pimdir::collection::PimdirCollectionId("imap/Sent".into()),
                 checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
@@ -3327,7 +3367,8 @@ mod tests {
         syncs(dir);
         let mut store = io_pimdir::client::PimdirStore::open(dir)
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         let declaration: Vec<_> = names
             .iter()
             .map(|name| io_pimdir::capability::PimdirCapability {
@@ -3452,6 +3493,7 @@ mod tests {
             store.set_collection_name(id, name).unwrap();
             store
                 .for_source(source)
+                .unwrap()
                 .write(vec![io_pimdir::change::PimdirWriteOp::SetCheckpoint {
                     collection: PimdirCollectionId(id.into()),
                     checkpoint: io_pimdir::collection::PimdirCheckpoint(Vec::new()),
@@ -3533,7 +3575,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut store = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("msgraph");
+            .for_source("msgraph")
+            .unwrap();
         for id in ["msgraph/Drafts", "msgraph/Archive"] {
             store.ensure_collection(id, MAIL_KIND).unwrap();
             store
@@ -3802,7 +3845,8 @@ mod tests {
 
         let mut store = io_pimdir::client::PimdirStore::open(dir)
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         store.ensure_collection(collection, MAIL_KIND).unwrap();
         for batch in mails.chunks(1000) {
             let ops = batch
@@ -4243,7 +4287,8 @@ mod tests {
         }
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 2);
         drop(owner);
         seed(
@@ -4450,7 +4495,8 @@ mod tests {
         if let Some(declared) = declared {
             let mut store = io_pimdir::client::PimdirStore::open(dir.path())
                 .unwrap()
-                .for_source("imap");
+                .for_source("imap")
+                .unwrap();
             let declaration: Vec<_> = declared
                 .iter()
                 .map(|(name, support)| io_pimdir::capability::PimdirCapability {
@@ -4513,7 +4559,8 @@ mod tests {
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         owner
             .write(vec![PimdirWriteOp::RefusePlacement {
@@ -4684,7 +4731,8 @@ mod tests {
             .unwrap();
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         let seen = io_pimdir::capability::PimdirCapability {
             collection: None,
@@ -4958,7 +5006,8 @@ mod tests {
 
             let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
                 .unwrap()
-                .for_source("imap");
+                .for_source("imap")
+                .unwrap();
             let report = owner.drain().unwrap();
             assert_eq!((report.applied, report.parked), (1, 0), "{op:?}");
             drop(owner);
@@ -5068,7 +5117,8 @@ mod tests {
             .unwrap();
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
         let id = client
@@ -5148,7 +5198,8 @@ mod tests {
         );
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         owner.drain().unwrap();
         drop(owner);
 
@@ -5188,7 +5239,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut store = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         for id in ["imap/Drafts", "imap/Trash"] {
             store.ensure_collection(id, MAIL_KIND).unwrap();
         }
@@ -5266,7 +5318,8 @@ mod tests {
 
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         let report = owner.drain().unwrap();
         drop(owner);
         assert_eq!((report.applied, report.parked), (0, 1));
@@ -5324,7 +5377,8 @@ mod tests {
             .unwrap();
         let mut owner = io_pimdir::client::PimdirStore::open(dir.path())
             .unwrap()
-            .for_source("imap");
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
 

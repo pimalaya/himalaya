@@ -38,7 +38,8 @@ fn store(root: &Path) {
     let mut store = PimdirStore::open(root)
         .unwrap()
         .for_account("work")
-        .for_source("imap");
+        .for_source("imap")
+        .unwrap();
     store.ensure_collection(INBOX, "message/rfc822").unwrap();
 
     for day in 1..=3 {

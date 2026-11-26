@@ -16,11 +16,12 @@ use ariadne::{Config, Label, Report, ReportKind, Source};
 use chrono::{DateTime, FixedOffset, Local};
 use io_pimdir::{
     client::search::{
-        PimdirIndex, PimdirSearchClock, PimdirSearchCursor, PimdirSearchHit, PimdirSearchMatched,
-        PimdirSearchOptions, PimdirSearchThread,
+        PimdirIndex, PimdirSearchClock, PimdirSearchHit, PimdirSearchMatched, PimdirSearchOptions,
+        PimdirSearchThread,
     },
     search::{
         coverage::{PimdirSearchCoverage, PimdirSearchTemporal, PimdirSearchUnread},
+        plan::PimdirSearchCursor,
         query::{PimdirQuery, PimdirQueryError, PimdirQueryErrorCode, PimdirQueryKind},
         tag::{PimdirSearchTagPlacement, PimdirSearchTagSource},
     },
@@ -736,7 +737,10 @@ mod tests {
     /// and a bodiless `d`, and the client reading it.
     fn indexed_store() -> (tempfile::TempDir, PimdirClient) {
         let dir = tempfile::tempdir().unwrap();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         owner.ensure_collection(INBOX, "message/rfc822").unwrap();
         owner
             .write(vec![PimdirWriteOp::SetCheckpoint {
@@ -779,7 +783,10 @@ mod tests {
         for (raw, flags) in mails {
             client.add_message(INBOX, &flags, raw).unwrap();
         }
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 3);
         let flags = PimdirFlags::Unknown;
         owner
@@ -981,7 +988,10 @@ mod tests {
                 ),
             )
             .unwrap();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
         refresh(dir.path());
@@ -1027,7 +1037,10 @@ mod tests {
         assert!(agenda.hits.is_empty(), "a queued add is listed");
         assert_eq!(agenda.coverage.behind, 0);
 
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
         let agenda = page(&client, "agenda");
@@ -1259,7 +1272,10 @@ mod tests {
         let (dir, client) = indexed_store();
         let lunch: i64 = id_of(&client, "Lunch").parse().unwrap();
 
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert!(owner.add_property(lunch, "pimdir/label", "todo").unwrap());
         drop(owner);
 
@@ -1292,7 +1308,10 @@ mod tests {
         client
             .store_flags(INBOX, &[report.as_str()], &flagged, FlagOp::Add)
             .unwrap();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 1);
         drop(owner);
 
@@ -1332,7 +1351,7 @@ mod tests {
         assert!(!dir.path().join("index.db").exists(), "the index was built");
     }
 
-    /// An index of another SEARCH draft is refused as `index-version`,
+    /// An index of a SEARCH draft is refused as `index-version`,
     /// pointing at the sync engine, and left as it is.
     #[test]
     fn an_index_of_another_draft_is_refused_as_index_version() {
@@ -1369,7 +1388,10 @@ mod tests {
     #[test]
     fn a_range_below_the_coverage_is_not_complete() {
         let (dir, client) = indexed_store();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         let inbox = PimdirCollectionId(INBOX.into());
         owner
             .write(vec![
@@ -1465,7 +1487,10 @@ mod tests {
     #[test]
     fn a_bodiless_message_is_incomplete_only_while_a_term_reads_it() {
         let (dir, client) = indexed_store();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         let inbox = PimdirCollectionId(INBOX.into());
         owner
             .write(vec![
@@ -1568,7 +1593,10 @@ mod tests {
         let lunch = |id| mail(id, "From: carol@z.org\r\nSubject: Lunch", "Pizza?");
         work.add_message("work/INBOX", &[], lunch("w")).unwrap();
         home.add_message("home/INBOX", &[], lunch("h")).unwrap();
-        let mut owner = PimdirStore::open(dir.path()).unwrap().for_source("imap");
+        let mut owner = PimdirStore::open(dir.path())
+            .unwrap()
+            .for_source("imap")
+            .unwrap();
         assert_eq!(owner.drain().unwrap().applied, 2);
         drop(owner);
         refresh(dir.path());

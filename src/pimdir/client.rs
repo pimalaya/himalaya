@@ -160,7 +160,7 @@ impl PimdirClient {
     /// its action kind.
     ///
     /// The owner role is held inside this call alone. Another account's
-    /// row, a foreign-draft or damaged store and a sync in flight are
+    /// row, another version's or a damaged store and a sync in flight are
     /// refused at once; an unconfirmed row (§15.2) may have taken effect.
     pub fn cancel_queued(&self, handle: &PimdirActionHandle) -> Result<String> {
         let kind = match self.queue_row(handle)? {

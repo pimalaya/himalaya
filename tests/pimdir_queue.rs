@@ -40,7 +40,8 @@ fn store(root: &Path) {
     let mut store = PimdirStore::open(root)
         .unwrap()
         .for_account("work")
-        .for_source("imap");
+        .for_source("imap")
+        .unwrap();
     for collection in ["imap/INBOX", "imap/Archive", "imap/Sent"] {
         store.ensure_collection(collection, MAIL).unwrap();
     }
@@ -201,18 +202,31 @@ fn every_pending_row_lists_and_shows_as_it_lists() {
     assert_eq!(shown["state"], "pending", "{shown}");
 }
 
-/// A copy into a mailbox where another source holds the message already
-/// joins it once the sync engine drains it, rather than minting a second
-/// message there (pimdir SYNC §4, K4 of pimdir's a-smaller-sync).
+/// A copy into a mailbox both sources sync, where the other one holds the
+/// message already, joins it once the sync engine drains it, rather than
+/// minting a second message there (pimdir SYNC §4, §7).
 #[test]
 fn a_copy_into_a_mailbox_holding_the_message_lists_one_envelope() {
     let himalaya = Himalaya::new();
     let root = himalaya.home.path().join("store");
 
+    let mut imap = PimdirStore::open(&root)
+        .unwrap()
+        .for_account("work")
+        .for_source("imap")
+        .unwrap();
+    imap.write(vec![PimdirWriteOp::SetCheckpoint {
+        collection: PimdirCollectionId("imap/Archive".into()),
+        checkpoint: PimdirCheckpoint(Vec::new()),
+    }])
+    .unwrap();
+    drop(imap);
+
     let mut other = PimdirStore::open(&root)
         .unwrap()
         .for_account("work")
-        .for_source("jmap");
+        .for_source("jmap")
+        .unwrap();
     other.ensure_collection("imap/Archive", MAIL).unwrap();
     let hash = hash::hash(STORED);
     let derived = mail::derive(STORED);
@@ -251,7 +265,8 @@ fn a_copy_into_a_mailbox_holding_the_message_lists_one_envelope() {
     let mut owner = PimdirStore::open(&root)
         .unwrap()
         .for_account("work")
-        .for_source("imap");
+        .for_source("imap")
+        .unwrap();
     let report = owner.drain().unwrap();
     drop(owner);
     assert_eq!((report.applied, report.parked), (1, 0));

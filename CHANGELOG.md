@@ -295,9 +295,12 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 - Changed a `mailbox.alias.<role>` naming no mailbox id to mark the role of the listed mailbox carrying that name, on every backend.
 - Changed the mbox backend to refuse a keyword `X-Keywords` would not give back: holding a whitespace, a comma or a control character, or longer than 255 bytes.
 - Changed an mbox mailbox name holding a NUL or a `.` or `..` level, or a level starting with `.` or ending in `.lock`, `.lck` or `.msf`, to be refused wherever a mailbox is taken.
-- **BREAKING**: Changed the pimdir backend to pimdir storage-draft-17 and search-draft-17: a store an earlier build wrote is refused `store-version` and its index `index-version`, never migrated.
+- **BREAKING**: Changed the pimdir backend to pimdir storage-v1, sync-v1 and search-v1 (io-pimdir 1.0.0): a store an earlier release wrote is refused `store-version` and its index `index-version`, never migrated.
 
-  Drain it with the neverest that wrote it until `pimdir queue list` lists nothing, move its directory aside, then sync a new store (MIGRATION.md).
+  Sync it with the neverest that wrote it until `pimdir queue list` lists nothing, move its directory aside, then let a v1 neverest sync a new store (MIGRATION.md).
+
+- Changed a pimdir store a later release wrote to be read while its `read_version` is at most 1, judged by its `store_meta` alone.
+- Changed a pimdir `message copy` or `message move` into a mailbox its source does not sync to be applied under a source syncing it, and to park when none does (pimdir SYNC §7).
 
 - Changed a pimdir store whose directory or pimdir.db another user can read to be refused with `store-exposed`: `chmod 700` the directory and `chmod 600` pimdir.db.
 - **BREAKING**: Changed the pimdir queue rows to print `row`, the integer row id, with `handle` beside it, the row under the store's identity, where they printed `queueId`.
