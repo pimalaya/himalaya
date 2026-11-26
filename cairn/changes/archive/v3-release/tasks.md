@@ -14,7 +14,7 @@ change: v3-release
 - [x] ~~Publish ical-rs~~ Dropped: no longer a dependency, its patch gone with pimdir-follows-storage-draft-09 (2026-11-06).
 - [x] Raise the requirements to the published versions (io-gmail 0.6 with them, for one io-http), remove `[patch.crates-io]`, confirm a clean crates.io build: clippy over the 15 feature sets, the whole suite and the build without SMTP pass
 - [x] ~~Tighten deny.toml once no git source remains~~ Dropped: the owner keeps `allow-org.github = ["pimalaya"]`, git pins being common across the family (2026-11-11).
-- [ ] Owner validation of the whole family, then Ortie and Himalaya released together with pimalaya-cli and pimalaya-config 0.4
+- [x] Owner validation of the whole family, then Ortie and Himalaya released together with pimalaya-cli and pimalaya-config 0.4 Validated by the owner on 2026-11-26 (Ortie 3.0.0 out since 2026-11-21).
 
 ## Release
 
@@ -24,6 +24,6 @@ change: v3-release
 - [x] Adopt the io-imap release handing raw bytes and land HIM-18 (the-schema-review-remainder), ruled before v3 on 2026-11-19 (2026-11-19: io-imap 0.12, the-releases-of-2026-11-19)
 - [x] Bump the version to 3.0.0 (the schema `$id`s follow, `v3`): 6f12217c; every `$id` reads `v3`, pinned by tests/json_schema.rs `every_schema_id_names_the_v3_contract` (2026-11-26).
 - [x] Finalise the CHANGELOG `[Unreleased]` section into `[3.0.0]`, its breaking entries marked: `[3.0.0]` written by 869fe31f and 944ba0ad; checked 2026-11-26 against `git log v2.2.1..HEAD` (churn inside the major folded into the final state, as 869fe31f chose), `source-empty` added, a stray blank line removed; MIGRATION.md reread against the pimdir v1 move and the `--help` of the release build, nothing stale found. Its date stays for the lead to set.
-- [ ] Run the manual provider reports under cairn/spec/testing against the release build, on the Google, Microsoft and Fastmail test accounts only
-- [ ] Tag and publish
-- [ ] Log entry; status `landed`
+- [x] Run the manual provider reports under cairn/spec/testing against the release build, on the Google, Microsoft and Fastmail test accounts only Run on 2026-11-26 (c3cdf686), the search fixes rechecked live after (91f04312).
+- [x] Tag and publish: v3.0.0 on the release commit, published by the tag workflow once CI is green (2026-11-26).
+- [x] Log entry; status `landed`: cairn/log/2026-11-26-v3-release.md.

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.0] - 2026-11-25
+## [3.0.0] - 2026-11-26
 
 Himalaya 3 is a low-level CLI over a unified mail API: the same commands on every backend, the protocol-specific ones beside them, plain text for a glance and `--json` for scripts, frontends and AI agents. Daily-mail comfort (tables, colours, relative dates, rich composition) moves to frontends such as himalaya-tui and to mml, and the offline side to the pimdir store Neverest syncs, which Himalaya reads and queues its writes into.
 
