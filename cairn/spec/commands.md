@@ -244,6 +244,7 @@ A command SHALL exit 0 when it succeeds and 1 when it prints the failure object.
 | `store-in-flight` | a pimdir store verb is between two of its chunks; retry |
 | `store-exposed` | a pimdir store is a link or another user can read or write it; restrict it |
 | `store-reset` | a pimdir store is not the one that answered the queue row's handle, a copy restored since; nothing is done with the row |
+| `source-empty` | a pimdir store was bound to an empty source id, which no row may hold; nothing is done |
 | `lock-replaced` | a pimdir store's lock file was removed or replaced under a write; nothing is written; retry |
 | `item-duplicate` | a pimdir mailbox holds the message already, or has its creation queued; nothing is staged |
 | `flag-invalid` | a flag a pimdir store cannot hold: empty, or holding whitespace, a control or a non-ASCII character; nothing is staged |

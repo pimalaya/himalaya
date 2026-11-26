@@ -43,7 +43,7 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 - Added the account codes `account-missing`, `account-default-missing`, `account-default-several` and `backend-not-built`, the last naming the cargo feature to rebuild with.
 - Added the pimdir codes io-pimdir gives a store, its queue and its search index.
 
-  Store: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `store-account-ambiguous`, `store-account-unknown`, `sync-version`, `lock-replaced`.
+  Store: `store-version`, `store-uncreated`, `store-foreign`, `store-corrupt`, `store-not-current`, `store-hash-algo`, `store-busy`, `store-owned`, `store-staging`, `store-in-flight`, `store-exposed`, `store-reset`, `source-empty`, `store-account-ambiguous`, `store-account-unknown`, `sync-version`, `lock-replaced`.
 
   Queue and index: `body-pending`, `item-duplicate`, `flag-invalid`, `action-malformed`, `conflict-unread`, `unsupported`, `no-performer`, `ambiguous-performer`, `row-not-found`, `confirmation-required`, `index-missing`, `index-outdated`, `index-version`, `index-zone-unknown`, `index-fts5-missing`, `query-refused`, `query-unanswerable`, `tag-refused`.
 
@@ -301,7 +301,6 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 
 - Changed a pimdir store a later release wrote to be read while its `read_version` is at most 1, judged by its `store_meta` alone.
 - Changed a pimdir `message copy` or `message move` into a mailbox its source does not sync to be applied under a source syncing it, and to park when none does (pimdir SYNC §7).
-
 - Changed a pimdir store whose directory or pimdir.db another user can read to be refused with `store-exposed`: `chmod 700` the directory and `chmod 600` pimdir.db.
 - **BREAKING**: Changed the pimdir queue rows to print `row`, the integer row id, with `handle` beside it, the row under the store's identity, where they printed `queueId`.
 

@@ -125,6 +125,9 @@ pub enum ErrorCode {
     /// The pimdir store is not the one that answered the queue row's
     /// handle, a copy restored since: nothing was done with the row.
     StoreReset,
+    /// The pimdir store was bound to an empty source id, which no row
+    /// may hold: nothing was done.
+    SourceEmpty,
     /// The lock file of the pimdir store was removed or replaced under a
     /// write: nothing was written. Retry.
     LockReplaced,
@@ -407,6 +410,7 @@ const PIMDIR_CODES: &[(&str, ErrorCode)] = &[
     ("store-in-flight", ErrorCode::StoreInFlight),
     ("store-exposed", ErrorCode::StoreExposed),
     ("store-reset", ErrorCode::StoreReset),
+    ("source-empty", ErrorCode::SourceEmpty),
     ("lock-replaced", ErrorCode::LockReplaced),
     ("item-duplicate", ErrorCode::ItemDuplicate),
     ("flag-invalid", ErrorCode::FlagInvalid),
@@ -470,6 +474,14 @@ mod tests {
         for (pimdir, ours) in PIMDIR_CODES {
             assert_eq!(serde_json::to_value(ours).unwrap(), *pimdir);
         }
+    }
+
+    #[test]
+    fn an_empty_source_is_coded_source_empty() {
+        assert_eq!(
+            ErrorCode::of_pimdir(&PimdirError::SourceEmpty),
+            Some(ErrorCode::SourceEmpty)
+        );
     }
 
     #[test]
