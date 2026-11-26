@@ -54,6 +54,8 @@ A last pass over the 220 schemas the 3.0.0 release build writes (`json-schema --
 - **R4, `pimdir thread` has no `errors`.** One unreadable member fails the command (src/pimdir/index.rs:308), where `pimdir search --threads` lists it under `errors`. Recommendation: add `errors`, exit 3.
 - **R5, `imap thread` flags.** Its entries print `[{raw, iana}]` where `imap fetch` and `imap store` print wire strings. Recommendation: accept the richer shape, or align on strings now.
 
+Landed 2026-11-26 as recommended (owner ruling of 2026-11-26, all five before the tag): R1 prints `{emails, errors}` from the raw `Email/get`; R2 `flags` `array|null`; R3 `{id}` of the script active before; R4 `errors` on `pimdir thread`, exit 3; R5 wire strings. See cairn/log/2026-11-26-the-schema-review-remainder.md.
+
 ### Not breaking, after the tag
 
 - **R6, descriptions missing** on `imap flag` (`flags`, `permanentFlags`), `imap search|sort` (`ids`, `uidMode`), `imap thread` (`threads`), the `event` key of the `imap raw` and `sieve raw` events, and the root alternatives of `attachment download`, `message parse` and `himalaya-error`'s `ReportCode`; no test checks keys and alternatives, src/json_schema.rs only refusing doc links.

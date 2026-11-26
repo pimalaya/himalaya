@@ -93,6 +93,9 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 
 - Added `message parse [EML]`, printing the `message read` view of a raw message from a file or stdin with no account, `--part` and `--section` writing one part.
 - Added `--stdout` to `attachment download`, writing one part's decoded bytes to stdout, or `{id, mime, filename, size, data}` with `data` in base64 under `--json`.
+
+  It takes exactly one part id, no id or several being refused `usage-invalid`, exit 2, before connecting.
+
 - Added `contentId` to `attachment list --json`.
 - Added `--all` (`-A`) to `message reply`, replying to everyone but the account's own address ([#779]).
 - Added the source's attachments to `message forward`, `--no-attachments` leaving them out ([#780]).
@@ -108,7 +111,7 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 
   The command fails when the server does not announce `DSN`.
 
-- Added `from`, `date` and `flags` to each `imap thread` entry.
+- Added `from`, `date` and `flags` to each `imap thread` entry, the flags as the server spells them, as `imap fetch` prints them.
 - Added the IMAP mailbox roles a plain `LIST` marks with a special-use attribute (RFC 6154), shown by `mailbox list` and taken by `-m`.
 
   A `mailbox.alias.<role>` still wins.
@@ -128,8 +131,8 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
   `--sort`, `--threads` and `--page-token` shape the answer; each hit carries its envelope, mailboxes and a snippet, and `coverage` says what the index could not see.
 
 - Added `pimdir count`, counting the account's mail a query matches, with its coverage.
-- Added `pimdir thread`, listing the thread of a message from the search index, oldest first.
-- Added `pimdir tag`, queueing a flag change on every message a query matches, `--dry-run` queueing nothing.
+- Added `pimdir thread`, listing the thread of a message from the search index, oldest first, a member the store cannot read under `errors` (exit 3).
+- Added `pimdir tag`, queueing a flag change on every message a query matches, `--dry-run` queueing nothing, a placement whose flags were never read printing `flags` `null`.
 - Added `pimdir flag list|add|set|remove`, reading and staging any flag of a pimdir message by its raw spelling, keywords included ([#790]).
 - Added `pimdir mailbox list`, listing each mailbox with its `total` and `unread` counts and the `coverage` the sync engine last listed it within.
 - Added `pimdir mailbox create`, `rename` and `delete`, queueing the change for the sync engine to apply on the server.
@@ -243,8 +246,10 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 - Changed the write confirmations on a pimdir account to say the write is queued (*Message queued for sending*), the sync engine applying it later.
 - **BREAKING**: Changed `envelope search` to read the pimdir SEARCH query language (§8), as `pimdir search`, Calendula and Cardamum do: `from:alice date:2026-11-02.. is:unread "weekly sync"`.
 
-  `order by` is now `--sort newest-first|oldest-first|title|sender|relevance`, Maildir and mbox match whole words, and a `~`, `/` or `{` form is reserved (`search-invalid`). A clause the backend cannot search fails `search-unsupported`; MIGRATION.md maps every v2 clause.
+  `order by` is now `--sort newest-first|oldest-first|title|sender|relevance`, Maildir and mbox match whole words, and a `~`, `/` or `{` form is reserved (`search-invalid`). A clause the backend cannot search fails `search-unsupported`: a prefix (`repo*`) on Gmail, an instant or an amount back from now (`date:2d`) on Microsoft Graph, which compares days. MIGRATION.md maps every v2 clause.
 
+- **BREAKING**: Changed `jmap email read --json` to print `{emails, errors}`, each email as the server sent it, an id not found an `errors` entry coded `message-not-found` (exit 3).
+- **BREAKING**: Changed `sieve deactivate --json` to print `{id}`, the script active before, `null` when none was.
 - **BREAKING**: Changed `flag add|set|remove` and `message copy|move|delete` given ids the mailbox does not hold to print each as a `message-not-found` entry and exit 3, the others acted on ([#777]).
 - **BREAKING**: Changed a send whose follow-up failed to print its receipt and exit 3: a copy refused after the send and a reply's `answered` flag are item errors of the receipt.
 - **BREAKING**: Changed a JMAP, Gmail or Microsoft Graph `message read`, and the source read of `message reply|forward` and `attachment list|download`, to fail `message-not-found` when the mailbox given does not hold the message.
@@ -471,7 +476,7 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 - Fixed the JMAP set and method errors dropping the type, description and arguments the server sent.
 - Fixed setting the JMAP vacation response on Fastmail failing after the update was applied.
 - Fixed a JMAP mailbox name matching none being sent to the server, and one two mailboxes carry resolving to the first: both are refused.
-- Fixed `jmap email read` printing server values unsanitized, running two emails together and exiting 0 when no id named one.
+- Fixed `jmap email read` printing server values unsanitized and running two emails together.
 - Fixed the JMAP `query` commands returning the objects in the server's order rather than the query's.
 - Fixed `jmap email update` dropping the patches a replacement overrode and accepting no change: both are refused.
 - Fixed a Gmail search pattern widening the search with the operators it held: each pattern is a literal.
@@ -483,7 +488,7 @@ The wizard, the m2dir backend and the display options are gone, an unknown confi
 - Fixed `mailbox list` on Microsoft Graph leaving out the nested folders and every folder past the first page: a nested one is named by its path (`Projets/Alpha`).
 - Fixed a Microsoft Graph mailbox naming no folder being sent into the request path: it is refused, and every id is percent-encoded.
 - Fixed the Microsoft Graph envelopes being dated by arrival: the date is the `Date:` header, else the arrival.
-- Fixed a Microsoft Graph search pattern holding KQL syntax widening the search: each word is a quoted KQL phrase.
+- Fixed a Microsoft Graph search pattern holding KQL syntax widening the search: each word is a quoted KQL phrase, a phrase one quoted string.
 - Fixed `flag set` on Microsoft Graph leaving the categories it did not name.
 - Fixed `msgraph messages list --search` failing on a value holding `:` or `-`.
 - Fixed `msgraph attachments list` listing the first page alone: it follows every next link.

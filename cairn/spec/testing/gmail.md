@@ -53,6 +53,7 @@ Unified commands on the Gmail REST backend. Companion: [gmail-specific.md](gmail
 ### Bugs
 
 - **H1: a trailing `*` is dropped on Gmail, so a prefix word finds nothing.** `himalaya -a google --json envelope search -m live-2026-11-26-himalaya-A 'subject:repo*'` printed `{"envelopes":[],"nextPage":null,"total":null,"errors":[]}`, exit 0, while `subject:report` found the `weekly report` fixture; `zebr*` found nothing where `zebra` found it. The help says "A trailing `*` makes a word a prefix" and search.md says no term is dropped, yet `lower` in src/unified/email/search/query.rs reads `text.text` and never `text.prefix`, so Gmail receives the whole word `repo`. Either refuse the prefix with `search-unsupported` (Gmail has no prefix operator) or declare it; the shared lowering suggests Graph loses it too (not tested here).
+- **H1 fixed 2026-11-26** (cairn/changes/archive/a-prefix-or-phrase-is-never-dropped), rechecked on the release build in `INBOX`: `subject:integ*`, `integ*` and `from:goo*` exit 1 coded `search-unsupported` (``Cannot search `subject:integ*`: Gmail search matches whole words and has no prefix search``) before any search; `subject:"integration test"` lists the 56 `io-* integration test` messages as `subject:integration` does, `subject:"test integration"` none.
 - **G6 (2026-11-18) is fixed:** a missing label is now `mailbox-not-found` on `message move` (exit 1) and on `message send --save` (item error, exit 3).
 
 ### Behaviour (not bugs)

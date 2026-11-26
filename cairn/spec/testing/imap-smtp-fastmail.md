@@ -55,13 +55,13 @@ status: current
 ### Bugs / issues
 
 - **F4 (2026-11-18): fixed.** A missing mailbox is coded `mailbox-not-found` on `SELECT`, `APPEND`, `MOVE`, `RENAME`, `DELETE` and the send copy, the server's `NO` kept in `sources`.
-- **F5: `attachment download --stdout` without an id is uncoded.** `himalaya -a fastmail attachment download 6 -m live-2026-11-26-himalaya-A --stdout` prints ``Error: `--stdout` takes exactly one attachment id``, exit 1. The command line is what is wrong, which commands.md (exit codes) and MIGRATION.md treat as `usage-invalid`, exit 2; src/unified/attachment/download.rs `stdout_part_id` bails from `execute`, after the client is built, rather than in clap.
+- **F5: `attachment download --stdout` without an id is uncoded.** `himalaya -a fastmail attachment download 6 -m live-2026-11-26-himalaya-A --stdout` prints ``Error: `--stdout` takes exactly one attachment id``, exit 1. The command line is what is wrong, which commands.md (exit codes) and MIGRATION.md treat as `usage-invalid`, exit 2; src/unified/attachment/download.rs `stdout_part_id` bails from `execute`, after the client is built, rather than in clap. Fixed 2026-11-26 (log 2026-11-26-the-v3-report-fixes): no id or several beside `--stdout` is refused `usage-invalid`, exit 2, before the client is built (tests/early_refusal.rs).
 
 ### Provider-specific behaviour (not bugs)
 
 - **P1: Fastmail (Cyrus) matches whole words.** `subject:repo` finds nothing, `subject:report` finds both; himalaya sends the substring `SEARCH` the RFC asks for.
 - **P2: date terms read the `Date:` header**: every fixture arrived within the same minute and still split by its `Date:` on `yesterday`, `5h`, `2d` and the instants.
-- **P3: a prefix term finds nothing on Fastmail.** `subject:repo*` lists nothing: the lowering reads `PimdirQueryText::text` alone (src/unified/email/search/query.rs), so the `*` is dropped before `SEARCH`, which is right for an RFC substring server but not for Fastmail's word matching.
+- **P3: a prefix term finds nothing on Fastmail.** `subject:repo*` lists nothing: the lowering reads `PimdirQueryText::text` alone (src/unified/email/search/query.rs), so the `*` is dropped before `SEARCH`, which is right for an RFC substring server but not for Fastmail's word matching. Ruled 2026-11-26 (a-prefix-or-phrase-is-never-dropped): IMAP answers a prefix by its stem as a substring, so on Fastmail it finds only the whole word (`subject:receipt*` lists `Your receipt from Fastmail`, `subject:integ*` and `subject:subscr*` nothing, rechecked on the release build). A phrase is sent as one string, which Fastmail matches as its words in any order: `subject:"test integration"` lists `io-smtp integration test`, `subject:"date billing"` the billing message; the capability detail says so.
 - **P4: the listing follows arrival.** `envelope list` orders by UID, newest first: Epsilon (dated 10 days ago, added fifth) lists above Delta (3 days ago, added fourth). Use `--sort newest-first` for the `Date:` order.
 
 ### Observations

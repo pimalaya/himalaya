@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: a-prefix-or-phrase-is-never-dropped
-status: active
+status: landed
 created: 2026-11-26
 ---
 
@@ -19,4 +19,4 @@ Found by the v3 provider reports of 2026-11-26 (cairn/spec/testing/gmail.md H1, 
 
 ## Open
 
-- Whether IMAP and JMAP should refuse a prefix rather than answer it by substring (they already over-match plain words the same way).
+- Whether IMAP and JMAP should refuse a prefix rather than answer it by substring (they already over-match plain words the same way). Ruled 2026-11-26 by the owner: answered by substring.

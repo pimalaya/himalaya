@@ -59,6 +59,8 @@ v3 makes Himalaya a low-level CLI: plain text for a human to glance at, `--json`
 - **`gmail labels get` and `msgraph mail-folders get` take one id** and print the object: run one per id, `.labels[0]` or `.folders[0]` becoming `.`.
 - **`sieve check|put` print `warnings` as a list**, `[]` when none, instead of a string or `null`.
 - **`jmap email parse` prints `bodies` as `[{blobId, body}]`**, instead of a list of strings.
+- **`jmap email read --json` prints `{emails, errors}`**, each email as the server sent it: read the bodies from `.emails[].bodyValues`. An id the server does not find is an `errors` entry coded `message-not-found`, exit 3, where v2 only logged it.
+- **`sieve deactivate --json` prints `{id}`**, the script that was active, `null` when none was.
 
 ### Exit codes and error codes
 
@@ -114,8 +116,8 @@ v3 makes Himalaya a low-level CLI: plain text for a human to glance at, `--json`
 | `order by from` | `--sort sender` |
 | `order by to`, a descending subject or sender | none |
 
-- **A relative amount is an instant** (`date:2d` is the last 48 hours), which Microsoft Graph refuses with `search-unsupported`, its search comparing days: write a day there, `date:2026-11-24..`.
-- **Text matches whole words** on Maildir, mbox and pimdir, where v2 matched a substring: `subject:repo*` finds `report`.
+- **A relative amount is an instant** (`date:2d` is the last 48 hours, `date:1w` the last 7 days). Microsoft Graph compares days alone, so it refuses `date:2d` and `date:1w` with `search-unsupported` where v2 served `after 2 days ago`: write the day there, `date:2026-11-24..`.
+- **Text matches whole words** on Maildir, mbox and pimdir, where v2 matched a substring: `subject:repo*` finds `report`, and so it does on Microsoft Graph. Gmail has no prefix search and refuses `repo*` with `search-unsupported`; IMAP and JMAP send its stem `repo`, matched as the server matches text.
 - **The capability options take the predicate names**: `envelope.search.message-id` is `envelope.search.mid`, `envelope.search.sort.date` is `sort.newest-first` and `sort.oldest-first`.
 - **`pimdir search --sort date|name` is `--sort newest-first|title`**.
 - **A word starting with `~`, a word of two characters or more starting with `/` and a value starting with `{` are refused** (`reserved-form`): quote them to search the characters, `"~draft"`.
