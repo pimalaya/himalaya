@@ -68,9 +68,25 @@ pub fn get(
     object: &str,
     ids: Option<&[String]>,
 ) -> Result<JmapRawList> {
+    get_with(client, object, ids, Map::new())
+}
+
+/// Runs `<object>/get` on `ids` with the further arguments `args`
+/// (`fetchTextBodyValues`).
+pub fn get_with(
+    client: &mut JmapClientStd,
+    object: &str,
+    ids: Option<&[String]>,
+    mut args: Map<String, Value>,
+) -> Result<JmapRawList> {
     let account = account_id(client)?;
-    let args = json!({"accountId": account, "ids": ids});
-    let calls = vec![(format!("{object}/get"), args, String::from("g"))];
+    args.insert(String::from("accountId"), json!(account));
+    args.insert(String::from("ids"), json!(ids));
+    let calls = vec![(
+        format!("{object}/get"),
+        Value::Object(args),
+        String::from("g"),
+    )];
 
     let get = send(client, object, calls)?.into_iter().next();
     Ok(listed(get.unwrap_or_default()))
@@ -294,6 +310,31 @@ mod tests {
         assert_eq!(list.list, [vacation]);
         let requests = requests.lock().unwrap();
         assert!(requests[0].contains("urn:ietf:params:jmap:vacationresponse"));
+    }
+
+    /// A get carries its further arguments beside its ids, the emails kept
+    /// as sent.
+    #[test]
+    fn a_get_with_body_values_keeps_the_emails_as_sent() {
+        let email = json!({"id": "e1", "bodyValues": {}, "x-vendor": 1});
+        let answer = json!({"methodResponses": [
+            ["Email/get", {"accountId": "a1", "state": "s1", "list": [email], "notFound": ["e2"]}, "g"],
+        ], "sessionState": "s"});
+        let (mut client, requests) = client_and_requests(vec![answer]);
+        let mut args = Map::new();
+        args.insert(String::from("fetchTextBodyValues"), json!(true));
+        let ids = [String::from("e1"), String::from("e2")];
+
+        let list = raw::get_with(&mut client, "Email", Some(&ids), args).unwrap();
+
+        assert_eq!(list.list, [email]);
+        assert_eq!(list.not_found, ["e2"]);
+        let request = requests.lock().unwrap().join("");
+        assert!(
+            request.contains(r#""fetchTextBodyValues":true"#),
+            "{request}"
+        );
+        assert!(request.contains(r#""ids":["e1","e2"]"#), "{request}");
     }
 
     /// A method answering `error` fails the listing with that error.

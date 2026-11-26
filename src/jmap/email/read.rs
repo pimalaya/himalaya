@@ -5,19 +5,30 @@
 
 use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::email::{JmapEmail, JmapEmailAddress, get::JmapEmailGetOptions};
-use log::warn;
+use io_jmap::rfc8621::email::{JmapEmail, JmapEmailAddress};
 use pimalaya_cli::{printer::Printer, sanitize};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::{Map, Value, json};
 
-use crate::{jmap::client::JmapClient, unified::message::read::sanitize_body};
+use crate::{
+    error::{ErrorCode, ItemError, partial_when, write_item_errors},
+    jmap::{
+        backend::not_found_errors,
+        client::JmapClient,
+        email::query::email_of,
+        raw::{self, JmapRawList},
+    },
+    unified::message::read::sanitize_body,
+};
 
 /// Read the content of a JMAP email (Email/get with body).
 ///
-/// Shows headers and plain text body by default.
+/// Shows headers and plain text body by default. Under `--json` the
+/// emails print as the server sent them. An id the server does not find
+/// is an entry of `errors`, coded `message-not-found`, and exits 3.
 #[derive(Debug, Parser)]
 pub struct JmapEmailReadCommand {
     /// The email ID(s) to read.
@@ -29,35 +40,21 @@ pub struct JmapEmailReadCommand {
 }
 
 impl JmapEmailReadCommand {
-    /// Fetches the emails with their bodies and prints them, failing
-    /// when none of the ids names one.
+    /// Fetches the emails with their bodies and prints them, then the
+    /// error of each id not found.
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let opts = JmapEmailGetOptions {
-            properties: None,
-            fetch_text_body_values: !self.html,
-            fetch_html_body_values: self.html,
-            max_body_value_bytes: 0,
+        let mut args = Map::new();
+        let fetch = match self.html {
+            true => "fetchHTMLBodyValues",
+            false => "fetchTextBodyValues",
         };
-        let output = client.email_get(self.ids.clone(), opts)?;
+        args.insert(String::from(fetch), json!(true));
 
-        if output.emails.is_empty() {
-            bail!("No JMAP email found: {}", output.not_found.join(", "));
-        }
+        let list = raw::get_with(client, "Email", Some(&self.ids), args)?;
+        let output = JmapEmailReadOutput::new(list, self.html);
 
-        for id in output.not_found {
-            warn!("email `{id}` not found, ignoring it");
-        }
-
-        let texts = output
-            .emails
-            .iter()
-            .map(|email| render(email, self.html))
-            .collect();
-
-        printer.out(JmapEmailReadOutput {
-            emails: output.emails,
-            texts,
-        })
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -116,15 +113,37 @@ fn render(email: &JmapEmail, html: bool) -> String {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct JmapEmailReadOutput {
-    /// The emails found, with the body values asked for.
-    emails: Vec<JmapEmail>,
+    /// The emails found, each as the server sent it, with the body values
+    /// asked for.
+    #[schemars(with = "Vec<Map<String, Value>>")]
+    emails: Vec<Value>,
     /// The text form of each email.
     #[serde(skip)]
     texts: Vec<String>,
+    /// The error of each email the server did not find (`notFound`).
+    errors: Vec<ItemError>,
+}
+
+impl JmapEmailReadOutput {
+    /// The emails of a get as sent, each laid out as text, and the error
+    /// of each id not found.
+    fn new(list: JmapRawList, html: bool) -> Self {
+        let texts = list
+            .list
+            .iter()
+            .map(|email| render(&email_of(email), html))
+            .collect();
+
+        Self {
+            emails: list.list,
+            texts,
+            errors: not_found_errors(list.not_found, ErrorCode::MessageNotFound),
+        }
+    }
 }
 
 impl fmt::Display for JmapEmailReadOutput {
-    /// Separates the emails with a blank line.
+    /// Separates the emails with a blank line, then lists the errors.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, text) in self.texts.iter().enumerate() {
             if i > 0 {
@@ -132,7 +151,7 @@ impl fmt::Display for JmapEmailReadOutput {
             }
             write!(f, "{text}")?;
         }
-        Ok(())
+        write_item_errors(f, &self.errors)
     }
 }
 
@@ -150,8 +169,12 @@ fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
 #[cfg(test)]
 mod tests {
     use io_jmap::rfc8621::email::JmapEmail;
+    use serde_json::json;
 
-    use crate::jmap::email::read::{JmapEmailReadOutput, render};
+    use crate::jmap::{
+        email::read::{JmapEmailReadOutput, render},
+        raw::JmapRawList,
+    };
 
     fn email(subject: &str, body: &str) -> JmapEmail {
         serde_json::from_value(serde_json::json!({
@@ -185,10 +208,31 @@ mod tests {
         );
     }
 
+    /// The emails print as the server sent them, a property io-jmap does
+    /// not model kept and none added, and an id not found is an item error.
+    #[test]
+    fn an_email_prints_as_sent_and_a_missing_id_is_an_item_error() {
+        let sent = json!({"id": "E1", "subject": "hi", "x-vendor": 1});
+        let list = JmapRawList {
+            list: vec![sent.clone()],
+            not_found: vec![String::from("E2")],
+            rest: Default::default(),
+        };
+
+        let output = JmapEmailReadOutput::new(list, false);
+        let json = serde_json::to_value(&output).unwrap();
+
+        assert_eq!(json["emails"], json!([sent]));
+        assert_eq!(json["errors"][0]["id"], "E2");
+        assert_eq!(json["errors"][0]["code"], "message-not-found");
+        assert!(output.to_string().contains("E2"), "{output}");
+    }
+
     #[test]
     fn several_emails_are_set_apart() {
         let output = JmapEmailReadOutput {
             emails: Vec::new(),
+            errors: Vec::new(),
             texts: vec![
                 render(&email("a", "one"), true),
                 render(&email("b", "two"), true),

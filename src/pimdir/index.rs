@@ -17,7 +17,6 @@ use chrono::{DateTime, FixedOffset, Local};
 use io_pimdir::{
     client::search::{
         PimdirIndex, PimdirSearchClock, PimdirSearchHit, PimdirSearchMatched, PimdirSearchOptions,
-        PimdirSearchThread,
     },
     search::{
         coverage::{PimdirSearchCoverage, PimdirSearchTemporal, PimdirSearchUnread},
@@ -119,7 +118,9 @@ impl PimdirClient {
 
     /// The thread of the message `id`, its members oldest first, a message
     /// no thread holds being its own.
-    pub fn mail_thread(&self, id: &str) -> Result<PimdirMailThread> {
+    ///
+    /// Each member the store cannot read is an item error beside it.
+    pub fn mail_thread(&self, id: &str) -> Result<(PimdirMailThread, Vec<ItemError>)> {
         let Ok(seq) = id.parse::<i64>() else {
             bail!("Message id `{id}` is not a pimdir id: it takes the number a listing prints");
         };
@@ -136,7 +137,15 @@ impl PimdirClient {
                     .iter()
                     .all(|hit| hit.kind == PimdirQueryKind::Mail.as_str()) =>
             {
-                self.mail_thread_of(&index, thread)
+                let mut errors = Vec::new();
+                let thread = PimdirMailThread {
+                    hits: self.mail_hits(&index, thread.hits, &mut errors),
+                    thread: thread.thread,
+                    count: thread.count,
+                    first_date: thread.first,
+                    last_date: thread.last,
+                };
+                Ok((thread, errors))
             }
             Some(_) => bail!("Item `{id}` is not a message"),
             None => bail!(
@@ -201,10 +210,10 @@ impl PimdirClient {
                     _ if !placement.missing.is_empty() => PimdirTagStatus::Unsupported,
                     _ => PimdirTagStatus::Planned,
                 };
-                let flags = match &placement.next {
-                    Some(next) => next.iter().map(Flag::from_raw).collect(),
-                    None => Vec::new(),
-                };
+                let flags = placement
+                    .next
+                    .as_ref()
+                    .map(|next| next.iter().map(Flag::from_raw).collect());
                 let subject = Some(hit.title.clone()).filter(|title| !title.is_empty());
                 tagged.push(PimdirTagged {
                     id: hit.seq.to_string(),
@@ -294,25 +303,6 @@ impl PimdirClient {
                 .collect(),
             matched: hit.matched.map(PimdirMailMatched::from),
             snippet: hit.snippet,
-        })
-    }
-
-    /// A thread of the index as Himalaya lists it.
-    fn mail_thread_of(
-        &self,
-        index: &PimdirIndex,
-        thread: PimdirSearchThread,
-    ) -> Result<PimdirMailThread> {
-        let mut hits = Vec::with_capacity(thread.hits.len());
-        for hit in thread.hits {
-            hits.push(self.mail_hit(index, hit)?);
-        }
-        Ok(PimdirMailThread {
-            thread: thread.thread,
-            count: thread.count,
-            first_date: thread.first,
-            last_date: thread.last,
-            hits,
         })
     }
 }
@@ -484,9 +474,9 @@ pub struct PimdirTagged {
     pub mailbox: String,
     /// The subject, `null` when the message has none.
     pub subject: Option<String>,
-    /// The flags the placement carries once the tag applies, empty when
-    /// its flags were never read.
-    pub flags: Vec<Flag>,
+    /// The flags the placement carries once the tag applies, `null` when
+    /// its flags were never read (`unknown-flags`).
+    pub flags: Option<Vec<Flag>>,
     /// What the tag does there.
     pub status: PimdirTagStatus,
     /// The queue row the change waits in, `null` when none was staged.
@@ -974,6 +964,37 @@ mod tests {
         assert_eq!(threads.errors.len(), 1, "{:?}", threads.errors);
     }
 
+    /// A member of a thread the store cannot read is an item error, the
+    /// other members still listed.
+    #[test]
+    fn a_thread_member_the_store_cannot_read_is_an_item_error() {
+        let (dir, client) = indexed_store();
+        let report = id_of(&client, "Quarterly report");
+        let reply = id_of(&client, "Re: Quarterly report");
+
+        let conn = rusqlite::Connection::open(dir.path().join("pimdir.db")).unwrap();
+        conn.execute_batch("PRAGMA ignore_check_constraints = ON")
+            .unwrap();
+        let seq: i64 = reply.parse().unwrap();
+        let sql = "UPDATE summary SET size = 'x' \
+                   WHERE item = (SELECT id FROM items WHERE seq = ?1)";
+        assert_eq!(conn.execute(sql, [seq]).unwrap(), 1);
+        drop(conn);
+
+        let (thread, errors) = client.mail_thread(&report).unwrap();
+        let ids: Vec<&str> = thread
+            .hits
+            .iter()
+            .map(|hit| hit.envelope.id.as_str())
+            .collect();
+        assert_eq!(ids, [report.as_str()]);
+        let [error] = errors.as_slice() else {
+            panic!("{errors:?}");
+        };
+        assert_eq!(error.id.as_deref(), Some(reply.as_str()));
+        assert_eq!(error.code, Some(ErrorCode::MessageUnreadable));
+    }
+
     #[test]
     fn a_day_is_read_in_the_zone_the_clock_states() {
         let (dir, mut client) = indexed_store();
@@ -1068,7 +1089,8 @@ mod tests {
         assert_eq!(threads.threads[0].count, 2);
 
         let reply = id_of(&client, "Re: Quarterly report");
-        let thread = client.mail_thread(&reply).unwrap();
+        let (thread, errors) = client.mail_thread(&reply).unwrap();
+        assert!(errors.is_empty(), "{errors:?}");
         let subjects: Vec<&str> = thread
             .hits
             .iter()
@@ -1077,7 +1099,7 @@ mod tests {
         assert_eq!(subjects, ["Quarterly report", "Re: Quarterly report"]);
 
         let lunch = id_of(&client, "Lunch");
-        assert_eq!(client.mail_thread(&lunch).unwrap().hits.len(), 1);
+        assert_eq!(client.mail_thread(&lunch).unwrap().0.hits.len(), 1);
         assert!(client.mail_thread("999").is_err());
     }
 
@@ -1160,6 +1182,7 @@ mod tests {
 
         assert_eq!(tag.tagged.len(), 1);
         assert_eq!(tag.tagged[0].status, PimdirTagStatus::UnknownFlags);
+        assert_eq!(tag.tagged[0].flags, None);
         assert_eq!(tag.tagged[0].handle, None);
         assert!(client.store.pending_actions(INBOX).unwrap().is_empty());
     }

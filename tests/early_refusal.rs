@@ -1,9 +1,9 @@
 //! # Early refusals
 //!
-//! A value a protocol command refuses itself is refused with the command
-//! line: coded `usage-invalid`, exit 2, before the secret command runs and
-//! the session opens. The account's password command writes a marker file,
-//! which must not exist after the run.
+//! A value a command refuses itself is refused with the command line: coded
+//! `usage-invalid`, exit 2, before the secret command runs and the session
+//! opens. The account's password command writes a marker file, which must
+//! not exist after the run.
 
 #![cfg(all(
     feature = "imap",
@@ -56,6 +56,8 @@ fn a_value_the_command_refuses_is_refused_before_the_session() {
         &["jmap", "submission", "create", "E1", "--identity-id", "I1"],
         &["msgraph", "messages", "update", "M1"],
         &["msgraph", "request", "frob", "me"],
+        &["attachment", "download", "6", "--stdout"],
+        &["attachment", "download", "6", "2", "3", "--stdout"],
     ] {
         let args = refused(args);
         let output = run(dir.path(), &config, &args);

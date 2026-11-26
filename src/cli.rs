@@ -324,13 +324,15 @@ impl Command {
                 |printer, account, client| cmd.execute(printer, account, client),
             ),
             #[cfg(any(backend, feature = "smtp"))]
-            Self::Attachment(cmd) => run_shared(
-                printer,
-                session,
-                vec![Capability::AttachmentList],
-                false,
-                |printer, account, client| cmd.execute(printer, account, client),
-            ),
+            Self::Attachment(cmd) => cmd.check().and_then(|()| {
+                run_shared(
+                    printer,
+                    session,
+                    vec![Capability::AttachmentList],
+                    false,
+                    |printer, account, client| cmd.execute(printer, account, client),
+                )
+            }),
             #[cfg(any(backend, feature = "smtp"))]
             Self::Vacation(cmd) => run_vacation(printer, session, cmd),
 

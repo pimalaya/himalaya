@@ -13,6 +13,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
+    error::{ItemError, partial_when},
     pimdir::{
         client::PimdirClient,
         index::{PimdirListStyle, PimdirMailThread},
@@ -29,7 +30,8 @@ use crate::{
 /// to its parent by `In-Reply-To`, else `References`, never by subject. A
 /// message no thread holds is listed alone. The text lists each reply after
 /// the earlier message its `In-Reply-To` names, its subject indented one
-/// step further; JSON lists them flat.
+/// step further; JSON lists them flat. A message the store cannot read is an
+/// entry of `errors`, the rest still listed; the command then exits 3.
 #[derive(Debug, Parser)]
 pub struct PimdirThreadCommand {
     /// The message id, as a listing prints it.
@@ -45,12 +47,16 @@ impl PimdirThreadCommand {
         account: &mut Account,
         client: &mut PimdirClient,
     ) -> Result<()> {
-        let thread = client.mail_thread(&self.id)?;
-        printer.out(PimdirThreadOutput {
+        let (thread, errors) = client.mail_thread(&self.id)?;
+        let output = PimdirThreadOutput {
             account: account.name().to_string(),
             style: PimdirListStyle::new(account),
             thread,
-        })
+            errors,
+        };
+
+        printer.out(&output)?;
+        partial_when(&output.errors)
     }
 }
 
@@ -67,6 +73,8 @@ pub struct PimdirThreadOutput {
     /// The thread, every message of it in the account, oldest first.
     #[serde(flatten)]
     pub thread: PimdirMailThread,
+    /// The error of each message of the thread the store cannot read.
+    pub errors: Vec<ItemError>,
 }
 
 impl fmt::Display for PimdirThreadOutput {
@@ -91,6 +99,10 @@ impl fmt::Display for PimdirThreadOutput {
                 sanitize::text(&format_names(&envelope.from)).into_owned(),
                 format!("{indent}{subject}"),
             ]);
+        }
+
+        for error in &self.errors {
+            listing.errors.push(error);
         }
 
         write!(f, "{listing}")
@@ -215,6 +227,7 @@ mod tests {
                     hit("4", Some("0"), true, "Bob", &["INBOX"]),
                 ],
             },
+            errors: Vec::new(),
         };
 
         let expected = "\

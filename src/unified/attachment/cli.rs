@@ -27,6 +27,15 @@ pub enum AttachmentCommand {
 }
 
 impl AttachmentCommand {
+    /// Refuses what the command line gets wrong and clap cannot see,
+    /// before the client is built.
+    pub fn check(&self) -> Result<()> {
+        match self {
+            Self::List(_) => Ok(()),
+            Self::Download(cmd) => cmd.check(),
+        }
+    }
+
     /// Runs the subcommand against the active account's client.
     pub fn execute(
         self,

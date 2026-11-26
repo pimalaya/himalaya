@@ -15,7 +15,7 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use mime::tree::{cst::MimeCst, entity::MimeEntity};
 use pimalaya_cli::{
-    error::CodedError,
+    error::{CodedError, usage_error},
     file::private_options,
     printer::Printer,
     sanitize::{path_component, text},
@@ -75,13 +75,22 @@ pub struct AttachmentDownloadCommand {
 }
 
 impl AttachmentDownloadCommand {
+    /// Refuses `--stdout` beside no id or several, as clap refuses a
+    /// wrong number of values, before the client is built.
+    pub fn check(&self) -> Result<()> {
+        if self.stdout && self.attachment_ids.len() != 1 {
+            let message = "`--stdout` takes exactly one attachment id";
+            let err = clap::Error::raw(clap::error::ErrorKind::WrongNumberOfValues, message);
+            return Err(usage_error(&err));
+        }
+
+        Ok(())
+    }
+
     /// The one part id `--stdout` reads, `None` without the flag.
     fn stdout_part_id(&self) -> Result<Option<String>> {
-        match (self.stdout, self.attachment_ids.as_slice()) {
-            (false, _) => Ok(None),
-            (true, [id]) => Ok(Some(id.clone())),
-            (true, _) => bail!("`--stdout` takes exactly one attachment id"),
-        }
+        self.check()?;
+        Ok(self.attachment_ids.first().filter(|_| self.stdout).cloned())
     }
 
     /// Fetches the message, writes the wanted parts and lists what

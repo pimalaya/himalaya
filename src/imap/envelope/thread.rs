@@ -3,12 +3,7 @@
 //! The `imap thread` command, RFC 5256 `THREAD`.
 
 use io_imap::client::ImapClient as _;
-use std::{
-    borrow::Cow,
-    collections::{BTreeSet, HashMap},
-    fmt,
-    num::NonZeroU32,
-};
+use std::{borrow::Cow, collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
@@ -39,7 +34,7 @@ use crate::{
     unified::{
         backend::Backend,
         capability::missing,
-        email::{address::Address, envelope::Envelope, flag::Flag},
+        email::{address::Address, envelope::Envelope},
         envelope::list::{format_date, format_flags, format_names},
     },
 };
@@ -232,8 +227,9 @@ pub struct ThreadEntry {
     pub from: Vec<Address>,
     /// The `Date:` header, `null` when it is missing or unparseable.
     pub date: Option<DateTime<FixedOffset>>,
-    /// The flags set on the message.
-    pub flags: BTreeSet<Flag>,
+    /// The flags set on the message, as the server spells them, as `imap
+    /// fetch` prints them; empty when its envelope could not be fetched.
+    pub flags: Vec<String>,
 }
 
 /// The `imap thread` output, a tree of conversations.
@@ -298,7 +294,9 @@ impl ImapThreadOutput {
             depth,
             from: envelope.map(|e| e.from.clone()).unwrap_or_default(),
             date: envelope.and_then(|e| e.date),
-            flags: envelope.map(|e| e.flags.clone()).unwrap_or_default(),
+            flags: envelope
+                .map(|e| e.flags.iter().map(|flag| flag.raw().to_owned()).collect())
+                .unwrap_or_default(),
         }
     }
 }
@@ -312,9 +310,9 @@ impl fmt::Display for ImapThreadOutput {
         }
 
         for entry in self.build_entries() {
-            let flags = match self.envelopes.contains_key(&entry.id) {
-                true => format_flags(&entry.flags, None),
-                false => String::from("    "),
+            let flags = match self.envelopes.get(&entry.id) {
+                Some(envelope) => format_flags(&envelope.flags, None),
+                None => String::from("    "),
             };
 
             let date = format_date(entry.date, &self.datetime_fmt, self.datetime_local_tz);
@@ -416,6 +414,8 @@ mod tests {
 
     /// A reply nests one step under the message it answers; answers of a
     /// message the mailbox lacks start back at the margin.
+    ///
+    /// Flags print as the server spells them.
     #[test]
     fn replies_follow_what_they_answer() {
         let lunch = members(&[1], vec![members(&[2, 4], vec![]), members(&[3], vec![])]);
@@ -451,6 +451,10 @@ Mailbox:  INBOX
 6        2026-11-11 10:00  Me     Re: Invoice
 ";
         assert_eq!(output.to_string(), expected);
+
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["threads"][0]["flags"], serde_json::json!(["\\Seen"]));
+        assert_eq!(json["threads"][1]["flags"], serde_json::json!([]));
     }
 
     /// A long thread listing fetches in chunks, so no command line outgrows

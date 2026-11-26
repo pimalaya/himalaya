@@ -16,7 +16,7 @@ use crate::{
     pimdir::{
         client::PimdirClient,
         flag::parse_flag,
-        index::{PimdirMailCoverage, PimdirTagStatus, PimdirTagged, local_clock, parse_query},
+        index::{PimdirMailCoverage, PimdirTagged, local_clock, parse_query},
     },
     unified::{backend::Backend, envelope::list::format_flags},
 };
@@ -111,12 +111,9 @@ impl fmt::Display for PimdirTagOutput {
         listing.head("Query", &self.query);
 
         for tagged in &self.tagged {
-            let flags = match tagged.status {
-                PimdirTagStatus::UnknownFlags => String::from("    "),
-                _ => {
-                    let flags = tagged.flags.iter().cloned().collect();
-                    format_flags(&flags, None)
-                }
+            let flags = match &tagged.flags {
+                Some(flags) => format_flags(&flags.iter().cloned().collect(), None),
+                None => String::from("    "),
             };
 
             listing.items.push([
@@ -144,15 +141,15 @@ mod tests {
         unified::email::flag::Flag,
     };
 
-    /// A tagged placement prints its flags as every flag prints, and a
-    /// message without a subject `null`.
+    /// A tagged placement prints its flags as every flag prints, `null`
+    /// when they were never read, and a message without a subject `null`.
     #[test]
     fn a_tagged_placement_prints_shared_flags() {
         let tagged = PimdirTagged {
             id: String::from("7"),
             mailbox: String::from("imap/INBOX"),
             subject: None,
-            flags: vec![Flag::from_raw("\\Seen"), Flag::from_raw("act")],
+            flags: Some(vec![Flag::from_raw("\\Seen"), Flag::from_raw("act")]),
             status: PimdirTagStatus::Planned,
             row: None,
             handle: None,
@@ -162,5 +159,13 @@ mod tests {
         let flags = json!([{"raw": "\\Seen", "iana": "seen"}, {"raw": "act", "iana": null}]);
         assert_eq!(json["flags"], flags);
         assert_eq!(json["subject"], serde_json::Value::Null);
+
+        let unknown = PimdirTagged {
+            flags: None,
+            status: PimdirTagStatus::UnknownFlags,
+            ..tagged
+        };
+        let json = serde_json::to_value(&unknown).unwrap();
+        assert_eq!(json["flags"], serde_json::Value::Null);
     }
 }
