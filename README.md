@@ -229,10 +229,18 @@ smtp.sasl.plain.password.command = "pass show fastmail"
 
 ### Gmail
 
-Use an [app password](https://myaccount.google.com/apppasswords) for IMAP and SMTP, or an OAuth 2.0 token from [Ortie](https://github.com/pimalaya/ortie) for the Gmail API, replacing both blocks. Special mailboxes live under `[Gmail]/`, so alias them.
+Use the Gmail API with an OAuth 2.0 token from [Ortie](https://github.com/pimalaya/ortie)'s Google account.
 
 ```toml
 [accounts.gmail]
+
+gmail.auth.token.command = ["ortie", "token", "show", "-a", "google"]
+```
+
+Or IMAP and SMTP, with an [app password](https://myaccount.google.com/apppasswords) or the same Ortie token over `xoauth2` (in place of `plain`, as for Outlook below). Special mailboxes live under `[Gmail]/`, so alias them.
+
+```toml
+[accounts.gmail-imap]
 
 imap.server = "imaps://imap.gmail.com:993"
 imap.sasl.plain.username = "example@gmail.com"
@@ -247,7 +255,10 @@ mailbox.alias.drafts = "[Gmail]/Drafts"
 mailbox.alias.trash = "[Gmail]/Trash"
 mailbox.alias.archive = "[Gmail]/All Mail"
 
-# gmail.auth.token.command = ["ortie", "token", "show", "-a", "gmail"]
+# imap.sasl.xoauth2.username = "example@gmail.com"
+# imap.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "google"]
+# smtp.sasl.xoauth2.username = "example@gmail.com"
+# smtp.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "google"]
 ```
 
 ### Outlook
